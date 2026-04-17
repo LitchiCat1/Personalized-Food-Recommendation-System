@@ -1,2 +1,24 @@
-# Created by venv; see https://docs.python.org/3/library/venv.html
+# Python
 **/.venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env*.local

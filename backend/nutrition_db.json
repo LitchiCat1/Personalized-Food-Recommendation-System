@@ -1,72 +1,176 @@
 {
   "apple": {
+    "name_zh": "蘋果",
     "calories": 52,
     "protein": 0.3,
     "fat": 0.2,
     "carbs": 14.0,
-    "unit": "per 100g"
+    "sodium": 1,
+    "fiber": 2.4,
+    "gi": "low",
+    "allergens": [],
+    "unit": "per 100g",
+    "density": 0.85
   },
   "pizza": {
+    "name_zh": "披薩",
     "calories": 266,
     "protein": 11.0,
     "fat": 10.0,
     "carbs": 33.0,
-    "unit": "per 100g"
+    "sodium": 640,
+    "fiber": 2.3,
+    "gi": "high",
+    "allergens": [
+      "麩質",
+      "牛奶"
+    ],
+    "unit": "per 100g",
+    "density": 0.75
   },
   "sandwich": {
+    "name_zh": "三明治",
     "calories": 250,
     "protein": 12.0,
     "fat": 9.0,
     "carbs": 30.0,
-    "unit": "per 100g"
+    "sodium": 580,
+    "fiber": 1.5,
+    "gi": "medium",
+    "allergens": [
+      "麩質",
+      "蛋"
+    ],
+    "unit": "per 100g",
+    "density": 0.68
   },
   "orange": {
+    "name_zh": "柳橙",
     "calories": 47,
     "protein": 0.9,
     "fat": 0.1,
     "carbs": 12.0,
-    "unit": "per 100g"
+    "sodium": 0,
+    "fiber": 2.4,
+    "gi": "low",
+    "allergens": [],
+    "unit": "per 100g",
+    "density": 0.92
   },
   "banana": {
+    "name_zh": "香蕉",
     "calories": 89,
     "protein": 1.1,
     "fat": 0.3,
     "carbs": 23.0,
-    "unit": "per 100g"
+    "sodium": 1,
+    "fiber": 2.6,
+    "gi": "medium",
+    "allergens": [],
+    "unit": "per 100g",
+    "density": 0.95
   },
   "hot dog": {
+    "name_zh": "熱狗",
     "calories": 290,
     "protein": 10.5,
     "fat": 24.0,
     "carbs": 3.0,
-    "unit": "per 100g"
+    "sodium": 1090,
+    "fiber": 0,
+    "gi": "low",
+    "allergens": [
+      "麩質"
+    ],
+    "unit": "per 100g",
+    "density": 0.80
   },
   "donut": {
+    "name_zh": "甜甜圈",
     "calories": 452,
     "protein": 4.9,
     "fat": 25.0,
     "carbs": 51.0,
-    "unit": "per 100g"
+    "sodium": 326,
+    "fiber": 1.7,
+    "gi": "high",
+    "allergens": [
+      "麩質",
+      "蛋",
+      "牛奶"
+    ],
+    "unit": "per 100g",
+    "density": 0.50
   },
   "cake": {
+    "name_zh": "蛋糕",
     "calories": 347,
     "protein": 4.5,
     "fat": 14.0,
     "carbs": 53.0,
-    "unit": "per 100g"
+    "sodium": 318,
+    "fiber": 0.5,
+    "gi": "high",
+    "allergens": [
+      "麩質",
+      "蛋",
+      "牛奶"
+    ],
+    "unit": "per 100g",
+    "density": 0.45
   },
   "broccoli": {
+    "name_zh": "花椰菜",
     "calories": 34,
     "protein": 2.8,
     "fat": 0.4,
     "carbs": 7.0,
-    "unit": "per 100g"
+    "sodium": 33,
+    "fiber": 2.6,
+    "gi": "low",
+    "allergens": [],
+    "unit": "per 100g",
+    "density": 0.60
   },
   "carrot": {
+    "name_zh": "胡蘿蔔",
     "calories": 41,
     "protein": 0.9,
     "fat": 0.2,
     "carbs": 10.0,
-    "unit": "per 100g"
+    "sodium": 69,
+    "fiber": 2.8,
+    "gi": "low",
+    "allergens": [],
+    "unit": "per 100g",
+    "density": 0.82
+  },
+  "bowl": {
+    "name_zh": "碗公飯",
+    "calories": 180,
+    "protein": 4.0,
+    "fat": 0.5,
+    "carbs": 40.0,
+    "sodium": 5,
+    "fiber": 0.8,
+    "gi": "high",
+    "allergens": [
+      "麩質"
+    ],
+    "unit": "per 100g",
+    "density": 1.10
+  },
+  "cup": {
+    "name_zh": "飲品",
+    "calories": 45,
+    "protein": 0.5,
+    "fat": 0.1,
+    "carbs": 11.0,
+    "sodium": 8,
+    "fiber": 0,
+    "gi": "medium",
+    "allergens": [],
+    "unit": "per 100g",
+    "density": 1.00
   }
 }

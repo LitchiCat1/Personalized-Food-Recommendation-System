@@ -4,3 +4,5 @@ ultralytics
 pymongo
 opencv-python-headless
 pillow
+numpy
+requests

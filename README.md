@@ -1,6 +1,6 @@
-# 🥗 NutriLens — 個人化飲食推薦與影像辨識 App
+# 個人化飲食推薦與影像辨識 App
 
-> AI 驅動的健康飲食管理工具，結合 YOLO 食物影像辨識、個人化營養分析與智慧餐點推薦。
+> 健康飲食管理工具，結合 YOLO 食物影像辨識、個人化營養分析與智慧餐點推薦。
 
 ## 📁 專案結構
 
@@ -35,23 +35,6 @@ Personalized-Food-Recommendation-System/
 └── docs/                     # 文件
     ├── PRD.md                # 產品需求文件
     └── CommandList.md        # 常用指令
-```
-
-## 🚀 快速開始
-
-### 後端
-```bash
-cd backend
-pip install -r requirements.txt
-python app.py
-```
-
-### 前端
-```bash
-cd frontend
-npm install
-npx expo start --tunnel    # 手機端 (Expo Go)
-npx expo start --web       # Web 端
 ```
 
 ## 🔑 核心功能

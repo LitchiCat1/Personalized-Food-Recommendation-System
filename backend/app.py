@@ -14,6 +14,7 @@ import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from ultralytics import YOLO
+from yolo_tfda_mapping import YOLO_TO_TFDA
 
 # ─── Optional MongoDB (graceful fallback to in-memory) ────────
 try:
@@ -40,10 +41,21 @@ CORS(app)
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "yolov8n.pt")
 model = YOLO(MODEL_PATH)
 
-# ─── Load nutrition database ─────────────────────────────────
+# ─── Load nutrition databases ────────────────────────────────
+# 1. Original hand-crafted DB (YOLO label → nutrients)
 DB_PATH = os.path.join(os.path.dirname(__file__), "nutrition_db.json")
 with open(DB_PATH, "r", encoding="utf-8") as f:
     NUTRITION_DB = json.load(f)
+
+# 2. TFDA 衛福部食品營養成分資料庫 (2,181 筆台灣食品)
+TFDA_PATH = os.path.join(os.path.dirname(__file__), "nutrition_db_tw.json")
+try:
+    with open(TFDA_PATH, "r", encoding="utf-8") as f:
+        TFDA_DB = json.load(f)
+    print(f"[✓] TFDA nutrition DB loaded: {len(TFDA_DB)} foods")
+except FileNotFoundError:
+    TFDA_DB = {}
+    print("[!] TFDA nutrition_db_tw.json not found — using fallback only")
 
 UNKNOWN_NUTRIENTS = {
     "name_zh": "未知食物",
@@ -87,8 +99,43 @@ DISEASE_RULES = {
 
 
 def get_nutrients(label: str) -> dict:
-    """查詢營養資料庫"""
-    return NUTRITION_DB.get(label.lower(), UNKNOWN_NUTRIENTS)
+    """
+    查詢營養資料庫 — 三層 fallback:
+    1. YOLO label → TFDA 映射 → TFDA DB (衛福部真實數據)
+    2. YOLO label → 原始 NUTRITION_DB (手動建檔)
+    3. UNKNOWN_NUTRIENTS
+    """
+    label_lower = label.lower()
+
+    # 1. 嘗試 YOLO→TFDA 映射
+    mapping = YOLO_TO_TFDA.get(label_lower)
+    if mapping and mapping.get("tfda_key") and mapping["tfda_key"] in TFDA_DB:
+        tfda = TFDA_DB[mapping["tfda_key"]]
+        return {
+            "name_zh": mapping.get("name_zh", tfda.get("name_zh", label)),
+            "calories": tfda.get("calories", 0),
+            "protein": tfda.get("protein", 0),
+            "fat": tfda.get("fat", 0),
+            "carbs": tfda.get("carbs", 0),
+            "sodium": tfda.get("sodium", 0),
+            "fiber": tfda.get("fiber", 0),
+            "sugar": tfda.get("sugar"),
+            "saturated_fat": tfda.get("saturated_fat"),
+            "cholesterol": tfda.get("cholesterol"),
+            "gi": mapping.get("gi"),
+            "allergens": mapping.get("allergens", []),
+            "unit": "per 100g",
+            "density": mapping.get("density", 0.80),
+            "source": "TFDA",
+            "tfda_code": tfda.get("code"),
+        }
+
+    # 2. Fallback to original DB
+    if label_lower in NUTRITION_DB:
+        return NUTRITION_DB[label_lower]
+
+    # 3. Unknown
+    return UNKNOWN_NUTRIENTS
 
 
 def estimate_weight(bbox_w: float, bbox_h: float, img_w: int, img_h: int, density: float) -> float:
@@ -173,7 +220,52 @@ def health():
         "mongo": USE_MONGO,
         "model": "yolov8n",
         "foods_in_db": len(NUTRITION_DB),
+        "foods_in_tfda": len(TFDA_DB),
     })
+
+
+# ─── 0. Food Search (TFDA 中文食品搜尋) ──────────────────────
+@app.route("/search/food", methods=["GET"])
+def search_food():
+    """
+    中文食品名搜尋 — 查詢 TFDA 資料庫
+    ?q=蘋果&limit=20
+    """
+    q = request.args.get("q", "").strip()
+    limit = min(int(request.args.get("limit", 20)), 100)
+
+    if not q:
+        return jsonify({"error": "缺少 q 參數"}), 400
+
+    results = []
+    for key, food in TFDA_DB.items():
+        if q in key or q in (food.get("name_en") or "").lower():
+            results.append({
+                "key": key,
+                "name_zh": food.get("name_zh", key),
+                "name_en": food.get("name_en", ""),
+                "category": food.get("category", ""),
+                "calories": food.get("calories", 0),
+                "protein": food.get("protein", 0),
+                "fat": food.get("fat", 0),
+                "carbs": food.get("carbs", 0),
+                "sodium": food.get("sodium", 0),
+                "fiber": food.get("fiber", 0),
+            })
+            if len(results) >= limit:
+                break
+
+    return jsonify({"query": q, "results": results, "count": len(results)})
+
+
+# ─── 0.5 Food Detail (TFDA 單筆食品完整資料) ─────────────────
+@app.route("/food/<path:food_key>", methods=["GET"])
+def get_food_detail(food_key):
+    """取得 TFDA 單筆食品完整營養資訊"""
+    food = TFDA_DB.get(food_key)
+    if not food:
+        return jsonify({"error": f"找不到食品: {food_key}"}), 404
+    return jsonify(food)
 
 
 # ─── 1. Image Detection (PRD: 即時影像辨識) ──────────────────

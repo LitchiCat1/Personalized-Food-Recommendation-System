@@ -1,3 +1,9 @@
+#此文件用於紀錄常用的指令
+
+最優先前置:
+(安裝依賴套件)
+cd frontend && npm install
+
 Git指令:
 (將GitHub的最新程式碼下載並合併到目前的workspace)
 git pull
@@ -10,9 +16,6 @@ git switch <分支名稱>
 
 (建立一個全新的獨立開發分支並立刻切換過去)
 git switch -c <分支名稱>
-
-(切換到main的branch並同步GitHub上的程式碼 前置動作：確保當前工作區的更改已經提交或是暫存) 
-git checkout main && git pull origin main
 
 (建立並切換至新的branch 前置動作：在main branch處於最新狀態時用) 
 git checkout -b <分支名稱>

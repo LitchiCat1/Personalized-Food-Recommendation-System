@@ -4,22 +4,19 @@
  */
 
 import { create } from 'zustand';
-import type { DetectedFood, MealEntry, HealthAlert, DailyRecord } from '@/constants/mock-data';
+import type { DetectedFood, MealEntry, HealthAlert } from '@/constants/mock-data';
 import {
   DAILY_NUTRITION,
   TODAY_MEALS,
   HEALTH_ALERTS,
   USER_PROFILE,
-  WEEKLY_HISTORY,
-  WEEKLY_SUMMARY,
-  RECOMMENDED_MEALS,
-  FILTERED_UNSAFE_MEALS,
-  AVAILABLE_CONDITIONS,
-  AVAILABLE_ALLERGENS,
 } from '@/constants/mock-data';
+import { resolveApiBaseUrl } from '@/lib/network';
+import type { DietaryRecord } from '@/lib/api';
 
 // ─── Types ──────────────────────────────────────────────────
 export interface UserProfile {
+  userId: string;
   name: string;
   email: string;
   gender: 'male' | 'female';
@@ -50,6 +47,7 @@ export interface NutriLensState {
   // User
   user: UserProfile;
   updateUserField: <K extends keyof UserProfile>(key: K, value: UserProfile[K]) => void;
+  replaceUser: (user: UserProfile) => void;
   toggleCondition: (condition: string) => void;
   toggleAllergen: (allergen: string) => void;
   recalculateBMR: () => void;
@@ -59,10 +57,12 @@ export interface NutriLensState {
   todayMeals: MealEntry[];
   healthAlerts: HealthAlert[];
   addMealFromScan: (detections: DetectedFood[]) => void;
+  replaceDashboardFromRecords: (records: DietaryRecord[]) => void;
 
   // Scanner
   scanResult: ScanResult;
   setScanResult: (detections: DetectedFood[]) => void;
+  updateScanFoodWeight: (foodId: string, nextWeight: number) => void;
   clearScan: () => void;
   setScanning: (v: boolean) => void;
 
@@ -85,6 +85,7 @@ function computeBMR(gender: string, weight: number, height: number, age: number)
 export const useStore = create<NutriLensState>((set, get) => ({
   // ── User Profile ──
   user: {
+    userId: 'demo_user',
     name: USER_PROFILE.name,
     email: USER_PROFILE.email,
     gender: USER_PROFILE.gender,
@@ -107,6 +108,8 @@ export const useStore = create<NutriLensState>((set, get) => ({
 
   updateUserField: (key, value) =>
     set((state) => ({ user: { ...state.user, [key]: value } })),
+
+  replaceUser: (user) => set({ user }),
 
   toggleCondition: (condition) =>
     set((state) => {
@@ -178,6 +181,58 @@ export const useStore = create<NutriLensState>((set, get) => ({
       };
     }),
 
+  replaceDashboardFromRecords: (records) =>
+    set((state) => {
+      const todayMeals = records.flatMap((record, recordIndex) => {
+        const foods = record.foods && record.foods.length > 0
+          ? record.foods
+          : [{
+              name: record.meal_type || '未命名餐點',
+              calories: record.total_calories,
+              protein: record.total_protein,
+              carbs: record.total_carbs,
+              fat: record.total_fat,
+              sodium: record.total_sodium,
+              fiber: record.total_fiber,
+              source: record.source,
+              warnings: [],
+            }];
+
+        return foods.map((food, foodIndex) => ({
+          id: `record_${record.timestamp}_${recordIndex}_${foodIndex}`,
+          name: food.name || '未命名食品',
+          calories: Number(food.calories || 0),
+          time: formatRecordTime(record.timestamp),
+          mealType: normalizeMealType(record.meal_type),
+          emoji: getSourceEmoji(food.source || record.source),
+          protein: Number(food.protein || 0),
+          carbs: Number(food.carbs || 0),
+          fat: Number(food.fat || 0),
+          sodium: Number(food.sodium || 0),
+          fiber: Number(food.fiber || 0),
+          warnings: food.warnings || [],
+        }));
+      });
+
+      const totals = sumMeals(todayMeals);
+      const healthAlerts = buildHealthAlerts(totals, state.dailyNutrition.sodium.target, state.dailyNutrition.protein.target);
+
+      return {
+        todayMeals,
+        healthAlerts,
+        dailyNutrition: {
+          ...state.dailyNutrition,
+          calories: { ...state.dailyNutrition.calories, current: totals.calories, target: state.user.dailyCalorieTarget },
+          protein: { ...state.dailyNutrition.protein, current: totals.protein },
+          carbs: { ...state.dailyNutrition.carbs, current: totals.carbs },
+          fat: { ...state.dailyNutrition.fat, current: totals.fat },
+          sodium: { ...state.dailyNutrition.sodium, current: totals.sodium },
+          fiber: { ...state.dailyNutrition.fiber, current: totals.fiber },
+        },
+        user: { ...state.user, totalMeals: Math.max(state.user.totalMeals, todayMeals.length) },
+      };
+    }),
+
   // ── Scanner ──
   scanResult: { isScanning: false, detections: [], timestamp: null },
 
@@ -185,10 +240,32 @@ export const useStore = create<NutriLensState>((set, get) => ({
     set({
       scanResult: {
         isScanning: false,
-        detections,
+        detections: detections.map(ensureOriginalPortion),
         timestamp: new Date().toISOString(),
       },
     }),
+
+  updateScanFoodWeight: (foodId, nextWeight) =>
+    set((state) => ({
+      scanResult: {
+        ...state.scanResult,
+        detections: state.scanResult.detections.map((food) => {
+          if (food.id !== foodId) return food;
+          const originalWeight = food.originalEstimatedWeight || food.estimatedWeight || 1;
+          const originalNutrition = food.originalNutrition || food.nutrition;
+          const safeWeight = Math.max(1, Math.round(nextWeight));
+          const scale = safeWeight / originalWeight;
+          return {
+            ...food,
+            estimatedWeight: safeWeight,
+            originalEstimatedWeight: originalWeight,
+            originalNutrition,
+            portionAdjusted: true,
+            nutrition: scaleNutrition(originalNutrition, scale),
+          };
+        }),
+      },
+    })),
 
   clearScan: () =>
     set({ scanResult: { isScanning: false, detections: [], timestamp: null } }),
@@ -201,7 +278,7 @@ export const useStore = create<NutriLensState>((set, get) => ({
   setCameraActive: (v) => set({ isCameraActive: v }),
 
   // ── API ──
-  apiBaseUrl: 'http://localhost:5000',
+  apiBaseUrl: resolveApiBaseUrl(),
   setApiBaseUrl: (url) => set({ apiBaseUrl: url }),
 }));
 
@@ -212,4 +289,90 @@ function getAutoMealType(): '早餐' | '午餐' | '晚餐' | '點心' {
   if (h < 14) return '午餐';
   if (h < 17) return '點心';
   return '晚餐';
+}
+
+function ensureOriginalPortion(food: DetectedFood): DetectedFood {
+  return {
+    ...food,
+    originalEstimatedWeight: food.originalEstimatedWeight || food.estimatedWeight,
+    originalNutrition: food.originalNutrition || food.nutrition,
+  };
+}
+
+function scaleNutrition(nutrition: DetectedFood['nutrition'], scale: number): DetectedFood['nutrition'] {
+  return {
+    calories: Math.round(nutrition.calories * scale),
+    protein: Math.round(nutrition.protein * scale * 10) / 10,
+    carbs: Math.round(nutrition.carbs * scale * 10) / 10,
+    fat: Math.round(nutrition.fat * scale * 10) / 10,
+    sodium: Math.round(nutrition.sodium * scale),
+    fiber: Math.round(nutrition.fiber * scale * 10) / 10,
+  };
+}
+
+function normalizeMealType(mealType?: string): '早餐' | '午餐' | '晚餐' | '點心' {
+  if (mealType === '早餐' || mealType === '午餐' || mealType === '晚餐' || mealType === '點心') {
+    return mealType;
+  }
+  return '點心';
+}
+
+function formatRecordTime(timestamp?: string): string {
+  if (!timestamp) return '--:--';
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    const match = timestamp.match(/T(\d{2}:\d{2})/);
+    return match?.[1] || '--:--';
+  }
+  return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+}
+
+function getSourceEmoji(source?: string): string {
+  if (source === 'manual') return '🔎';
+  if (source === 'nutrition-label') return '🏷️';
+  return '📸';
+}
+
+function sumMeals(meals: MealEntry[]) {
+  return {
+    calories: Math.round(meals.reduce((s, m) => s + m.calories, 0)),
+    protein: Math.round(meals.reduce((s, m) => s + m.protein, 0) * 10) / 10,
+    carbs: Math.round(meals.reduce((s, m) => s + m.carbs, 0) * 10) / 10,
+    fat: Math.round(meals.reduce((s, m) => s + m.fat, 0) * 10) / 10,
+    sodium: Math.round(meals.reduce((s, m) => s + m.sodium, 0)),
+    fiber: Math.round(meals.reduce((s, m) => s + m.fiber, 0) * 10) / 10,
+  };
+}
+
+function buildHealthAlerts(totals: ReturnType<typeof sumMeals>, sodiumTarget: number, proteinTarget: number): HealthAlert[] {
+  const alerts: HealthAlert[] = [];
+  if (totals.sodium >= sodiumTarget) {
+    alerts.push({
+      id: 'sodium-over',
+      type: 'danger',
+      title: '鈉含量已超過上限',
+      message: `今日鈉攝取 ${totals.sodium}mg，已超過建議上限 ${sodiumTarget}mg。`,
+      icon: '⚠️',
+    });
+  } else if (totals.sodium >= sodiumTarget * 0.8) {
+    alerts.push({
+      id: 'sodium-warning',
+      type: 'warning',
+      title: '鈉含量接近上限',
+      message: `今日鈉攝取 ${totals.sodium}mg，建議下一餐選擇低鈉餐點。`,
+      icon: '⚠️',
+    });
+  }
+
+  if (totals.protein >= proteinTarget * 0.6) {
+    alerts.push({
+      id: 'protein-good',
+      type: 'info',
+      title: '蛋白質攝取良好',
+      message: `已攝取 ${totals.protein}g 蛋白質，接近每日目標。`,
+      icon: '💪',
+    });
+  }
+
+  return alerts;
 }

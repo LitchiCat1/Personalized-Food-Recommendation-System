@@ -131,8 +131,11 @@ export type DetectedFood = {
   id: string;
   foodName: string;
   confidence: number;
+  source?: string;
+  needsConfirmation?: boolean;
   boundingBox: { x: number; y: number; w: number; h: number };
   estimatedWeight: number; // grams
+  originalEstimatedWeight?: number;
   nutrition: {
     calories: number;
     protein: number;
@@ -141,6 +144,15 @@ export type DetectedFood = {
     sodium: number;
     fiber: number;
   };
+  originalNutrition?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    sodium: number;
+    fiber: number;
+  };
+  portionAdjusted?: boolean;
   // PRD: 硬性排除規則 — GI 指數、過敏原
   gi: 'low' | 'medium' | 'high';
   allergens: string[];

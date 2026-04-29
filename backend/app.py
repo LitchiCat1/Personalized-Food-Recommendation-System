@@ -7,14 +7,50 @@ import base64
 import json
 import math
 import os
-from datetime import datetime, timedelta
+import uuid
+from datetime import datetime
 
 import cv2
 import numpy as np
+import psycopg2
+import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from ultralytics import YOLO
-from yolo_tfda_mapping import YOLO_TO_TFDA
+from repositories.storage import StorageRepository
+from services.disease_rule_service import load_disease_rules
+from services.env_service import load_local_env
+from services.history_service import build_history_response
+from services.healthy_food_service import build_healthy_food_recommendations
+from services.food_service import build_custom_food_doc, search_foods
+from services.nutrition_label_service import (
+    build_custom_food_search_result,
+    call_gemini_nutrition_ocr,
+    detect_image_mime,
+    extract_number,
+    normalize_nutrition_payload,
+    normalize_ocr_result,
+    scale_nutrition_per_100g,
+)
+from services.predict_service import predict_from_image
+from services.profile_service import build_bmr_response, build_user_profile
+from services.recommend_service import build_recommendation_response
+from yolo_tfda_mapping import YOLO_MANUAL_SEARCH_HINTS, YOLO_TO_TFDA
+
+
+load_local_env()
+BASE_DIR = os.path.dirname(__file__)
+
+pg_conn = None
+database_url = os.environ.get("DATABASE_URL")
+if database_url:
+    try:
+        pg_conn = psycopg2.connect(database_url, sslmode="require")
+        pg_conn.autocommit = True
+        print("[✓] PostgreSQL connected")
+    except Exception as e:
+        pg_conn = None
+        print(f"[!] PostgreSQL unavailable — {e}")
 
 # ─── Optional MongoDB (graceful fallback to in-memory) ────────
 try:
@@ -33,22 +69,33 @@ except Exception:
 # ─── In-memory fallback storage ──────────────────────────────
 _mem_users = {}
 _mem_records = []
+_mem_custom_foods = []
+storage = StorageRepository(db, USE_MONGO, _mem_users, _mem_records, _mem_custom_foods, pg_conn=pg_conn)
 
 app = Flask(__name__)
 CORS(app)
 
 # ─── Load YOLO model ─────────────────────────────────────────
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "yolov8n.pt")
-model = YOLO(MODEL_PATH)
+MODEL_PATH = os.path.join(BASE_DIR, "yolov8n.pt")
+model = None
+
+
+def get_model():
+    global model
+    if model is None:
+        print("[ ] Loading YOLO model...")
+        model = YOLO(MODEL_PATH)
+        print("[✓] YOLO model loaded")
+    return model
 
 # ─── Load nutrition databases ────────────────────────────────
 # 1. Original hand-crafted DB (YOLO label → nutrients)
-DB_PATH = os.path.join(os.path.dirname(__file__), "nutrition_db.json")
+DB_PATH = os.path.join(BASE_DIR, "nutrition_db.json")
 with open(DB_PATH, "r", encoding="utf-8") as f:
     NUTRITION_DB = json.load(f)
 
 # 2. TFDA 衛福部食品營養成分資料庫 (2,181 筆台灣食品)
-TFDA_PATH = os.path.join(os.path.dirname(__file__), "nutrition_db_tw.json")
+TFDA_PATH = os.path.join(BASE_DIR, "nutrition_db_tw.json")
 try:
     with open(TFDA_PATH, "r", encoding="utf-8") as f:
         TFDA_DB = json.load(f)
@@ -57,155 +104,9 @@ except FileNotFoundError:
     TFDA_DB = {}
     print("[!] TFDA nutrition_db_tw.json not found — using fallback only")
 
-UNKNOWN_NUTRIENTS = {
-    "name_zh": "未知食物",
-    "calories": None,
-    "protein": None,
-    "fat": None,
-    "carbs": None,
-    "sodium": None,
-    "fiber": None,
-    "gi": None,
-    "allergens": [],
-    "unit": None,
-    "density": 0.80,
-    "note": "資料庫中無此食物",
-}
-
 # ─── Disease filter rules (PRD: 硬性排除規則) ────────────────
-DISEASE_RULES = {
-    "糖尿病": {
-        "blocked_gi": ["high"],
-        "max_carbs_per_meal": 60,  # grams
-        "description": "限制高 GI、控醣",
-    },
-    "高血壓": {
-        "max_sodium_per_meal": 600,  # mg
-        "description": "限制鈉攝取 < 2000mg/日",
-    },
-    "慢性腎臟病": {
-        "max_protein_per_meal": 40,  # grams
-        "description": "限制蛋白質、磷、鉀",
-    },
-    "痛風": {
-        "blocked_labels": ["hot dog"],
-        "description": "限制高普林食物",
-    },
-    "高血脂": {
-        "max_fat_per_meal": 20,  # grams
-        "description": "限制飽和脂肪、膽固醇",
-    },
-}
-
-
-def get_nutrients(label: str) -> dict:
-    """
-    查詢營養資料庫 — 三層 fallback:
-    1. YOLO label → TFDA 映射 → TFDA DB (衛福部真實數據)
-    2. YOLO label → 原始 NUTRITION_DB (手動建檔)
-    3. UNKNOWN_NUTRIENTS
-    """
-    label_lower = label.lower()
-
-    # 1. 嘗試 YOLO→TFDA 映射
-    mapping = YOLO_TO_TFDA.get(label_lower)
-    if mapping and mapping.get("tfda_key") and mapping["tfda_key"] in TFDA_DB:
-        tfda = TFDA_DB[mapping["tfda_key"]]
-        return {
-            "name_zh": mapping.get("name_zh", tfda.get("name_zh", label)),
-            "calories": tfda.get("calories", 0),
-            "protein": tfda.get("protein", 0),
-            "fat": tfda.get("fat", 0),
-            "carbs": tfda.get("carbs", 0),
-            "sodium": tfda.get("sodium", 0),
-            "fiber": tfda.get("fiber", 0),
-            "sugar": tfda.get("sugar"),
-            "saturated_fat": tfda.get("saturated_fat"),
-            "cholesterol": tfda.get("cholesterol"),
-            "gi": mapping.get("gi"),
-            "allergens": mapping.get("allergens", []),
-            "unit": "per 100g",
-            "density": mapping.get("density", 0.80),
-            "source": "TFDA",
-            "tfda_code": tfda.get("code"),
-        }
-
-    # 2. Fallback to original DB
-    if label_lower in NUTRITION_DB:
-        return NUTRITION_DB[label_lower]
-
-    # 3. Unknown
-    return UNKNOWN_NUTRIENTS
-
-
-def estimate_weight(bbox_w: float, bbox_h: float, img_w: int, img_h: int, density: float) -> float:
-    """
-    PRD: 邊界框份量估算
-    Rough volume estimation based on bounding box area and reference density.
-    Returns estimated weight in grams.
-    """
-    pixel_area = (bbox_w * img_w) * (bbox_h * img_h)
-    # Reference: 640x640 image, 100g food ≈ 15000 px² at 0.8 density
-    ref_area = 15000
-    estimated_volume = (pixel_area / ref_area) * 100  # cm³
-    return round(estimated_volume * density, 1)
-
-
-def compute_bmr(gender: str, weight: float, height: float, age: int) -> float:
-    """PRD: Mifflin-St Jeor BMR 計算"""
-    if gender == "male":
-        return round(10 * weight + 6.25 * height - 5 * age + 5)
-    else:
-        return round(10 * weight + 6.25 * height - 5 * age - 161)
-
-
-def compute_tdee(bmr: float, activity_multiplier: float) -> float:
-    """PRD: TDEE = BMR × 活動量係數"""
-    return round(bmr * activity_multiplier)
-
-
-def check_food_safety(nutrients: dict, weight_g: float, user_conditions: list, user_allergens: list) -> list:
-    """
-    PRD: 安全過濾層 — 檢查食物是否符合使用者健康限制
-    Returns list of warning strings
-    """
-    warnings = []
-    if not nutrients.get("calories"):
-        return warnings
-
-    scale = weight_g / 100.0
-    actual_sodium = (nutrients.get("sodium") or 0) * scale
-    actual_carbs = (nutrients.get("carbs") or 0) * scale
-    actual_protein = (nutrients.get("protein") or 0) * scale
-    actual_fat = (nutrients.get("fat") or 0) * scale
-    gi = nutrients.get("gi")
-    food_allergens = nutrients.get("allergens", [])
-
-    # Check allergens
-    for a in food_allergens:
-        if a in user_allergens:
-            warnings.append(f"含過敏原: {a}")
-
-    # Check disease rules
-    for condition in user_conditions:
-        rules = DISEASE_RULES.get(condition, {})
-
-        if "blocked_gi" in rules and gi in rules["blocked_gi"]:
-            warnings.append(f"高 GI 食物 — {condition}患者請注意")
-
-        if "max_sodium_per_meal" in rules and actual_sodium > rules["max_sodium_per_meal"]:
-            warnings.append(f"高鈉 ({actual_sodium:.0f}mg) — {condition}患者請注意")
-
-        if "max_carbs_per_meal" in rules and actual_carbs > rules["max_carbs_per_meal"]:
-            warnings.append(f"碳水過高 ({actual_carbs:.0f}g) — {condition}患者請注意")
-
-        if "max_protein_per_meal" in rules and actual_protein > rules["max_protein_per_meal"]:
-            warnings.append(f"蛋白質過高 ({actual_protein:.0f}g) — {condition}患者請注意")
-
-        if "max_fat_per_meal" in rules and actual_fat > rules["max_fat_per_meal"]:
-            warnings.append(f"脂肪過高 ({actual_fat:.0f}g) — {condition}患者請注意")
-
-    return warnings
+DISEASE_RULES = load_disease_rules(BASE_DIR)
+print(f"[✓] Disease rules loaded: {len(DISEASE_RULES)} conditions")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -217,11 +118,21 @@ def check_food_safety(nutrients: dict, weight_g: float, user_conditions: list, u
 def health():
     return jsonify({
         "status": "ok",
+        "postgres": pg_conn is not None,
         "mongo": USE_MONGO,
         "model": "yolov8n",
+        "model_loaded": model is not None,
         "foods_in_db": len(NUTRITION_DB),
         "foods_in_tfda": len(TFDA_DB),
+        "disease_rules": len(DISEASE_RULES),
+        "custom_foods": len(storage.get_custom_foods()),
     })
+
+
+@app.route("/warmup", methods=["POST"])
+def warmup():
+    get_model()
+    return jsonify({"status": "ok", "model_loaded": True})
 
 
 # ─── 0. Food Search (TFDA 中文食品搜尋) ──────────────────────
@@ -232,29 +143,14 @@ def search_food():
     ?q=蘋果&limit=20
     """
     q = request.args.get("q", "").strip()
+    q_lower = q.lower()
     limit = min(int(request.args.get("limit", 20)), 100)
 
     if not q:
         return jsonify({"error": "缺少 q 參數"}), 400
 
-    results = []
-    for key, food in TFDA_DB.items():
-        if q in key or q in (food.get("name_en") or "").lower():
-            results.append({
-                "key": key,
-                "name_zh": food.get("name_zh", key),
-                "name_en": food.get("name_en", ""),
-                "category": food.get("category", ""),
-                "calories": food.get("calories", 0),
-                "protein": food.get("protein", 0),
-                "fat": food.get("fat", 0),
-                "carbs": food.get("carbs", 0),
-                "sodium": food.get("sodium", 0),
-                "fiber": food.get("fiber", 0),
-            })
-            if len(results) >= limit:
-                break
-
+    user_id = request.args.get("user_id")
+    results = search_foods(storage, TFDA_DB, q, limit, user_id, build_custom_food_search_result)
     return jsonify({"query": q, "results": results, "count": len(results)})
 
 
@@ -262,10 +158,75 @@ def search_food():
 @app.route("/food/<path:food_key>", methods=["GET"])
 def get_food_detail(food_key):
     """取得 TFDA 單筆食品完整營養資訊"""
+    custom_food = storage.get_custom_food(food_key)
+    if custom_food:
+        return jsonify(custom_food)
+
     food = TFDA_DB.get(food_key)
     if not food:
         return jsonify({"error": f"找不到食品: {food_key}"}), 404
     return jsonify(food)
+
+
+@app.route("/custom-food", methods=["POST"])
+def create_custom_food():
+    data = request.get_json(silent=True) or {}
+    try:
+        food_doc = build_custom_food_doc(
+            data,
+            normalize_nutrition_payload,
+            scale_nutrition_per_100g,
+            extract_number,
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    saved = storage.upsert_custom_food(food_doc)
+    return jsonify({"message": "自訂食品已儲存", "food": saved}), 201
+
+
+@app.route("/custom-foods", methods=["GET"])
+def list_custom_foods():
+    user_id = request.args.get("user_id")
+    foods = storage.get_custom_foods(user_id)
+    return jsonify({"foods": foods, "count": len(foods)})
+
+
+@app.route("/ocr/nutrition-label", methods=["POST"])
+def ocr_nutrition_label():
+    data = request.get_json(silent=True) or {}
+    if "image" not in data:
+        return jsonify({"error": "缺少 image 欄位（Base64）"}), 400
+
+    api_key = data.get("api_key") or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        return jsonify({"error": "缺少 Gemini API key，請設定 GEMINI_API_KEY 環境變數"}), 400
+
+    try:
+        img_bytes = base64.b64decode(data["image"])
+        mime_type = detect_image_mime(img_bytes)
+        parsed = call_gemini_nutrition_ocr(data["image"], mime_type, api_key)
+        normalized = normalize_ocr_result(parsed)
+        return jsonify(
+            {
+                "source": "Gemini OCR",
+                **normalized,
+                "suggested_custom_food": {
+                    "name_zh": normalized["product_name"],
+                    "brand": normalized["brand"],
+                    "serving_size_g": normalized["serving_size_g"],
+                    "servings_per_container": normalized["servings_per_container"],
+                    "nutrition_per_serving": normalized["nutrition_per_serving"],
+                    "nutrition_per_100g": normalized["nutrition_per_100g"],
+                    "ocr_text": normalized["ocr_text"],
+                    "source": "nutrition-label-ocr",
+                },
+            }
+        )
+    except requests.HTTPError as e:
+        return jsonify({"error": f"Gemini API 呼叫失敗: {e.response.text[:500]}"}), 502
+    except Exception as e:
+        return jsonify({"error": f"營養標示辨識失敗: {str(e)}"}), 500
 
 
 # ─── 1. Image Detection (PRD: 即時影像辨識) ──────────────────
@@ -286,75 +247,19 @@ def predict():
         if img is None:
             return jsonify({"error": "圖片解碼失敗"}), 400
 
-        img_h, img_w = img.shape[:2]
-        results = model.predict(source=img, verbose=False)
-
-        detections = []
-        total_calories = 0
-        total_sodium = 0
-
-        for box in results[0].boxes:
-            cls_id = int(box.cls[0])
-            label = model.names[cls_id]
-            confidence = round(float(box.conf[0]), 4)
-
-            # PRD: Bounding Box 座標
-            xyxy = box.xyxy[0].tolist()
-            x1, y1, x2, y2 = xyxy
-            bbox = {
-                "x": round(x1 / img_w, 4),
-                "y": round(y1 / img_h, 4),
-                "w": round((x2 - x1) / img_w, 4),
-                "h": round((y2 - y1) / img_h, 4),
-            }
-
-            nutrients = get_nutrients(label)
-            density = nutrients.get("density", 0.80)
-
-            # PRD: 份量估算
-            estimated_weight = estimate_weight(
-                bbox["w"], bbox["h"], img_w, img_h, density
+        return jsonify(
+            predict_from_image(
+                get_model(),
+                img,
+                user_conditions,
+                user_allergens,
+                YOLO_TO_TFDA,
+                TFDA_DB,
+                NUTRITION_DB,
+                DISEASE_RULES,
+                YOLO_MANUAL_SEARCH_HINTS,
             )
-
-            # Scale nutrients by estimated weight
-            scale = estimated_weight / 100.0
-            scaled_nutrition = {
-                "calories": round((nutrients.get("calories") or 0) * scale),
-                "protein": round((nutrients.get("protein") or 0) * scale, 1),
-                "carbs": round((nutrients.get("carbs") or 0) * scale, 1),
-                "fat": round((nutrients.get("fat") or 0) * scale, 1),
-                "sodium": round((nutrients.get("sodium") or 0) * scale),
-                "fiber": round((nutrients.get("fiber") or 0) * scale, 1),
-            }
-
-            total_calories += scaled_nutrition["calories"]
-            total_sodium += scaled_nutrition["sodium"]
-
-            # PRD: 安全檢查
-            safety_warnings = check_food_safety(
-                nutrients, estimated_weight, user_conditions, user_allergens
-            )
-
-            detections.append({
-                "label": label,
-                "name_zh": nutrients.get("name_zh", label),
-                "confidence": confidence,
-                "bounding_box": bbox,
-                "estimated_weight_g": estimated_weight,
-                "nutrition": scaled_nutrition,
-                "gi": nutrients.get("gi"),
-                "allergens": nutrients.get("allergens", []),
-                "warnings": safety_warnings,
-            })
-
-        return jsonify({
-            "detections": detections,
-            "summary": {
-                "total_items": len(detections),
-                "total_calories": total_calories,
-                "total_sodium": total_sodium,
-            },
-        })
+        )
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -363,10 +268,7 @@ def predict():
 # ─── 2. User Profile CRUD (PRD: 健康檔案與疾病管理) ──────────
 @app.route("/user/<user_id>", methods=["GET"])
 def get_user(user_id):
-    if USE_MONGO:
-        user = db.users.find_one({"user_id": user_id}, {"_id": 0})
-    else:
-        user = _mem_users.get(user_id)
+    user = storage.get_user(user_id)
 
     if not user:
         return jsonify({"error": "使用者不存在"}), 404
@@ -379,48 +281,9 @@ def create_or_update_user():
     if not data or "user_id" not in data:
         return jsonify({"error": "缺少 user_id"}), 400
 
-    user_id = data["user_id"]
+    user_doc = build_user_profile(data)
 
-    # PRD: 動態計算 BMR/TDEE
-    gender = data.get("gender", "male")
-    weight = data.get("weight", 70)
-    height = data.get("height", 170)
-    age = data.get("age", 25)
-    activity_multiplier = data.get("activity_multiplier", 1.55)
-
-    bmr = compute_bmr(gender, weight, height, age)
-    tdee = compute_tdee(bmr, activity_multiplier)
-
-    user_doc = {
-        "user_id": user_id,
-        "name": data.get("name", ""),
-        "gender": gender,
-        "height": height,
-        "weight": weight,
-        "age": age,
-        "activity_level": data.get("activity_level", "中等活動量"),
-        "activity_multiplier": activity_multiplier,
-        "bmi": round(weight / ((height / 100) ** 2), 1),
-        # PRD computed values
-        "bmr": bmr,
-        "tdee": tdee,
-        "daily_calorie_target": data.get("daily_calorie_target", tdee),
-        # PRD: 疾病標籤
-        "health_conditions": data.get("health_conditions", []),
-        # PRD: 過敏原
-        "allergens": data.get("allergens", []),
-        # Diet goals
-        "target_weight": data.get("target_weight"),
-        "diet_type": data.get("diet_type", "均衡飲食"),
-        "updated_at": datetime.utcnow().isoformat(),
-    }
-
-    if USE_MONGO:
-        db.users.update_one(
-            {"user_id": user_id}, {"$set": user_doc}, upsert=True
-        )
-    else:
-        _mem_users[user_id] = user_doc
+    storage.upsert_user(user_doc)
 
     return jsonify({"message": "使用者資料已更新", "user": user_doc})
 
@@ -446,11 +309,7 @@ def add_record():
         "source": data.get("source", "camera"),  # camera | manual
     }
 
-    if USE_MONGO:
-        db.records.insert_one(record)
-        record.pop("_id", None)
-    else:
-        _mem_records.append(record)
+    storage.insert_record(record)
 
     return jsonify({"message": "飲食紀錄已儲存", "record": record}), 201
 
@@ -458,17 +317,7 @@ def add_record():
 @app.route("/records/<user_id>", methods=["GET"])
 def get_records(user_id):
     date_str = request.args.get("date")  # YYYY-MM-DD
-
-    if USE_MONGO:
-        query = {"user_id": user_id}
-        if date_str:
-            query["timestamp"] = {"$regex": f"^{date_str}"}
-        records = list(db.records.find(query, {"_id": 0}).sort("timestamp", -1).limit(50))
-    else:
-        records = [r for r in _mem_records if r["user_id"] == user_id]
-        if date_str:
-            records = [r for r in records if r["timestamp"].startswith(date_str)]
-
+    records = storage.get_records(user_id, date_str, limit=50)
     return jsonify({"records": records, "count": len(records)})
 
 
@@ -476,78 +325,7 @@ def get_records(user_id):
 @app.route("/history/<user_id>", methods=["GET"])
 def get_history(user_id):
     days = int(request.args.get("days", 7))
-    end_date = datetime.utcnow()
-    start_date = end_date - timedelta(days=days)
-
-    if USE_MONGO:
-        pipeline = [
-            {
-                "$match": {
-                    "user_id": user_id,
-                    "timestamp": {
-                        "$gte": start_date.strftime("%Y-%m-%d"),
-                        "$lte": end_date.strftime("%Y-%m-%d") + "T23:59:59",
-                    },
-                }
-            },
-            {
-                "$group": {
-                    "_id": {"$substr": ["$timestamp", 0, 10]},
-                    "calories": {"$sum": "$total_calories"},
-                    "protein": {"$sum": "$total_protein"},
-                    "carbs": {"$sum": "$total_carbs"},
-                    "fat": {"$sum": "$total_fat"},
-                    "sodium": {"$sum": "$total_sodium"},
-                }
-            },
-            {"$sort": {"_id": 1}},
-        ]
-        daily = list(db.records.aggregate(pipeline))
-        daily_data = [
-            {
-                "date": d["_id"],
-                "calories": d["calories"],
-                "protein": d["protein"],
-                "carbs": d["carbs"],
-                "fat": d["fat"],
-                "sodium": d["sodium"],
-            }
-            for d in daily
-        ]
-    else:
-        # In-memory aggregation
-        from collections import defaultdict
-        agg = defaultdict(lambda: {"calories": 0, "protein": 0, "carbs": 0, "fat": 0, "sodium": 0})
-        for r in _mem_records:
-            if r["user_id"] != user_id:
-                continue
-            day = r["timestamp"][:10]
-            agg[day]["calories"] += r.get("total_calories", 0)
-            agg[day]["protein"] += r.get("total_protein", 0)
-            agg[day]["carbs"] += r.get("total_carbs", 0)
-            agg[day]["fat"] += r.get("total_fat", 0)
-            agg[day]["sodium"] += r.get("total_sodium", 0)
-        daily_data = [{"date": k, **v} for k, v in sorted(agg.items())]
-
-    # Compute averages
-    if daily_data:
-        n = len(daily_data)
-        avg = {
-            "avg_calories": round(sum(d["calories"] for d in daily_data) / n),
-            "avg_protein": round(sum(d["protein"] for d in daily_data) / n),
-            "avg_carbs": round(sum(d["carbs"] for d in daily_data) / n),
-            "avg_fat": round(sum(d["fat"] for d in daily_data) / n),
-            "avg_sodium": round(sum(d["sodium"] for d in daily_data) / n),
-        }
-    else:
-        avg = {}
-
-    return jsonify({
-        "user_id": user_id,
-        "days": days,
-        "daily": daily_data,
-        "summary": avg,
-    })
+    return jsonify(build_history_response(storage, user_id, days))
 
 
 # ─── 5. Recommendations (PRD: 個人化雙軌推薦引擎) ────────────
@@ -558,108 +336,33 @@ def recommend(user_id):
     1. 安全過濾層: 根據疾病禁忌排除不安全食物
     2. 口味排序層: 餘弦相似度 (placeholder, 目前用隨機分數)
     """
-    # Get user profile
-    if USE_MONGO:
-        user = db.users.find_one({"user_id": user_id}, {"_id": 0})
-    else:
-        user = _mem_users.get(user_id)
-
-    if not user:
+    result = build_recommendation_response(storage, NUTRITION_DB, TFDA_DB, DISEASE_RULES, user_id)
+    if not result:
         return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
+    return jsonify(result)
 
-    conditions = user.get("health_conditions", [])
-    allergens = user.get("allergens", [])
-    daily_target = user.get("daily_calorie_target", 2100)
 
-    # TODO: 從今日已攝取紀錄計算剩餘配額
-    remaining_calories = daily_target  # placeholder
-
-    # Build candidate pool from nutrition DB
-    safe_candidates = []
-    filtered_out = []
-
-    for label, nutrients in NUTRITION_DB.items():
-        food_allergens = nutrients.get("allergens", [])
-        gi = nutrients.get("gi")
-        is_safe = True
-        block_reasons = []
-
-        # Check allergens
-        for a in food_allergens:
-            if a in allergens:
-                is_safe = False
-                block_reasons.append(f"含過敏原: {a}")
-
-        # Check disease rules
-        for condition in conditions:
-            rules = DISEASE_RULES.get(condition, {})
-            if "blocked_gi" in rules and gi in rules["blocked_gi"]:
-                is_safe = False
-                block_reasons.append(f"高 GI — 不適合{condition}患者")
-            if "max_sodium_per_meal" in rules and (nutrients.get("sodium") or 0) > rules["max_sodium_per_meal"]:
-                is_safe = False
-                block_reasons.append(f"高鈉 — 不適合{condition}患者")
-            if "blocked_labels" in rules and label in rules["blocked_labels"]:
-                is_safe = False
-                block_reasons.append(f"不適合{condition}患者")
-
-        if is_safe:
-            safe_candidates.append({
-                "label": label,
-                "name_zh": nutrients.get("name_zh", label),
-                "calories": nutrients["calories"],
-                "protein": nutrients.get("protein", 0),
-                "carbs": nutrients.get("carbs", 0),
-                "fat": nutrients.get("fat", 0),
-                "sodium": nutrients.get("sodium", 0),
-                "gi": gi,
-                "match_score": 0,  # placeholder for cosine similarity
-            })
-        else:
-            filtered_out.append({
-                "label": label,
-                "name_zh": nutrients.get("name_zh", label),
-                "reasons": block_reasons,
-            })
-
-    # PRD: 口味排序層 (placeholder — 實際需要偏好向量)
-    import random
-    for c in safe_candidates:
-        c["match_score"] = random.randint(60, 98)
-    safe_candidates.sort(key=lambda x: x["match_score"], reverse=True)
-
-    return jsonify({
-        "user_id": user_id,
-        "remaining_calories": remaining_calories,
-        "health_conditions": conditions,
-        "recommended": safe_candidates[:10],
-        "filtered_out": filtered_out,
-        "total_candidates": len(safe_candidates),
-        "total_filtered": len(filtered_out),
-    })
+@app.route("/healthy-food-recommend/<user_id>", methods=["GET"])
+def healthy_food_recommend(user_id):
+    params = {
+        "budget": request.args.get("budget", 150),
+        "lat": request.args.get("lat", 25.0338),
+        "lng": request.args.get("lng", 121.5645),
+    }
+    result = build_healthy_food_recommendations(storage, DISEASE_RULES, user_id, params)
+    if not result:
+        return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
+    return jsonify(result)
 
 
 # ─── 6. BMR/TDEE Calculator (PRD: 動態計算) ─────────────────
 @app.route("/calculate/bmr", methods=["POST"])
 def calc_bmr():
     data = request.get_json()
-    gender = data.get("gender", "male")
-    weight = data.get("weight", 70)
-    height = data.get("height", 170)
-    age = data.get("age", 25)
-    activity = data.get("activity_multiplier", 1.55)
-
-    bmr = compute_bmr(gender, weight, height, age)
-    tdee = compute_tdee(bmr, activity)
-
-    return jsonify({
-        "bmr": bmr,
-        "tdee": tdee,
-        "formula": "Mifflin-St Jeor",
-        "gender": gender,
-        "bmi": round(weight / ((height / 100) ** 2), 1),
-    })
+    return jsonify(build_bmr_response(data))
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    app.run(debug=debug, host="0.0.0.0", port=port)

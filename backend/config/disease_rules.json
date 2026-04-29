@@ -1,0 +1,23 @@
+{
+  "糖尿病": {
+    "blocked_gi": ["high"],
+    "max_carbs_per_meal": 60,
+    "description": "限制高 GI、控醣"
+  },
+  "高血壓": {
+    "max_sodium_per_meal": 600,
+    "description": "限制鈉攝取 < 2000mg/日"
+  },
+  "慢性腎臟病": {
+    "max_protein_per_meal": 40,
+    "description": "限制蛋白質、磷、鉀"
+  },
+  "痛風": {
+    "blocked_labels": ["hot dog"],
+    "description": "限制高普林食物"
+  },
+  "高血脂": {
+    "max_fat_per_meal": 20,
+    "description": "限制飽和脂肪、膽固醇"
+  }
+}

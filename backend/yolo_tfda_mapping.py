@@ -3,7 +3,8 @@ YOLO COCO Label → TFDA 台灣食品 映射表
 COCO 80 類中的食物相關:
   46: banana, 47: apple, 48: sandwich, 49: orange, 50: broccoli,
   51: carrot, 52: hot dog, 53: pizza, 54: donut, 55: cake,
-  41: cup, 45: bowl, 39: bottle
+  41: cup, 45: bowl, 39: bottle, 40: wine glass, 42: fork,
+  43: knife, 44: spoon
 """
 
 # YOLO label (lowercase) → TFDA 資料 + 補充 metadata
@@ -93,4 +94,16 @@ YOLO_TO_TFDA = {
         "allergens": [],
         "density": 1.00,
     },
+}
+
+
+# COCO 容器/餐具類別不能直接推算營養，僅提供手動搜尋建議。
+YOLO_MANUAL_SEARCH_HINTS = {
+    "cup": ["咖啡", "牛奶", "豆漿", "果汁", "可樂", "茶"],
+    "bottle": ["可樂", "果汁", "茶", "牛奶", "優酪乳"],
+    "wine glass": ["紅酒", "白酒", "果汁"],
+    "bowl": ["白飯", "粥", "湯", "麵", "沙拉"],
+    "fork": ["義大利麵", "沙拉", "蛋糕"],
+    "knife": ["牛排", "豬排", "雞排"],
+    "spoon": ["湯", "粥", "咖哩飯", "優格"],
 }

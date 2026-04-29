@@ -22,3 +22,6 @@ Thumbs.db
 # Env
 .env
 .env*.local
+
+# TFDA
+backend/tfda_data/20_5.json

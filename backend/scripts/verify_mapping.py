@@ -5,7 +5,7 @@ sys.path.insert(0, r'd:\VibeCoding\mcu\Personalized-Food-Recommendation-System\b
 with open(r'd:\VibeCoding\mcu\Personalized-Food-Recommendation-System\backend\nutrition_db_tw.json', 'r', encoding='utf-8') as f:
     tw = json.load(f)
 
-from yolo_tfda_mapping import YOLO_TO_TFDA
+from yolo_tfda_mapping import YOLO_MANUAL_SEARCH_HINTS, YOLO_TO_TFDA
 
 print('=== YOLO -> TFDA Mapping Verification ===')
 for label, m in YOLO_TO_TFDA.items():
@@ -17,3 +17,10 @@ for label, m in YOLO_TO_TFDA.items():
         print(f'  MISS {label:12s} -> {key} NOT FOUND!')
     else:
         print(f'  SKIP {label:12s} (no TFDA mapping)')
+
+print('\n=== Manual Search Hints ===')
+for label, hints in YOLO_MANUAL_SEARCH_HINTS.items():
+    existing = [hint for hint in hints if any(hint in key or hint in (food.get('name_zh') or '') for key, food in tw.items())]
+    missing = [hint for hint in hints if hint not in existing]
+    status = 'OK' if existing else 'MISS'
+    print(f'  {status:4s} {label:12s} hints={len(hints)} searchable={len(existing)} missing={missing}')

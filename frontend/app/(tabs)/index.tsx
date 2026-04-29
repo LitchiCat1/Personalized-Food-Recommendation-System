@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import CalorieRing from '@/components/dashboard/CalorieRing';
 import NutrientBar from '@/components/dashboard/NutrientBar';
@@ -8,6 +8,7 @@ import AppContainer from '@/components/AppContainer';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
 import { useResponsive } from '@/hooks/useResponsive';
+import { fetchRecords } from '@/lib/api';
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -18,10 +19,46 @@ function getGreeting(): string {
   return '晚安 🌆';
 }
 
+function getLocalDateString(): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function DashboardScreen() {
   const { rs, isSmall } = useResponsive();
-  const { dailyNutrition, todayMeals, healthAlerts, user } = useStore();
+  const { dailyNutrition, todayMeals, healthAlerts, user, apiBaseUrl, replaceDashboardFromRecords } = useStore();
+  const [syncing, setSyncing] = useState(true);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const { calories, protein, carbs, fat, sodium, fiber } = dailyNutrition;
+
+  useEffect(() => {
+    let cancelled = false;
+    setSyncing(true);
+    setSyncError(null);
+
+    fetchRecords(apiBaseUrl, user.userId, getLocalDateString())
+      .then((data) => {
+        if (cancelled) return;
+        replaceDashboardFromRecords(data.records || []);
+      })
+      .catch((err: Error) => {
+        if (!cancelled) {
+          setSyncError(err.message);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSyncing(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, replaceDashboardFromRecords, user.userId]);
 
   return (
     <AppContainer>
@@ -36,6 +73,17 @@ export default function DashboardScreen() {
             {new Date().toLocaleDateString('zh-TW', { month: 'short', day: 'numeric', weekday: 'short' })}
           </Text>
         </View>
+      </View>
+
+      <View style={[styles.syncBanner, syncError && styles.syncBannerWarning]}>
+        {syncing ? <ActivityIndicator size="small" color={Palette.accent.cyan} /> : null}
+        <Text style={[styles.syncText, { fontSize: rs(11) }]}>
+          {syncing
+            ? '正在同步今日後端飲食紀錄...'
+            : syncError
+              ? `使用本機暫存資料：${syncError}`
+              : `已同步今日 ${todayMeals.length} 筆後端紀錄`}
+        </Text>
       </View>
 
       {/* Health Alerts */}
@@ -126,6 +174,13 @@ export default function DashboardScreen() {
       {todayMeals.map((meal) => (
         <MealCard key={meal.id} meal={meal} />
       ))}
+
+      {!syncing && !syncError && todayMeals.length === 0 ? (
+        <View style={styles.emptyMealsCard}>
+          <Text style={[styles.emptyMealsTitle, { fontSize: rs(14) }]}>今天尚未新增餐點</Text>
+          <Text style={[styles.emptyMealsText, { fontSize: rs(12) }]}>到「辨識」頁拍照、手動搜尋或使用營養標示 OCR 後，這裡會從後端同步顯示。</Text>
+        </View>
+      ) : null}
     </AppContainer>
   );
 }
@@ -142,6 +197,15 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md, borderWidth: 1, borderColor: Palette.border.subtle,
   },
   dateText: { ...Typography.caption, color: Palette.text.secondary },
+
+  syncBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    backgroundColor: Palette.bg.card, borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
+    marginBottom: Spacing.md, borderWidth: 1, borderColor: Palette.border.subtle,
+  },
+  syncBannerWarning: { borderColor: 'rgba(251,191,36,0.3)', backgroundColor: 'rgba(251,191,36,0.06)' },
+  syncText: { ...Typography.caption, color: Palette.text.secondary, flex: 1 },
 
   alertCard: {
     flexDirection: 'row', alignItems: 'flex-start', backgroundColor: Palette.bg.card,
@@ -195,4 +259,11 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs, borderRadius: Radius.full,
   },
   mealCountText: { ...Typography.small, color: Palette.accent.green },
+  emptyMealsCard: {
+    backgroundColor: Palette.bg.card, borderRadius: Radius.lg,
+    padding: Spacing.lg, borderWidth: 1, borderColor: Palette.border.subtle,
+    marginBottom: Spacing.xl,
+  },
+  emptyMealsTitle: { ...Typography.bodyBold, color: Palette.text.primary, marginBottom: Spacing.xs },
+  emptyMealsText: { ...Typography.caption, color: Palette.text.tertiary, lineHeight: 20 },
 });

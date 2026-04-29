@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
@@ -7,13 +7,118 @@ import { AVAILABLE_CONDITIONS, AVAILABLE_ALLERGENS, DIET_GOALS } from '@/constan
 import { useStore } from '@/store/useStore';
 import { useResponsive } from '@/hooks/useResponsive';
 import AppContainer from '@/components/AppContainer';
+import { fetchUserProfile, saveUserProfile } from '@/lib/api';
 
 export default function ProfileScreen() {
   const { rs, isSmall, gridCol2 } = useResponsive();
-  const { user, toggleCondition, toggleAllergen } = useStore();
+  const { user, toggleCondition, toggleAllergen, apiBaseUrl, replaceUser } = useStore();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const fallbackTargetWeight = user.targetWeight;
+  const userEmail = user.email;
+  const userStreak = user.streak;
+  const userTotalMeals = user.totalMeals;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchUserProfile(apiBaseUrl, user.userId)
+      .then((data) => {
+        if (cancelled) return;
+        replaceUser({
+          userId: data.user_id,
+          name: data.name,
+          email: userEmail,
+          gender: data.gender,
+          height: data.height,
+          weight: data.weight,
+          age: data.age,
+          bmi: data.bmi,
+          activityLevel: data.activity_level,
+          activityMultiplier: data.activity_multiplier,
+          bmr: data.bmr,
+          tdee: data.tdee,
+          healthConditions: data.health_conditions,
+          allergens: data.allergens,
+          dailyCalorieTarget: data.daily_calorie_target,
+          targetWeight: data.target_weight || fallbackTargetWeight,
+          dietType: data.diet_type,
+          streak: userStreak,
+          totalMeals: userTotalMeals,
+        });
+        setError(null);
+      })
+      .catch((err: Error) => {
+        if (!cancelled) {
+          setError(err.message);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, fallbackTargetWeight, replaceUser, user.userId, userEmail, userStreak, userTotalMeals]);
+
+  const syncProfile = async (nextUser = user) => {
+    setSaving(true);
+    try {
+      const response = await saveUserProfile(apiBaseUrl, {
+        user_id: nextUser.userId,
+        name: nextUser.name,
+        gender: nextUser.gender,
+        weight: nextUser.weight,
+        height: nextUser.height,
+        age: nextUser.age,
+        activity_level: nextUser.activityLevel,
+        activity_multiplier: nextUser.activityMultiplier,
+        daily_calorie_target: nextUser.dailyCalorieTarget,
+        health_conditions: nextUser.healthConditions,
+        allergens: nextUser.allergens,
+        target_weight: nextUser.targetWeight,
+        diet_type: nextUser.dietType,
+      });
+
+      replaceUser({
+        ...nextUser,
+        bmi: response.user.bmi,
+        bmr: response.user.bmr,
+        tdee: response.user.tdee,
+        dailyCalorieTarget: response.user.daily_calorie_target,
+      });
+      setError(null);
+    } catch (err: any) {
+      setError(err?.message || '儲存失敗');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const savingMessage = useMemo(() => {
+    if (saving) return '同步到後端中...';
+    if (error) return `同步狀態：${error}`;
+    return '目前頁面會將健康條件與過敏原同步到後端';
+  }, [saving, error]);
 
   return (
     <AppContainer>
+      {loading ? (
+        <View style={[styles.syncBanner, { padding: rs(16) }]}> 
+          <ActivityIndicator size="small" color={Palette.accent.cyan} />
+          <Text style={[styles.syncText, { fontSize: rs(12) }]}>讀取個人檔案中...</Text>
+        </View>
+      ) : (
+        <View style={[styles.syncBanner, { padding: rs(16) }]}> 
+          {saving ? <ActivityIndicator size="small" color={Palette.accent.cyan} /> : <Ionicons name="cloud-done-outline" size={rs(16)} color={error ? Palette.status.warning : Palette.accent.green} />}
+          <Text style={[styles.syncText, { fontSize: rs(12), color: error ? Palette.status.warning : Palette.text.secondary }]}>{savingMessage}</Text>
+        </View>
+      )}
+
       {/* Profile Header */}
       <View style={styles.profileHeader}>
         <LinearGradient
@@ -121,7 +226,13 @@ export default function ProfileScreen() {
             return (
               <Pressable
                 key={cond.id}
-                onPress={() => toggleCondition(cond.label)}
+                onPress={() => {
+                  const nextConditions = isActive
+                    ? user.healthConditions.filter((c) => c !== cond.label)
+                    : [...user.healthConditions, cond.label];
+                  toggleCondition(cond.label);
+                  void syncProfile({ ...user, healthConditions: nextConditions });
+                }}
                 style={({ pressed }) => [
                   styles.conditionChip,
                   { padding: rs(14) },
@@ -166,7 +277,13 @@ export default function ProfileScreen() {
             return (
               <Pressable
                 key={allergen}
-                onPress={() => toggleAllergen(allergen)}
+                onPress={() => {
+                  const nextAllergens = isActive
+                    ? user.allergens.filter((a) => a !== allergen)
+                    : [...user.allergens, allergen];
+                  toggleAllergen(allergen);
+                  void syncProfile({ ...user, allergens: nextAllergens });
+                }}
                 style={({ pressed }) => [
                   styles.allergenChip,
                   { paddingHorizontal: rs(12), paddingVertical: rs(6) },
@@ -215,6 +332,18 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  syncBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.lg,
+  },
+  syncText: { ...Typography.caption, flex: 1 },
   profileHeader: { alignItems: 'center', marginTop: Spacing.xl, marginBottom: Spacing['2xl'] },
   avatarGlow: { alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.lg },
   avatarContainer: { position: 'relative' },

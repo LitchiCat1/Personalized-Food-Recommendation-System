@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
@@ -7,10 +7,49 @@ import { Ionicons } from '@expo/vector-icons';
 import { HapticTab } from '@/components/haptic-tab';
 import { Palette, Spacing } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
+import { fetchUserProfile } from '@/lib/api';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const isCameraActive = useStore((s) => s.isCameraActive);
+  const apiBaseUrl = useStore((s) => s.apiBaseUrl);
+
+  useEffect(() => {
+    let cancelled = false;
+    const currentUser = useStore.getState().user;
+
+    fetchUserProfile(apiBaseUrl, currentUser.userId)
+      .then((data) => {
+        if (cancelled) return;
+        const latestUser = useStore.getState().user;
+        useStore.getState().replaceUser({
+          ...latestUser,
+          userId: data.user_id,
+          name: data.name,
+          gender: data.gender,
+          height: data.height,
+          weight: data.weight,
+          age: data.age,
+          bmi: data.bmi,
+          activityLevel: data.activity_level,
+          activityMultiplier: data.activity_multiplier,
+          bmr: data.bmr,
+          tdee: data.tdee,
+          healthConditions: data.health_conditions,
+          allergens: data.allergens,
+          dailyCalorieTarget: data.daily_calorie_target,
+          targetWeight: data.target_weight || latestUser.targetWeight,
+          dietType: data.diet_type,
+        });
+      })
+      .catch(() => {
+        // Individual screens still surface API errors where the user can act on them.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl]);
 
   // Fix #2: Proper bottom safe area for Samsung virtual buttons
   const bottomInset = Math.max(insets.bottom, 8);

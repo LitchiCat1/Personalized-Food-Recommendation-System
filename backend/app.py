@@ -26,8 +26,10 @@ from services.food_service import build_custom_food_doc, search_foods
 from services.nutrition_label_service import (
     build_custom_food_search_result,
     call_gemini_nutrition_ocr,
+    call_gemini_nutrition_ocr_with_rotation,
     detect_image_mime,
     extract_number,
+    get_gemini_api_keys,
     normalize_nutrition_payload,
     normalize_ocr_result,
     scale_nutrition_per_100g,
@@ -198,14 +200,14 @@ def ocr_nutrition_label():
     if "image" not in data:
         return jsonify({"error": "缺少 image 欄位（Base64）"}), 400
 
-    api_key = data.get("api_key") or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if not api_key:
-        return jsonify({"error": "缺少 Gemini API key，請設定 GEMINI_API_KEY 環境變數"}), 400
+    api_keys = get_gemini_api_keys(data.get("api_key"))
+    if not api_keys:
+        return jsonify({"error": "缺少 Gemini API key，請設定 GEMINI_API_KEYS 或 GEMINI_API_KEY 環境變數"}), 400
 
     try:
         img_bytes = base64.b64decode(data["image"])
         mime_type = detect_image_mime(img_bytes)
-        parsed = call_gemini_nutrition_ocr(data["image"], mime_type, api_key)
+        parsed = call_gemini_nutrition_ocr_with_rotation(data["image"], mime_type, api_keys)
         normalized = normalize_ocr_result(parsed)
         return jsonify(
             {

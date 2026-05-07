@@ -5,6 +5,9 @@ import re
 import requests
 
 
+RETRYABLE_GEMINI_STATUS_CODES = {401, 403, 429, 500, 502, 503, 504}
+
+
 def extract_number(value, as_int: bool = False):
     if value is None:
         return None
@@ -90,6 +93,46 @@ def detect_image_mime(img_bytes: bytes) -> str:
     if img_bytes.startswith(b"RIFF") and b"WEBP" in img_bytes[:16]:
         return "image/webp"
     return "image/jpeg"
+
+
+def get_gemini_api_keys(explicit_key: str | None = None) -> list[str]:
+    raw_keys = [
+        explicit_key,
+        os.environ.get("GEMINI_API_KEYS"),
+        os.environ.get("GEMINI_API_KEY"),
+        os.environ.get("GOOGLE_API_KEY"),
+    ]
+    keys: list[str] = []
+    seen = set()
+    for raw in raw_keys:
+        if not raw:
+            continue
+        for key in raw.split(","):
+            normalized = key.strip()
+            if normalized and normalized not in seen:
+                keys.append(normalized)
+                seen.add(normalized)
+    return keys
+
+
+def call_gemini_nutrition_ocr_with_rotation(image_b64: str, mime_type: str, api_keys: list[str]) -> dict:
+    if not api_keys:
+        raise ValueError("缺少 Gemini API key，請設定 GEMINI_API_KEYS 或 GEMINI_API_KEY 環境變數")
+
+    last_error: requests.HTTPError | None = None
+    for index, api_key in enumerate(api_keys):
+        try:
+            return call_gemini_nutrition_ocr(image_b64, mime_type, api_key)
+        except requests.HTTPError as e:
+            last_error = e
+            status_code = e.response.status_code if e.response is not None else None
+            if status_code not in RETRYABLE_GEMINI_STATUS_CODES or index == len(api_keys) - 1:
+                raise
+            print(f"[!] Gemini key #{index + 1} failed with HTTP {status_code}; trying next key")
+
+    if last_error:
+        raise last_error
+    raise ValueError("Gemini API key 輪替失敗")
 
 
 def call_gemini_nutrition_ocr(image_b64: str, mime_type: str, api_key: str) -> dict:

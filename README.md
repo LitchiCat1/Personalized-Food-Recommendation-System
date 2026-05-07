@@ -39,10 +39,7 @@ Personalized-Food-Recommendation-System/
 └── docs/                     # 文件
     ├── PRD.md                # 產品需求文件
     ├── Project_Architecture_and_Status.md # 架構、功能狀態、部署整合文件
-    ├── CommandList.md        # 常用指令
-    ├── Work_Log_2026-05-07.md # Render + Supabase Auth 部署工作日誌
-    ├── API_Key_Rotation.md   # API key 輪替說明
-    └── Version_Comparison_TFDA.md # TFDA 資料版本比較
+    └── Operations_Runbook.md # 指令、部署驗收、key 輪替、工作日誌與事故經驗
 ```
 
 ## 🔑 核心功能狀態
@@ -71,7 +68,7 @@ Personalized-Food-Recommendation-System/
 - 權限驗證：無 token 回 `401`，正確 token 回 `200`，跨 `user_id` 回 `403`
 - CI：GitHub Actions 後端 syntax check + 前端 typecheck
 
-本次部署經驗與避免重犯的操作守則記錄於 `docs/Work_Log_2026-05-07.md`。
+部署驗收、環境變數、API key 輪替、工作日誌與避免重犯的操作守則記錄於 `docs/Operations_Runbook.md`。
 
 ## Expo Go 測試注意事項
 

@@ -119,9 +119,7 @@ Personalized-Food-Recommendation-System/
 └── docs/
     ├── PRD.md                          # 產品需求與研究背景
     ├── Project_Architecture_and_Status.md
-    ├── CommandList.md                  # 常用指令
-    ├── API_Key_Rotation.md             # Gemini API key 輪替
-    └── Version_Comparison_TFDA.md      # TFDA 資料版本差異
+    └── Operations_Runbook.md           # 指令、部署驗收、key 輪替、工作日誌與事故經驗
 ```
 
 ## 5. 技術棧
@@ -598,13 +596,32 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 
 第一次接手本專案建議依序閱讀：
 
-1. `docs/PRD.md`
-2. `docs/Project_Architecture_and_Status.md`
-3. `README.md`
-4. `backend/app.py`
-5. `backend/repositories/storage.py`
-6. `backend/services/predict_service.py`
-7. `frontend/lib/api.ts`
-8. `frontend/lib/scanner.ts`
-9. `frontend/store/useStore.ts`
-10. 目標頁面，例如 `frontend/app/(tabs)/scanner.tsx`
+1. `docs/PRD.md`：產品願景、研究背景與原始需求。
+2. `docs/Project_Architecture_and_Status.md`：目前實作架構、功能狀態、限制與 roadmap。
+3. `docs/Operations_Runbook.md`：部署、驗收、環境變數、API key 輪替與事故經驗。
+
+## 17. TFDA 資料庫版本歷史
+
+本節保留 TFDA 資料庫升級脈絡，避免 docs 內散落過多狀態型文件。
+
+### 17.1 v0.0.1：概念驗證階段
+
+- 使用 `nutrition_db.json` 作為主要資料來源。
+- 內部僅包含約 12 筆手動輸入食品資料，例如蘋果、披薩、熱狗等。
+- 營養數據僅提供熱量、蛋白質、脂肪、碳水化合物、鈉、膳食纖維等基礎欄位。
+- YOLO 辨識結果直接以英文 label 對應小型 JSON；找不到時回傳未知食物。
+- 主要限制是資料量太少、不夠在地化、缺乏進階營養素，難以支援疾病規則。
+
+### 17.2 v0.0.2：TFDA 官方資料升級
+
+- 解析 TFDA 原始資料 `backend/tfda_data/20_5.json`。
+- 透過 `backend/scripts/convert_tfda.py` 轉換為 `backend/nutrition_db_tw.json`。
+- 目前整理出約 2,181 筆台灣常見食品。
+- 營養欄位從基礎 6 項擴展到糖、飽和脂肪、反式脂肪、膽固醇、多種維生素、鉀、鈣、鐵、鎂、磷、鋅等進階欄位。
+- 新增 `backend/yolo_tfda_mapping.py`，將 YOLO COCO label 對應到 TFDA 中文食品。
+- 查詢 fallback 順序為 TFDA 在地資料庫、舊版手工資料庫、未知食物預設值。
+- 新增或強化 `GET /search/food` 與 `GET /food/<food_key>`，支援中文食品搜尋與單筆營養資料查詢。
+
+### 17.3 目前狀態
+
+TFDA 資料庫已成為手動搜尋、推薦候選與 YOLO 映射 fallback 的主要來源。短期瓶頸不再是營養資料筆數，而是 YOLO COCO 通用模型與台灣混合餐、便當、湯品、小吃之間的辨識落差。

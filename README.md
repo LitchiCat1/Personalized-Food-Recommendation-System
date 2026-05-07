@@ -56,7 +56,7 @@ Personalized-Food-Recommendation-System/
 - **未知食品備援** — TFDA 搜尋 + 自訂食品 + 營養標示 OCR
 - **跨平台響應式** — 手機/平板/桌面自適應
 
-目前仍未完成正式登入/註冊、CI 自動化測試、正式餐廳 API 串接，以及 Render + Supabase 實際部署驗證。詳細狀態請以 `docs/Project_Architecture_and_Status.md` 的 roadmap 稽核表為準。
+目前仍未完成正式登入/註冊、正式餐廳 API 串接與完整自動化測試；Render + Supabase 部署已完成首次驗證，GitHub Actions 已有基礎 CI。詳細狀態請以 `docs/Project_Architecture_and_Status.md` 的 roadmap 稽核表為準。
 
 ## Expo Go 測試注意事項
 

@@ -1,13 +1,13 @@
 # 專案架構與功能狀態總整理
 
-> 最後更新：2026-04-28  
+> 最後更新：2026-05-07
 > 專案：NutriLens / Personalized Food Recommendation System
 
 ## 1. 文件目的
 
 本文件整合 `docs/PRD.md` 與目前實際程式碼狀態，作為後續開發、交接、部署與功能補齊的主要參考。
 
-`PRD.md` 描述的是產品願景與研究目標；本文件描述的是目前 repository 內已實作的架構、功能完成度、限制與 Render + Supabase 異地連線準備狀態。
+`PRD.md` 描述的是產品願景與研究目標；本文件描述的是目前 repository 內已實作的架構、功能完成度、限制與 Render + Supabase 部署驗證狀態。
 
 ## 2. 專案定位
 
@@ -34,7 +34,7 @@
 | 資料庫 | MongoDB | PostgreSQL/Supabase 優先，MongoDB 備援，In-memory fallback |
 | 推薦 | 安全過濾 + 口味排序 + 地圖導向 | 安全過濾、候選擴展與歷史偏好加權已完成；真實地圖/餐廳 API 尚未完成 |
 | OCR | 未明確細化 | 已使用 Gemini Vision API 做包裝食品營養標示 OCR |
-| 部署 | 雲端資料儲存 | 已有 `render.yaml` 與 Supabase `DATABASE_URL` 支援 |
+| 部署 | 雲端資料儲存 | Render Web Service + Supabase Postgres 已完成首次部署驗證 |
 
 ## 4. 完整專案架構
 
@@ -138,6 +138,7 @@ Personalized-Food-Recommendation-System/
 | OCR | Google Gemini Vision API via REST |
 | Database | PostgreSQL/Supabase, MongoDB fallback, In-memory fallback |
 | Deployment | Render Web Service free plan + Supabase Postgres free plan |
+| CI | GitHub Actions，Backend syntax check + Frontend typecheck |
 
 ## 6. 後端架構
 
@@ -263,6 +264,8 @@ Personalized-Food-Recommendation-System/
   -> 使用者可儲存為 custom_food 或直接加入紀錄
 ```
 
+後端優先讀取 `GEMINI_API_KEYS`，支援以逗號分隔多組 key；若未設定，才 fallback 到 `GEMINI_API_KEY` 或 `GOOGLE_API_KEY`。當 Gemini 回傳 `401`、`403`、`429`、`500`、`502`、`503`、`504` 時，會嘗試下一組 key。
+
 ### 8.4 飲食紀錄與趨勢
 
 ```txt
@@ -333,6 +336,7 @@ GET /healthy-food-recommend/<user_id>
 - 已完成附近健康餐點推薦 MVP。
 - 已完成 PostgreSQL/MongoDB/In-memory 三層資料儲存 fallback。
 - 已完成 Render `PORT` 支援與 `render.yaml`。
+- 已完成 Gemini 多 API key 輪替，Render 建議使用 `GEMINI_API_KEYS`。
 
 ### 10.2 前端
 
@@ -357,6 +361,8 @@ GET /healthy-food-recommend/<user_id>
 - 已完成 Supabase Postgres 連線支援，只要設定 `DATABASE_URL`。
 - 已完成 `frontend/.env.local.example`，可指定 Render 後端 URL。
 - 後端 `/health` 可檢查 PostgreSQL、MongoDB、模型與資料庫載入狀態。
+- 已完成 Render Web Service + Supabase Session Pooler 實測，`/health` 已確認 `status: ok`、`postgres: true`。
+- 已完成 GitHub Actions CI：後端 Python syntax check 與前端 TypeScript typecheck。
 
 ## 11. 未完成功能與目前限制
 
@@ -412,20 +418,26 @@ GET /healthy-food-recommend/<user_id>
 - 目前沒有完整自動化測試。
 - 後端只有 `backend/test_client.py` 類型的手動整合測試。
 - 前端尚未建立 e2e、component test 或 API mock 測試。
-- 尚未建立 CI/CD pipeline。
-- `frontend/package.json` 只有 `lint` script，沒有正式 `typecheck`、`test`、`build` script。
-- repository 目前沒有 `.github/workflows`。
+- 已建立基礎 GitHub Actions CI，但目前只涵蓋後端 syntax check 與前端 typecheck。
+- `frontend/package.json` 已有 `typecheck` script，但尚未建立正式 test、build script。
+- 尚未建立 pytest/unit test、前端 component test 或 e2e test。
 
 ### 11.8 免費部署限制
 
 - Render free plan 會休眠，第一次請求可能明顯變慢。
 - Supabase free plan 有容量、連線數與流量限制。
 - Gemini API OCR 依賴 API key 與免費額度，可能受速率或配額影響。
-- `render.yaml` 與 `DATABASE_URL` 支援已存在，但尚未在文件中記錄實際部署 URL、部署日期與 `/health` 驗證結果。
+- 已完成首次部署驗證，但仍需持續記錄後續部署、錯誤與健康檢查結果。
 
-## 12. Render + Supabase 異地連線準備狀態
+## 12. Render + Supabase 部署驗證狀態
 
-目前專案已具備用免費方案做跨網路測試的基本條件。
+目前專案已完成免費方案跨網路部署驗證。
+
+- Render URL：`https://personalized-food-recommendation-system-nq8t.onrender.com`
+- Render service id：`srv-d7u2qhdckfvc73ei96l0`
+- 部署分支：`v0.0.3`
+- 驗證日期：2026-05-07
+- `/health` 驗證摘要：`status: ok`、`postgres: true`、`foods_in_tfda: 2181`、`disease_rules: 5`
 
 ### 12.1 後端 Render
 
@@ -439,23 +451,27 @@ services:
     plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: python app.py
+    startCommand: python -u app.py
     envVars:
-      - key: GEMINI_API_KEY
+      - key: GEMINI_API_KEYS
         sync: false
       - key: DATABASE_URL
         sync: false
+      - key: FLASK_DEBUG
+        value: "false"
 ```
 
 Render 需要設定：
 
-- `DATABASE_URL`：Supabase Postgres connection string。
-- `GEMINI_API_KEY`：營養標示 OCR 使用。
-- `FLASK_DEBUG=false`：可選，正式測試建議關閉 debug。
+- `DATABASE_URL`：Supabase Postgres connection string，Render 上 value 必須直接以 `postgresql://` 開頭，不要包含 `DATABASE_URL=` 前綴。
+- `GEMINI_API_KEYS`：營養標示 OCR 使用，可用逗號分隔多組 Gemini key。
+- `FLASK_DEBUG=false`：正式測試建議關閉 debug。
 
 ### 12.2 Supabase
 
-Supabase 只需要提供 PostgreSQL connection string 給 Render 的 `DATABASE_URL`。
+Supabase 只需要提供 PostgreSQL connection string 給 Render 的 `DATABASE_URL`。Render 實測已使用 Supabase Session Pooler 成功連線；連線字串通常包含 pooler host、port、database、user 與 password。
+
+常見錯誤：Render 的 `DATABASE_URL` value 若誤填成 `DATABASE_URL=postgresql://...`，後端會將 `DATABASE_URL` 視為 connection option，可能出現 `invalid dsn: invalid connection option "DATABASE_URL"`。
 
 後端啟動後會自動建立：
 
@@ -475,6 +491,12 @@ EXPO_PUBLIC_API_BASE_URL=https://your-render-service.onrender.com
 
 ```txt
 GET https://your-render-service.onrender.com/health
+```
+
+目前已驗證 URL：
+
+```txt
+GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 ```
 
 建議確認：
@@ -497,9 +519,9 @@ GET https://your-render-service.onrender.com/health
 | 5 | 口味偏好與推薦分數升級 | MVP 可用 | 近期飲食紀錄會產生 `preference_score` 與原因 | 仍是啟發式分數，尚無採納/略過/不喜歡回饋模型 |
 | 6 | YOLO/TFDA 映射擴充 | MVP 可用 | 食物 label 已映射；容器/餐具會回傳搜尋建議 | 尚未訓練食物專用模型，混合餐與台灣小吃仍依賴手動搜尋/OCR |
 | 7 | 份量估算校正 | MVP 可用 | 掃描結果可調整重量並即時重算營養 | 尚未用校正資料反饋 density，也沒有參考物/深度感測自動校正 |
-| 8 | 測試與 CI | 未完成 | 有 `backend/test_client.py` 手動測試；可跑 `npx tsc --noEmit` 與 `npx eslint .` | 尚無 pytest/unit test、前端 test、CI workflow、正式 typecheck script |
+| 8 | 測試與 CI | 基礎 CI 已完成 | `.github/workflows/ci.yml` 會跑後端 syntax check 與前端 `npm run typecheck` | 尚無 pytest/unit test、前端 test、e2e、正式 build check |
 | 9 | 使用者身份驗證 | 未完成 | 有 user profile CRUD 與 `user_id` 欄位 | 尚無登入/註冊/token 驗證/資料權限隔離 |
-| 10 | Render + Supabase 實測檢查流程 | 未完成 | 有 `render.yaml`、`DATABASE_URL`、`.env.local.example` | 尚未記錄實際部署 URL、Supabase 實測結果與遠端 `/health` 截圖/輸出 |
+| 10 | Render + Supabase 實測檢查流程 | 已完成首次驗證 | 已記錄 Render URL、Supabase 實測結果與遠端 `/health` 摘要 | 尚需維護後續部署紀錄與正式前端連線驗收 |
 
 ## 14. 重新標註的未完成清單
 
@@ -507,9 +529,9 @@ GET https://your-render-service.onrender.com/health
 
 ### 14.1 最高優先級
 
-1. 建立測試與 CI 基礎：新增後端可自動執行的 smoke/unit tests、前端 `typecheck` script、GitHub Actions。
-2. 補身份驗證與資料隔離：至少導入登入狀態、token 驗證與 user_id 權限檢查。
-3. 完成 Render + Supabase 實測紀錄：部署 URL、環境變數、`/health` 結果、前端連線設定與常見錯誤排除。
+1. 補身份驗證與資料隔離：至少導入登入狀態、token 驗證與 user_id 權限檢查。
+2. 建立完整測試：新增後端 smoke/unit tests、前端 test/e2e、正式 build check。
+3. 完成前端遠端驗收：以手機或 Web 連線 Render 後端，確認 profile、掃描、紀錄、歷史與推薦流程。
 
 ### 14.2 中優先級
 

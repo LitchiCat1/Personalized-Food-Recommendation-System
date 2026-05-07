@@ -40,6 +40,7 @@ Personalized-Food-Recommendation-System/
     ├── PRD.md                # 產品需求文件
     ├── Project_Architecture_and_Status.md # 架構、功能狀態、部署整合文件
     ├── CommandList.md        # 常用指令
+    ├── Work_Log_2026-05-07.md # Render + Supabase Auth 部署工作日誌
     ├── API_Key_Rotation.md   # API key 輪替說明
     └── Version_Comparison_TFDA.md # TFDA 資料版本比較
 ```
@@ -54,9 +55,23 @@ Personalized-Food-Recommendation-System/
 - **健康餐點推薦 MVP** — 預算 + 定位 + 時段 + 疾病史 + 剩餘營養素排序附近餐點
 - **飲食趨勢分析** — 週熱量柱狀圖 + 營養素均值 + AI 洞察
 - **未知食品備援** — TFDA 搜尋 + 自訂食品 + 營養標示 OCR
+- **Supabase Auth** — 前端登入/註冊、Bearer token 傳遞、後端 user_id 權限檢查
+- **Render + Supabase 部署** — 後端已在 Render 強制 Supabase Auth，資料存於 Supabase Postgres
 - **跨平台響應式** — 手機/平板/桌面自適應
 
-目前仍未完成正式登入/註冊、正式餐廳 API 串接與完整自動化測試；Render + Supabase 部署已完成首次驗證，GitHub Actions 已有基礎 CI。詳細狀態請以 `docs/Project_Architecture_and_Status.md` 的 roadmap 稽核表為準。
+目前仍未完成正式餐廳 API 串接、完整 profile 編輯表單與完整自動化測試；Render + Supabase 部署、Supabase Auth 登入與後端強制 user-scoped 權限檢查已完成驗證，GitHub Actions 已有基礎 CI。詳細狀態請以 `docs/Project_Architecture_and_Status.md` 的 roadmap 稽核表為準。
+
+## 部署與驗證狀態
+
+- Render URL：`https://personalized-food-recommendation-system-nq8t.onrender.com`
+- Render service id：`srv-d7u2qhdckfvc73ei96l0`
+- 部署分支：`v0.0.3`
+- 後端儲存：Supabase Postgres Session Pooler
+- 後端 Auth：`SUPABASE_AUTH_REQUIRED=true`
+- 權限驗證：無 token 回 `401`，正確 token 回 `200`，跨 `user_id` 回 `403`
+- CI：GitHub Actions 後端 syntax check + 前端 typecheck
+
+本次部署經驗與避免重犯的操作守則記錄於 `docs/Work_Log_2026-05-07.md`。
 
 ## Expo Go 測試注意事項
 

@@ -353,6 +353,9 @@ GET /healthy-food-recommend/<user_id>
 - 已完成定位、預算與附近健康餐點 UI。
 - 已完成 history 頁呼叫 `/history` 並顯示趨勢。
 - 已完成 API base URL 自動推導與 Render URL 環境變數支援。
+- 已完成 Supabase Auth 登入/註冊基礎整合；有 Supabase public env 時會進入 AuthGate，登入後使用 Supabase Auth user id。
+- 已完成 Bearer token 傳遞，user-scoped API 會帶 `Authorization: Bearer <access_token>`。
+- 已完成首次登入自動建立後端 profile，避免 Supabase Auth uuid 找不到 profile。
 - 已完成手機、平板與 web 的基本響應式顯示。
 
 ### 10.3 部署與資料
@@ -362,6 +365,7 @@ GET /healthy-food-recommend/<user_id>
 - 已完成 `frontend/.env.local.example`，可指定 Render 後端 URL。
 - 後端 `/health` 可檢查 PostgreSQL、MongoDB、模型與資料庫載入狀態。
 - 已完成 Render Web Service + Supabase Session Pooler 實測，`/health` 已確認 `status: ok`、`postgres: true`。
+- 已完成 Render 強制 Supabase Auth 實測，`SUPABASE_AUTH_REQUIRED=true` 後 user-scoped API 會驗證 token 與 `user_id`。
 - 已完成 GitHub Actions CI：後端 Python syntax check 與前端 TypeScript typecheck。
 
 ## 11. 未完成功能與目前限制
@@ -370,11 +374,12 @@ GET /healthy-food-recommend/<user_id>
 
 ### 11.1 帳號與資料隔離
 
-- 尚未完成正式登入、註冊或身份驗證。
-- 目前前端預設使用 `demo_user`，只適合測試，不適合正式多人上線。
-- 尚未整合 Supabase Auth。
-- 後端已提供可選式 Supabase Auth Bearer token 驗證；設定 `SUPABASE_AUTH_REQUIRED=true` 後，user scoped API 會要求 token subject 等於目標 `user_id`。
-- 前端尚未完成登入/註冊與 token 傳遞，因此目前 Render 仍以 `SUPABASE_AUTH_REQUIRED=false` 維持 demo 流程。
+- 已完成 Supabase Auth 基礎登入/註冊整合。
+- 已完成後端 user-scoped API 的 Supabase Bearer token 驗證。
+- Render 目前已設定 `SUPABASE_AUTH_REQUIRED=true`，正式遠端 API 不再允許未帶 token 存取使用者資料。
+- token subject 必須等於目標 `user_id`；無 token 回 `401`，跨使用者存取回 `403`。
+- 未設定 Supabase public env 的本機前端仍可進入 demo 模式，僅供開發便利，不代表正式部署權限模型。
+- 尚未完成登出按鈕、完整 profile 編輯表單、session 過期提示與使用者管理 UI。
 
 ### 11.2 影像辨識準確度
 
@@ -428,7 +433,7 @@ GET /healthy-food-recommend/<user_id>
 - Render free plan 會休眠，第一次請求可能明顯變慢。
 - Supabase free plan 有容量、連線數與流量限制。
 - Gemini API OCR 依賴 API key 與免費額度，可能受速率或配額影響。
-- 已完成首次部署驗證，但仍需持續記錄後續部署、錯誤與健康檢查結果。
+- 已完成 Render + Supabase + Supabase Auth 強制驗證，但仍需持續記錄後續部署、錯誤與健康檢查結果。
 
 ## 12. Render + Supabase 部署驗證狀態
 
@@ -439,6 +444,8 @@ GET /healthy-food-recommend/<user_id>
 - 部署分支：`v0.0.3`
 - 驗證日期：2026-05-07
 - `/health` 驗證摘要：`status: ok`、`postgres: true`、`foods_in_tfda: 2181`、`disease_rules: 5`
+- Auth 驗證摘要：未帶 token 回 `401`，正確 token 回 `200`，跨 `user_id` 回 `403`
+- 最新強制 Auth deploy：`dep-d7u8pb67r5hc73bfus20`
 
 ### 12.1 後端 Render
 
@@ -461,7 +468,7 @@ services:
       - key: FLASK_DEBUG
         value: "false"
       - key: SUPABASE_AUTH_REQUIRED
-        value: "false"
+        value: "true"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_PUBLISHABLE_KEY
@@ -473,8 +480,8 @@ Render 需要設定：
 - `DATABASE_URL`：Supabase Postgres connection string，Render 上 value 必須直接以 `postgresql://` 開頭，不要包含 `DATABASE_URL=` 前綴。
 - `GEMINI_API_KEYS`：營養標示 OCR 使用，可用逗號分隔多組 Gemini key。
 - `FLASK_DEBUG=false`：正式測試建議關閉 debug。
-- `SUPABASE_AUTH_REQUIRED=false`：目前 demo 模式保持關閉；完成前端登入與 token 傳遞後改為 `true`。
-- `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY`：啟用後端 Supabase Auth token 驗證時必填。
+- `SUPABASE_AUTH_REQUIRED=true`：Render 正式環境已啟用；user-scoped API 必須帶 Supabase access token。
+- `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY`：後端 Supabase Auth token 驗證必填。
 
 ### 12.2 Supabase
 
@@ -494,6 +501,8 @@ Supabase 只需要提供 PostgreSQL connection string 給 Render 的 `DATABASE_U
 
 ```env
 EXPO_PUBLIC_API_BASE_URL=https://your-render-service.onrender.com
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
 部署完成後先測：
@@ -529,8 +538,8 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 | 6 | YOLO/TFDA 映射擴充 | MVP 可用 | 食物 label 已映射；容器/餐具會回傳搜尋建議 | 尚未訓練食物專用模型，混合餐與台灣小吃仍依賴手動搜尋/OCR |
 | 7 | 份量估算校正 | MVP 可用 | 掃描結果可調整重量並即時重算營養 | 尚未用校正資料反饋 density，也沒有參考物/深度感測自動校正 |
 | 8 | 測試與 CI | 基礎 CI 已完成 | `.github/workflows/ci.yml` 會跑後端 syntax check 與前端 `npm run typecheck` | 尚無 pytest/unit test、前端 test、e2e、正式 build check |
-| 9 | 使用者身份驗證 | 部分完成 | 後端已可選式驗證 Supabase Bearer token 與 `user_id` 權限；前端已支援 Supabase Auth session 與 Bearer token 傳遞 | 尚未完成正式遠端登入驗收；Render 目前仍關閉強制驗證 |
-| 10 | Render + Supabase 實測檢查流程 | 已完成首次驗證 | 已記錄 Render URL、Supabase 實測結果與遠端 `/health` 摘要 | 尚需維護後續部署紀錄與正式前端連線驗收 |
+| 9 | 使用者身份驗證 | MVP 可用 | 後端已強制驗證 Supabase Bearer token 與 `user_id` 權限；前端已支援 Supabase Auth session 與 Bearer token 傳遞 | 尚未完成登出 UI、session 過期提示、完整 profile 編輯與自動化測試 |
+| 10 | Render + Supabase 實測檢查流程 | 已完成 | 已記錄 Render URL、Supabase 實測結果、遠端 `/health` 摘要與 401/200/403 權限驗收 | 尚需維護後續部署紀錄與將 smoke tests 自動化 |
 
 ## 14. 重新標註的未完成清單
 
@@ -538,9 +547,9 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 
 ### 14.1 最高優先級
 
-1. 設定前端 `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 並完成登入/註冊遠端驗收。
-2. 將 Render `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` 補齊並把 `SUPABASE_AUTH_REQUIRED` 切為 `true`。
-3. 建立完整測試：新增後端 smoke/unit tests、前端 test/e2e、正式 build check。
+1. 建立完整測試：新增後端 smoke/unit tests、前端 test/e2e、正式 build check。
+2. 補前端登出、session 過期提示與完整 profile 編輯表單。
+3. 將 Render/Supabase/Auth smoke test 流程自動化，但不保存 secret values。
 
 ### 14.2 中優先級
 
@@ -579,10 +588,11 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 
 完成順序 9 到 10 後，專案應達到：
 
-- 使用者不再共用 `demo_user`。
+- 正式 Supabase Auth 模式下使用者不再共用 `demo_user`。
 - 手機或 Web 前端可以連線 Render 後端。
 - 使用者 profile、飲食紀錄、歷史趨勢可存在 Supabase。
 - 部署前有固定檢查流程，避免 Render/Supabase 設定錯誤。
+- user-scoped API 在 Render 上已驗證無 token 回 `401`、正確 token 回 `200`、跨使用者回 `403`。
 
 ## 16. 後續閱讀建議
 

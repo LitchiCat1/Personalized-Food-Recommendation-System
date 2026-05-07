@@ -48,3 +48,25 @@ cd frontend && npm run typecheck
 
 (前端 lint；若 expo lint 在環境中卡住，可改用底層 ESLint)
 cd frontend && npx eslint .
+
+Render / Supabase 部署後驗收:
+(原則：不要在終端輸出 access token、API key、database password；只輸出狀態碼與必要 user id)
+
+(檢查 Render deploy 狀態)
+render deploys list srv-d7u2qhdckfvc73ei96l0 --output json
+
+(檢查 Render health)
+curl https://personalized-food-recommendation-system-nq8t.onrender.com/health
+
+(權限驗收標準)
+GET /user/<user_id> 不帶 Authorization 應回 401
+GET /user/<user_id> 帶正確 Supabase Bearer token 應回 200
+GET /user/demo_user 帶其他使用者 token 應回 403
+
+(前端型別檢查與 Web 驗收)
+cd frontend && npm run typecheck
+cd frontend && npm run web -- --port 8083
+
+安全提醒:
+聊天、commit、README、docs 中都不要放 Render API key、Supabase database password、Gemini API key、Supabase service_role key。
+如果 key 曾經貼到聊天或日誌中，直接視為 compromised，應立即輪替或撤銷。

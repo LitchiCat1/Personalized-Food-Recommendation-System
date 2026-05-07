@@ -14,7 +14,7 @@ services:
       - key: FLASK_DEBUG
         value: "false"
       - key: SUPABASE_AUTH_REQUIRED
-        value: "false"
+        value: "true"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_PUBLISHABLE_KEY

@@ -28,6 +28,7 @@ jobs:
           python -m py_compile \
             backend/app.py \
             backend/repositories/storage.py \
+            backend/services/auth_service.py \
             backend/services/disease_rule_service.py \
             backend/services/env_service.py \
             backend/services/food_service.py \

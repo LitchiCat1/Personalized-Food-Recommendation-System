@@ -373,7 +373,8 @@ GET /healthy-food-recommend/<user_id>
 - 尚未完成正式登入、註冊或身份驗證。
 - 目前前端預設使用 `demo_user`，只適合測試，不適合正式多人上線。
 - 尚未整合 Supabase Auth。
-- 後端 API 目前信任前端傳入的 `user_id`，沒有驗證 requester 是否有權讀寫該使用者資料。
+- 後端已提供可選式 Supabase Auth Bearer token 驗證；設定 `SUPABASE_AUTH_REQUIRED=true` 後，user scoped API 會要求 token subject 等於目標 `user_id`。
+- 前端尚未完成登入/註冊與 token 傳遞，因此目前 Render 仍以 `SUPABASE_AUTH_REQUIRED=false` 維持 demo 流程。
 
 ### 11.2 影像辨識準確度
 
@@ -459,6 +460,12 @@ services:
         sync: false
       - key: FLASK_DEBUG
         value: "false"
+      - key: SUPABASE_AUTH_REQUIRED
+        value: "false"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
 ```
 
 Render 需要設定：
@@ -466,6 +473,8 @@ Render 需要設定：
 - `DATABASE_URL`：Supabase Postgres connection string，Render 上 value 必須直接以 `postgresql://` 開頭，不要包含 `DATABASE_URL=` 前綴。
 - `GEMINI_API_KEYS`：營養標示 OCR 使用，可用逗號分隔多組 Gemini key。
 - `FLASK_DEBUG=false`：正式測試建議關閉 debug。
+- `SUPABASE_AUTH_REQUIRED=false`：目前 demo 模式保持關閉；完成前端登入與 token 傳遞後改為 `true`。
+- `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY`：啟用後端 Supabase Auth token 驗證時必填。
 
 ### 12.2 Supabase
 
@@ -520,7 +529,7 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 | 6 | YOLO/TFDA 映射擴充 | MVP 可用 | 食物 label 已映射；容器/餐具會回傳搜尋建議 | 尚未訓練食物專用模型，混合餐與台灣小吃仍依賴手動搜尋/OCR |
 | 7 | 份量估算校正 | MVP 可用 | 掃描結果可調整重量並即時重算營養 | 尚未用校正資料反饋 density，也沒有參考物/深度感測自動校正 |
 | 8 | 測試與 CI | 基礎 CI 已完成 | `.github/workflows/ci.yml` 會跑後端 syntax check 與前端 `npm run typecheck` | 尚無 pytest/unit test、前端 test、e2e、正式 build check |
-| 9 | 使用者身份驗證 | 未完成 | 有 user profile CRUD 與 `user_id` 欄位 | 尚無登入/註冊/token 驗證/資料權限隔離 |
+| 9 | 使用者身份驗證 | 部分完成 | 後端已可選式驗證 Supabase Bearer token 與 `user_id` 權限 | 尚無前端登入/註冊、session 管理與 token 傳遞；Render 目前仍關閉強制驗證 |
 | 10 | Render + Supabase 實測檢查流程 | 已完成首次驗證 | 已記錄 Render URL、Supabase 實測結果與遠端 `/health` 摘要 | 尚需維護後續部署紀錄與正式前端連線驗收 |
 
 ## 14. 重新標註的未完成清單
@@ -529,9 +538,9 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 
 ### 14.1 最高優先級
 
-1. 補身份驗證與資料隔離：至少導入登入狀態、token 驗證與 user_id 權限檢查。
-2. 建立完整測試：新增後端 smoke/unit tests、前端 test/e2e、正式 build check。
-3. 完成前端遠端驗收：以手機或 Web 連線 Render 後端，確認 profile、掃描、紀錄、歷史與推薦流程。
+1. 完成前端 Supabase Auth：登入/註冊、session 管理、API request 帶 Bearer token。
+2. 將 Render `SUPABASE_AUTH_REQUIRED` 切為 `true`，完成正式資料隔離驗收。
+3. 建立完整測試：新增後端 smoke/unit tests、前端 test/e2e、正式 build check。
 
 ### 14.2 中優先級
 

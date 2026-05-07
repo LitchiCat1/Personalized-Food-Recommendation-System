@@ -18,6 +18,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from ultralytics import YOLO
 from repositories.storage import StorageRepository
+from services.auth_service import AuthError, is_auth_required, verify_supabase_user
 from services.disease_rule_service import load_disease_rules
 from services.env_service import load_local_env
 from services.history_service import build_history_response
@@ -76,6 +77,31 @@ storage = StorageRepository(db, USE_MONGO, _mem_users, _mem_records, _mem_custom
 
 app = Flask(__name__)
 CORS(app)
+
+
+def get_request_user_id():
+    if not is_auth_required():
+        return None
+    if not hasattr(request, "_cached_auth_user"):
+        request._cached_auth_user = verify_supabase_user(request.headers.get("Authorization"))
+    return request._cached_auth_user["id"]
+
+
+def require_user_access(user_id: str | None):
+    if not is_auth_required():
+        return None
+    if not user_id:
+        raise AuthError("缺少 user_id", 400)
+
+    authenticated_user_id = get_request_user_id()
+    if user_id != authenticated_user_id:
+        raise AuthError("無權存取其他使用者資料", 403)
+    return authenticated_user_id
+
+
+@app.errorhandler(AuthError)
+def handle_auth_error(error):
+    return jsonify({"error": str(error)}), error.status_code
 
 # ─── Load YOLO model ─────────────────────────────────────────
 MODEL_PATH = os.path.join(BASE_DIR, "yolov8n.pt")
@@ -152,6 +178,9 @@ def search_food():
         return jsonify({"error": "缺少 q 參數"}), 400
 
     user_id = request.args.get("user_id")
+    if is_auth_required():
+        user_id = user_id or get_request_user_id()
+        require_user_access(user_id)
     results = search_foods(storage, TFDA_DB, q, limit, user_id, build_custom_food_search_result)
     return jsonify({"query": q, "results": results, "count": len(results)})
 
@@ -162,6 +191,7 @@ def get_food_detail(food_key):
     """取得 TFDA 單筆食品完整營養資訊"""
     custom_food = storage.get_custom_food(food_key)
     if custom_food:
+        require_user_access(custom_food.get("user_id"))
         return jsonify(custom_food)
 
     food = TFDA_DB.get(food_key)
@@ -173,6 +203,8 @@ def get_food_detail(food_key):
 @app.route("/custom-food", methods=["POST"])
 def create_custom_food():
     data = request.get_json(silent=True) or {}
+    if is_auth_required():
+        data["user_id"] = require_user_access(data.get("user_id"))
     try:
         food_doc = build_custom_food_doc(
             data,
@@ -190,6 +222,9 @@ def create_custom_food():
 @app.route("/custom-foods", methods=["GET"])
 def list_custom_foods():
     user_id = request.args.get("user_id")
+    if is_auth_required():
+        user_id = user_id or get_request_user_id()
+        require_user_access(user_id)
     foods = storage.get_custom_foods(user_id)
     return jsonify({"foods": foods, "count": len(foods)})
 
@@ -270,6 +305,7 @@ def predict():
 # ─── 2. User Profile CRUD (PRD: 健康檔案與疾病管理) ──────────
 @app.route("/user/<user_id>", methods=["GET"])
 def get_user(user_id):
+    require_user_access(user_id)
     user = storage.get_user(user_id)
 
     if not user:
@@ -282,6 +318,8 @@ def create_or_update_user():
     data = request.get_json()
     if not data or "user_id" not in data:
         return jsonify({"error": "缺少 user_id"}), 400
+    if is_auth_required():
+        data["user_id"] = require_user_access(data.get("user_id"))
 
     user_doc = build_user_profile(data)
 
@@ -296,6 +334,8 @@ def add_record():
     data = request.get_json()
     if not data:
         return jsonify({"error": "缺少資料"}), 400
+    if is_auth_required():
+        data["user_id"] = require_user_access(data.get("user_id"))
 
     record = {
         "user_id": data.get("user_id"),
@@ -318,6 +358,7 @@ def add_record():
 
 @app.route("/records/<user_id>", methods=["GET"])
 def get_records(user_id):
+    require_user_access(user_id)
     date_str = request.args.get("date")  # YYYY-MM-DD
     records = storage.get_records(user_id, date_str, limit=50)
     return jsonify({"records": records, "count": len(records)})
@@ -326,6 +367,7 @@ def get_records(user_id):
 # ─── 4. History & Trends (PRD: 飲食趨勢回顧) ─────────────────
 @app.route("/history/<user_id>", methods=["GET"])
 def get_history(user_id):
+    require_user_access(user_id)
     days = int(request.args.get("days", 7))
     return jsonify(build_history_response(storage, user_id, days))
 
@@ -338,6 +380,7 @@ def recommend(user_id):
     1. 安全過濾層: 根據疾病禁忌排除不安全食物
     2. 口味排序層: 餘弦相似度 (placeholder, 目前用隨機分數)
     """
+    require_user_access(user_id)
     result = build_recommendation_response(storage, NUTRITION_DB, TFDA_DB, DISEASE_RULES, user_id)
     if not result:
         return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
@@ -346,6 +389,7 @@ def recommend(user_id):
 
 @app.route("/healthy-food-recommend/<user_id>", methods=["GET"])
 def healthy_food_recommend(user_id):
+    require_user_access(user_id)
     params = {
         "budget": request.args.get("budget", 150),
         "lat": request.args.get("lat", 25.0338),

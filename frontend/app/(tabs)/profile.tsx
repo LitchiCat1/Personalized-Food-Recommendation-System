@@ -24,6 +24,24 @@ export default function ProfileScreen() {
     let cancelled = false;
 
     fetchUserProfile(apiBaseUrl, user.userId, { accessToken })
+      .catch((err: Error) => {
+        if (!err.message.includes('使用者不存在')) throw err;
+        return saveUserProfile(apiBaseUrl, {
+          user_id: user.userId,
+          name: user.name,
+          gender: user.gender,
+          weight: user.weight,
+          height: user.height,
+          age: user.age,
+          activity_level: user.activityLevel,
+          activity_multiplier: user.activityMultiplier,
+          daily_calorie_target: user.dailyCalorieTarget,
+          health_conditions: user.healthConditions,
+          allergens: user.allergens,
+          target_weight: user.targetWeight,
+          diet_type: user.dietType,
+        }, { accessToken }).then((response) => response.user);
+      })
       .then((data) => {
         if (cancelled) return;
         replaceUser({

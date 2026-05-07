@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { HapticTab } from '@/components/haptic-tab';
 import { Palette, Spacing } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
-import { fetchUserProfile } from '@/lib/api';
+import { fetchUserProfile, saveUserProfile } from '@/lib/api';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -21,6 +21,24 @@ export default function TabLayout() {
     const currentUser = useStore.getState().user;
 
     fetchUserProfile(apiBaseUrl, currentUser.userId, { accessToken })
+      .catch((err: Error) => {
+        if (!err.message.includes('使用者不存在')) throw err;
+        return saveUserProfile(apiBaseUrl, {
+          user_id: currentUser.userId,
+          name: currentUser.name,
+          gender: currentUser.gender,
+          weight: currentUser.weight,
+          height: currentUser.height,
+          age: currentUser.age,
+          activity_level: currentUser.activityLevel,
+          activity_multiplier: currentUser.activityMultiplier,
+          daily_calorie_target: currentUser.dailyCalorieTarget,
+          health_conditions: currentUser.healthConditions,
+          allergens: currentUser.allergens,
+          target_weight: currentUser.targetWeight,
+          diet_type: currentUser.dietType,
+        }, { accessToken }).then((response) => response.user);
+      })
       .then((data) => {
         if (cancelled) return;
         const latestUser = useStore.getState().user;

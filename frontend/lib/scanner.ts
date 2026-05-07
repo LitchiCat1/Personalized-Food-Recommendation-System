@@ -1,4 +1,13 @@
 import type { DetectedFood } from '@/constants/mock-data';
+import type { ApiAuth } from '@/lib/api';
+
+
+function buildHeaders(auth?: ApiAuth, contentType?: string): HeadersInit {
+  const headers: Record<string, string> = {};
+  if (contentType) headers['Content-Type'] = contentType;
+  if (auth?.accessToken) headers.Authorization = `Bearer ${auth.accessToken}`;
+  return headers;
+}
 
 export type RejectedDetection = {
   label: string;
@@ -73,6 +82,7 @@ export async function saveRecord(params: {
   userId: string;
   foods: DetectedFood[];
   source: 'camera' | 'manual' | 'nutrition-label';
+  auth?: ApiAuth;
 }) {
   if (params.foods.length === 0) return;
   const totalCalories = params.foods.reduce((sum, item) => sum + item.nutrition.calories, 0);
@@ -84,7 +94,7 @@ export async function saveRecord(params: {
 
   await fetch(`${params.apiBaseUrl}/record`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(params.auth, 'application/json'),
     body: JSON.stringify({
       user_id: params.userId,
       meal_type: '點心',
@@ -114,8 +124,17 @@ export async function manualSearchFood(params: {
   apiBaseUrl: string;
   keyword: string;
   limit?: number;
+  userId?: string;
+  auth?: ApiAuth;
 }): Promise<DetectedFood[]> {
-  const resp = await fetch(`${params.apiBaseUrl}/search/food?q=${encodeURIComponent(params.keyword)}&limit=${params.limit || 6}`);
+  const query = new URLSearchParams({
+    q: params.keyword,
+    limit: String(params.limit || 6),
+  });
+  if (params.userId) query.set('user_id', params.userId);
+  const resp = await fetch(`${params.apiBaseUrl}/search/food?${query.toString()}`, {
+    headers: buildHeaders(params.auth),
+  });
   const data = await resp.json();
   if (!resp.ok) {
     throw new Error(data.error || '搜尋失敗');
@@ -162,10 +181,11 @@ export async function saveCustomFood(params: {
   apiBaseUrl: string;
   userId: string;
   draft: OCRDraft;
+  auth?: ApiAuth;
 }) {
   const resp = await fetch(`${params.apiBaseUrl}/custom-food`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(params.auth, 'application/json'),
     body: JSON.stringify({
       user_id: params.userId,
       name_zh: params.draft.product_name,

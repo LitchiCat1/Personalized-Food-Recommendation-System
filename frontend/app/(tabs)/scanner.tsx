@@ -144,6 +144,7 @@ export default function ScannerScreen() {
     setScanning,
     addMealFromScan,
     apiBaseUrl,
+    accessToken,
     isCameraActive,
     setCameraActive,
     user,
@@ -284,7 +285,7 @@ export default function ScannerScreen() {
 
     setManualSearching(true);
     try {
-      const foods = await manualSearchFood({ apiBaseUrl, keyword, limit: 6 });
+      const foods = await manualSearchFood({ apiBaseUrl, keyword, limit: 6, userId: user.userId, auth: { accessToken } });
       setManualResults(foods);
       if (foods.length === 0) {
         Alert.alert('查無結果', '請試試更短的關鍵字或常見食品名稱');
@@ -298,7 +299,7 @@ export default function ScannerScreen() {
 
   const persistRecord = async (foods: DetectedFood[], source: 'camera' | 'manual' | 'nutrition-label') => {
     try {
-      await saveRecord({ apiBaseUrl, userId: user.userId, foods, source });
+      await saveRecord({ apiBaseUrl, userId: user.userId, foods, source, auth: { accessToken } });
     } catch {
       // Keep local-first UX even if backend record persistence fails.
     }
@@ -321,7 +322,7 @@ export default function ScannerScreen() {
   const handleSaveCustomFood = async () => {
     if (!ocrDraft) return;
     try {
-      const data = await saveCustomFood({ apiBaseUrl, userId: user.userId, draft: ocrDraft });
+      const data = await saveCustomFood({ apiBaseUrl, userId: user.userId, draft: ocrDraft, auth: { accessToken } });
       Alert.alert('自訂食品已儲存', `${data.food?.name_zh || ocrDraft.product_name} 之後可直接搜尋使用`);
     } catch {
       Alert.alert('儲存失敗', '請稍後再試');

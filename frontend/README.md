@@ -43,6 +43,17 @@ EXPO_PUBLIC_API_BASE_URL=http://你的電腦IP:5000
 
 如果沒有設定，系統會嘗試自動推導 Expo 開發主機的 IP。
 
+## Supabase Auth
+
+若要啟用正式登入/註冊與後端 `user_id` 權限隔離，需在 `frontend/.env.local` 設定：
+
+```env
+EXPO_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+```
+
+設定後，前端會顯示 Supabase Auth 登入/註冊畫面，並在呼叫 user scoped API 時附上 `Authorization: Bearer <access_token>`。若未設定 Supabase Auth 變數，前端會維持 demo 模式。
+
 ## 開發原則
 
 1. 新的 API 呼叫優先加到 `lib/api.ts`
@@ -70,7 +81,7 @@ EXPO_PUBLIC_API_BASE_URL=http://你的電腦IP:5000
 ## 後續優化方向
 
 1. 補上可編輯的 profile 表單欄位：身高、體重、年齡、活動量、目標熱量、目標體重、飲食型態
-2. 補上正式身份驗證與 user_id 權限隔離，目前仍使用 `demo_user` 作為測試入口
+2. 完成 Supabase Auth 遠端驗收並將 Render `SUPABASE_AUTH_REQUIRED` 切為 `true`
 3. 補上新增餐點失敗時的重試或待同步狀態，目前 scanner 採 local-first UX
 4. 將健康餐點推薦資料源改成可更新的外部資料表或正式 API
 5. 把更多資料轉換邏輯從頁面搬到 `lib/` 或 hooks

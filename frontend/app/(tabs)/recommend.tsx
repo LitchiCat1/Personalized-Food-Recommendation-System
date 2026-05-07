@@ -21,7 +21,7 @@ function formatReason(item: RecommendationItem) {
 
 export default function RecommendScreen() {
   const { rs, isSmall } = useResponsive();
-  const { user, apiBaseUrl } = useStore();
+  const { user, apiBaseUrl, accessToken } = useStore();
   const [data, setData] = useState<RecommendationResponse | null>(null);
   const [healthyData, setHealthyData] = useState<HealthyFoodResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +36,7 @@ export default function RecommendScreen() {
     setLoading(true);
     setError(null);
 
-    fetchRecommendations(apiBaseUrl, user.userId)
+    fetchRecommendations(apiBaseUrl, user.userId, { accessToken })
       .then((result) => {
         if (!cancelled) {
           setData(result);
@@ -56,7 +56,7 @@ export default function RecommendScreen() {
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, user.userId]);
+  }, [accessToken, apiBaseUrl, user.userId]);
 
   const recommended = data?.recommended || [];
   const filteredOut = data?.filtered_out || [];
@@ -77,11 +77,16 @@ export default function RecommendScreen() {
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
       setLocationLabel(`目前定位：${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-      const result = await fetchHealthyFoodRecommendations(apiBaseUrl, user.userId, {
-        budget: Number(budget) || 150,
-        lat,
-        lng,
-      });
+      const result = await fetchHealthyFoodRecommendations(
+        apiBaseUrl,
+        user.userId,
+        {
+          budget: Number(budget) || 150,
+          lat,
+          lng,
+        },
+        { accessToken }
+      );
       setHealthyData(result);
     } catch (err: any) {
       setHealthyError(err?.message || '無法取得健康餐點推薦');

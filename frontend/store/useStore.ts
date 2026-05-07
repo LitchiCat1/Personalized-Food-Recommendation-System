@@ -46,6 +46,11 @@ export interface ScanResult {
 export interface NutriLensState {
   // User
   user: UserProfile;
+  accessToken: string | null;
+  authReady: boolean;
+  isAuthenticated: boolean;
+  setAuthSession: (session: { userId: string; email?: string | null; accessToken: string | null } | null) => void;
+  setAuthReady: (ready: boolean) => void;
   updateUserField: <K extends keyof UserProfile>(key: K, value: UserProfile[K]) => void;
   replaceUser: (user: UserProfile) => void;
   toggleCondition: (condition: string) => void;
@@ -105,6 +110,28 @@ export const useStore = create<NutriLensState>((set, get) => ({
     targetWeight: USER_PROFILE.goals.targetWeight,
     dietType: USER_PROFILE.goals.dietType,
   },
+
+  accessToken: null,
+  authReady: false,
+  isAuthenticated: false,
+
+  setAuthReady: (ready) => set({ authReady: ready }),
+
+  setAuthSession: (session) =>
+    set((state) => {
+      if (!session) {
+        return { accessToken: null, isAuthenticated: false };
+      }
+      return {
+        accessToken: session.accessToken,
+        isAuthenticated: true,
+        user: {
+          ...state.user,
+          userId: session.userId,
+          email: session.email || state.user.email,
+        },
+      };
+    }),
 
   updateUserField: (key, value) =>
     set((state) => ({ user: { ...state.user, [key]: value } })),

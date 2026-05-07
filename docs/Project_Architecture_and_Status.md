@@ -529,7 +529,7 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 | 6 | YOLO/TFDA 映射擴充 | MVP 可用 | 食物 label 已映射；容器/餐具會回傳搜尋建議 | 尚未訓練食物專用模型，混合餐與台灣小吃仍依賴手動搜尋/OCR |
 | 7 | 份量估算校正 | MVP 可用 | 掃描結果可調整重量並即時重算營養 | 尚未用校正資料反饋 density，也沒有參考物/深度感測自動校正 |
 | 8 | 測試與 CI | 基礎 CI 已完成 | `.github/workflows/ci.yml` 會跑後端 syntax check 與前端 `npm run typecheck` | 尚無 pytest/unit test、前端 test、e2e、正式 build check |
-| 9 | 使用者身份驗證 | 部分完成 | 後端已可選式驗證 Supabase Bearer token 與 `user_id` 權限 | 尚無前端登入/註冊、session 管理與 token 傳遞；Render 目前仍關閉強制驗證 |
+| 9 | 使用者身份驗證 | 部分完成 | 後端已可選式驗證 Supabase Bearer token 與 `user_id` 權限；前端已支援 Supabase Auth session 與 Bearer token 傳遞 | 尚未完成正式遠端登入驗收；Render 目前仍關閉強制驗證 |
 | 10 | Render + Supabase 實測檢查流程 | 已完成首次驗證 | 已記錄 Render URL、Supabase 實測結果與遠端 `/health` 摘要 | 尚需維護後續部署紀錄與正式前端連線驗收 |
 
 ## 14. 重新標註的未完成清單
@@ -538,8 +538,8 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 
 ### 14.1 最高優先級
 
-1. 完成前端 Supabase Auth：登入/註冊、session 管理、API request 帶 Bearer token。
-2. 將 Render `SUPABASE_AUTH_REQUIRED` 切為 `true`，完成正式資料隔離驗收。
+1. 設定前端 `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 並完成登入/註冊遠端驗收。
+2. 將 Render `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` 補齊並把 `SUPABASE_AUTH_REQUIRED` 切為 `true`。
 3. 建立完整測試：新增後端 smoke/unit tests、前端 test/e2e、正式 build check。
 
 ### 14.2 中優先級

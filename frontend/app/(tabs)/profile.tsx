@@ -11,7 +11,7 @@ import { fetchUserProfile, saveUserProfile } from '@/lib/api';
 
 export default function ProfileScreen() {
   const { rs, isSmall, gridCol2 } = useResponsive();
-  const { user, toggleCondition, toggleAllergen, apiBaseUrl, replaceUser } = useStore();
+  const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser } = useStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -23,7 +23,7 @@ export default function ProfileScreen() {
   useEffect(() => {
     let cancelled = false;
 
-    fetchUserProfile(apiBaseUrl, user.userId)
+    fetchUserProfile(apiBaseUrl, user.userId, { accessToken })
       .then((data) => {
         if (cancelled) return;
         replaceUser({
@@ -63,7 +63,7 @@ export default function ProfileScreen() {
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, fallbackTargetWeight, replaceUser, user.userId, userEmail, userStreak, userTotalMeals]);
+  }, [accessToken, apiBaseUrl, fallbackTargetWeight, replaceUser, user.userId, userEmail, userStreak, userTotalMeals]);
 
   const syncProfile = async (nextUser = user) => {
     setSaving(true);
@@ -82,7 +82,7 @@ export default function ProfileScreen() {
         allergens: nextUser.allergens,
         target_weight: nextUser.targetWeight,
         diet_type: nextUser.dietType,
-      });
+      }, { accessToken });
 
       replaceUser({
         ...nextUser,

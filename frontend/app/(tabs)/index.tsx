@@ -29,7 +29,7 @@ function getLocalDateString(): string {
 
 export default function DashboardScreen() {
   const { rs, isSmall } = useResponsive();
-  const { dailyNutrition, todayMeals, healthAlerts, user, apiBaseUrl, replaceDashboardFromRecords } = useStore();
+  const { dailyNutrition, todayMeals, healthAlerts, user, apiBaseUrl, accessToken, replaceDashboardFromRecords } = useStore();
   const [syncing, setSyncing] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
   const { calories, protein, carbs, fat, sodium, fiber } = dailyNutrition;
@@ -39,7 +39,7 @@ export default function DashboardScreen() {
     setSyncing(true);
     setSyncError(null);
 
-    fetchRecords(apiBaseUrl, user.userId, getLocalDateString())
+    fetchRecords(apiBaseUrl, user.userId, getLocalDateString(), { accessToken })
       .then((data) => {
         if (cancelled) return;
         replaceDashboardFromRecords(data.records || []);
@@ -58,7 +58,7 @@ export default function DashboardScreen() {
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, replaceDashboardFromRecords, user.userId]);
+  }, [accessToken, apiBaseUrl, replaceDashboardFromRecords, user.userId]);
 
   return (
     <AppContainer>

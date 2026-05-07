@@ -13,12 +13,14 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const isCameraActive = useStore((s) => s.isCameraActive);
   const apiBaseUrl = useStore((s) => s.apiBaseUrl);
+  const accessToken = useStore((s) => s.accessToken);
+  const isAuthenticated = useStore((s) => s.isAuthenticated);
 
   useEffect(() => {
     let cancelled = false;
     const currentUser = useStore.getState().user;
 
-    fetchUserProfile(apiBaseUrl, currentUser.userId)
+    fetchUserProfile(apiBaseUrl, currentUser.userId, { accessToken })
       .then((data) => {
         if (cancelled) return;
         const latestUser = useStore.getState().user;
@@ -49,7 +51,7 @@ export default function TabLayout() {
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl]);
+  }, [accessToken, apiBaseUrl, isAuthenticated]);
 
   // Fix #2: Proper bottom safe area for Samsung virtual buttons
   const bottomInset = Math.max(insets.bottom, 8);

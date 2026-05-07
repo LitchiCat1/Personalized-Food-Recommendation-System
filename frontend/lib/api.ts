@@ -143,6 +143,17 @@ export type UserProfileResponse = {
   diet_type: string;
 };
 
+export type ApiAuth = {
+  accessToken?: string | null;
+};
+
+function buildHeaders(auth?: ApiAuth, contentType?: string): HeadersInit {
+  const headers: Record<string, string> = {};
+  if (contentType) headers['Content-Type'] = contentType;
+  if (auth?.accessToken) headers.Authorization = `Bearer ${auth.accessToken}`;
+  return headers;
+}
+
 async function parseJson<T>(resp: Response): Promise<T> {
   const data = await resp.json();
   if (!resp.ok) {
@@ -151,31 +162,39 @@ async function parseJson<T>(resp: Response): Promise<T> {
   return data as T;
 }
 
-export async function fetchHistory(apiBaseUrl: string, userId: string, days = 7): Promise<HistoryResponse> {
-  const resp = await fetch(`${apiBaseUrl}/history/${encodeURIComponent(userId)}?days=${days}`);
+export async function fetchHistory(apiBaseUrl: string, userId: string, days = 7, auth?: ApiAuth): Promise<HistoryResponse> {
+  const resp = await fetch(`${apiBaseUrl}/history/${encodeURIComponent(userId)}?days=${days}`, {
+    headers: buildHeaders(auth),
+  });
   return parseJson<HistoryResponse>(resp);
 }
 
-export async function fetchRecords(apiBaseUrl: string, userId: string, date?: string): Promise<RecordsResponse> {
+export async function fetchRecords(apiBaseUrl: string, userId: string, date?: string, auth?: ApiAuth): Promise<RecordsResponse> {
   const query = date ? `?date=${encodeURIComponent(date)}` : '';
-  const resp = await fetch(`${apiBaseUrl}/records/${encodeURIComponent(userId)}${query}`);
+  const resp = await fetch(`${apiBaseUrl}/records/${encodeURIComponent(userId)}${query}`, {
+    headers: buildHeaders(auth),
+  });
   return parseJson<RecordsResponse>(resp);
 }
 
-export async function fetchRecommendations(apiBaseUrl: string, userId: string): Promise<RecommendationResponse> {
-  const resp = await fetch(`${apiBaseUrl}/recommend/${encodeURIComponent(userId)}`);
+export async function fetchRecommendations(apiBaseUrl: string, userId: string, auth?: ApiAuth): Promise<RecommendationResponse> {
+  const resp = await fetch(`${apiBaseUrl}/recommend/${encodeURIComponent(userId)}`, {
+    headers: buildHeaders(auth),
+  });
   return parseJson<RecommendationResponse>(resp);
 }
 
-export async function fetchUserProfile(apiBaseUrl: string, userId: string): Promise<UserProfileResponse> {
-  const resp = await fetch(`${apiBaseUrl}/user/${encodeURIComponent(userId)}`);
+export async function fetchUserProfile(apiBaseUrl: string, userId: string, auth?: ApiAuth): Promise<UserProfileResponse> {
+  const resp = await fetch(`${apiBaseUrl}/user/${encodeURIComponent(userId)}`, {
+    headers: buildHeaders(auth),
+  });
   return parseJson<UserProfileResponse>(resp);
 }
 
-export async function saveUserProfile(apiBaseUrl: string, payload: Record<string, unknown>) {
+export async function saveUserProfile(apiBaseUrl: string, payload: Record<string, unknown>, auth?: ApiAuth) {
   const resp = await fetch(`${apiBaseUrl}/user`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(auth, 'application/json'),
     body: JSON.stringify(payload),
   });
   return parseJson<{ message: string; user: UserProfileResponse }>(resp);
@@ -184,13 +203,16 @@ export async function saveUserProfile(apiBaseUrl: string, payload: Record<string
 export async function fetchHealthyFoodRecommendations(
   apiBaseUrl: string,
   userId: string,
-  params: { budget: number; lat: number; lng: number }
+  params: { budget: number; lat: number; lng: number },
+  auth?: ApiAuth
 ): Promise<HealthyFoodResponse> {
   const query = new URLSearchParams({
     budget: String(params.budget),
     lat: String(params.lat),
     lng: String(params.lng),
   });
-  const resp = await fetch(`${apiBaseUrl}/healthy-food-recommend/${encodeURIComponent(userId)}?${query.toString()}`);
+  const resp = await fetch(`${apiBaseUrl}/healthy-food-recommend/${encodeURIComponent(userId)}?${query.toString()}`, {
+    headers: buildHeaders(auth),
+  });
   return parseJson<HealthyFoodResponse>(resp);
 }

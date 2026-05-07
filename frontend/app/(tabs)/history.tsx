@@ -31,7 +31,7 @@ function buildInsights(summary: HistoryResponse['summary'], daily: HistoryDay[],
 
 export default function HistoryScreen() {
   const { rs, isSmall } = useResponsive();
-  const { user, apiBaseUrl } = useStore();
+  const { user, apiBaseUrl, accessToken } = useStore();
   const target = user.dailyCalorieTarget;
   const [history, setHistory] = useState<HistoryResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,7 +42,7 @@ export default function HistoryScreen() {
     setLoading(true);
     setError(null);
 
-    fetchHistory(apiBaseUrl, user.userId, 7)
+    fetchHistory(apiBaseUrl, user.userId, 7, { accessToken })
       .then((data) => {
         if (!cancelled) {
           setHistory(data);
@@ -62,7 +62,7 @@ export default function HistoryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, user.userId]);
+  }, [accessToken, apiBaseUrl, user.userId]);
 
   const daily = useMemo(() => history?.daily || [], [history]);
   const summary = useMemo(() => history?.summary || {}, [history]);

@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
+import AuthGate from '@/components/AuthGate';
 import { Palette } from '@/constants/theme';
 
 // Force dark mode for the entire app
@@ -26,11 +27,13 @@ export const unstable_settings = {
 export default function RootLayout() {
   return (
     <ThemeProvider value={NutriLensDarkTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="light" />
+      <AuthGate>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        </Stack>
+        <StatusBar style="light" />
+      </AuthGate>
     </ThemeProvider>
   );
 }

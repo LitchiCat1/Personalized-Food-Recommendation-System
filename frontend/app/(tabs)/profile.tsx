@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, TextInput, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
@@ -168,30 +168,47 @@ export default function ProfileScreen() {
     Alert.alert('個人檔案已更新', '身體數據與飲食目標已同步到後端。');
   };
 
-  const handleSignOut = () => {
+  const performSignOut = async () => {
     if (!isSupabaseAuthConfigured || !supabase) {
       Alert.alert('Demo 模式', '目前未設定 Supabase Auth，無需登出。');
       return;
     }
     const supabaseClient = supabase;
 
+    setSigningOut(true);
+    try {
+      const { error: signOutError } = await supabaseClient.auth.signOut();
+      if (signOutError) throw signOutError;
+      useStore.getState().setAuthSession(null);
+    } catch (err: any) {
+      Alert.alert('登出失敗', err?.message || '請稍後再試。');
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
+  const handleSignOut = () => {
+    if (!isSupabaseAuthConfigured || !supabase) {
+      Alert.alert('Demo 模式', '目前未設定 Supabase Auth，無需登出。');
+      return;
+    }
+
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window === 'undefined'
+        ? true
+        : window.confirm('登出後需要重新登入才能讀取你的雲端資料。');
+      if (confirmed) {
+        void performSignOut();
+      }
+      return;
+    }
+
     Alert.alert('登出 NutriLens', '登出後需要重新登入才能讀取你的雲端資料。', [
       { text: '取消', style: 'cancel' },
       {
         text: '登出',
         style: 'destructive',
-        onPress: async () => {
-          setSigningOut(true);
-          try {
-            const { error: signOutError } = await supabaseClient.auth.signOut();
-            if (signOutError) throw signOutError;
-            useStore.getState().setAuthSession(null);
-          } catch (err: any) {
-            Alert.alert('登出失敗', err?.message || '請稍後再試。');
-          } finally {
-            setSigningOut(false);
-          }
-        },
+        onPress: () => { void performSignOut(); },
       },
     ]);
   };

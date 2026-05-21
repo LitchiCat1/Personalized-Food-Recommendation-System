@@ -17,12 +17,17 @@ export default function TabLayout() {
   const isAuthenticated = useStore((s) => s.isAuthenticated);
 
   useEffect(() => {
+    if (!isAuthenticated || !accessToken) {
+      return;
+    }
+
     let cancelled = false;
     const currentUser = useStore.getState().user;
 
     fetchUserProfile(apiBaseUrl, currentUser.userId, { accessToken })
       .then((data) => {
         if (cancelled) return;
+        if (!useStore.getState().isAuthenticated) return;
         const latestUser = useStore.getState().user;
         useStore.getState().replaceUser({
           ...latestUser,

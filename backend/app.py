@@ -8,7 +8,7 @@ import json
 import math
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 import cv2
 import numpy as np
@@ -19,10 +19,10 @@ from flask_cors import CORS
 from ultralytics import YOLO
 from repositories.storage import StorageRepository
 from services.auth_service import AuthError, is_auth_required, verify_supabase_user
-from services.disease_rule_service import load_disease_rules
+from services.disease_rule_service import build_disease_rules_response, load_disease_rules
 from services.env_service import load_local_env
 from services.history_service import build_history_response
-from services.healthy_food_service import build_healthy_food_recommendations
+from services.healthy_food_service import build_healthy_food_recommendations, load_restaurant_catalog
 from services.food_service import build_custom_food_doc, search_foods
 from services.nutrition_label_service import (
     build_custom_food_search_result,
@@ -56,6 +56,7 @@ if database_url:
         print(f"[!] PostgreSQL unavailable — {e}")
 
 # ─── Optional MongoDB (graceful fallback to in-memory) ────────
+mongo = None
 try:
     from pymongo import MongoClient
     MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
@@ -65,6 +66,8 @@ try:
     USE_MONGO = True
     print("[✓] MongoDB connected")
 except Exception:
+    if mongo is not None:
+        mongo.close()
     USE_MONGO = False
     db = None
     print("[!] MongoDB unavailable — using in-memory storage")
@@ -73,7 +76,8 @@ except Exception:
 _mem_users = {}
 _mem_records = []
 _mem_custom_foods = []
-storage = StorageRepository(db, USE_MONGO, _mem_users, _mem_records, _mem_custom_foods, pg_conn=pg_conn)
+_mem_recommendation_feedback = []
+storage = StorageRepository(db, USE_MONGO, _mem_users, _mem_records, _mem_custom_foods, _mem_recommendation_feedback, pg_conn=pg_conn)
 
 app = Flask(__name__)
 CORS(app)
@@ -136,6 +140,9 @@ except FileNotFoundError:
 DISEASE_RULES = load_disease_rules(BASE_DIR)
 print(f"[✓] Disease rules loaded: {len(DISEASE_RULES)} conditions")
 
+RESTAURANT_CATALOG = load_restaurant_catalog(BASE_DIR)
+print(f"[✓] Restaurant catalog loaded: {len(RESTAURANT_CATALOG)} restaurants")
+
 
 # ═══════════════════════════════════════════════════════════════
 #  API Routes
@@ -153,8 +160,15 @@ def health():
         "foods_in_db": len(NUTRITION_DB),
         "foods_in_tfda": len(TFDA_DB),
         "disease_rules": len(DISEASE_RULES),
+        "disease_rule_review_status": build_disease_rules_response(DISEASE_RULES)["review_status_counts"],
+        "restaurants": len(RESTAURANT_CATALOG),
         "custom_foods": len(storage.get_custom_foods()),
     })
+
+
+@app.route("/disease-rules", methods=["GET"])
+def disease_rules():
+    return jsonify(build_disease_rules_response(DISEASE_RULES))
 
 
 @app.route("/warmup", methods=["POST"])
@@ -339,7 +353,8 @@ def add_record():
 
     record = {
         "user_id": data.get("user_id"),
-        "timestamp": data.get("timestamp", datetime.utcnow().isoformat()),
+        "client_record_id": data.get("client_record_id"),
+        "timestamp": data.get("timestamp", datetime.now(timezone.utc).replace(tzinfo=None).isoformat()),
         "meal_type": data.get("meal_type", "午餐"),
         "foods": data.get("foods", []),
         "total_calories": data.get("total_calories", 0),
@@ -351,9 +366,13 @@ def add_record():
         "source": data.get("source", "camera"),  # camera | manual
     }
 
-    storage.insert_record(record)
+    saved_record = storage.insert_record(record)
 
-    return jsonify({"message": "飲食紀錄已儲存", "record": record}), 201
+    if saved_record.get("_deduplicated"):
+        saved_record = {key: value for key, value in saved_record.items() if key != "_deduplicated"}
+        return jsonify({"message": "飲食紀錄已存在", "record": saved_record, "deduplicated": True}), 200
+
+    return jsonify({"message": "飲食紀錄已儲存", "record": saved_record, "deduplicated": False}), 201
 
 
 @app.route("/records/<user_id>", methods=["GET"])
@@ -395,10 +414,44 @@ def healthy_food_recommend(user_id):
         "lat": request.args.get("lat", 25.0338),
         "lng": request.args.get("lng", 121.5645),
     }
-    result = build_healthy_food_recommendations(storage, DISEASE_RULES, user_id, params)
+    result = build_healthy_food_recommendations(storage, DISEASE_RULES, RESTAURANT_CATALOG, user_id, params)
     if not result:
         return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
     return jsonify(result)
+
+
+@app.route("/recommend/<user_id>/feedback", methods=["POST"])
+def create_recommendation_feedback(user_id):
+    require_user_access(user_id)
+    data = request.get_json(silent=True) or {}
+    action = data.get("action")
+    if action not in {"accepted", "skipped", "disliked"}:
+        return jsonify({"error": "action 必須是 accepted、skipped 或 disliked"}), 400
+
+    item = data.get("item") or {}
+    item_label = item.get("label") or data.get("item_label")
+    if not item_label:
+        return jsonify({"error": "缺少 item.label"}), 400
+
+    feedback_doc = {
+        "user_id": user_id,
+        "action": action,
+        "item_label": item_label,
+        "item_name": item.get("name_zh") or item.get("item_name") or data.get("item_name"),
+        "item_source": item.get("source") or data.get("item_source"),
+        "item": item,
+        "created_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+    }
+    saved = storage.insert_recommendation_feedback(feedback_doc)
+    return jsonify({"message": "推薦回饋已儲存", "feedback": saved}), 201
+
+
+@app.route("/recommend/<user_id>/feedback", methods=["GET"])
+def list_recommendation_feedback(user_id):
+    require_user_access(user_id)
+    limit = min(int(request.args.get("limit", 100)), 500)
+    feedback = storage.get_recommendation_feedback(user_id, limit=limit)
+    return jsonify({"feedback": feedback, "count": len(feedback)})
 
 
 # ─── 6. BMR/TDEE Calculator (PRD: 動態計算) ─────────────────

@@ -1,57 +1,19 @@
-from datetime import datetime
+import json
+import os
+from datetime import datetime, timezone
 from math import cos, radians, sin, sqrt, atan2
 
 
-RESTAURANT_CATALOG = [
-    {
-        "restaurant_id": "fp_001",
-        "name": "原型健康餐盒",
-        "lat": 25.0338,
-        "lng": 121.5645,
-        "open_hours": ["11:00-20:30"],
-        "tags": ["高蛋白", "低鈉", "健康餐盒"],
-        "items": [
-            {"name": "舒肥雞胸餐盒", "price": 140, "calories": 520, "protein": 38, "carbs": 42, "fat": 12, "sodium": 480, "gi": "low"},
-            {"name": "鮭魚藜麥餐盒", "price": 180, "calories": 560, "protein": 34, "carbs": 40, "fat": 18, "sodium": 420, "gi": "low"},
-        ],
-    },
-    {
-        "restaurant_id": "fp_002",
-        "name": "日光沙拉廚房",
-        "lat": 25.0351,
-        "lng": 121.5622,
-        "open_hours": ["10:30-19:30"],
-        "tags": ["沙拉", "低 GI"],
-        "items": [
-            {"name": "雞胸酪梨沙拉", "price": 155, "calories": 430, "protein": 30, "carbs": 18, "fat": 22, "sodium": 360, "gi": "low"},
-            {"name": "豆腐藜麥碗", "price": 135, "calories": 410, "protein": 20, "carbs": 36, "fat": 14, "sodium": 300, "gi": "low"},
-        ],
-    },
-    {
-        "restaurant_id": "fp_003",
-        "name": "輕湯食堂",
-        "lat": 25.0316,
-        "lng": 121.5661,
-        "open_hours": ["11:00-14:00", "17:00-21:00"],
-        "tags": ["湯品", "暖食"],
-        "items": [
-            {"name": "蒸魚野菜套餐", "price": 170, "calories": 470, "protein": 33, "carbs": 35, "fat": 14, "sodium": 520, "gi": "low"},
-            {"name": "蕈菇雞湯麵", "price": 150, "calories": 590, "protein": 28, "carbs": 62, "fat": 16, "sodium": 680, "gi": "medium"},
-        ],
-    },
-    {
-        "restaurant_id": "fp_004",
-        "name": "晨間好食",
-        "lat": 25.0344,
-        "lng": 121.5604,
-        "open_hours": ["07:00-14:00"],
-        "tags": ["早餐", "輕食"],
-        "items": [
-            {"name": "鮪魚蛋吐司盒", "price": 95, "calories": 390, "protein": 24, "carbs": 34, "fat": 14, "sodium": 430, "gi": "medium"},
-            {"name": "燕麥優格水果杯", "price": 85, "calories": 320, "protein": 15, "carbs": 38, "fat": 9, "sodium": 120, "gi": "low"},
-        ],
-    },
-]
+def load_restaurant_catalog(base_dir: str) -> list[dict]:
+    catalog_path = os.environ.get(
+        "RESTAURANT_CATALOG_PATH",
+        os.path.join(base_dir, "data", "restaurant_catalog.json"),
+    )
+    with open(catalog_path, "r", encoding="utf-8") as f:
+        catalog = json.load(f)
+    if not isinstance(catalog, list):
+        raise ValueError("restaurant catalog must be a JSON array")
+    return catalog
 
 
 def is_open_now(open_hours: list[str], now: datetime) -> bool:
@@ -72,7 +34,7 @@ def haversine_km(lat1, lon1, lat2, lon2):
     return radius * c
 
 
-def build_healthy_food_recommendations(storage, disease_rules: dict, user_id: str, params: dict):
+def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_catalog: list[dict], user_id: str, params: dict):
     user = storage.get_user(user_id)
     if not user:
         return None
@@ -80,7 +42,7 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, user_id: st
     budget = int(params.get("budget", 150))
     lat = float(params.get("lat", 25.0338))
     lng = float(params.get("lng", 121.5645))
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     conditions = user.get("health_conditions", [])
     daily_target = user.get("daily_calorie_target", 2100)
 
@@ -104,7 +66,7 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, user_id: st
     recommendations = []
     filtered_out = []
 
-    for restaurant in RESTAURANT_CATALOG:
+    for restaurant in restaurant_catalog:
         distance_km = haversine_km(lat, lng, restaurant["lat"], restaurant["lng"])
         if distance_km > 5:
             continue

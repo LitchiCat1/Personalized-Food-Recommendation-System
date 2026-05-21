@@ -9,6 +9,8 @@ import AppContainer from '@/components/AppContainer';
 import {
   fetchHealthyFoodRecommendations,
   fetchRecommendations,
+  saveRecommendationFeedback,
+  type RecommendationFeedbackAction,
   type HealthyFoodResponse,
   type RecommendationItem,
   type RecommendationResponse,
@@ -28,6 +30,8 @@ export default function RecommendScreen() {
   const [healthyLoading, setHealthyLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [healthyError, setHealthyError] = useState<string | null>(null);
+  const [feedbackStatus, setFeedbackStatus] = useState<Record<string, RecommendationFeedbackAction>>({});
+  const [feedbackSavingKey, setFeedbackSavingKey] = useState<string | null>(null);
   const [budget, setBudget] = useState('150');
   const [locationLabel, setLocationLabel] = useState('尚未取得定位');
 
@@ -95,6 +99,19 @@ export default function RecommendScreen() {
     }
   };
 
+  const handleRecommendationFeedback = async (meal: RecommendationItem, action: RecommendationFeedbackAction) => {
+    const key = meal.label;
+    setFeedbackSavingKey(key);
+    try {
+      await saveRecommendationFeedback(apiBaseUrl, user.userId, action, meal, { accessToken });
+      setFeedbackStatus((current) => ({ ...current, [key]: action }));
+    } catch (err: any) {
+      setError(err?.message || '推薦回饋儲存失敗');
+    } finally {
+      setFeedbackSavingKey(null);
+    }
+  };
+
   return (
     <AppContainer>
       <View style={styles.header}>
@@ -150,7 +167,7 @@ export default function RecommendScreen() {
           {preferenceProfile && preferenceProfile.food_count > 0 ? (
             <View style={[styles.sourceCard, { padding: rs(12), borderColor: 'rgba(244,114,182,0.22)' }]}> 
               <Ionicons name="heart-outline" size={rs(14)} color={Palette.accent.pink} />
-              <Text style={[styles.sourceText, { fontSize: rs(11) }]}>已參考近期 {preferenceProfile.record_count} 筆紀錄、{preferenceProfile.food_count} 個食品建立偏好分數</Text>
+              <Text style={[styles.sourceText, { fontSize: rs(11) }]}>已參考近期 {preferenceProfile.record_count} 筆紀錄、{preferenceProfile.food_count} 個食品與 {preferenceProfile.feedback_count || 0} 筆推薦回饋建立偏好分數</Text>
             </View>
           ) : null}
 
@@ -203,6 +220,7 @@ export default function RecommendScreen() {
                       <Ionicons name="shield-checkmark-outline" size={rs(10)} color={Palette.text.tertiary} />
                       <Text style={[styles.mealMetaText, { fontSize: rs(10) }]}>{meal.source === 'TFDA' ? 'TFDA 官方資料' : meal.source === 'manual-db' ? '基礎資料庫' : '自訂食品'}</Text>
                       {(meal.preference_score || 0) > 0 ? <Text style={[styles.mealMetaText, { fontSize: rs(10), color: Palette.accent.pink }]}>偏好 +{meal.preference_score}</Text> : null}
+                      {(meal.feedback_adjustment || 0) !== 0 ? <Text style={[styles.mealMetaText, { fontSize: rs(10), color: (meal.feedback_adjustment || 0) > 0 ? Palette.accent.green : Palette.status.warning }]}>回饋 {meal.feedback_adjustment! > 0 ? '+' : ''}{meal.feedback_adjustment}</Text> : null}
                       {meal.gi ? <Text style={[styles.mealMetaText, { fontSize: rs(10) }]}>GI {meal.gi === 'low' ? '低' : meal.gi === 'medium' ? '中' : '高'}</Text> : null}
                     </View>
                   </View>
@@ -246,6 +264,36 @@ export default function RecommendScreen() {
                       <Text style={[styles.mealNutritionValue, { fontSize: rs(12), color: n.color }]}>{n.value}</Text>
                     </View>
                   ))}
+                </View>
+
+                <View style={styles.feedbackRow}>
+                  {[
+                    { action: 'accepted' as const, label: '採納', icon: 'checkmark-circle-outline' as const },
+                    { action: 'skipped' as const, label: '略過', icon: 'play-skip-forward-outline' as const },
+                    { action: 'disliked' as const, label: '不喜歡', icon: 'thumbs-down-outline' as const },
+                  ].map((item) => {
+                    const active = feedbackStatus[meal.label] === item.action;
+                    const saving = feedbackSavingKey === meal.label;
+                    return (
+                      <Pressable
+                        key={item.action}
+                        disabled={saving}
+                        onPress={() => handleRecommendationFeedback(meal, item.action)}
+                        style={({ pressed }) => [
+                          styles.feedbackButton,
+                          active && styles.feedbackButtonActive,
+                          (pressed || saving) && { opacity: 0.72 },
+                        ]}
+                      >
+                        {saving && item.action === 'accepted' ? (
+                          <ActivityIndicator size="small" color={Palette.accent.cyan} />
+                        ) : (
+                          <Ionicons name={item.icon} size={rs(12)} color={active ? Palette.accent.green : Palette.text.tertiary} />
+                        )}
+                        <Text style={[styles.feedbackButtonText, { fontSize: rs(10) }, active && styles.feedbackButtonTextActive]}>{item.label}</Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
             ))
@@ -434,6 +482,23 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   preferenceReasonText: { ...Typography.small, color: Palette.accent.pink },
+
+  feedbackRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
+  feedbackButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    backgroundColor: Palette.bg.elevated,
+    paddingVertical: Spacing.sm,
+  },
+  feedbackButtonActive: { borderColor: 'rgba(74,222,128,0.35)', backgroundColor: Palette.accent.greenDim },
+  feedbackButtonText: { ...Typography.small, color: Palette.text.tertiary },
+  feedbackButtonTextActive: { color: Palette.accent.green },
 
   mealNutritionRow: {
     flexDirection: 'row', backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, overflow: 'hidden',

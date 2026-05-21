@@ -1,11 +1,11 @@
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from psycopg2.extras import Json, RealDictCursor
 
 
 class StorageRepository:
-    def __init__(self, db, use_mongo: bool, mem_users: dict, mem_records: list, mem_custom_foods: list, pg_conn=None):
+    def __init__(self, db, use_mongo: bool, mem_users: dict, mem_records: list, mem_custom_foods: list, mem_recommendation_feedback: list | None = None, pg_conn=None):
         self.db = db
         self.use_mongo = use_mongo
         self.pg_conn = pg_conn
@@ -13,6 +13,7 @@ class StorageRepository:
         self.mem_users = mem_users
         self.mem_records = mem_records
         self.mem_custom_foods = mem_custom_foods
+        self.mem_recommendation_feedback = mem_recommendation_feedback if mem_recommendation_feedback is not None else []
         if self.use_postgres:
             self._init_postgres_tables()
 
@@ -32,6 +33,7 @@ class StorageRepository:
                 CREATE TABLE IF NOT EXISTS records (
                     id BIGSERIAL PRIMARY KEY,
                     user_id TEXT NOT NULL,
+                    client_record_id TEXT,
                     timestamp TEXT NOT NULL,
                     meal_type TEXT,
                     foods JSONB,
@@ -45,6 +47,7 @@ class StorageRepository:
                 );
                 """
             )
+            cursor.execute("ALTER TABLE records ADD COLUMN IF NOT EXISTS client_record_id TEXT;")
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS custom_foods (
@@ -55,8 +58,24 @@ class StorageRepository:
                 );
                 """
             )
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS recommendation_feedback (
+                    id BIGSERIAL PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    item_label TEXT NOT NULL,
+                    item_name TEXT,
+                    item_source TEXT,
+                    action TEXT NOT NULL,
+                    doc JSONB NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                );
+                """
+            )
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_records_user_timestamp ON records (user_id, timestamp DESC);")
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_records_user_client_record ON records (user_id, client_record_id) WHERE client_record_id IS NOT NULL;")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_custom_foods_user_id ON custom_foods (user_id);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_recommendation_feedback_user_created ON recommendation_feedback (user_id, created_at DESC);")
 
     def _fetch_json_doc(self, table: str, key_field: str, key_value: str):
         with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -91,18 +110,23 @@ class StorageRepository:
         return user_doc
 
     def insert_record(self, record: dict):
+        existing = self.get_record_by_client_record_id(record.get("user_id"), record.get("client_record_id"))
+        if existing:
+            return {**existing, "_deduplicated": True}
+
         if self.use_postgres:
             with self.pg_conn.cursor() as cursor:
                 cursor.execute(
                     """
                     INSERT INTO records (
-                        user_id, timestamp, meal_type, foods,
+                        user_id, client_record_id, timestamp, meal_type, foods,
                         total_calories, total_protein, total_carbs,
                         total_fat, total_sodium, total_fiber, source
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         record.get("user_id"),
+                        record.get("client_record_id"),
                         record.get("timestamp"),
                         record.get("meal_type"),
                         Json(record.get("foods", [])),
@@ -122,10 +146,34 @@ class StorageRepository:
             self.mem_records.append(record)
         return record
 
+    def get_record_by_client_record_id(self, user_id: str | None, client_record_id: str | None):
+        if not user_id or not client_record_id:
+            return None
+        if self.use_postgres:
+            with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    SELECT user_id, client_record_id, timestamp, meal_type, foods, total_calories, total_protein,
+                           total_carbs, total_fat, total_sodium, total_fiber, source
+                    FROM records
+                    WHERE user_id = %s AND client_record_id = %s
+                    LIMIT 1
+                    """,
+                    (user_id, client_record_id),
+                )
+                row = cursor.fetchone()
+            return dict(row) if row else None
+        if self.use_mongo:
+            return self.db.records.find_one({"user_id": user_id, "client_record_id": client_record_id}, {"_id": 0})
+        for record in self.mem_records:
+            if record.get("user_id") == user_id and record.get("client_record_id") == client_record_id:
+                return record
+        return None
+
     def get_records(self, user_id: str, date_str: str | None = None, limit: int = 50):
         if self.use_postgres:
             sql = """
-                SELECT user_id, timestamp, meal_type, foods, total_calories, total_protein,
+                SELECT user_id, client_record_id, timestamp, meal_type, foods, total_calories, total_protein,
                        total_carbs, total_fat, total_sodium, total_fiber, source
                 FROM records
                 WHERE user_id = %s
@@ -153,10 +201,10 @@ class StorageRepository:
         return records[:limit]
 
     def get_today_records(self, user_id: str):
-        return self.get_records(user_id, datetime.utcnow().strftime("%Y-%m-%d"), limit=500)
+        return self.get_records(user_id, datetime.now(timezone.utc).strftime("%Y-%m-%d"), limit=500)
 
     def get_history(self, user_id: str, days: int):
-        end_date = datetime.utcnow()
+        end_date = datetime.now(timezone.utc).replace(tzinfo=None)
         start_date = end_date - timedelta(days=days)
 
         if self.use_postgres:
@@ -301,3 +349,45 @@ class StorageRepository:
             else:
                 self.mem_custom_foods.append(food_doc)
         return food_doc
+
+    def insert_recommendation_feedback(self, feedback_doc: dict):
+        if self.use_postgres:
+            with self.pg_conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO recommendation_feedback (user_id, item_label, item_name, item_source, action, doc, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                    """,
+                    (
+                        feedback_doc.get("user_id"),
+                        feedback_doc.get("item_label"),
+                        feedback_doc.get("item_name"),
+                        feedback_doc.get("item_source"),
+                        feedback_doc.get("action"),
+                        Json(feedback_doc),
+                    ),
+                )
+            return feedback_doc
+        if self.use_mongo:
+            self.db.recommendation_feedback.insert_one(feedback_doc)
+        else:
+            self.mem_recommendation_feedback.append(feedback_doc)
+        return feedback_doc
+
+    def get_recommendation_feedback(self, user_id: str, limit: int = 100):
+        if self.use_postgres:
+            with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    SELECT doc FROM recommendation_feedback
+                    WHERE user_id = %s
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                    """,
+                    (user_id, limit),
+                )
+                rows = cursor.fetchall()
+            return [row["doc"] for row in rows]
+        if self.use_mongo:
+            return list(self.db.recommendation_feedback.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).limit(limit))
+        return [doc for doc in reversed(self.mem_recommendation_feedback) if doc.get("user_id") == user_id][:limit]

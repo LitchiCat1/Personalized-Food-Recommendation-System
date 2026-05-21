@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
@@ -8,6 +8,7 @@ import { useStore } from '@/store/useStore';
 import { useResponsive } from '@/hooks/useResponsive';
 import AppContainer from '@/components/AppContainer';
 import { fetchUserProfile, saveUserProfile } from '@/lib/api';
+import { isSupabaseAuthConfigured, supabase } from '@/lib/supabase';
 
 export default function ProfileScreen() {
   const { rs, isSmall, gridCol2 } = useResponsive();
@@ -15,6 +16,17 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [profileDraft, setProfileDraft] = useState({
+    name: user.name,
+    height: String(user.height),
+    weight: String(user.weight),
+    age: String(user.age),
+    activityMultiplier: String(user.activityMultiplier),
+    dailyCalorieTarget: String(user.dailyCalorieTarget),
+    targetWeight: String(user.targetWeight || ''),
+    dietType: user.dietType,
+  });
   const fallbackTargetWeight = user.targetWeight;
   const userEmail = user.email;
   const userStreak = user.streak;
@@ -83,6 +95,19 @@ export default function ProfileScreen() {
     };
   }, [accessToken, apiBaseUrl, fallbackTargetWeight, replaceUser, user.userId, userEmail, userStreak, userTotalMeals]);
 
+  useEffect(() => {
+    setProfileDraft({
+      name: user.name,
+      height: String(user.height),
+      weight: String(user.weight),
+      age: String(user.age),
+      activityMultiplier: String(user.activityMultiplier),
+      dailyCalorieTarget: String(user.dailyCalorieTarget),
+      targetWeight: String(user.targetWeight || ''),
+      dietType: user.dietType,
+    });
+  }, [user.name, user.height, user.weight, user.age, user.activityMultiplier, user.dailyCalorieTarget, user.targetWeight, user.dietType]);
+
   const syncProfile = async (nextUser = user) => {
     setSaving(true);
     try {
@@ -115,6 +140,60 @@ export default function ProfileScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const updateDraft = (key: keyof typeof profileDraft, value: string) => {
+    setProfileDraft((draft) => ({ ...draft, [key]: value }));
+  };
+
+  const parsePositiveNumber = (value: string, fallback: number) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  };
+
+  const handleSaveProfileFields = async () => {
+    const nextUser = {
+      ...user,
+      name: profileDraft.name.trim() || user.name,
+      height: parsePositiveNumber(profileDraft.height, user.height),
+      weight: parsePositiveNumber(profileDraft.weight, user.weight),
+      age: Math.round(parsePositiveNumber(profileDraft.age, user.age)),
+      activityMultiplier: parsePositiveNumber(profileDraft.activityMultiplier, user.activityMultiplier),
+      dailyCalorieTarget: Math.round(parsePositiveNumber(profileDraft.dailyCalorieTarget, user.dailyCalorieTarget)),
+      targetWeight: parsePositiveNumber(profileDraft.targetWeight, user.targetWeight),
+      dietType: profileDraft.dietType.trim() || user.dietType,
+    };
+
+    await syncProfile(nextUser);
+    Alert.alert('個人檔案已更新', '身體數據與飲食目標已同步到後端。');
+  };
+
+  const handleSignOut = () => {
+    if (!isSupabaseAuthConfigured || !supabase) {
+      Alert.alert('Demo 模式', '目前未設定 Supabase Auth，無需登出。');
+      return;
+    }
+    const supabaseClient = supabase;
+
+    Alert.alert('登出 NutriLens', '登出後需要重新登入才能讀取你的雲端資料。', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '登出',
+        style: 'destructive',
+        onPress: async () => {
+          setSigningOut(true);
+          try {
+            const { error: signOutError } = await supabaseClient.auth.signOut();
+            if (signOutError) throw signOutError;
+            useStore.getState().setAuthSession(null);
+          } catch (err: any) {
+            Alert.alert('登出失敗', err?.message || '請稍後再試。');
+          } finally {
+            setSigningOut(false);
+          }
+        },
+      },
+    ]);
   };
 
   const savingMessage = useMemo(() => {
@@ -158,6 +237,17 @@ export default function ProfileScreen() {
         <Text style={[styles.userName, { fontSize: rs(isSmall ? 22 : 26) }]}>{user.name}</Text>
         <Text style={[styles.userEmail, { fontSize: rs(13) }]}>{user.email}</Text>
 
+        <View style={styles.sessionBadge}>
+          <Ionicons
+            name={isSupabaseAuthConfigured ? 'lock-closed-outline' : 'flask-outline'}
+            size={rs(12)}
+            color={isSupabaseAuthConfigured ? Palette.accent.green : Palette.status.warning}
+          />
+          <Text style={[styles.sessionBadgeText, { fontSize: rs(10), color: isSupabaseAuthConfigured ? Palette.accent.green : Palette.status.warning }]}>
+            {isSupabaseAuthConfigured ? 'Supabase Auth 已登入' : 'Demo 模式'}
+          </Text>
+        </View>
+
         <View style={styles.streakRow}>
           <View style={styles.streakBadge}>
             <Text style={styles.streakEmoji}>🔥</Text>
@@ -196,6 +286,42 @@ export default function ProfileScreen() {
 
       {/* Body Stats Grid */}
       <Text style={[styles.sectionTitle, { fontSize: rs(16) }]}>身體數據</Text>
+      <View style={[styles.editProfileCard, { padding: rs(16) }]}>
+        <View style={styles.editHeader}>
+          <Ionicons name="create-outline" size={rs(15)} color={Palette.accent.cyan} />
+          <Text style={[styles.editTitle, { fontSize: rs(13) }]}>編輯基本資料與目標</Text>
+        </View>
+        <View style={styles.formGrid}>
+          {[
+            { key: 'name', label: '姓名', keyboardType: 'default' as const },
+            { key: 'height', label: '身高 cm', keyboardType: 'numeric' as const },
+            { key: 'weight', label: '體重 kg', keyboardType: 'numeric' as const },
+            { key: 'age', label: '年齡', keyboardType: 'numeric' as const },
+            { key: 'activityMultiplier', label: '活動係數', keyboardType: 'decimal-pad' as const },
+            { key: 'dailyCalorieTarget', label: '目標熱量 kcal', keyboardType: 'numeric' as const },
+            { key: 'targetWeight', label: '目標體重 kg', keyboardType: 'numeric' as const },
+            { key: 'dietType', label: '飲食型態', keyboardType: 'default' as const },
+          ].map((field) => (
+            <View key={field.key} style={[styles.inputGroup, { width: gridCol2(Spacing.sm) }]}>
+              <Text style={[styles.inputLabel, { fontSize: rs(10) }]}>{field.label}</Text>
+              <TextInput
+                value={profileDraft[field.key as keyof typeof profileDraft]}
+                onChangeText={(value) => updateDraft(field.key as keyof typeof profileDraft, value)}
+                keyboardType={field.keyboardType}
+                placeholderTextColor={Palette.text.tertiary}
+                style={[styles.profileInput, { fontSize: rs(13), padding: rs(10) }]}
+              />
+            </View>
+          ))}
+        </View>
+        <Pressable
+          disabled={saving}
+          onPress={handleSaveProfileFields}
+          style={({ pressed }) => [styles.saveProfileButton, { padding: rs(12) }, (pressed || saving) && { opacity: 0.75 }]}
+        >
+          {saving ? <ActivityIndicator size="small" color={Palette.bg.primary} /> : <Text style={[styles.saveProfileText, { fontSize: rs(13) }]}>儲存基本資料</Text>}
+        </Pressable>
+      </View>
       <View style={styles.statsGrid}>
         {[
           { label: '身高', value: `${user.height}`, unit: 'cm', icon: '📏', color: Palette.accent.blue },
@@ -237,6 +363,10 @@ export default function ProfileScreen() {
         <View style={styles.conditionsHeader}>
           <Ionicons name="shield-checkmark" size={rs(14)} color={Palette.accent.orange} />
           <Text style={[styles.conditionsSubtitle, { fontSize: rs(11) }]}>點擊切換疾病配置，影響推薦過濾規則</Text>
+        </View>
+        <View style={[styles.medicalDisclaimer, { padding: rs(12) }]}>
+          <Ionicons name="medical-outline" size={rs(14)} color={Palette.status.warning} />
+          <Text style={[styles.medicalDisclaimerText, { fontSize: rs(11) }]}>疾病與營養提醒僅供健康管理參考，不可取代醫師或營養師的個人化建議。</Text>
         </View>
         <View style={styles.conditionsGrid}>
           {AVAILABLE_CONDITIONS.map((cond) => {
@@ -340,6 +470,19 @@ export default function ProfileScreen() {
       </View>
 
       {/* Settings */}
+      <Pressable
+        disabled={signingOut}
+        onPress={handleSignOut}
+        style={({ pressed }) => [styles.signOutButton, { padding: rs(14) }, (pressed || signingOut) && { opacity: 0.7 }]}
+      >
+        <Ionicons name="log-out-outline" size={rs(18)} color={Palette.status.error} />
+        <View style={styles.signOutTextWrap}>
+          <Text style={[styles.signOutText, { fontSize: rs(14) }]}>{signingOut ? '登出中...' : '登出'}</Text>
+          <Text style={[styles.signOutHint, { fontSize: rs(10) }]}>清除本機 Supabase session，保護個人資料</Text>
+        </View>
+        {signingOut ? <ActivityIndicator size="small" color={Palette.status.error} /> : <Ionicons name="chevron-forward" size={rs(16)} color={Palette.text.tertiary} />}
+      </Pressable>
+
       <Pressable style={({ pressed }) => [styles.settingsButton, { padding: rs(14) }, pressed && { opacity: 0.7 }]}>
         <Ionicons name="settings-outline" size={rs(18)} color={Palette.text.secondary} />
         <Text style={[styles.settingsText, { fontSize: rs(14) }]}>應用程式設定</Text>
@@ -377,6 +520,19 @@ const styles = StyleSheet.create({
   },
   userName: { ...Typography.h1, color: Palette.text.primary, marginBottom: Spacing.xs },
   userEmail: { ...Typography.body, color: Palette.text.tertiary, marginBottom: Spacing.lg },
+  sessionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    marginBottom: Spacing.md,
+  },
+  sessionBadgeText: { ...Typography.small },
   streakRow: { flexDirection: 'row', gap: Spacing.md },
   streakBadge: {
     flexDirection: 'row', alignItems: 'center',
@@ -387,6 +543,34 @@ const styles = StyleSheet.create({
   streakText: { ...Typography.caption, color: Palette.text.secondary },
 
   sectionTitle: { ...Typography.h3, color: Palette.text.primary, marginBottom: Spacing.lg },
+
+  editProfileCard: {
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius.xl,
+    marginBottom: Spacing.xl,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    ...Shadows.card,
+  },
+  editHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md },
+  editTitle: { ...Typography.bodyBold, color: Palette.text.primary },
+  formGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.md },
+  inputGroup: { gap: Spacing.xs },
+  inputLabel: { ...Typography.small, color: Palette.text.tertiary },
+  profileInput: {
+    color: Palette.text.primary,
+    backgroundColor: Palette.bg.elevated,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    borderRadius: Radius.md,
+  },
+  saveProfileButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.md,
+    backgroundColor: Palette.accent.green,
+  },
+  saveProfileText: { ...Typography.bodyBold, color: Palette.bg.primary },
 
   metabolismCard: {
     backgroundColor: Palette.bg.card, borderRadius: Radius.xl,
@@ -430,6 +614,17 @@ const styles = StyleSheet.create({
   },
   conditionsHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.lg },
   conditionsSubtitle: { ...Typography.small, color: Palette.text.tertiary, flex: 1 },
+  medicalDisclaimer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    backgroundColor: 'rgba(251, 191, 36, 0.08)',
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.18)',
+    marginBottom: Spacing.lg,
+  },
+  medicalDisclaimerText: { ...Typography.small, color: Palette.text.secondary, flex: 1, lineHeight: 18 },
   conditionsGrid: { gap: Spacing.md },
   conditionChip: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
@@ -473,6 +668,20 @@ const styles = StyleSheet.create({
   goalInfo: { flex: 1 },
   goalLabel: { ...Typography.caption, color: Palette.text.tertiary, marginBottom: 2 },
   goalValue: { ...Typography.bodyBold },
+
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(248,113,113,0.08)',
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(248,113,113,0.22)',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  signOutTextWrap: { flex: 1 },
+  signOutText: { ...Typography.bodyBold, color: Palette.status.error, marginBottom: 2 },
+  signOutHint: { ...Typography.small, color: Palette.text.tertiary },
 
   settingsButton: {
     flexDirection: 'row', alignItems: 'center',

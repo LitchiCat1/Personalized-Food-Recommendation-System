@@ -80,6 +80,7 @@ export async function runPrediction(params: {
 export async function saveRecord(params: {
   apiBaseUrl: string;
   userId: string;
+  clientRecordId?: string;
   foods: DetectedFood[];
   source: 'camera' | 'manual' | 'nutrition-label';
   auth?: ApiAuth;
@@ -92,11 +93,12 @@ export async function saveRecord(params: {
   const totalSodium = params.foods.reduce((sum, item) => sum + item.nutrition.sodium, 0);
   const totalFiber = params.foods.reduce((sum, item) => sum + item.nutrition.fiber, 0);
 
-  await fetch(`${params.apiBaseUrl}/record`, {
+  const resp = await fetch(`${params.apiBaseUrl}/record`, {
     method: 'POST',
     headers: buildHeaders(params.auth, 'application/json'),
     body: JSON.stringify({
       user_id: params.userId,
+      client_record_id: params.clientRecordId,
       meal_type: '點心',
       foods: params.foods.map((food) => ({
         name: food.foodName,
@@ -118,6 +120,10 @@ export async function saveRecord(params: {
       source: params.source,
     }),
   });
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    throw new Error(data.error || '飲食紀錄同步失敗');
+  }
 }
 
 export async function manualSearchFood(params: {

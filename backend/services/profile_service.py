@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def compute_bmr(gender: str, weight: float, height: float, age: int) -> float:
@@ -39,7 +39,7 @@ def build_user_profile(data: dict) -> dict:
         "allergens": data.get("allergens", []),
         "target_weight": data.get("target_weight"),
         "diet_type": data.get("diet_type", "均衡飲食"),
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     }
 
 

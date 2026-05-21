@@ -91,10 +91,16 @@ DATABASE_URL=postgresql://...
 GEMINI_API_KEYS=key1,key2,key3
 GEMINI_API_KEY=single-key-fallback
 GEMINI_MODEL=gemini-1.5-flash
+DISEASE_RULES_PATH=backend/config/disease_rules.json
+RESTAURANT_CATALOG_PATH=backend/data/restaurant_catalog.json
 SUPABASE_AUTH_REQUIRED=true
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
+
+`RESTAURANT_CATALOG_PATH` 可省略；未設定時後端會使用 `backend/data/restaurant_catalog.json`。若要測試替代餐廳資料源，請指定 JSON 檔路徑，不要把 API token 或私有商家資料寫入 repo。
+
+`DISEASE_RULES_PATH` 可省略；未設定時後端會使用 `backend/config/disease_rules.json`。替代規則檔必須包含 `rule_version`、`review_status`、`last_reviewed`、`reviewed_by`、`evidence_level`、`references` 與 `medical_disclaimer`，否則啟動時會失敗。
 
 ### 3.2 前端
 
@@ -178,6 +184,7 @@ curl https://personalized-food-recommendation-system-nq8t.onrender.com/health
 - `postgres: true`
 - `foods_in_tfda` 大於 0
 - `disease_rules` 大於 0
+- `restaurants` 大於 0
 
 ### 6.3 Auth 權限驗收
 
@@ -193,6 +200,22 @@ curl https://personalized-food-recommendation-system-nq8t.onrender.com/health
 - 未帶 token：`401`
 - 正確 token + 自己的 `user_id`：`200`
 - 正確 token + 其他 `user_id`：`403`
+
+自動化 smoke script：
+
+```powershell
+$env:SMOKE_API_BASE_URL="https://personalized-food-recommendation-system-nq8t.onrender.com"
+$env:SMOKE_USER_ID="<supabase-auth-user-id>"
+$env:SMOKE_ACCESS_TOKEN="<supabase-access-token>"
+$env:SMOKE_FORBIDDEN_USER_ID="demo_user"
+python backend/scripts/smoke_render_auth.py
+```
+
+注意：
+
+- 不要把 `SMOKE_ACCESS_TOKEN` 寫入 repo、docs、CI logs 或聊天內容。
+- CI 若要跑此腳本，使用 GitHub Actions secrets 注入環境變數，且只輸出狀態碼與非敏感摘要。
+- 缺少必要環境變數時腳本會以 exit code `2` 跳過，不會使用任何硬編碼 token。
 
 ### 6.4 前端回歸驗收
 

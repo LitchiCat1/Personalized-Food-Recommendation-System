@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def normalize_number(value) -> float:
@@ -149,6 +149,49 @@ def compute_preference_score(candidate: dict, profile: dict) -> tuple[int, list[
     return min(score, 35), reasons[:3]
 
 
+def build_feedback_profile(feedback_docs: list[dict]) -> dict:
+    by_label = {}
+    counts = {"accepted": 0, "skipped": 0, "disliked": 0}
+
+    for doc in feedback_docs:
+        action = doc.get("action")
+        label = doc.get("item_label")
+        if action not in counts or not label:
+            continue
+        counts[action] += 1
+        by_label.setdefault(label, {"accepted": 0, "skipped": 0, "disliked": 0})[action] += 1
+
+    return {
+        "by_label": by_label,
+        "counts": counts,
+        "total": sum(counts.values()),
+    }
+
+
+def compute_feedback_adjustment(candidate: dict, feedback_profile: dict) -> tuple[int, list[str]]:
+    stats = feedback_profile.get("by_label", {}).get(candidate.get("label"), {})
+    if not stats:
+        return 0, []
+
+    score = 0
+    reasons = []
+    accepted = stats.get("accepted", 0)
+    skipped = stats.get("skipped", 0)
+    disliked = stats.get("disliked", 0)
+
+    if accepted:
+        score += min(18, accepted * 9)
+        reasons.append("你曾採納這項推薦")
+    if skipped:
+        score -= min(10, skipped * 5)
+        reasons.append("你曾略過這項推薦")
+    if disliked:
+        score -= min(35, disliked * 18)
+        reasons.append("你曾標記不喜歡")
+
+    return score, reasons[:2]
+
+
 def build_recommendation_response(storage, nutrition_db: dict, tfda_db: dict, disease_rules: dict, user_id: str):
     user = storage.get_user(user_id)
     if not user:
@@ -158,7 +201,7 @@ def build_recommendation_response(storage, nutrition_db: dict, tfda_db: dict, di
     allergens = user.get("allergens", [])
     daily_target = user.get("daily_calorie_target", 2100)
 
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     today_records = storage.get_records(user_id, today, limit=500)
     recent_records = storage.get_records(user_id, limit=50)
     consumed_today = sum(record.get("total_calories", 0) for record in today_records)
@@ -168,6 +211,8 @@ def build_recommendation_response(storage, nutrition_db: dict, tfda_db: dict, di
     filtered_out = []
     candidates = build_recommendation_candidates(storage, nutrition_db, tfda_db, user_id)
     preference_profile = build_preference_profile(recent_records)
+    feedback_docs = storage.get_recommendation_feedback(user_id, limit=100)
+    feedback_profile = build_feedback_profile(feedback_docs)
 
     for nutrients in candidates:
         label = nutrients["label"]
@@ -205,6 +250,7 @@ def build_recommendation_response(storage, nutrition_db: dict, tfda_db: dict, di
             elif gi == "medium":
                 macro_bonus += 4
             preference_score, preference_reasons = compute_preference_score(nutrients, preference_profile)
+            feedback_adjustment, feedback_reasons = compute_feedback_adjustment(nutrients, feedback_profile)
 
             safety_badges = []
             if (nutrients.get("sodium") or 0) <= 400:
@@ -227,9 +273,10 @@ def build_recommendation_response(storage, nutrition_db: dict, tfda_db: dict, di
                     "sodium": nutrients.get("sodium", 0),
                     "gi": gi,
                     "source": nutrients.get("source"),
-                    "match_score": min(99, int(fit_score + lower_sodium_bonus + macro_bonus + preference_score)),
+                    "match_score": max(0, min(99, int(fit_score + lower_sodium_bonus + macro_bonus + preference_score + feedback_adjustment))),
                     "preference_score": preference_score,
-                    "preference_reasons": preference_reasons,
+                    "feedback_adjustment": feedback_adjustment,
+                    "preference_reasons": (feedback_reasons + preference_reasons)[:4],
                     "safety_badges": safety_badges,
                 }
             )
@@ -260,5 +307,7 @@ def build_recommendation_response(storage, nutrition_db: dict, tfda_db: dict, di
         "preference_profile": {
             "record_count": preference_profile["record_count"],
             "food_count": preference_profile["food_count"],
+            "feedback_count": feedback_profile["total"],
+            "feedback_counts": feedback_profile["counts"],
         },
     }

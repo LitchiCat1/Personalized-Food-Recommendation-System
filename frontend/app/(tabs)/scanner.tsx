@@ -25,6 +25,16 @@ import {
   type OCRDraft,
   type RejectedDetection,
 } from '@/lib/scanner';
+import {
+  canRetryPendingRecordSync,
+  enqueuePendingRecordSync,
+  loadPendingRecordSyncQueue,
+  markPendingRecordSyncFailed,
+  MAX_RECORD_SYNC_ATTEMPTS,
+  removePendingRecordSync,
+  type PendingRecordSync,
+  type RecordSource,
+} from '@/lib/recordSyncQueue';
 
 function OCRDraftCard({
   rs,
@@ -157,18 +167,14 @@ export default function ScannerScreen() {
   const [rejectedDetections, setRejectedDetections] = useState<RejectedDetection[]>([]);
   const [ocrQuerying, setOcrQuerying] = useState(false);
   const [ocrDraft, setOcrDraft] = useState<OCRDraft | null>(null);
-
-  useFocusEffect(
-    useCallback(() => {
-      return () => {
-        setCameraActive(false);
-      };
-    }, [setCameraActive])
-  );
+  const [syncingRecord, setSyncingRecord] = useState(false);
+  const [pendingRecordQueue, setPendingRecordQueue] = useState<PendingRecordSync[]>([]);
 
   const results = scanResult.detections;
   const totalCal = results.reduce((sum, f) => sum + f.nutrition.calories, 0);
   const totalSodium = results.reduce((sum, f) => sum + f.nutrition.sodium, 0);
+  const userPendingRecords = pendingRecordQueue.filter((item) => item.userId === user.userId);
+  const firstPendingRecord = userPendingRecords[0];
 
   const handleCamera = async () => {
     if (isWeb) {
@@ -297,25 +303,91 @@ export default function ScannerScreen() {
     }
   };
 
-  const persistRecord = async (foods: DetectedFood[], source: 'camera' | 'manual' | 'nutrition-label') => {
+  const persistRecord = async (foods: DetectedFood[], source: RecordSource, clientRecordId = buildClientRecordId()) => {
+    setSyncingRecord(true);
     try {
-      await saveRecord({ apiBaseUrl, userId: user.userId, foods, source, auth: { accessToken } });
-    } catch {
-      // Keep local-first UX even if backend record persistence fails.
+      await saveRecord({ apiBaseUrl, userId: user.userId, clientRecordId, foods, source, auth: { accessToken } });
+      return true;
+    } catch (error: any) {
+      const nextQueue = await enqueuePendingRecordSync({
+        userId: user.userId,
+        clientRecordId,
+        foods,
+        source,
+        error: error?.message || '後端暫時無法儲存這筆紀錄',
+      });
+      setPendingRecordQueue(nextQueue);
+      return false;
+    } finally {
+      setSyncingRecord(false);
     }
   };
+
+  const syncPendingRecords = useCallback(async (queue: PendingRecordSync[], options?: { manual?: boolean }) => {
+    const userQueue = queue.filter((item) => item.userId === user.userId);
+    const retryableQueue = options?.manual ? userQueue : userQueue.filter(canRetryPendingRecordSync);
+    if (retryableQueue.length === 0) return 0;
+
+    setSyncingRecord(true);
+    let syncedCount = 0;
+    try {
+      for (const item of retryableQueue) {
+        try {
+          await saveRecord({ apiBaseUrl, userId: item.userId, clientRecordId: item.clientRecordId, foods: item.foods, source: item.source, auth: { accessToken } });
+          const nextQueue = await removePendingRecordSync(item.id);
+          setPendingRecordQueue(nextQueue);
+          syncedCount += 1;
+        } catch (error: any) {
+          const nextQueue = await markPendingRecordSyncFailed(item.id, error?.message || '後端暫時無法儲存這筆紀錄');
+          setPendingRecordQueue(nextQueue);
+          break;
+        }
+      }
+    } finally {
+      setSyncingRecord(false);
+    }
+
+    return syncedCount;
+  }, [accessToken, apiBaseUrl, user.userId]);
+
+  const retryPendingRecordSync = async () => {
+    const syncedCount = await syncPendingRecords(pendingRecordQueue, { manual: true });
+
+    if (syncedCount > 0) {
+      Alert.alert('同步完成', `${syncedCount} 筆待同步餐點已寫入後端紀錄。`);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      loadPendingRecordSyncQueue().then((queue) => {
+        if (!active) return;
+        setPendingRecordQueue(queue);
+        void syncPendingRecords(queue);
+      });
+      return () => {
+        active = false;
+        setCameraActive(false);
+      };
+    }, [setCameraActive, syncPendingRecords])
+  );
 
   const handleAddRecord = () => {
     if (results.length === 0) return;
     addMealFromScan(results);
-    persistRecord(results, 'camera');
+    persistRecord(results, 'camera').then((ok) => {
+      if (!ok) Alert.alert('已加入本機畫面', '後端同步失敗，請稍後在辨識頁重試。');
+    });
     clearScan();
     Alert.alert('✅ 已加入', `${results.length} 項食物已加入今日紀錄`);
   };
 
   const handleAddManualFood = (food: DetectedFood) => {
     addMealFromScan([food]);
-    persistRecord([food], 'manual');
+    persistRecord([food], 'manual').then((ok) => {
+      if (!ok) Alert.alert('已加入本機畫面', '後端同步失敗，請稍後在辨識頁重試。');
+    });
     Alert.alert('已加入今日紀錄', `${food.foodName} 已以每 100g 份量加入今日紀錄`);
   };
 
@@ -333,7 +405,9 @@ export default function ScannerScreen() {
     if (!ocrDraft) return;
     const food = buildOCRDetectedFood(ocrDraft);
     addMealFromScan([food]);
-    persistRecord([food], 'nutrition-label');
+    persistRecord([food], 'nutrition-label').then((ok) => {
+      if (!ok) Alert.alert('已加入本機畫面', '後端同步失敗，請稍後在辨識頁重試。');
+    });
     Alert.alert('已加入今日紀錄', `${food.foodName} 已依包裝營養標示加入紀錄`);
   };
 
@@ -361,6 +435,31 @@ export default function ScannerScreen() {
         <Text style={[styles.contextText, { fontSize: rs(11) }]}>疾病：{user.healthConditions.length > 0 ? user.healthConditions.join('、') : '未設定'}</Text>
         <Text style={[styles.contextText, { fontSize: rs(11) }]}>過敏原：{user.allergens.length > 0 ? user.allergens.join('、') : '未設定'}</Text>
       </View>
+
+      {(syncingRecord || firstPendingRecord) && (
+        <View style={[styles.syncStatusCard, firstPendingRecord && styles.syncStatusWarning]}>
+          {syncingRecord ? (
+            <ActivityIndicator size="small" color={Palette.accent.cyan} />
+          ) : (
+            <Ionicons name="cloud-offline-outline" size={rs(16)} color={Palette.status.warning} />
+          )}
+          <View style={styles.syncStatusTextWrap}>
+            <Text style={[styles.syncStatusTitle, { fontSize: rs(12) }]}>
+              {syncingRecord ? '正在同步飲食紀錄...' : `有 ${userPendingRecords.length} 筆餐點尚未同步`}
+            </Text>
+            {firstPendingRecord ? (
+              <Text style={[styles.syncStatusMessage, { fontSize: rs(10) }]}>
+                {firstPendingRecord.error}，已重試 {firstPendingRecord.attempts}/{MAX_RECORD_SYNC_ATTEMPTS} 次
+              </Text>
+            ) : null}
+          </View>
+          {firstPendingRecord && !syncingRecord ? (
+            <Pressable onPress={retryPendingRecordSync} style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.75 }]}>
+              <Text style={[styles.retryButtonText, { fontSize: rs(11) }]}>重試</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      )}
 
       <View style={styles.viewfinderContainer}>
         <LinearGradient colors={['rgba(167, 139, 250, 0.08)', 'rgba(96, 165, 250, 0.04)', 'transparent']} style={[styles.viewfinder, { height: rs(180) }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
@@ -451,6 +550,10 @@ export default function ScannerScreen() {
   );
 }
 
+function buildClientRecordId(): string {
+  return `record_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 const CORNER_SIZE = 24;
 const CORNER_WIDTH = 3;
 
@@ -506,6 +609,29 @@ const styles = StyleSheet.create({
   },
   contextTitle: { ...Typography.caption, color: Palette.text.primary, marginBottom: 4 },
   contextText: { ...Typography.small, color: Palette.text.tertiary },
+
+  syncStatusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+  },
+  syncStatusWarning: { borderColor: 'rgba(251,191,36,0.32)', backgroundColor: 'rgba(251,191,36,0.06)' },
+  syncStatusTextWrap: { flex: 1 },
+  syncStatusTitle: { ...Typography.caption, color: Palette.text.primary },
+  syncStatusMessage: { ...Typography.small, color: Palette.text.tertiary, marginTop: 2 },
+  retryButton: {
+    backgroundColor: Palette.accent.cyanDim,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+  },
+  retryButtonText: { ...Typography.caption, color: Palette.accent.cyan },
 
   manualCard: {
     backgroundColor: Palette.bg.card, borderRadius: Radius.xl, marginBottom: Spacing.xl,

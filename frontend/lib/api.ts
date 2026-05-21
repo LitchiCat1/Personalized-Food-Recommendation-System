@@ -67,6 +67,7 @@ export type RecommendationItem = {
   source?: string;
   match_score: number;
   preference_score?: number;
+  feedback_adjustment?: number;
   preference_reasons?: string[];
   safety_badges?: string[];
   reasons?: string[];
@@ -89,6 +90,22 @@ export type RecommendationResponse = {
   preference_profile?: {
     record_count: number;
     food_count: number;
+    feedback_count?: number;
+    feedback_counts?: Record<RecommendationFeedbackAction, number>;
+  };
+};
+
+export type RecommendationFeedbackAction = 'accepted' | 'skipped' | 'disliked';
+
+export type RecommendationFeedbackResponse = {
+  message: string;
+  feedback: {
+    user_id: string;
+    action: RecommendationFeedbackAction;
+    item_label: string;
+    item_name?: string;
+    item_source?: string;
+    created_at: string;
   };
 };
 
@@ -182,6 +199,21 @@ export async function fetchRecommendations(apiBaseUrl: string, userId: string, a
     headers: buildHeaders(auth),
   });
   return parseJson<RecommendationResponse>(resp);
+}
+
+export async function saveRecommendationFeedback(
+  apiBaseUrl: string,
+  userId: string,
+  action: RecommendationFeedbackAction,
+  item: RecommendationItem,
+  auth?: ApiAuth
+): Promise<RecommendationFeedbackResponse> {
+  const resp = await fetch(`${apiBaseUrl}/recommend/${encodeURIComponent(userId)}/feedback`, {
+    method: 'POST',
+    headers: buildHeaders(auth, 'application/json'),
+    body: JSON.stringify({ action, item }),
+  });
+  return parseJson<RecommendationFeedbackResponse>(resp);
 }
 
 export async function fetchUserProfile(apiBaseUrl: string, userId: string, auth?: ApiAuth): Promise<UserProfileResponse> {

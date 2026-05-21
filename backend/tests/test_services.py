@@ -1,10 +1,17 @@
+import os
 import unittest
 
-from services.disease_rule_service import load_disease_rules
+from services.disease_rule_service import build_disease_rules_response, load_disease_rules
+from services.healthy_food_service import load_restaurant_catalog
 from services.history_service import build_history_response
 from services.predict_service import assess_detection
 from services.profile_service import build_bmr_response
-from services.recommend_service import build_preference_profile, compute_preference_score
+from services.recommend_service import (
+    build_feedback_profile,
+    build_preference_profile,
+    compute_feedback_adjustment,
+    compute_preference_score,
+)
 from yolo_tfda_mapping import YOLO_MANUAL_SEARCH_HINTS
 
 
@@ -30,9 +37,28 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertEqual(result["summary"]["avg_calories"], 900)
 
     def test_disease_rules_load(self):
-        rules = load_disease_rules("backend")
+        rules = load_disease_rules(os.path.dirname(os.path.dirname(__file__)))
         self.assertIn("高血壓", rules)
         self.assertIn("max_sodium_per_meal", rules["高血壓"])
+        self.assertIn("rule_version", rules["高血壓"])
+        self.assertIn("medical_disclaimer", rules["高血壓"])
+
+    def test_disease_rules_governance_response(self):
+        rules = load_disease_rules(os.path.dirname(os.path.dirname(__file__)))
+        response = build_disease_rules_response(rules)
+
+        self.assertEqual(response["count"], len(rules))
+        self.assertIn("medical_disclaimer", response)
+        self.assertIn("needs_clinical_review", response["review_status_counts"])
+        hypertension = next(item for item in response["conditions"] if item["condition"] == "高血壓")
+        self.assertEqual(hypertension["limits"]["max_sodium_per_meal"], 600)
+        self.assertGreater(len(hypertension["references"]), 0)
+
+    def test_restaurant_catalog_load(self):
+        catalog = load_restaurant_catalog(os.path.dirname(os.path.dirname(__file__)))
+        self.assertGreater(len(catalog), 0)
+        self.assertIn("items", catalog[0])
+        self.assertGreater(len(catalog[0]["items"]), 0)
 
     def test_generic_detection_returns_search_hints(self):
         result = assess_detection("cup", 0.9, {"calories": 10}, {}, {}, YOLO_MANUAL_SEARCH_HINTS)
@@ -49,6 +75,25 @@ class ServiceSmokeTests(unittest.TestCase):
         )
         self.assertGreater(score, 0)
         self.assertGreater(len(reasons), 0)
+
+    def test_feedback_adjustment_rewards_and_penalizes(self):
+        profile = build_feedback_profile([
+            {"item_label": "salad", "action": "accepted"},
+            {"item_label": "salad", "action": "accepted"},
+            {"item_label": "burger", "action": "disliked"},
+            {"item_label": "soup", "action": "skipped"},
+        ])
+
+        salad_score, salad_reasons = compute_feedback_adjustment({"label": "salad"}, profile)
+        burger_score, burger_reasons = compute_feedback_adjustment({"label": "burger"}, profile)
+        soup_score, soup_reasons = compute_feedback_adjustment({"label": "soup"}, profile)
+
+        self.assertGreater(salad_score, 0)
+        self.assertLess(burger_score, 0)
+        self.assertLess(soup_score, 0)
+        self.assertIn("採納", salad_reasons[0])
+        self.assertIn("不喜歡", burger_reasons[0])
+        self.assertEqual(profile["total"], 4)
 
 
 if __name__ == "__main__":

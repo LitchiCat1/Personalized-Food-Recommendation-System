@@ -187,6 +187,7 @@ Personalized-Food-Recommendation-System/
 | `GET` | `/history/<user_id>?days=` | 飲食歷史與趨勢彙整 |
 | `GET` | `/recommend/<user_id>` | 規則型食物推薦 |
 | `GET` | `/healthy-food-recommend/<user_id>` | 附近健康餐點推薦 MVP |
+| `GET` | `/disease-rules` | 疾病規則版本、審核狀態、參考來源與醫療免責摘要 |
 | `POST` | `/calculate/bmr` | BMR/TDEE/BMI 計算 |
 
 ## 7. 前端架構
@@ -268,7 +269,13 @@ Personalized-Food-Recommendation-System/
 
 ```txt
 前端加入掃描/手動/OCR 食品
-  -> POST /record
+  -> 先更新本機 Dashboard
+  -> 產生 client_record_id
+  -> POST /record，payload 包含 client_record_id
+  -> 若同步失敗，寫入 frontend/lib/recordSyncQueue.ts 的本機待同步佇列
+  -> Scanner 聚焦時自動重送未達 5 次上限的待同步紀錄
+  -> 使用者可在 Scanner 頁以目前 Supabase session 重試同 user_id 的佇列
+  -> 後端以 (user_id, client_record_id) 做冪等去重
   -> StorageRepository 儲存至 PostgreSQL/MongoDB/Memory
   -> GET /history/<user_id>?days=7
   -> 後端依日期聚合熱量、蛋白質、碳水、脂肪、鈉
@@ -288,14 +295,14 @@ GET /recommend/<user_id>
 
 GET /healthy-food-recommend/<user_id>
   -> 取得定位與預算
-  -> 掃描內建 RESTAURANT_CATALOG
+  -> 載入 backend/data/restaurant_catalog.json 或 RESTAURANT_CATALOG_PATH 指定資料源
   -> 過濾距離、營業時間、預算、疾病限制
   -> 依預算、距離、熱量契合、低鈉、高蛋白排序
 ```
 
 ## 9. 疾病與過敏原規則
 
-目前疾病規則集中於 `backend/config/disease_rules.json`，由 `backend/services/disease_rule_service.py` 載入後傳入辨識、推薦與健康餐點推薦流程。
+目前疾病規則集中於 `backend/config/disease_rules.json`，由 `backend/services/disease_rule_service.py` 載入、驗證治理欄位後傳入辨識、推薦與健康餐點推薦流程。`GET /disease-rules` 會公開規則版本、審核狀態、參考來源、限制摘要與醫療免責聲明。
 
 | 疾病 | 目前規則 |
 |------|----------|
@@ -306,6 +313,14 @@ GET /healthy-food-recommend/<user_id>
 | 高血脂 | 單餐脂肪上限 20g |
 
 過敏原目前由使用者 profile 的 `allergens` 陣列與食品資料中的 `allergens` 陣列比對。
+
+疾病規則治理欄位包含：
+
+- `rule_version`：規則版本。
+- `review_status`：目前審核狀態，現階段皆為 `needs_clinical_review`。
+- `last_reviewed`、`reviewed_by`：最近整理日期與整理者。
+- `evidence_level`、`references`：規則依據層級與參考來源。
+- `medical_disclaimer`：疾病提醒不可取代醫師或營養師建議的免責文字。
 
 ## 10. 已完成功能
 
@@ -322,16 +337,20 @@ GET /healthy-food-recommend/<user_id>
 - 已完成容器/餐具類 YOLO 標籤的保守拒絕策略與 TFDA 搜尋建議詞。
 - 已完成疾病規則與過敏原警示。
 - 已完成疾病規則設定化，規則已從 `backend/app.py` 移到 `backend/config/disease_rules.json`。
+- 已完成疾病規則治理 metadata 與載入驗證，並新增 `/disease-rules` 查詢端點。
 - 已完成 BMR/TDEE/BMI 計算。
 - 已完成使用者 profile CRUD。
 - 已完成飲食紀錄新增與查詢。
+- 已完成 `/record` 的 `client_record_id` 冪等去重，待同步佇列重試不會重複寫入同一筆餐點。
 - 已完成 7 日飲食歷史彙整。
 - 已完成 TFDA 與自訂食品搜尋。
 - 已完成營養標示 OCR 與自訂食品儲存。
 - 已完成規則型推薦。
 - 已完成推薦候選擴展，`/recommend` 會納入 TFDA 與使用者自訂食品，並回傳來源統計。
 - 已完成歷史飲食偏好加權，`/recommend` 會參考近期紀錄產生 `preference_score` 與偏好原因。
+- 已完成推薦回饋記錄，使用者可標記採納、略過或不喜歡，`/recommend` 會把近期回饋納入排序。
 - 已完成附近健康餐點推薦 MVP。
+- 已完成健康餐點餐廳資料源資料化，預設由 `backend/data/restaurant_catalog.json` 載入。
 - 已完成 PostgreSQL/MongoDB/In-memory 三層資料儲存 fallback。
 - 已完成 Render `PORT` 支援與 `render.yaml`。
 - 已完成 Gemini 多 API key 輪替，Render 建議使用 `GEMINI_API_KEYS`。
@@ -354,6 +373,12 @@ GET /healthy-food-recommend/<user_id>
 - 已完成 Supabase Auth 登入/註冊基礎整合；有 Supabase public env 時會進入 AuthGate，登入後使用 Supabase Auth user id。
 - 已完成 Bearer token 傳遞，user-scoped API 會帶 `Authorization: Bearer <access_token>`。
 - 已完成首次登入自動建立後端 profile，避免 Supabase Auth uuid 找不到 profile。
+- 已完成 profile 完整可編輯表單與登出按鈕。
+- 已完成掃描/手動/OCR 新增紀錄本機持久化待同步佇列與重試入口。
+- 已完成新增紀錄 `client_record_id` 產生與待同步佇列保存。
+- 已完成 Scanner 聚焦時自動重送待同步紀錄，並設定自動重送最多 5 次。
+- 已完成推薦卡片採納、略過、不喜歡回饋按鈕。
+- 已完成健康狀況設定區塊的醫療免責提示。
 - 已完成手機、平板與 web 的基本響應式顯示。
 
 ### 10.3 部署與資料
@@ -394,33 +419,34 @@ GET /healthy-food-recommend/<user_id>
 - 疾病規則目前為簡化設定，不等同醫療建議。
 - 慢性腎臟病等疾病實際還需鉀、磷、鈉、蛋白質分期限制，目前尚未完整規則化。
 - TFDA 資料雖已整合，但不是所有食品都已被推薦與搜尋流程完整利用。
-- 疾病規則尚未有版本、來源、審核者與醫療免責顯示機制。
+- 疾病規則已有版本、來源、審核狀態與醫療免責 metadata；但目前審核狀態仍是 `needs_clinical_review`，尚未建立正式臨床審核流程或疾病分期規則。
 
 ### 11.4 推薦引擎
 
 - `/recommend` 目前是規則型與分數型排序，不是真正的個人化口味向量或協同過濾。
 - PRD 提到的「餘弦相似度」目前尚未完整實作。
-- 使用者點擊、喜好、拒絕尚未形成可學習的推薦模型。
-- 推薦候選已納入 TFDA 與使用者自訂食品，排序也會參考歷史飲食紀錄；但目前仍是啟發式加權，尚未達到完整協同過濾或向量推薦。
-- 推薦結果尚未記錄使用者是否採納、略過或不喜歡，因此偏好分數只能從飲食紀錄間接推估。
+- 使用者採納、略過或不喜歡已會被記錄並回饋到排序；但目前仍是啟發式加權，尚未達到完整協同過濾或向量推薦。
+- 推薦候選已納入 TFDA 與使用者自訂食品，排序也會參考歷史飲食紀錄與近期推薦回饋。
 
 ### 11.5 餐廳與地圖資料
 
-- `/healthy-food-recommend` 目前使用 `healthy_food_service.py` 的內建 `RESTAURANT_CATALOG`。
+- `/healthy-food-recommend` 目前使用 `backend/data/restaurant_catalog.json`，也可用 `RESTAURANT_CATALOG_PATH` 指向替代 JSON 資料源。
 - 尚未串接 Google Maps、外送平台、餐廳公開 API 或正式商家資料源。
 - 營業時間與距離計算只是 MVP 邏輯。
 
 ### 11.6 前端資料同步
 
 - Dashboard 已會從 `/records` 同步今日紀錄，但初始載入與後端失敗時仍會保留 `constants/mock-data.ts` 的本地預設資料。
-- 今日掃描新增採 local-first UX，後端寫入失敗時不會阻止使用者加入本地畫面，也尚未提供重試佇列或同步失敗提示。
+- 今日掃描、手動搜尋與 OCR 新增採 local-first UX，後端寫入失敗時不會阻止使用者加入本地畫面，並會把失敗紀錄保存到本機待同步佇列。
+- 待同步佇列依 `userId` 顯示與重試，重啟 app 後仍會保留；重試會沿用同一個 `client_record_id`，後端會避免重複寫入。
+- Scanner 聚焦時會自動重送未達 5 次上限的待同步紀錄；達上限後停止自動重送，但使用者仍可手動重試。
+- 目前尚未依網路恢復事件自動重送，也尚未提供同步佇列詳情頁。
 - 部分設定項如飲食目標卡片與應用程式設定仍是展示型 UI。
-- Profile 頁面目前主要可切換疾病與過敏原；身高、體重、年齡、活動量、目標熱量等尚未提供完整可編輯表單。
 
 ### 11.7 測試與品質
 
-- 目前沒有完整自動化測試。
-- 後端只有 `backend/test_client.py` 類型的手動整合測試。
+- 目前已有後端 service smoke tests 與部分 Flask API route tests，但尚未形成完整自動化測試矩陣。
+- 後端仍保留 `backend/test_client.py` 類型的手動整合測試。
 - 前端尚未建立 e2e、component test 或 API mock 測試。
 - 已建立基礎 GitHub Actions CI，但目前只涵蓋後端 syntax check 與前端 typecheck。
 - `frontend/package.json` 已有 `typecheck` script，但尚未建立正式 test、build script。
@@ -528,9 +554,9 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 
 | 順序 | 功能 | 稽核狀態 | 已具備 | 尚未完善 / 下一步 |
 |------|------|----------|--------|------------------|
-| 1 | Dashboard 從後端同步今日紀錄 | MVP 可用 | `index.tsx` 會呼叫 `/records` 並重建今日統計 | 後端寫入失敗沒有重試佇列；初始 fallback 仍用 mock data |
+| 1 | Dashboard 從後端同步今日紀錄 | MVP 可用 | `index.tsx` 會呼叫 `/records` 並重建今日統計；Scanner 新增紀錄失敗會進本機待同步佇列；Scanner 聚焦會自動重送；後端以 `client_record_id` 冪等去重 | 初始 fallback 仍用 mock data；待同步佇列尚未依網路恢復事件自動重送，也沒有詳情頁 |
 | 2 | Dashboard 與 History 資料一致化 | MVP 可用 | `/history` 回傳 `record_count`、總餐數、記錄天數；前端已顯示 | streak、總餐數、今日統計尚未全部由後端統一提供 |
-| 3 | 疾病規則設定化 | MVP 可用 | 規則已移至 `backend/config/disease_rules.json`，啟動時載入 | 尚無規則版本、來源、審核流程與管理介面 |
+| 3 | 疾病規則設定化 | MVP 可用 | 規則已移至 `backend/config/disease_rules.json`，啟動時驗證治理欄位，可由 `/disease-rules` 查詢版本、來源與免責資訊；Profile 已顯示醫療免責提示 | 尚無正式臨床審核流程、疾病分期規則與管理介面 |
 | 4 | 推薦候選擴展到 TFDA 與自訂食品 | MVP 可用 | `/recommend` 已納入 TFDA、自訂食品、來源統計 | 尚未針對 TFDA 類別做更精細的候選篩選與效能索引 |
 | 5 | 口味偏好與推薦分數升級 | MVP 可用 | 近期飲食紀錄會產生 `preference_score` 與原因 | 仍是啟發式分數，尚無採納/略過/不喜歡回饋模型 |
 | 6 | YOLO/TFDA 映射擴充 | MVP 可用 | 食物 label 已映射；容器/餐具會回傳搜尋建議 | 尚未訓練食物專用模型，混合餐與台灣小吃仍依賴手動搜尋/OCR |
@@ -545,22 +571,21 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 
 ### 14.1 最高優先級
 
-1. 建立完整測試：新增後端 smoke/unit tests、前端 test/e2e、正式 build check。
-2. 補前端登出、session 過期提示與完整 profile 編輯表單。
+1. 擴充完整測試：補更多後端 route/unit tests、前端 test/e2e、正式 build check。
+2. 補前端 session 過期提示、網路恢復事件自動重送與同步佇列詳情頁。
 3. 將 Render/Supabase/Auth smoke test 流程自動化，但不保存 secret values。
 
 ### 14.2 中優先級
 
-1. Profile 完整可編輯：身高、體重、年齡、活動量、目標熱量、目標體重、飲食型態。
-2. 同步可靠性：掃描/手動/OCR 新增紀錄失敗時要有提示、重試或待同步狀態。
-3. 推薦回饋資料：記錄使用者採納、略過、不喜歡，用於後續偏好模型。
-4. 健康餐點資料來源：把內建 `RESTAURANT_CATALOG` 移到資料檔或資料庫，未來才方便替換正式 API。
+1. 同步可靠性：為待同步佇列補網路恢復事件重送、同步狀態詳情頁與失敗項目管理。
+2. 推薦模型：把目前啟發式回饋加權演進為可解釋的偏好模型或向量排序。
+3. 健康餐點資料來源：從 JSON 資料檔演進為資料庫或正式餐廳 API。
 
 ### 14.3 低優先級 / 研究型
 
 1. 食物專用模型或 fine-tuning：改善混合餐、台灣小吃、便當類辨識。
 2. 份量自動校正：參考物、餐盤尺度、深度感測或使用者校正資料回饋 density。
-3. 疾病規則醫療化：補規則來源、版本、審核者、疾病分期與醫療免責 UI。
+3. 疾病規則醫療化：建立正式臨床審核流程、疾病分期規則與更完整的前端規則來源說明 UI。
 
 ## 15. 階段完成標準
 

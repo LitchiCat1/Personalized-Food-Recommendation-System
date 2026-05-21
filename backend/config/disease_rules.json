@@ -2,22 +2,82 @@
   "糖尿病": {
     "blocked_gi": ["high"],
     "max_carbs_per_meal": 60,
-    "description": "限制高 GI、控醣"
+    "description": "限制高 GI、控醣",
+    "rule_version": "2026.05.1",
+    "review_status": "needs_clinical_review",
+    "last_reviewed": "2026-05-21",
+    "reviewed_by": "project-team",
+    "evidence_level": "nutrition-guideline-derived",
+    "references": [
+      {
+        "title": "衛生福利部國民健康署：糖尿病飲食與健康飲食原則",
+        "url": "https://www.hpa.gov.tw/"
+      }
+    ],
+    "medical_disclaimer": "此規則僅用於餐點提醒與推薦排序，不可取代醫師、營養師或個人化醫療建議。"
   },
   "高血壓": {
     "max_sodium_per_meal": 600,
-    "description": "限制鈉攝取 < 2000mg/日"
+    "description": "限制鈉攝取 < 2000mg/日",
+    "rule_version": "2026.05.1",
+    "review_status": "needs_clinical_review",
+    "last_reviewed": "2026-05-21",
+    "reviewed_by": "project-team",
+    "evidence_level": "nutrition-guideline-derived",
+    "references": [
+      {
+        "title": "衛生福利部國民健康署：成人每日鈉攝取建議",
+        "url": "https://www.hpa.gov.tw/"
+      }
+    ],
+    "medical_disclaimer": "此規則僅用於餐點提醒與推薦排序，不可取代醫師、營養師或個人化醫療建議。"
   },
   "慢性腎臟病": {
     "max_protein_per_meal": 40,
-    "description": "限制蛋白質、磷、鉀"
+    "description": "限制蛋白質、磷、鉀",
+    "rule_version": "2026.05.1",
+    "review_status": "needs_clinical_review",
+    "last_reviewed": "2026-05-21",
+    "reviewed_by": "project-team",
+    "evidence_level": "screening-rule-only",
+    "references": [
+      {
+        "title": "衛生福利部國民健康署：慢性腎臟病防治與飲食衛教",
+        "url": "https://www.hpa.gov.tw/"
+      }
+    ],
+    "medical_disclaimer": "慢性腎臟病飲食限制會因分期、檢驗值與治療方式不同而差異很大；此規則僅供提醒，不可取代醫療建議。"
   },
   "痛風": {
     "blocked_labels": ["hot dog"],
-    "description": "限制高普林食物"
+    "description": "限制高普林食物",
+    "rule_version": "2026.05.1",
+    "review_status": "needs_clinical_review",
+    "last_reviewed": "2026-05-21",
+    "reviewed_by": "project-team",
+    "evidence_level": "screening-rule-only",
+    "references": [
+      {
+        "title": "衛生福利部國民健康署：高尿酸與痛風飲食衛教",
+        "url": "https://www.hpa.gov.tw/"
+      }
+    ],
+    "medical_disclaimer": "此規則僅用於餐點提醒與推薦排序，不可取代醫師、營養師或個人化醫療建議。"
   },
   "高血脂": {
     "max_fat_per_meal": 20,
-    "description": "限制飽和脂肪、膽固醇"
+    "description": "限制飽和脂肪、膽固醇",
+    "rule_version": "2026.05.1",
+    "review_status": "needs_clinical_review",
+    "last_reviewed": "2026-05-21",
+    "reviewed_by": "project-team",
+    "evidence_level": "nutrition-guideline-derived",
+    "references": [
+      {
+        "title": "衛生福利部國民健康署：健康飲食與血脂管理衛教",
+        "url": "https://www.hpa.gov.tw/"
+      }
+    ],
+    "medical_disclaimer": "此規則僅用於餐點提醒與推薦排序，不可取代醫師、營養師或個人化醫療建議。"
   }
 }

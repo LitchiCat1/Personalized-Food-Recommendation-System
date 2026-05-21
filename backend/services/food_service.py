@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 
@@ -60,7 +60,7 @@ def build_custom_food_doc(data: dict, normalize_nutrition_payload, scale_nutriti
     if not any(value is not None for value in nutrition_per_100g.values()):
         nutrition_per_100g = scale_nutrition_per_100g(nutrition_per_serving, serving_size_g)
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     return {
         "food_id": data.get("food_id") or f"custom_{uuid.uuid4().hex[:10]}",
         "user_id": data.get("user_id", "demo_user"),

@@ -19,28 +19,52 @@ def search_foods(storage, tfda_db: dict, query: str, limit: int, user_id: str | 
             if len(results) >= limit:
                 return results
 
+    tfda_candidates = []
     for key, food in tfda_db.items():
         if q in key or q in (food.get("name_zh") or "") or q_lower in (food.get("name_en") or "").lower():
-            results.append(
-                {
-                    "key": key,
-                    "name_zh": food.get("name_zh", key),
-                    "name_en": food.get("name_en", ""),
-                    "category": food.get("category", ""),
-                    "calories": food.get("calories", 0),
-                    "protein": food.get("protein", 0),
-                    "fat": food.get("fat", 0),
-                    "carbs": food.get("carbs", 0),
-                    "sodium": food.get("sodium", 0),
-                    "fiber": food.get("fiber", 0),
-                    "unit": food.get("unit", "per 100g"),
-                    "source": "TFDA",
-                }
-            )
-            if len(results) >= limit:
-                break
+            tfda_candidates.append((_score_tfda_match(q, q_lower, key, food), key, food))
+
+    for _, key, food in sorted(tfda_candidates, key=lambda item: item[0])[:limit - len(results)]:
+        results.append(
+            {
+                "key": key,
+                "name_zh": food.get("name_zh", key),
+                "name_en": food.get("name_en", ""),
+                "category": food.get("category", ""),
+                "calories": food.get("calories", 0),
+                "protein": food.get("protein", 0),
+                "fat": food.get("fat", 0),
+                "carbs": food.get("carbs", 0),
+                "sodium": food.get("sodium", 0),
+                "fiber": food.get("fiber", 0),
+                "unit": food.get("unit", "per 100g"),
+                "source": "TFDA",
+            }
+        )
 
     return results
+
+
+def _score_tfda_match(q: str, q_lower: str, key: str, food: dict) -> tuple:
+    name_zh = food.get("name_zh", key) or key
+    name_en = (food.get("name_en") or "").lower()
+    category = food.get("category", "") or ""
+
+    if name_zh == q or key == q:
+        match_rank = 0
+    elif name_zh.startswith(q) or key.startswith(q):
+        match_rank = 1
+    elif q in name_zh or q in key:
+        match_rank = 2
+    elif q_lower and name_en.startswith(q_lower):
+        match_rank = 3
+    else:
+        match_rank = 4
+
+    category_rank = 0 if category == "水果類" else 1
+    processed_penalty = sum(token in name_zh for token in ["汁", "飲", "茶", "乳", "發酵", "濃稠", "保久", "餅", "醬"])
+    average_bonus = 0 if "平均值" in name_zh else 1
+    return (match_rank, category_rank, processed_penalty, average_bonus, len(name_zh), name_zh)
 
 
 def build_custom_food_doc(data: dict, normalize_nutrition_payload, scale_nutrition_per_100g, extract_number):

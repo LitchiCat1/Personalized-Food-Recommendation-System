@@ -4,11 +4,11 @@ import requests
 
 from services.food_service import search_foods
 from services.food_analysis_service import build_detection_reliability, build_portion_range, check_food_safety
-from services.nutrition_label_service import extract_json_block, extract_number
+from services.nutrition_label_service import extract_json_block, extract_number, get_gemini_models
 
 
 VISION_FOOD_MIN_CONFIDENCE = float(os.environ.get("VISION_FOOD_MIN_CONFIDENCE", "0.45"))
-RETRYABLE_GEMINI_STATUS_CODES = {401, 403, 429, 500, 502, 503, 504}
+RETRYABLE_GEMINI_STATUS_CODES = {401, 403, 404, 429, 500, 502, 503, 504}
 
 
 def call_gemini_food_recognition_with_rotation(image_b64: str, mime_type: str, api_keys: list[str]) -> dict:
@@ -16,23 +16,28 @@ def call_gemini_food_recognition_with_rotation(image_b64: str, mime_type: str, a
         raise ValueError("缺少 Gemini API key，請設定 GEMINI_API_KEYS 或 GEMINI_API_KEY 環境變數")
 
     last_error: requests.HTTPError | None = None
-    for index, api_key in enumerate(api_keys):
-        try:
-            return call_gemini_food_recognition(image_b64, mime_type, api_key)
-        except requests.HTTPError as e:
-            last_error = e
-            status_code = e.response.status_code if e.response is not None else None
-            if status_code not in RETRYABLE_GEMINI_STATUS_CODES or index == len(api_keys) - 1:
-                raise
-            print(f"[!] Gemini food key #{index + 1} failed with HTTP {status_code}; trying next key")
+    models = get_gemini_models()
+    total_attempts = len(api_keys) * len(models)
+    attempt = 0
+    for key_index, api_key in enumerate(api_keys):
+        for model in models:
+            attempt += 1
+            try:
+                return call_gemini_food_recognition(image_b64, mime_type, api_key, model)
+            except requests.HTTPError as e:
+                last_error = e
+                status_code = e.response.status_code if e.response is not None else None
+                if status_code not in RETRYABLE_GEMINI_STATUS_CODES or attempt == total_attempts:
+                    raise
+                print(f"[WARN] Gemini food key #{key_index + 1} model {model} failed with HTTP {status_code}; trying next option")
 
     if last_error:
         raise last_error
     raise ValueError("Gemini food recognition key rotation failed")
 
 
-def call_gemini_food_recognition(image_b64: str, mime_type: str, api_key: str) -> dict:
-    gemini_model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+def call_gemini_food_recognition(image_b64: str, mime_type: str, api_key: str, gemini_model: str | None = None) -> dict:
+    gemini_model = gemini_model or get_gemini_models()[0]
     prompt = (
         "你是台灣飲食紀錄 App 的食物影像分析器。請辨識照片中可食用項目，"
         "特別注意台灣常見餐點、便當、白飯、麵、湯、肉類、青菜與飲料。"

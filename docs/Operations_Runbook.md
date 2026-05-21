@@ -86,7 +86,7 @@ python -m py_compile "backend/app.py" "backend/services/auth_service.py" "backen
 DATABASE_URL=postgresql://...
 GEMINI_API_KEYS=key1,key2,key3
 GEMINI_API_KEY=single-key-fallback
-GEMINI_MODEL=gemini-1.5-flash
+GEMINI_MODELS=gemini-2.5-flash,gemini-2.0-flash
 DISEASE_RULES_PATH=backend/config/disease_rules.json
 RESTAURANT_CATALOG_PATH=backend/data/restaurant_catalog.json
 SUPABASE_AUTH_REQUIRED=true
@@ -112,7 +112,7 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 
 ## 4. Gemini API Key 輪替
 
-本專案使用 Gemini API 進行食物影像辨識與營養標示 OCR。Render 部署環境建議使用 `GEMINI_API_KEYS` 放多組 key 做輪替；本機可使用單一 `GEMINI_API_KEY` 或同樣使用 `GEMINI_API_KEYS`。
+本專案使用 Gemini API 進行食物影像辨識與營養標示 OCR。Render 部署環境建議使用 `GEMINI_API_KEYS` 放多組 key 做輪替；本機可使用單一 `GEMINI_API_KEY` 或同樣使用 `GEMINI_API_KEYS`。模型可用 `GEMINI_MODELS` 以逗號分隔設定候選順序；未設定時會依序嘗試 `gemini-2.5-flash`、`gemini-2.0-flash`、`gemini-1.5-flash`。
 
 單一 key：
 

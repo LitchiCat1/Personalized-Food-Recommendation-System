@@ -3,6 +3,7 @@ import unittest
 
 from services.disease_rule_service import build_disease_rules_response, load_disease_rules
 from services.food_analysis_service import build_detection_reliability, build_portion_range
+from services.food_service import search_foods
 from services.healthy_food_service import load_restaurant_catalog
 from services.history_service import build_history_response
 from services.profile_service import build_bmr_response
@@ -62,6 +63,26 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertGreater(len(catalog), 0)
         self.assertIn("items", catalog[0])
         self.assertGreater(len(catalog[0]["items"]), 0)
+
+    def test_food_search_prefers_whole_fruit_over_processed_matches(self):
+        tfda_db = {
+            "脫脂保久濃稠發酵乳(草莓&蘋果)": {
+                "name_zh": "脫脂保久濃稠發酵乳(草莓&蘋果)",
+                "category": "乳品類",
+                "calories": 68,
+            },
+            "蘋果平均值(混色)": {
+                "name_zh": "蘋果平均值(混色)",
+                "name_en": "Apple",
+                "category": "水果類",
+                "calories": 51,
+            },
+        }
+
+        results = search_foods(FakeStorage(), tfda_db, "蘋果", 2, "demo_user", lambda food: food)
+
+        self.assertEqual(results[0]["name_zh"], "蘋果平均值(混色)")
+        self.assertEqual(results[0]["category"], "水果類")
 
     def test_detection_reliability_and_portion_range(self):
         high = build_detection_reliability("apple", 0.91, False, {"source": "TFDA"})

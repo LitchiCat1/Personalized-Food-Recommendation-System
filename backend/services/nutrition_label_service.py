@@ -5,7 +5,8 @@ import re
 import requests
 
 
-RETRYABLE_GEMINI_STATUS_CODES = {401, 403, 429, 500, 502, 503, 504}
+RETRYABLE_GEMINI_STATUS_CODES = {401, 403, 404, 429, 500, 502, 503, 504}
+DEFAULT_GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
 
 
 def extract_number(value, as_int: bool = False):
@@ -115,28 +116,52 @@ def get_gemini_api_keys(explicit_key: str | None = None) -> list[str]:
     return keys
 
 
+def get_gemini_models() -> list[str]:
+    raw_models = [os.environ.get("GEMINI_MODELS"), os.environ.get("GEMINI_MODEL")]
+    models: list[str] = []
+    seen = set()
+    for raw in raw_models:
+        if not raw:
+            continue
+        for model in raw.split(","):
+            normalized = model.strip()
+            if normalized and normalized not in seen:
+                models.append(normalized)
+                seen.add(normalized)
+    for model in DEFAULT_GEMINI_MODELS:
+        if model not in seen:
+            models.append(model)
+            seen.add(model)
+    return models
+
+
 def call_gemini_nutrition_ocr_with_rotation(image_b64: str, mime_type: str, api_keys: list[str]) -> dict:
     if not api_keys:
         raise ValueError("缺少 Gemini API key，請設定 GEMINI_API_KEYS 或 GEMINI_API_KEY 環境變數")
 
     last_error: requests.HTTPError | None = None
-    for index, api_key in enumerate(api_keys):
-        try:
-            return call_gemini_nutrition_ocr(image_b64, mime_type, api_key)
-        except requests.HTTPError as e:
-            last_error = e
-            status_code = e.response.status_code if e.response is not None else None
-            if status_code not in RETRYABLE_GEMINI_STATUS_CODES or index == len(api_keys) - 1:
-                raise
-            print(f"[!] Gemini key #{index + 1} failed with HTTP {status_code}; trying next key")
+    models = get_gemini_models()
+    total_attempts = len(api_keys) * len(models)
+    attempt = 0
+    for key_index, api_key in enumerate(api_keys):
+        for model in models:
+            attempt += 1
+            try:
+                return call_gemini_nutrition_ocr(image_b64, mime_type, api_key, model)
+            except requests.HTTPError as e:
+                last_error = e
+                status_code = e.response.status_code if e.response is not None else None
+                if status_code not in RETRYABLE_GEMINI_STATUS_CODES or attempt == total_attempts:
+                    raise
+                print(f"[WARN] Gemini key #{key_index + 1} model {model} failed with HTTP {status_code}; trying next option")
 
     if last_error:
         raise last_error
     raise ValueError("Gemini API key 輪替失敗")
 
 
-def call_gemini_nutrition_ocr(image_b64: str, mime_type: str, api_key: str) -> dict:
-    gemini_model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+def call_gemini_nutrition_ocr(image_b64: str, mime_type: str, api_key: str, gemini_model: str | None = None) -> dict:
+    gemini_model = gemini_model or get_gemini_models()[0]
     prompt = (
         "請辨識這張食品營養標示圖片，盡量依台灣常見營養標示格式擷取資訊。"
         "只回傳合法 JSON，不要加 markdown、不要加解釋。"

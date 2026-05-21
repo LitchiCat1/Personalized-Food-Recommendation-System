@@ -10,8 +10,6 @@ import os
 import uuid
 from datetime import datetime, timezone
 
-import cv2
-import numpy as np
 import psycopg2
 import requests
 from flask import Flask, request, jsonify
@@ -363,6 +361,9 @@ def predict():
     user_allergens = data.get("allergens", [])
 
     try:
+        import cv2
+        import numpy as np
+
         img_bytes = base64.b64decode(data["image"])
         img_arr = np.frombuffer(img_bytes, dtype=np.uint8)
         img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)

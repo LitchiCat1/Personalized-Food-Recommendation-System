@@ -1,9 +1,5 @@
 flask
 flask-cors
-ultralytics
 pymongo
-opencv-python-headless
-pillow
-numpy
 requests
 psycopg2-binary

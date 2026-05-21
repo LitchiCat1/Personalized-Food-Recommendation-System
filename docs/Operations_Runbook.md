@@ -149,6 +149,8 @@ GEMINI_API_KEYS=key1,key2,key3
 - 後端 Auth：`SUPABASE_AUTH_REQUIRED=true`
 - 最新已驗證強制 Auth deploy：`dep-d7u8pb67r5hc73bfus20`
 
+此 Render URL 是後端 API，不是前端網頁。瀏覽器打開根路徑 `/` 只會看到 API 狀態 JSON；正式操作畫面需啟動 Expo frontend，或另外部署 frontend static site。
+
 Render 需要設定：
 
 ```env
@@ -173,6 +175,16 @@ render deploys list srv-d7u2qhdckfvc73ei96l0 --output json
 latest deploy 應為 `live`。
 
 ### 6.2 Health check
+
+根路徑可讀性檢查：
+
+```powershell
+curl https://personalized-food-recommendation-system-nq8t.onrender.com/
+```
+
+應回傳 API 狀態 JSON。若 `/` 回 `404`，通常代表後端仍在舊版部署；不代表 `/health` 或 API 壞掉。
+
+健康檢查：
 
 ```powershell
 curl https://personalized-food-recommendation-system-nq8t.onrender.com/health

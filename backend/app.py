@@ -149,6 +149,21 @@ print(f"[✓] Restaurant catalog loaded: {len(RESTAURANT_CATALOG)} restaurants")
 # ═══════════════════════════════════════════════════════════════
 
 
+@app.route("/", methods=["GET"])
+def index():
+    return jsonify({
+        "name": "Personalized Food Recommendation Backend",
+        "status": "ok",
+        "message": "This is the backend API. Use /health for health checks or connect the Expo frontend to this base URL.",
+        "health_url": "/health",
+        "docs": {
+            "health": "/health",
+            "disease_rules": "/disease-rules",
+            "food_search": "/search/food?q=蘋果",
+        },
+    })
+
+
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({

@@ -173,6 +173,7 @@ Personalized-Food-Recommendation-System/
 
 | Method | Path | 功能 |
 |--------|------|------|
+| `GET` | `/` | 後端 API 狀態說明，避免直接打 Render URL 時出現 404 |
 | `GET` | `/health` | 健康檢查，回傳 DB、模型、資料庫、疾病規則載入狀態 |
 | `GET` | `/search/food?q=&limit=&user_id=` | 搜尋自訂食品與 TFDA 食品 |
 | `GET` | `/food/<food_key>` | 取得單一食品完整資料 |

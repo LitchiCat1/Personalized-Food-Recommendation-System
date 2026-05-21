@@ -221,13 +221,13 @@ export default function ScannerScreen() {
         try {
           const ok = await handlePrediction(photo.base64);
           if (ok) return;
-        } catch {
-          // Backend unavailable — fallback to demo
+        } catch (error: any) {
+          Alert.alert('AI 辨識暫時不可用', error?.message || '請先使用手動搜尋加入餐點。');
         }
       }
 
       setRejectedDetections([]);
-      setScanResult(SCANNER_DEMO_RESULTS);
+      clearScan();
     } catch {
       Alert.alert('拍照失敗', '請再試一次');
       setScanning(false);
@@ -249,13 +249,13 @@ export default function ScannerScreen() {
       try {
         const ok = await handlePrediction(asset.base64);
         if (ok) return;
-      } catch {
-        // fallback
+      } catch (error: any) {
+        Alert.alert('AI 辨識暫時不可用', error?.message || '請先使用手動搜尋加入餐點。');
       }
     }
 
     setRejectedDetections([]);
-    setScanResult(SCANNER_DEMO_RESULTS);
+    clearScan();
   };
 
   const handleLabelOCRFromGallery = async () => {

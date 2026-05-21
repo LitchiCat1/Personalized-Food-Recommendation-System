@@ -31,6 +31,8 @@ services:
         sync: false
       - key: FLASK_DEBUG
         value: "false"
+      - key: ENABLE_YOLO_FALLBACK
+        value: "false"
       - key: SUPABASE_AUTH_REQUIRED
         value: "true"
       - key: SUPABASE_URL

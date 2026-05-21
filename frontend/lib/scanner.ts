@@ -95,6 +95,10 @@ export async function runPrediction(params: {
     // Fall back to local YOLO endpoint when Gemini Vision is unavailable.
   }
 
+  if (params.apiBaseUrl.includes('onrender.com')) {
+    throw new Error('AI 食物辨識暫時不可用，請先使用手動搜尋加入餐點。');
+  }
+
   const resp = await fetch(`${params.apiBaseUrl}/predict`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

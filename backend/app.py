@@ -16,7 +16,6 @@ import psycopg2
 import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from ultralytics import YOLO
 from repositories.storage import StorageRepository
 from services.auth_service import AuthError, is_auth_required, verify_supabase_user
 from services.disease_rule_service import build_disease_rules_response, load_disease_rules
@@ -54,10 +53,10 @@ if database_url:
     try:
         pg_conn = psycopg2.connect(database_url, sslmode="require")
         pg_conn.autocommit = True
-        print("[✓] PostgreSQL connected")
+        print("[OK] PostgreSQL connected")
     except Exception as e:
         pg_conn = None
-        print(f"[!] PostgreSQL unavailable — {e}")
+        print(f"[WARN] PostgreSQL unavailable - {e}")
 
 # ─── Optional MongoDB (graceful fallback to in-memory) ────────
 mongo = None
@@ -68,13 +67,13 @@ try:
     mongo.server_info()  # trigger connection check
     db = mongo["nutrilens"]
     USE_MONGO = True
-    print("[✓] MongoDB connected")
+    print("[OK] MongoDB connected")
 except Exception:
     if mongo is not None:
         mongo.close()
     USE_MONGO = False
     db = None
-    print("[!] MongoDB unavailable — using in-memory storage")
+    print("[WARN] MongoDB unavailable - using in-memory storage")
 
 # ─── In-memory fallback storage ──────────────────────────────
 _mem_users = {}
@@ -113,15 +112,20 @@ def handle_auth_error(error):
 
 # ─── Load YOLO model ─────────────────────────────────────────
 MODEL_PATH = os.path.join(BASE_DIR, "yolov8n.pt")
+YOLO_ENABLED = os.environ.get("ENABLE_YOLO_FALLBACK", "false").lower() == "true"
 model = None
 
 
 def get_model():
     global model
+    if not YOLO_ENABLED:
+        raise RuntimeError("YOLO fallback is disabled on this deployment")
     if model is None:
+        from ultralytics import YOLO
+
         print("[ ] Loading YOLO model...")
         model = YOLO(MODEL_PATH)
-        print("[✓] YOLO model loaded")
+        print("[OK] YOLO model loaded")
     return model
 
 # ─── Load nutrition databases ────────────────────────────────
@@ -135,17 +139,17 @@ TFDA_PATH = os.path.join(BASE_DIR, "nutrition_db_tw.json")
 try:
     with open(TFDA_PATH, "r", encoding="utf-8") as f:
         TFDA_DB = json.load(f)
-    print(f"[✓] TFDA nutrition DB loaded: {len(TFDA_DB)} foods")
+    print(f"[OK] TFDA nutrition DB loaded: {len(TFDA_DB)} foods")
 except FileNotFoundError:
     TFDA_DB = {}
-    print("[!] TFDA nutrition_db_tw.json not found — using fallback only")
+    print("[WARN] TFDA nutrition_db_tw.json not found - using fallback only")
 
 # ─── Disease filter rules (PRD: 硬性排除規則) ────────────────
 DISEASE_RULES = load_disease_rules(BASE_DIR)
-print(f"[✓] Disease rules loaded: {len(DISEASE_RULES)} conditions")
+print(f"[OK] Disease rules loaded: {len(DISEASE_RULES)} conditions")
 
 RESTAURANT_CATALOG = load_restaurant_catalog(BASE_DIR)
-print(f"[✓] Restaurant catalog loaded: {len(RESTAURANT_CATALOG)} restaurants")
+print(f"[OK] Restaurant catalog loaded: {len(RESTAURANT_CATALOG)} restaurants")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -175,6 +179,7 @@ def health():
         "postgres": pg_conn is not None,
         "mongo": USE_MONGO,
         "model": "yolov8n",
+        "yolo_enabled": YOLO_ENABLED,
         "model_loaded": model is not None,
         "foods_in_db": len(NUTRITION_DB),
         "foods_in_tfda": len(TFDA_DB),
@@ -192,6 +197,8 @@ def disease_rules():
 
 @app.route("/warmup", methods=["POST"])
 def warmup():
+    if not YOLO_ENABLED:
+        return jsonify({"status": "skipped", "model_loaded": False, "reason": "YOLO fallback disabled"})
     get_model()
     return jsonify({"status": "ok", "model_loaded": True})
 
@@ -341,6 +348,13 @@ def predict_vision_food():
 # ─── 1. Image Detection (PRD: 即時影像辨識) ──────────────────
 @app.route("/predict", methods=["POST"])
 def predict():
+    if not YOLO_ENABLED:
+        return jsonify({
+            "error": "YOLO fallback is disabled on this deployment. Use /predict/vision-food or manual search.",
+            "detections": [],
+            "rejected_detections": [],
+        }), 503
+
     data = request.get_json(silent=True)
     if not data or "image" not in data:
         return jsonify({"error": "缺少 image 欄位（Base64）"}), 400

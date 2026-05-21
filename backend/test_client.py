@@ -62,7 +62,7 @@ def test_user_profile():
 
 
 def test_predict():
-    sep("Image Detection (with health context)")
+    sep("Gemini Vision Food Recognition (with health context)")
     try:
         with open(IMAGE_PATH, "rb") as f:
             img_b64 = base64.b64encode(f.read()).decode("utf-8")
@@ -70,7 +70,7 @@ def test_predict():
         print(f"[跳過] 找不到 {IMAGE_PATH}")
         return
 
-    resp = requests.post(f"{API_URL}/predict", json={
+    resp = requests.post(f"{API_URL}/predict/vision-food", json={
         "image": img_b64,
         "health_conditions": ["高血壓"],
         "allergens": ["花生", "蝦蟹"],
@@ -83,8 +83,7 @@ def test_predict():
         print(f"    信心度: {det['confidence']:.2%}")
         print(f"    份量: {det['estimated_weight_g']}g")
         print(f"    GI: {det['gi']}")
-        bb = det["bounding_box"]
-        print(f"    Bbox: x={bb['x']:.2f} y={bb['y']:.2f} w={bb['w']:.2f} h={bb['h']:.2f}")
+        print(f"    份量方法: {det.get('portion_estimation_method')}")
         n = det["nutrition"]
         print(f"    熱量={n['calories']}kcal 蛋白質={n['protein']}g 碳水={n['carbs']}g 脂肪={n['fat']}g 鈉={n['sodium']}mg 纖維={n['fiber']}g")
         if det["allergens"]:

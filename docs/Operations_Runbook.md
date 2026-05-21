@@ -64,14 +64,10 @@ npx expo start -c
 避免一次啟動耗時模型或長時間無輸出，優先跑短檢查：
 
 ```powershell
-python -m py_compile "backend/app.py" "backend/services/auth_service.py" "backend/repositories/storage.py" "backend/services/disease_rule_service.py" "backend/services/history_service.py" "backend/services/predict_service.py" "backend/services/recommend_service.py" "backend/services/healthy_food_service.py"
+python -m py_compile "backend/app.py" "backend/services/auth_service.py" "backend/repositories/storage.py" "backend/services/disease_rule_service.py" "backend/services/history_service.py" "backend/services/food_analysis_service.py" "backend/services/vision_food_service.py" "backend/services/recommend_service.py" "backend/services/healthy_food_service.py"
 ```
 
-YOLO/TFDA 映射檢查：
-
-```powershell
-python backend/scripts/verify_mapping.py
-```
+食物辨識目前採 Gemini Vision 初判，再由後端查 TFDA/自訂食品資料庫取得營養值；不再部署本機影像模型。
 
 ## 3. 本機環境變數
 
@@ -116,7 +112,7 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 
 ## 4. Gemini API Key 輪替
 
-本專案使用 Gemini API 進行營養標示 OCR。Render 部署環境建議使用 `GEMINI_API_KEYS` 放多組 key 做輪替；本機可使用單一 `GEMINI_API_KEY` 或同樣使用 `GEMINI_API_KEYS`。
+本專案使用 Gemini API 進行食物影像辨識與營養標示 OCR。Render 部署環境建議使用 `GEMINI_API_KEYS` 放多組 key 做輪替；本機可使用單一 `GEMINI_API_KEY` 或同樣使用 `GEMINI_API_KEYS`。
 
 單一 key：
 

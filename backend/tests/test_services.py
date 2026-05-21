@@ -2,9 +2,9 @@ import os
 import unittest
 
 from services.disease_rule_service import build_disease_rules_response, load_disease_rules
+from services.food_analysis_service import build_detection_reliability, build_portion_range
 from services.healthy_food_service import load_restaurant_catalog
 from services.history_service import build_history_response
-from services.predict_service import assess_detection, build_detection_reliability, build_portion_range
 from services.profile_service import build_bmr_response
 from services.recommend_service import (
     build_feedback_profile,
@@ -13,7 +13,6 @@ from services.recommend_service import (
     compute_preference_score,
 )
 from services.vision_food_service import build_vision_food_response
-from yolo_tfda_mapping import YOLO_MANUAL_SEARCH_HINTS
 
 
 class FakeStorage:
@@ -64,18 +63,13 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertIn("items", catalog[0])
         self.assertGreater(len(catalog[0]["items"]), 0)
 
-    def test_generic_detection_returns_search_hints(self):
-        result = assess_detection("cup", 0.9, {"calories": 10}, {}, {}, YOLO_MANUAL_SEARCH_HINTS)
-        self.assertFalse(result["accepted"])
-        self.assertIn("咖啡", result["search_hints"])
-
     def test_detection_reliability_and_portion_range(self):
         high = build_detection_reliability("apple", 0.91, False, {"source": "TFDA"})
         low = build_detection_reliability("bowl", 0.58, True, {"source": "TFDA"})
 
         self.assertEqual(high["level"], "high")
         self.assertEqual(low["level"], "low")
-        self.assertIn("份量由照片", low["reasons"][2])
+        self.assertIn("Gemini", low["reasons"][2])
 
         high_range = build_portion_range(100, high["level"])
         low_range = build_portion_range(100, low["level"])
@@ -121,7 +115,8 @@ class ServiceSmokeTests(unittest.TestCase):
             lambda food: food,
         )
 
-        self.assertEqual(response["engine"], "gemini-vision-tfda")
+        self.assertEqual(response["engine"], "gemini-vision-db-lookup")
+        self.assertEqual(response["nutrition_grounding"], "database_only")
         self.assertEqual(len(response["detections"]), 1)
         detection = response["detections"][0]
         self.assertEqual(detection["name_zh"], "白飯")

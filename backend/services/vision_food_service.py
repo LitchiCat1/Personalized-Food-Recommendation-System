@@ -3,8 +3,8 @@ import os
 import requests
 
 from services.food_service import search_foods
+from services.food_analysis_service import build_detection_reliability, build_portion_range, check_food_safety
 from services.nutrition_label_service import extract_json_block, extract_number
-from services.predict_service import build_detection_reliability, build_portion_range, check_food_safety
 
 
 VISION_FOOD_MIN_CONFIDENCE = float(os.environ.get("VISION_FOOD_MIN_CONFIDENCE", "0.45"))
@@ -36,7 +36,8 @@ def call_gemini_food_recognition(image_b64: str, mime_type: str, api_key: str) -
     prompt = (
         "你是台灣飲食紀錄 App 的食物影像分析器。請辨識照片中可食用項目，"
         "特別注意台灣常見餐點、便當、白飯、麵、湯、肉類、青菜與飲料。"
-        "不要直接產生營養數字，只估計食物名稱與份量。"
+        "你不能連線資料庫，也不要直接產生營養數字；營養資料會由後端用你提供的候選名稱查 TFDA 與使用者自訂食品資料庫。"
+        "請提供常見中文食品名稱與可查資料庫的同義候選，例如白飯/白米飯、雞腿便當/雞腿/白飯/青菜。"
         "只回傳合法 JSON，不要加 markdown、不要加解釋。"
         "若無法確定，confidence 請降低並在 uncertainty_notes 說明。"
         "JSON schema: "
@@ -174,7 +175,9 @@ def build_vision_food_response(
         )
 
     return {
-        "engine": "gemini-vision-tfda",
+        "engine": "gemini-vision-db-lookup",
+        "nutrition_grounding": "database_only",
+        "database_sources": ["user_custom_foods", "TFDA"],
         "meal_guess": parsed.get("meal_guess") or "",
         "detections": detections,
         "rejected_detections": rejected_detections,

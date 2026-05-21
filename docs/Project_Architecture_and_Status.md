@@ -16,8 +16,8 @@
 目前系統已具備以下主軸：
 
 - 使用手機相機或相簿圖片進行食物辨識。
-- 以 YOLOv8 偵測食物類別與 Bounding Box。
-- 將 YOLO label 對應到 TFDA 台灣食品營養資料庫。
+- 以 Gemini Vision 判斷食物名稱、候選同義詞與份量描述。
+- 後端使用 Gemini 候選名稱查詢 TFDA 台灣食品營養資料庫與使用者自訂食品，營養數字只來自資料庫。
 - 依照估算重量換算熱量、蛋白質、碳水、脂肪、鈉與纖維。
 - 依照疾病與過敏原規則產生警示或排除推薦。
 - 支援手動搜尋 TFDA 食品、營養標示 OCR、自訂食品與飲食紀錄。
@@ -29,7 +29,7 @@
 |------|----------|----------|
 | 前端 | React Native 行動 App | Expo React Native + TypeScript + Expo Router，支援 mobile/web 開發 |
 | 後端 | Flask API | Flask API，已拆分 services 與 repository |
-| 影像模型 | YOLO 深度學習辨識 | YOLOv8 Nano (`yolov8n.pt`) |
+| 影像模型 | 原規劃為本機深度學習辨識 | Gemini Vision API + 後端資料庫營養對應 |
 | 營養資料 | 營養資料庫 | TFDA 台灣食品資料庫 + 手工 DB + 自訂食品 |
 | 資料庫 | MongoDB | PostgreSQL/Supabase 優先，MongoDB 備援，In-memory fallback |
 | 推薦 | 安全過濾 + 口味排序 + 地圖導向 | 安全過濾、候選擴展與歷史偏好加權已完成；真實地圖/餐廳 API 尚未完成 |
@@ -51,10 +51,8 @@ Personalized-Food-Recommendation-System/
 │   │   └── disease_rules.json          # 疾病飲食限制規則設定
 │   ├── requirements.txt                # Python 依賴
 │   ├── test_client.py                  # 後端 API 手動測試腳本
-│   ├── yolov8n.pt                      # YOLOv8 Nano 預訓練模型
 │   ├── nutrition_db.json               # 舊版手工營養資料庫
 │   ├── nutrition_db_tw.json            # TFDA 台灣食品營養資料庫，約 2,181 筆
-│   ├── yolo_tfda_mapping.py            # YOLO COCO label 到 TFDA 食品映射與手動搜尋建議
 │   │
 │   ├── repositories/
 │   │   └── storage.py                  # PostgreSQL/MongoDB/In-memory 資料層抽象
@@ -66,13 +64,13 @@ Personalized-Food-Recommendation-System/
 │   │   ├── healthy_food_service.py     # 附近健康餐點推薦 MVP
 │   │   ├── history_service.py          # 飲食歷史彙整
 │   │   ├── nutrition_label_service.py  # Gemini Vision 營養標示 OCR
-│   │   ├── predict_service.py          # YOLO 辨識、營養換算、安全檢查
+│   │   ├── food_analysis_service.py    # 可信度、份量區間與健康警示共用邏輯
+│   │   ├── vision_food_service.py      # Gemini Vision 食物辨識與資料庫營養對應
 │   │   ├── profile_service.py          # 使用者 profile、BMR/TDEE/BMI
 │   │   └── recommend_service.py        # 規則型雙軌推薦
 │   │
 │   ├── scripts/
 │   │   ├── convert_tfda.py             # TFDA 原始資料轉換
-│   │   └── verify_mapping.py           # 驗證 YOLO 到 TFDA 映射
 │   │
 │   └── tfda_data/
 │       ├── 20_5.json                   # TFDA 原始完整資料
@@ -131,8 +129,8 @@ Personalized-Food-Recommendation-System/
 | State | Zustand |
 | UI / Device | expo-camera, expo-image-picker, expo-location, react-native-svg |
 | Backend | Flask, Flask-CORS |
-| AI Detection | Ultralytics YOLOv8 Nano |
-| Image Processing | OpenCV headless, Pillow, NumPy |
+| AI Detection | Google Gemini Vision API via REST |
+| Nutrition Grounding | TFDA 台灣食品資料庫 + user scoped custom foods |
 | OCR | Google Gemini Vision API via REST |
 | Database | PostgreSQL/Supabase, MongoDB fallback, In-memory fallback |
 | Deployment | Render Web Service free plan + Supabase Postgres free plan |
@@ -150,7 +148,6 @@ Personalized-Food-Recommendation-System/
   -> 若無 PostgreSQL 或連線失敗，嘗試 MongoDB
   -> 若 MongoDB 也不可用，退回 In-memory
   -> 載入 Flask app + CORS
-  -> 載入 YOLOv8 模型
   -> 載入 nutrition_db.json 與 nutrition_db_tw.json
   -> 開放 API routes
 ```
@@ -180,7 +177,7 @@ Personalized-Food-Recommendation-System/
 | `POST` | `/custom-food` | 建立或更新自訂食品 |
 | `GET` | `/custom-foods?user_id=` | 列出自訂食品 |
 | `POST` | `/ocr/nutrition-label` | 營養標示 OCR |
-| `POST` | `/predict` | 影像辨識與營養分析 |
+| `POST` | `/predict/vision-food` | Gemini 食物辨識與資料庫營養分析 |
 | `GET` | `/user/<user_id>` | 取得使用者 profile |
 | `POST` | `/user` | 建立或更新使用者 profile |
 | `POST` | `/record` | 新增飲食紀錄 |
@@ -198,7 +195,7 @@ Personalized-Food-Recommendation-System/
 | Tab | 檔案 | 功能 |
 |-----|------|------|
 | 首頁 | `frontend/app/(tabs)/index.tsx` | 今日熱量、營養素進度、BMR/TDEE、今日餐點 |
-| 辨識 | `frontend/app/(tabs)/scanner.tsx` | 相機拍攝、相簿上傳、YOLO 辨識、TFDA 手動搜尋、營養標示 OCR |
+| 辨識 | `frontend/app/(tabs)/scanner.tsx` | 相機拍攝、相簿上傳、Gemini Vision 辨識、TFDA 手動搜尋、營養標示 OCR |
 | 推薦 | `frontend/app/(tabs)/recommend.tsx` | 規則型推薦、疾病過濾結果、附近健康餐點推薦 |
 | 趨勢 | `frontend/app/(tabs)/history.tsx` | 7 日熱量、營養均值、鈉攝取與簡易洞察 |
 | 我的 | `frontend/app/(tabs)/profile.tsx` | 使用者資料、BMR/TDEE、疾病、過敏原與後端同步 |
@@ -218,7 +215,7 @@ Personalized-Food-Recommendation-System/
 | 檔案 | 職責 |
 |------|------|
 | `frontend/lib/api.ts` | `history`、`recommend`、`profile`、`healthy-food-recommend` API 與型別 |
-| `frontend/lib/scanner.ts` | `/predict`、`/record`、`/search/food`、`/ocr/nutrition-label`、`/custom-food` |
+| `frontend/lib/scanner.ts` | `/predict/vision-food`、`/record`、`/search/food`、`/ocr/nutrition-label`、`/custom-food` |
 | `frontend/lib/network.ts` | 解析 `EXPO_PUBLIC_API_BASE_URL`、Expo host、localhost、Android emulator fallback |
 
 ## 8. 核心資料流程
@@ -228,21 +225,11 @@ Personalized-Food-Recommendation-System/
 ```txt
 前端拍照或上傳圖片
   -> base64 image
-  -> 優先 POST /predict/vision-food
+  -> POST /predict/vision-food
   -> Gemini Vision 判斷台灣常見食物語意、候選名稱與份量描述
   -> 後端以 Gemini 食物名稱搜尋 user scoped custom_foods 與 TFDA nutrition_db_tw.json
   -> 營養數字只由資料庫換算，不直接採用 Gemini 生成值
   -> 回傳 recognition reliability、portion_range_g、alternatives 與人工確認提示
-  -> Gemini 不可用或無結果時 fallback 到 POST /predict
-  -> Flask 解碼圖片
-  -> YOLOv8 偵測 label、confidence、bounding box
-  -> assess_detection 做信心與泛標籤檢查，容器/餐具類別回傳手動搜尋建議
-  -> get_nutrients 三層 fallback
-     1. YOLO_TO_TFDA -> nutrition_db_tw.json
-     2. nutrition_db.json
-     3. UNKNOWN_NUTRIENTS
-  -> estimate_weight 依 Bounding Box 面積與 density 估算重量
-  -> 回傳 reliability、portion_range_g 與 portion_estimation_method
   -> 前端可人工校正重量，並依原始每份營養比例即時重算
   -> 依每 100g 營養資料換算實際營養素
   -> check_food_safety 比對疾病規則與過敏原
@@ -334,14 +321,12 @@ GET /healthy-food-recommend/<user_id>
 ### 10.1 後端
 
 - 已完成 Flask API 主服務。
-- 已完成 YOLOv8 Nano 模型載入與圖片辨識。
-- 已完成 Bounding Box 份量估算與營養素縮放。
+- 已完成 Gemini Vision 食物影像辨識。
+- 已完成 Gemini 份量估算、可信區間與營養素縮放。
 - 已完成前端份量校正，掃描結果可調整重量並即時重算營養素。
 - 已完成 TFDA 台灣食品營養資料庫整合，約 2,181 筆食品。
-- 已完成 YOLO label 到 TFDA 食品的靜態映射。
-- 已完成手工營養 DB fallback 與未知食品 fallback。
-- 已完成低信心辨識拒絕、需確認標記、泛標籤手動搜尋提示。
-- 已完成容器/餐具類 YOLO 標籤的保守拒絕策略與 TFDA 搜尋建議詞。
+- 已完成 Gemini 候選食品名稱到 TFDA/自訂食品資料庫的查詢對應。
+- 已完成低信心辨識拒絕、需確認標記與手動搜尋提示。
 - 已完成疾病規則與過敏原警示。
 - 已完成疾病規則設定化，規則已從 `backend/app.py` 移到 `backend/config/disease_rules.json`。
 - 已完成疾病規則治理 metadata 與載入驗證，並新增 `/disease-rules` 查詢端點。
@@ -367,7 +352,7 @@ GET /healthy-food-recommend/<user_id>
 - 已完成 Expo Router 五個主要 tab。
 - 已完成 Dashboard 熱量環圖、營養素進度與今日餐點顯示。
 - 已完成相機拍攝與相簿上傳入口。
-- 已完成 scanner 頁面呼叫 `/predict`。
+- 已完成 scanner 頁面呼叫 `/predict/vision-food`。
 - 已完成辨識結果、拒絕結果、警示與加入今日紀錄流程。
 - 已完成 TFDA 手動搜尋與加入紀錄流程。
 - 已完成營養標示 OCR、儲存自訂食品、直接加入紀錄流程。
@@ -394,7 +379,7 @@ GET /healthy-food-recommend/<user_id>
 - 已完成 `render.yaml`，可用 Render Blueprint 部署後端 Web Service 與前端 Static Site。
 - 已完成 Supabase Postgres 連線支援，只要設定 `DATABASE_URL`。
 - 已完成 `frontend/.env.local.example`，可指定 Render 後端 URL。
-- 後端 `/health` 可檢查 PostgreSQL、MongoDB、模型與資料庫載入狀態。
+- 後端 `/health` 可檢查 PostgreSQL、MongoDB、辨識引擎與資料庫載入狀態。
 - 已完成 Render Web Service + Supabase Session Pooler 實測，`/health` 已確認 `status: ok`、`postgres: true`。
 - 已完成 Render 強制 Supabase Auth 實測，`SUPABASE_AUTH_REQUIRED=true` 後 user-scoped API 會驗證 token 與 `user_id`。
 - 已完成 GitHub Actions CI：後端 Python syntax check 與前端 TypeScript typecheck。
@@ -414,13 +399,12 @@ GET /healthy-food-recommend/<user_id>
 
 ### 11.2 影像辨識準確度
 
-目前 TFDA 營養資料庫約 2,181 筆，已足夠支撐 MVP 的手動搜尋、推薦候選與自訂食品流程；短期不需要再新增大型營養資料庫。主要瓶頸是 YOLOv8 Nano 的 COCO 類別與台灣食物名稱之間的映射，而不是營養資料筆數。
+目前 TFDA 營養資料庫約 2,181 筆，已足夠支撐 MVP 的手動搜尋、推薦候選與自訂食品流程。影像辨識已改為 Gemini Vision 判斷食物語意，後端再查資料庫取得營養值；主要限制改為 Gemini 對照片內容與份量的初判不確定性，以及 TFDA 名稱對應是否命中。
 
-- 目前使用 `yolov8n.pt`，這是 COCO 通用模型，不是專門訓練的台灣食物模型。
-- `yolo_tfda_mapping.py` 目前只映射 COCO 原生食物標籤，容器與餐具類別會保守拒絕並提示 TFDA 搜尋詞。
-- 混合餐、便當、湯品、台灣小吃的辨識能力有限。
-- 份量估算是 2D Bounding Box 面積乘上 density，前端已可人工校正重量；但尚未加入深度感測、參考物或餐盤大小自動校正。
-- 份量校正目前只在前端即時重算並隨紀錄保存，尚未形成可回饋模型或校正 density 的學習資料。
+- Gemini 只提供食物名稱、候選同義詞、份量描述與估計重量，不直接提供營養數字。
+- 營養數字只來自 TFDA 或使用者自訂食品資料庫。
+- 若 Gemini 候選名稱找不到資料庫對應，會回到手動搜尋流程。
+- 份量估算仍需人工確認；前端已可人工校正重量，但尚未形成校正回饋資料。
 
 ### 11.3 營養與醫療安全
 
@@ -563,7 +547,7 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 
 - `status: ok`
 - `postgres: true`
-- `model: yolov8n`
+- `recognition_engine: gemini-vision-db-lookup`
 - `foods_in_tfda` 大於 0
 
 ## 13. 未完成功能製作順序
@@ -577,7 +561,7 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 | 3 | 疾病規則設定化 | MVP 可用 | 規則已移至 `backend/config/disease_rules.json`，啟動時驗證治理欄位，可由 `/disease-rules` 查詢版本、來源與免責資訊；Profile 已顯示醫療免責提示 | 尚無正式臨床審核流程、疾病分期規則與管理介面 |
 | 4 | 推薦候選擴展到 TFDA 與自訂食品 | MVP 可用 | `/recommend` 已納入 TFDA、自訂食品、來源統計 | 尚未針對 TFDA 類別做更精細的候選篩選與效能索引 |
 | 5 | 口味偏好與推薦分數升級 | MVP 可用 | 近期飲食紀錄會產生 `preference_score` 與原因 | 仍是啟發式分數，尚無採納/略過/不喜歡回饋模型 |
-| 6 | YOLO/TFDA 映射擴充 | MVP 可用 | 食物 label 已映射；容器/餐具會回傳搜尋建議 | 尚未訓練食物專用模型，混合餐與台灣小吃仍依賴手動搜尋/OCR |
+| 6 | Gemini/TFDA 名稱對應 | MVP 可用 | Gemini 會產生候選中文食品名稱，後端查 TFDA/自訂食品資料庫 | 尚未建立大型評測集與同義詞命中率分析，未命中時仍依賴手動搜尋/OCR |
 | 7 | 份量估算校正 | MVP 可用 | 掃描結果可調整重量並即時重算營養 | 尚未用校正資料反饋 density，也沒有參考物/深度感測自動校正 |
 | 8 | 測試與 CI | 基礎 CI 已完成 | `.github/workflows/ci.yml` 會跑後端 syntax check 與前端 `npm run typecheck` | 尚無 pytest/unit test、前端 test、e2e、正式 build check |
 | 9 | 使用者身份驗證 | MVP 可用 | 後端已強制驗證 Supabase Bearer token 與 `user_id` 權限；前端已支援 Supabase Auth session 與 Bearer token 傳遞 | 尚未完成登出 UI、session 過期提示、完整 profile 編輯與自動化測試 |
@@ -601,7 +585,7 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 
 ### 14.3 低優先級 / 研究型
 
-1. 食物專用模型或 fine-tuning：改善混合餐、台灣小吃、便當類辨識。
+1. Gemini 影像辨識評測集：整理混合餐、台灣小吃、便當類照片，量測名稱命中與份量誤差。
 2. 份量自動校正：參考物、餐盤尺度、深度感測或使用者校正資料回饋 density。
 3. 疾病規則醫療化：建立正式臨床審核流程、疾病分期規則與更完整的前端規則來源說明 UI。
 
@@ -652,7 +636,7 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 - 使用 `nutrition_db.json` 作為主要資料來源。
 - 內部僅包含約 12 筆手動輸入食品資料，例如蘋果、披薩、熱狗等。
 - 營養數據僅提供熱量、蛋白質、脂肪、碳水化合物、鈉、膳食纖維等基礎欄位。
-- YOLO 辨識結果直接以英文 label 對應小型 JSON；找不到時回傳未知食物。
+- 早期影像辨識結果直接以英文 label 對應小型 JSON；找不到時回傳未知食物。
 - 主要限制是資料量太少、不夠在地化、缺乏進階營養素，難以支援疾病規則。
 
 ### 17.2 v0.0.2：TFDA 官方資料升級
@@ -661,10 +645,10 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 - 透過 `backend/scripts/convert_tfda.py` 轉換為 `backend/nutrition_db_tw.json`。
 - 目前整理出約 2,181 筆台灣常見食品。
 - 營養欄位從基礎 6 項擴展到糖、飽和脂肪、反式脂肪、膽固醇、多種維生素、鉀、鈣、鐵、鎂、磷、鋅等進階欄位。
-- 新增 `backend/yolo_tfda_mapping.py`，將 YOLO COCO label 對應到 TFDA 中文食品。
+- 曾新增靜態 label 對應表，將通用影像 label 對應到 TFDA 中文食品。
 - 查詢 fallback 順序為 TFDA 在地資料庫、舊版手工資料庫、未知食物預設值。
 - 新增或強化 `GET /search/food` 與 `GET /food/<food_key>`，支援中文食品搜尋與單筆營養資料查詢。
 
 ### 17.3 目前狀態
 
-TFDA 資料庫已成為手動搜尋、推薦候選與 YOLO 映射 fallback 的主要來源。短期瓶頸不再是營養資料筆數，而是 YOLO COCO 通用模型與台灣混合餐、便當、湯品、小吃之間的辨識落差。
+TFDA 資料庫已成為手動搜尋、推薦候選與 Gemini 影像辨識營養對應的主要來源。短期瓶頸不再是營養資料筆數，而是 Gemini 候選名稱與 TFDA 食品名稱的命中率，以及照片份量估計的不確定性。

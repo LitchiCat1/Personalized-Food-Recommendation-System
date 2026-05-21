@@ -78,35 +78,14 @@ export async function runPrediction(params: {
     user_id: params.userId,
   };
 
-  try {
-    const visionResp = await fetch(`${params.apiBaseUrl}/predict/vision-food`, {
-      method: 'POST',
-      headers: buildHeaders(params.auth, 'application/json'),
-      body: JSON.stringify(body),
-    });
-    const visionData = await visionResp.json();
-    if (visionResp.ok && ((visionData.detections || []).length > 0 || (visionData.rejected_detections || []).length > 0)) {
-      return {
-        detections: mapApiDetections(visionData.detections || []),
-        rejectedDetections: visionData.rejected_detections || [],
-      };
-    }
-  } catch {
-    // Fall back to local YOLO endpoint when Gemini Vision is unavailable.
-  }
-
-  if (params.apiBaseUrl.includes('onrender.com')) {
-    throw new Error('AI 食物辨識暫時不可用，請先使用手動搜尋加入餐點。');
-  }
-
-  const resp = await fetch(`${params.apiBaseUrl}/predict`, {
+  const resp = await fetch(`${params.apiBaseUrl}/predict/vision-food`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(params.auth, 'application/json'),
     body: JSON.stringify(body),
   });
   const data = await resp.json();
   if (!resp.ok) {
-    throw new Error(data.error || '辨識失敗');
+    throw new Error(data.error || 'Gemini 食物辨識失敗');
   }
   return {
     detections: mapApiDetections(data.detections || []),

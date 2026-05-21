@@ -1,6 +1,6 @@
 # 個人化飲食推薦與影像辨識 App
 
-> 健康飲食管理工具，結合 YOLO 食物影像辨識、個人化營養分析與智慧餐點推薦。
+> 健康飲食管理工具，結合 Gemini Vision 食物辨識、資料庫營養對應、個人化營養分析與智慧餐點推薦。
 
 ## 📁 專案結構
 
@@ -14,7 +14,6 @@ Personalized-Food-Recommendation-System/
 │   ├── nutrition_db_tw.json  # TFDA 台灣食品營養資料庫
 │   ├── requirements.txt      # Python 依賴
 │   ├── test_client.py        # API 測試腳本
-│   └── yolov8n.pt            # YOLOv8 預訓練模型
 ├── frontend/                 # Expo React Native 前端
 │   ├── app/                  # Expo Router 頁面
 │   │   ├── (tabs)/           # Tab 導覽頁面
@@ -44,7 +43,7 @@ Personalized-Food-Recommendation-System/
 
 ## 🔑 核心功能狀態
 
-- **YOLO 食物辨識** — 多目標偵測 + Bounding Box + 份量估算
+- **Gemini Vision 食物辨識** — 食物名稱/份量初判 + 後端 TFDA/自訂食品資料庫營養對應
 - **份量校正** — 掃描結果可人工調整重量並即時重算營養素
 - **個人化營養追蹤** — BMR/TDEE 計算、三大營養素 + 鈉/纖維進度
 - **安全過濾引擎** — 5 種疾病禁忌規則 + 過敏原比對
@@ -92,5 +91,5 @@ Personalized-Food-Recommendation-System/
 | State | Zustand |
 | Navigation | Expo Router (file-based) |
 | Backend | Flask + PostgreSQL/Supabase + MongoDB fallback |
-| AI Model | YOLOv8 (Ultralytics) |
+| AI Model | Gemini Vision API + TFDA/custom food DB lookup |
 | Camera | expo-camera + expo-image-picker |

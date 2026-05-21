@@ -429,7 +429,7 @@ export default function ScannerScreen() {
     <AppContainer>
       <View style={styles.header}>
         <Text style={[styles.title, { fontSize: rs(isSmall ? 22 : 26) }]}>AI 食物辨識</Text>
-        <Text style={[styles.subtitle, { fontSize: rs(13) }]}>拍攝或上傳食物照片，YOLO 多目標偵測自動分析營養成分</Text>
+        <Text style={[styles.subtitle, { fontSize: rs(13) }]}>拍攝或上傳食物照片，Gemini 判斷食物，後端查 TFDA/自訂資料庫換算營養</Text>
       </View>
 
       <View style={styles.contextCard}>
@@ -481,7 +481,7 @@ export default function ScannerScreen() {
                 <Ionicons name="scan-outline" size={rs(40)} color={Palette.accent.purple} />
               </View>
               <Text style={[styles.viewfinderText, { fontSize: rs(14) }]}>將食物對準框內</Text>
-              <Text style={[styles.viewfinderHint, { fontSize: rs(11) }]}>支援 YOLO 多目標即時偵測</Text>
+              <Text style={[styles.viewfinderHint, { fontSize: rs(11) }]}>Gemini Vision + 資料庫營養對應</Text>
             </View>
           ) : (
             <View style={styles.viewfinderInner}>

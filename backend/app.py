@@ -1,6 +1,6 @@
 """
 NutriLens Backend — Flask API
-PRD-aligned: YOLO detection + nutrition analysis + user management + recommendations
+PRD-aligned: Gemini Vision food recognition + nutrition analysis + user management + recommendations
 """
 
 import base64
@@ -32,14 +32,12 @@ from services.nutrition_label_service import (
     normalize_ocr_result,
     scale_nutrition_per_100g,
 )
-from services.predict_service import predict_from_image
 from services.profile_service import build_bmr_response, build_user_profile
 from services.recommend_service import build_recommendation_response
 from services.vision_food_service import (
     build_vision_food_response,
     call_gemini_food_recognition_with_rotation,
 )
-from yolo_tfda_mapping import YOLO_MANUAL_SEARCH_HINTS, YOLO_TO_TFDA
 
 
 load_local_env()
@@ -108,26 +106,8 @@ def require_user_access(user_id: str | None):
 def handle_auth_error(error):
     return jsonify({"error": str(error)}), error.status_code
 
-# ─── Load YOLO model ─────────────────────────────────────────
-MODEL_PATH = os.path.join(BASE_DIR, "yolov8n.pt")
-YOLO_ENABLED = os.environ.get("ENABLE_YOLO_FALLBACK", "false").lower() == "true"
-model = None
-
-
-def get_model():
-    global model
-    if not YOLO_ENABLED:
-        raise RuntimeError("YOLO fallback is disabled on this deployment")
-    if model is None:
-        from ultralytics import YOLO
-
-        print("[ ] Loading YOLO model...")
-        model = YOLO(MODEL_PATH)
-        print("[OK] YOLO model loaded")
-    return model
-
 # ─── Load nutrition databases ────────────────────────────────
-# 1. Original hand-crafted DB (YOLO label → nutrients)
+# 1. Original hand-crafted DB (legacy fallback candidates)
 DB_PATH = os.path.join(BASE_DIR, "nutrition_db.json")
 with open(DB_PATH, "r", encoding="utf-8") as f:
     NUTRITION_DB = json.load(f)
@@ -176,9 +156,7 @@ def health():
         "status": "ok",
         "postgres": pg_conn is not None,
         "mongo": USE_MONGO,
-        "model": "yolov8n",
-        "yolo_enabled": YOLO_ENABLED,
-        "model_loaded": model is not None,
+        "recognition_engine": "gemini-vision-db-lookup",
         "foods_in_db": len(NUTRITION_DB),
         "foods_in_tfda": len(TFDA_DB),
         "disease_rules": len(DISEASE_RULES),
@@ -191,14 +169,6 @@ def health():
 @app.route("/disease-rules", methods=["GET"])
 def disease_rules():
     return jsonify(build_disease_rules_response(DISEASE_RULES))
-
-
-@app.route("/warmup", methods=["POST"])
-def warmup():
-    if not YOLO_ENABLED:
-        return jsonify({"status": "skipped", "model_loaded": False, "reason": "YOLO fallback disabled"})
-    get_model()
-    return jsonify({"status": "ok", "model_loaded": True})
 
 
 # ─── 0. Food Search (TFDA 中文食品搜尋) ──────────────────────
@@ -341,52 +311,6 @@ def predict_vision_food():
         return jsonify({"error": f"Gemini Vision 食物辨識呼叫失敗: {e.response.text[:500]}"}), 502
     except Exception as e:
         return jsonify({"error": f"Gemini Vision 食物辨識失敗: {str(e)}"}), 500
-
-
-# ─── 1. Image Detection (PRD: 即時影像辨識) ──────────────────
-@app.route("/predict", methods=["POST"])
-def predict():
-    if not YOLO_ENABLED:
-        return jsonify({
-            "error": "YOLO fallback is disabled on this deployment. Use /predict/vision-food or manual search.",
-            "detections": [],
-            "rejected_detections": [],
-        }), 503
-
-    data = request.get_json(silent=True)
-    if not data or "image" not in data:
-        return jsonify({"error": "缺少 image 欄位（Base64）"}), 400
-
-    user_conditions = data.get("health_conditions", [])
-    user_allergens = data.get("allergens", [])
-
-    try:
-        import cv2
-        import numpy as np
-
-        img_bytes = base64.b64decode(data["image"])
-        img_arr = np.frombuffer(img_bytes, dtype=np.uint8)
-        img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
-
-        if img is None:
-            return jsonify({"error": "圖片解碼失敗"}), 400
-
-        return jsonify(
-            predict_from_image(
-                get_model(),
-                img,
-                user_conditions,
-                user_allergens,
-                YOLO_TO_TFDA,
-                TFDA_DB,
-                NUTRITION_DB,
-                DISEASE_RULES,
-                YOLO_MANUAL_SEARCH_HINTS,
-            )
-        )
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
 # ─── 2. User Profile CRUD (PRD: 健康檔案與疾病管理) ──────────

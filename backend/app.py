@@ -38,6 +38,10 @@ from services.nutrition_label_service import (
 from services.predict_service import predict_from_image
 from services.profile_service import build_bmr_response, build_user_profile
 from services.recommend_service import build_recommendation_response
+from services.vision_food_service import (
+    build_vision_food_response,
+    call_gemini_food_recognition_with_rotation,
+)
 from yolo_tfda_mapping import YOLO_MANUAL_SEARCH_HINTS, YOLO_TO_TFDA
 
 
@@ -293,6 +297,45 @@ def ocr_nutrition_label():
         return jsonify({"error": f"Gemini API 呼叫失敗: {e.response.text[:500]}"}), 502
     except Exception as e:
         return jsonify({"error": f"營養標示辨識失敗: {str(e)}"}), 500
+
+
+@app.route("/predict/vision-food", methods=["POST"])
+def predict_vision_food():
+    data = request.get_json(silent=True) or {}
+    if "image" not in data:
+        return jsonify({"error": "缺少 image 欄位（Base64）"}), 400
+
+    api_keys = get_gemini_api_keys(data.get("api_key"))
+    if not api_keys:
+        return jsonify({"error": "缺少 Gemini API key，請設定 GEMINI_API_KEYS 或 GEMINI_API_KEY 環境變數"}), 400
+
+    user_conditions = data.get("health_conditions", [])
+    user_allergens = data.get("allergens", [])
+    user_id = data.get("user_id")
+    if is_auth_required():
+        user_id = user_id or get_request_user_id()
+        require_user_access(user_id)
+
+    try:
+        img_bytes = base64.b64decode(data["image"])
+        mime_type = detect_image_mime(img_bytes)
+        parsed = call_gemini_food_recognition_with_rotation(data["image"], mime_type, api_keys)
+        return jsonify(
+            build_vision_food_response(
+                parsed,
+                storage,
+                TFDA_DB,
+                DISEASE_RULES,
+                user_conditions,
+                user_allergens,
+                user_id,
+                build_custom_food_search_result,
+            )
+        )
+    except requests.HTTPError as e:
+        return jsonify({"error": f"Gemini Vision 食物辨識呼叫失敗: {e.response.text[:500]}"}), 502
+    except Exception as e:
+        return jsonify({"error": f"Gemini Vision 食物辨識失敗: {str(e)}"}), 500
 
 
 # ─── 1. Image Detection (PRD: 即時影像辨識) ──────────────────

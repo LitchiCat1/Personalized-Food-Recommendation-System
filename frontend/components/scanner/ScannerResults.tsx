@@ -179,6 +179,18 @@ const styles = StyleSheet.create({
   confidenceText: { ...Typography.small, color: Palette.accent.green },
   foodWeight: { ...Typography.small, color: Palette.text.tertiary },
   foodMeta: { ...Typography.small, color: Palette.text.tertiary, marginTop: 4 },
+  reliabilityCard: {
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+  },
+  reliabilityHigh: { backgroundColor: Palette.accent.greenDim, borderColor: 'rgba(74, 222, 128, 0.24)' },
+  reliabilityMedium: { backgroundColor: 'rgba(251, 191, 36, 0.08)', borderColor: 'rgba(251, 191, 36, 0.24)' },
+  reliabilityLow: { backgroundColor: 'rgba(248, 113, 113, 0.08)', borderColor: 'rgba(248, 113, 113, 0.24)' },
+  reliabilityHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: 4 },
+  reliabilityTitle: { ...Typography.bodyBold },
+  reliabilityText: { ...Typography.small, color: Palette.text.tertiary, lineHeight: 16 },
   portionCard: {
     backgroundColor: 'rgba(34, 211, 238, 0.06)',
     borderRadius: Radius.md,
@@ -255,3 +267,15 @@ const styles = StyleSheet.create({
   addButtonInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
   addButtonText: { ...Typography.bodyBold, color: Palette.text.inverse },
 });
+
+function getReliabilityLabel(level: NonNullable<DetectedFood['reliability']>['level']): string {
+  if (level === 'high') return '高';
+  if (level === 'medium') return '中';
+  return '低';
+}
+
+function getReliabilityColor(level: NonNullable<DetectedFood['reliability']>['level']): string {
+  if (level === 'high') return Palette.accent.green;
+  if (level === 'medium') return Palette.status.warning;
+  return Palette.status.error;
+}

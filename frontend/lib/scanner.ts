@@ -44,6 +44,17 @@ function mapApiDetections(detections: any[]): DetectedFood[] {
     boundingBox: d.bounding_box,
     estimatedWeight: d.estimated_weight_g,
     originalEstimatedWeight: d.estimated_weight_g,
+    portionRange: d.portion_range_g ? {
+      minG: d.portion_range_g.min_g,
+      maxG: d.portion_range_g.max_g,
+      uncertaintyPercent: d.portion_range_g.uncertainty_percent,
+    } : undefined,
+    portionEstimationMethod: d.portion_estimation_method,
+    reliability: d.reliability ? {
+      level: d.reliability.level,
+      score: d.reliability.score,
+      reasons: d.reliability.reasons || [],
+    } : undefined,
     nutrition: d.nutrition,
     originalNutrition: d.nutrition,
     gi: d.gi || 'medium',
@@ -57,15 +68,37 @@ export async function runPrediction(params: {
   imageBase64: string;
   healthConditions: string[];
   allergens: string[];
+  userId?: string;
+  auth?: ApiAuth;
 }): Promise<{ detections: DetectedFood[]; rejectedDetections: RejectedDetection[] }> {
+  const body = {
+    image: params.imageBase64,
+    health_conditions: params.healthConditions,
+    allergens: params.allergens,
+    user_id: params.userId,
+  };
+
+  try {
+    const visionResp = await fetch(`${params.apiBaseUrl}/predict/vision-food`, {
+      method: 'POST',
+      headers: buildHeaders(params.auth, 'application/json'),
+      body: JSON.stringify(body),
+    });
+    const visionData = await visionResp.json();
+    if (visionResp.ok && ((visionData.detections || []).length > 0 || (visionData.rejected_detections || []).length > 0)) {
+      return {
+        detections: mapApiDetections(visionData.detections || []),
+        rejectedDetections: visionData.rejected_detections || [],
+      };
+    }
+  } catch {
+    // Fall back to local YOLO endpoint when Gemini Vision is unavailable.
+  }
+
   const resp = await fetch(`${params.apiBaseUrl}/predict`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      image: params.imageBase64,
-      health_conditions: params.healthConditions,
-      allergens: params.allergens,
-    }),
+    body: JSON.stringify(body),
   });
   const data = await resp.json();
   if (!resp.ok) {
@@ -153,6 +186,13 @@ export async function manualSearchFood(params: {
     needsConfirmation: false,
     boundingBox: { x: 0, y: 0, w: 0, h: 0 },
     estimatedWeight: 100,
+    portionRange: { minG: 100, maxG: 100, uncertaintyPercent: 0 },
+    portionEstimationMethod: 'manual_tfda_100g',
+    reliability: {
+      level: 'high',
+      score: 1,
+      reasons: ['使用者手動選擇 TFDA 食品資料', '營養值以每 100g 顯示，份量仍需自行校正'],
+    },
     nutrition: {
       calories: food.calories || 0,
       protein: food.protein || 0,
@@ -220,6 +260,13 @@ export function buildOCRDetectedFood(draft: OCRDraft): DetectedFood {
     needsConfirmation: false,
     boundingBox: { x: 0, y: 0, w: 0, h: 0 },
     estimatedWeight: draft.serving_size_g || 100,
+    portionRange: { minG: draft.serving_size_g || 100, maxG: draft.serving_size_g || 100, uncertaintyPercent: 0 },
+    portionEstimationMethod: 'nutrition_label_serving_size',
+    reliability: {
+      level: 'medium',
+      score: 0.8,
+      reasons: ['使用 Gemini OCR 讀取營養標示', '仍需人工核對包裝文字與每份重量'],
+    },
     nutrition: {
       calories: Number(draft.nutrition_per_serving?.calories || 0),
       protein: Number(draft.nutrition_per_serving?.protein || 0),

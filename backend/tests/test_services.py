@@ -4,7 +4,7 @@ import unittest
 from services.disease_rule_service import build_disease_rules_response, load_disease_rules
 from services.healthy_food_service import load_restaurant_catalog
 from services.history_service import build_history_response
-from services.predict_service import assess_detection
+from services.predict_service import assess_detection, build_detection_reliability, build_portion_range
 from services.profile_service import build_bmr_response
 from services.recommend_service import (
     build_feedback_profile,
@@ -12,6 +12,7 @@ from services.recommend_service import (
     compute_feedback_adjustment,
     compute_preference_score,
 )
+from services.vision_food_service import build_vision_food_response
 from yolo_tfda_mapping import YOLO_MANUAL_SEARCH_HINTS
 
 
@@ -21,6 +22,9 @@ class FakeStorage:
             {"date": "2026-04-28", "record_count": 2, "calories": 1000, "protein": 50, "carbs": 120, "fat": 30, "sodium": 900},
             {"date": "2026-04-29", "record_count": 1, "calories": 800, "protein": 40, "carbs": 100, "fat": 20, "sodium": 700},
         ]
+
+    def get_custom_foods(self, user_id: str | None = None):
+        return []
 
 
 class ServiceSmokeTests(unittest.TestCase):
@@ -64,6 +68,66 @@ class ServiceSmokeTests(unittest.TestCase):
         result = assess_detection("cup", 0.9, {"calories": 10}, {}, {}, YOLO_MANUAL_SEARCH_HINTS)
         self.assertFalse(result["accepted"])
         self.assertIn("咖啡", result["search_hints"])
+
+    def test_detection_reliability_and_portion_range(self):
+        high = build_detection_reliability("apple", 0.91, False, {"source": "TFDA"})
+        low = build_detection_reliability("bowl", 0.58, True, {"source": "TFDA"})
+
+        self.assertEqual(high["level"], "high")
+        self.assertEqual(low["level"], "low")
+        self.assertIn("份量由照片", low["reasons"][2])
+
+        high_range = build_portion_range(100, high["level"])
+        low_range = build_portion_range(100, low["level"])
+        self.assertEqual(high_range["uncertainty_percent"], 25)
+        self.assertEqual(low_range["uncertainty_percent"], 60)
+        self.assertLess(high_range["min_g"], high_range["max_g"])
+
+    def test_vision_food_response_matches_tfda_and_scales_nutrition(self):
+        parsed = {
+            "meal_guess": "便當",
+            "items": [
+                {
+                    "name_zh": "白飯",
+                    "confidence": 0.86,
+                    "estimated_weight_g": 180,
+                    "portion_description": "約一碗",
+                    "visual_evidence": "照片右下方白色米飯",
+                    "alternatives": ["白米飯"],
+                }
+            ],
+            "uncertainty_notes": ["份量為照片估算"],
+        }
+        tfda_db = {
+            "白飯": {
+                "name_zh": "白飯",
+                "calories": 183,
+                "protein": 3,
+                "fat": 0.3,
+                "carbs": 40,
+                "sodium": 2,
+                "fiber": 0.4,
+            }
+        }
+
+        response = build_vision_food_response(
+            parsed,
+            FakeStorage(),
+            tfda_db,
+            {},
+            [],
+            [],
+            "demo_user",
+            lambda food: food,
+        )
+
+        self.assertEqual(response["engine"], "gemini-vision-tfda")
+        self.assertEqual(len(response["detections"]), 1)
+        detection = response["detections"][0]
+        self.assertEqual(detection["name_zh"], "白飯")
+        self.assertEqual(detection["nutrition"]["calories"], 329)
+        self.assertEqual(detection["portion_estimation_method"], "gemini_vision_portion_estimate_v1")
+        self.assertIn("reliability", detection)
 
     def test_preference_score(self):
         profile = build_preference_profile([

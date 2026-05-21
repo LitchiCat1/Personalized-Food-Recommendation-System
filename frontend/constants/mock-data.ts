@@ -136,6 +136,13 @@ export type DetectedFood = {
   boundingBox: { x: number; y: number; w: number; h: number };
   estimatedWeight: number; // grams
   originalEstimatedWeight?: number;
+  portionRange?: { minG: number; maxG: number; uncertaintyPercent: number };
+  portionEstimationMethod?: string;
+  reliability?: {
+    level: 'high' | 'medium' | 'low';
+    score: number;
+    reasons: string[];
+  };
   nutrition: {
     calories: number;
     protein: number;

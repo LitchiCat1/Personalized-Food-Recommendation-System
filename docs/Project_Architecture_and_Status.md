@@ -228,7 +228,12 @@ Personalized-Food-Recommendation-System/
 ```txt
 前端拍照或上傳圖片
   -> base64 image
-  -> POST /predict
+  -> 優先 POST /predict/vision-food
+  -> Gemini Vision 判斷台灣常見食物語意、候選名稱與份量描述
+  -> 後端以 Gemini 食物名稱搜尋 user scoped custom_foods 與 TFDA nutrition_db_tw.json
+  -> 營養數字只由資料庫換算，不直接採用 Gemini 生成值
+  -> 回傳 recognition reliability、portion_range_g、alternatives 與人工確認提示
+  -> Gemini 不可用或無結果時 fallback 到 POST /predict
   -> Flask 解碼圖片
   -> YOLOv8 偵測 label、confidence、bounding box
   -> assess_detection 做信心與泛標籤檢查，容器/餐具類別回傳手動搜尋建議
@@ -237,6 +242,7 @@ Personalized-Food-Recommendation-System/
      2. nutrition_db.json
      3. UNKNOWN_NUTRIENTS
   -> estimate_weight 依 Bounding Box 面積與 density 估算重量
+  -> 回傳 reliability、portion_range_g 與 portion_estimation_method
   -> 前端可人工校正重量，並依原始每份營養比例即時重算
   -> 依每 100g 營養資料換算實際營養素
   -> check_food_safety 比對疾病規則與過敏原

@@ -304,6 +304,7 @@ export const useStore = create<NutriLensState>((set, get) => ({
             estimatedWeight: safeWeight,
             originalEstimatedWeight: originalWeight,
             originalNutrition,
+            portionRange: { minG: safeWeight, maxG: safeWeight, uncertaintyPercent: 0 },
             portionAdjusted: true,
             nutrition: scaleNutrition(originalNutrition, scale),
           };

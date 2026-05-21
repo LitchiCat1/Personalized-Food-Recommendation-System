@@ -22,6 +22,11 @@ DETECTION_CONFIRMATION_CONFIDENCE = float(
 )
 GENERIC_LABELS_REQUIRING_CONFIRMATION = {"bowl"}
 GENERIC_LABELS_REQUIRING_MANUAL_SEARCH = {"cup", "bottle", "wine glass", "fork", "knife", "spoon"}
+PORTION_UNCERTAINTY_BY_CONFIDENCE = {
+    "high": 0.25,
+    "medium": 0.40,
+    "low": 0.60,
+}
 
 
 def get_nutrients(label: str, yolo_to_tfda: dict, tfda_db: dict, nutrition_db: dict) -> dict:
@@ -66,6 +71,36 @@ def estimate_weight(bbox_w: float, bbox_h: float, img_w: int, img_h: int, densit
     ref_area = 15000
     estimated_volume = (pixel_area / ref_area) * 100
     return round(estimated_volume * density, 1)
+
+
+def build_portion_range(weight_g: float, reliability_level: str) -> dict:
+    uncertainty = PORTION_UNCERTAINTY_BY_CONFIDENCE.get(reliability_level, 0.60)
+    return {
+        "min_g": max(1, round(weight_g * (1 - uncertainty), 1)),
+        "max_g": round(weight_g * (1 + uncertainty), 1),
+        "uncertainty_percent": int(uncertainty * 100),
+    }
+
+
+def build_detection_reliability(label: str, confidence: float, needs_confirmation: bool, nutrients: dict) -> dict:
+    if needs_confirmation or confidence < DETECTION_CONFIRMATION_CONFIDENCE:
+        level = "low" if confidence < 0.60 else "medium"
+    else:
+        level = "high"
+
+    reasons = [
+        f"YOLO 影像辨識信心 {confidence:.0%}",
+        "營養值依 TFDA/資料庫每 100g 換算" if nutrients.get("source") == "TFDA" else "營養值依內建資料庫換算",
+        "份量由照片中物件面積估算，未使用秤重或深度資訊",
+    ]
+    if needs_confirmation:
+        reasons.append("此結果已標記為需要人工確認")
+
+    return {
+        "level": level,
+        "score": round(max(0, min(1, confidence)), 2),
+        "reasons": reasons,
+    }
 
 
 def check_food_safety(nutrients: dict, weight_g: float, user_conditions: list, user_allergens: list, disease_rules: dict) -> list:
@@ -193,6 +228,13 @@ def predict_from_image(model, img, user_conditions, user_allergens, yolo_to_tfda
 
         density = nutrients.get("density", 0.80)
         estimated_weight = estimate_weight(bbox["w"], bbox["h"], img_w, img_h, density)
+        reliability = build_detection_reliability(
+            label,
+            confidence,
+            detection_assessment["needs_confirmation"],
+            nutrients,
+        )
+        portion_range = build_portion_range(estimated_weight, reliability["level"])
         scale = estimated_weight / 100.0
         scaled_nutrition = {
             "calories": round((nutrients.get("calories") or 0) * scale),
@@ -220,6 +262,9 @@ def predict_from_image(model, img, user_conditions, user_allergens, yolo_to_tfda
                 "source": nutrients.get("source", "fallback"),
                 "bounding_box": bbox,
                 "estimated_weight_g": estimated_weight,
+                "portion_range_g": portion_range,
+                "portion_estimation_method": "bbox_area_density_v1",
+                "reliability": reliability,
                 "nutrition": scaled_nutrition,
                 "gi": nutrients.get("gi"),
                 "allergens": nutrients.get("allergens", []),

@@ -198,6 +198,8 @@ export default function ScannerScreen() {
       imageBase64,
       healthConditions: user.healthConditions,
       allergens: user.allergens,
+      userId: user.userId,
+      auth: { accessToken },
     });
     setRejectedDetections(response.rejectedDetections);
     if (response.detections.length > 0) {

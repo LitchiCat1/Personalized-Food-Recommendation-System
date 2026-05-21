@@ -371,6 +371,7 @@ GET /healthy-food-recommend/<user_id>
 - 已完成定位、預算與附近健康餐點 UI。
 - 已完成 history 頁呼叫 `/history` 並顯示趨勢。
 - 已完成 API base URL 自動推導與 Render URL 環境變數支援。
+- 已完成 Expo Web static export 設定，Render 可部署 frontend static site 供同學以瀏覽器測試。
 - 已完成 Supabase Auth 登入/註冊基礎整合；有 Supabase public env 時會進入 AuthGate，登入後使用 Supabase Auth user id。
 - 已完成 Bearer token 傳遞，user-scoped API 會帶 `Authorization: Bearer <access_token>`。
 - 已完成首次登入自動建立後端 profile，避免 Supabase Auth uuid 找不到 profile。
@@ -384,7 +385,7 @@ GET /healthy-food-recommend/<user_id>
 
 ### 10.3 部署與資料
 
-- 已完成 `render.yaml`，可用 Render Blueprint 或 Web Service 部署後端。
+- 已完成 `render.yaml`，可用 Render Blueprint 部署後端 Web Service 與前端 Static Site。
 - 已完成 Supabase Postgres 連線支援，只要設定 `DATABASE_URL`。
 - 已完成 `frontend/.env.local.example`，可指定 Render 後端 URL。
 - 後端 `/health` 可檢查 PostgreSQL、MongoDB、模型與資料庫載入狀態。
@@ -520,7 +521,7 @@ Supabase 只需要提供 PostgreSQL connection string 給 Render 的 `DATABASE_U
 - `records`
 - `custom_foods`
 
-### 12.3 前端連線 Render
+### 12.3 前端連線與部署 Render
 
 在 `frontend/.env.local` 設定：
 
@@ -529,6 +530,16 @@ EXPO_PUBLIC_API_BASE_URL=https://your-render-service.onrender.com
 EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
+
+Render Blueprint 已包含 frontend static site：
+
+- service name：`personalized-food-recommendation-frontend`
+- rootDir：`frontend`
+- build command：`npm ci && npm run build:web`
+- publish path：`dist`
+- SPA rewrite：`/* -> /index.html`
+
+部署後同學應使用 frontend static site 網址操作 App；backend URL 只提供 API 與 `/health`。
 
 部署完成後先測：
 

@@ -142,14 +142,15 @@ GEMINI_API_KEYS=key1,key2,key3
 
 ## 5. Render + Supabase 部署狀態
 
-- Render URL：`https://personalized-food-recommendation-system-nq8t.onrender.com`
+- Backend Render URL：`https://personalized-food-recommendation-system-nq8t.onrender.com`
+- Frontend Render Static Site：由 Blueprint 建立 `personalized-food-recommendation-frontend`，部署後使用 Render 指派網址
 - Render service id：`srv-d7u2qhdckfvc73ei96l0`
 - 部署分支：`v0.0.3`
 - 後端儲存：Supabase Postgres Session Pooler
 - 後端 Auth：`SUPABASE_AUTH_REQUIRED=true`
 - 最新已驗證強制 Auth deploy：`dep-d7u8pb67r5hc73bfus20`
 
-此 Render URL 是後端 API，不是前端網頁。瀏覽器打開根路徑 `/` 只會看到 API 狀態 JSON；正式操作畫面需啟動 Expo frontend，或另外部署 frontend static site。
+Backend Render URL 是後端 API，不是前端網頁。瀏覽器打開根路徑 `/` 只會看到 API 狀態 JSON；正式操作畫面請使用 frontend static site 網址。
 
 Render 需要設定：
 
@@ -163,6 +164,16 @@ SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
 `DATABASE_URL` value 必須直接以 `postgresql://` 開頭，不要包含 `DATABASE_URL=` 前綴。
+
+Frontend Static Site 需要設定：
+
+```env
+EXPO_PUBLIC_API_BASE_URL=https://personalized-food-recommendation-system-nq8t.onrender.com
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+```
+
+`render.yaml` 已設定 frontend build：`npm ci && npm run build:web`，publish path：`dist`，並加上 SPA rewrite `/* -> /index.html`。
 
 ## 6. 部署後驗收流程
 
@@ -231,9 +242,20 @@ python backend/scripts/smoke_render_auth.py
 
 ### 6.4 前端回歸驗收
 
+Render Static Site 驗收：
+
+```powershell
+curl https://<frontend-static-site>.onrender.com
+```
+
+瀏覽器打開 frontend 網址後，應看到 NutriLens App 畫面。若登入頁沒有出現，確認 `EXPO_PUBLIC_SUPABASE_URL` 與 `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 是否已在 frontend static site 設定。
+
+本機驗收：
+
 ```powershell
 cd frontend
 npm run typecheck
+npm run build:web
 npm run web -- --port 8083
 ```
 

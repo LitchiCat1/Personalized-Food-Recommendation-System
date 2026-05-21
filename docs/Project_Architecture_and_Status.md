@@ -374,7 +374,7 @@ GET /healthy-food-recommend/<user_id>
 - 已完成 Expo Web static export 設定，Render 可部署 frontend static site 供同學以瀏覽器測試。
 - 已完成 Supabase Auth 登入/註冊基礎整合；有 Supabase public env 時會進入 AuthGate，登入後使用 Supabase Auth user id。
 - 已完成 Bearer token 傳遞，user-scoped API 會帶 `Authorization: Bearer <access_token>`。
-- 已完成首次登入自動建立後端 profile，避免 Supabase Auth uuid 找不到 profile。
+- 已完成首次登入 onboarding；若後端無 profile，使用者必須先填基本資料，避免看到預設示範資料。
 - 已完成 profile 完整可編輯表單與登出按鈕。
 - 已完成掃描/手動/OCR 新增紀錄本機持久化待同步佇列與重試入口。
 - 已完成新增紀錄 `client_record_id` 產生與待同步佇列保存。
@@ -404,7 +404,7 @@ GET /healthy-food-recommend/<user_id>
 - Render 目前已設定 `SUPABASE_AUTH_REQUIRED=true`，正式遠端 API 不再允許未帶 token 存取使用者資料。
 - token subject 必須等於目標 `user_id`；無 token 回 `401`，跨使用者存取回 `403`。
 - 未設定 Supabase public env 的本機前端仍可進入 demo 模式，僅供開發便利，不代表正式部署權限模型。
-- 尚未完成登出按鈕、完整 profile 編輯表單、session 過期提示與使用者管理 UI。
+- 已完成登出按鈕、完整 profile 編輯表單與首次登入 onboarding；尚未完成 session 過期提示與使用者管理 UI。
 
 ### 11.2 影像辨識準確度
 
@@ -438,7 +438,7 @@ GET /healthy-food-recommend/<user_id>
 
 ### 11.6 前端資料同步
 
-- Dashboard 已會從 `/records` 同步今日紀錄，但初始載入與後端失敗時仍會保留 `constants/mock-data.ts` 的本地預設資料。
+- Dashboard 已會從 `/records` 同步今日紀錄；新帳號在完成 onboarding 前不會進入 Dashboard，避免直接看到 `constants/mock-data.ts` 的示範資料。
 - 今日掃描、手動搜尋與 OCR 新增採 local-first UX，後端寫入失敗時不會阻止使用者加入本地畫面，並會把失敗紀錄保存到本機待同步佇列。
 - 待同步佇列依 `userId` 顯示與重試，重啟 app 後仍會保留；重試會沿用同一個 `client_record_id`，後端會避免重複寫入。
 - Scanner 聚焦時會自動重送未達 5 次上限的待同步紀錄；達上限後停止自動重送，但使用者仍可手動重試。

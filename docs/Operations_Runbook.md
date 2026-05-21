@@ -278,7 +278,7 @@ npm run web -- --port 8083
 - GitHub Actions CI 已建立。
 - 後端 Supabase Auth 驗證已在 Render 強制啟用。
 - 前端 Supabase Auth 已完成基本登入/註冊與 token 傳遞。
-- 首次登入若後端無 profile，前端會自動建立預設 profile。
+- 首次登入若後端無 profile，前端會導向 onboarding，要求使用者先填基本資料，不再自動建立預設 profile。
 - Expo Web SSR 的 Supabase storage 初始化錯誤已修正。
 
 ### 7.2 重要提交
@@ -314,7 +314,7 @@ Web server render 階段沒有 `window`。Supabase Web storage 必須使用 `typ
 
 ### 8.5 Auth user id 與 profile provisioning
 
-正式 Auth 後不可依賴 `demo_user`。登入成功後應以 token subject 作為唯一 `user_id`；若 profile 不存在，需建立預設 profile 或導向 onboarding。
+正式 Auth 後不可依賴 `demo_user`。登入成功後應以 token subject 作為唯一 `user_id`；若 profile 不存在，前端會導向 onboarding，完成基本資料後才建立後端 profile 並進入 App。
 
 ### 8.6 Supabase email rate limit
 

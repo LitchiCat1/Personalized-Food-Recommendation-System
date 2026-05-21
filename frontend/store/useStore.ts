@@ -63,6 +63,7 @@ export interface NutriLensState {
   healthAlerts: HealthAlert[];
   addMealFromScan: (detections: DetectedFood[]) => void;
   replaceDashboardFromRecords: (records: DietaryRecord[]) => void;
+  resetDashboard: () => void;
 
   // Scanner
   scanResult: ScanResult;
@@ -167,6 +168,22 @@ export const useStore = create<NutriLensState>((set, get) => ({
   dailyNutrition: { ...DAILY_NUTRITION },
   todayMeals: [...TODAY_MEALS],
   healthAlerts: [...HEALTH_ALERTS],
+
+  resetDashboard: () =>
+    set((state) => ({
+      todayMeals: [],
+      healthAlerts: [],
+      dailyNutrition: {
+        ...state.dailyNutrition,
+        calories: { ...state.dailyNutrition.calories, current: 0, target: state.user.dailyCalorieTarget },
+        protein: { ...state.dailyNutrition.protein, current: 0 },
+        carbs: { ...state.dailyNutrition.carbs, current: 0 },
+        fat: { ...state.dailyNutrition.fat, current: 0 },
+        sodium: { ...state.dailyNutrition.sodium, current: 0 },
+        fiber: { ...state.dailyNutrition.fiber, current: 0 },
+      },
+      user: { ...state.user, totalMeals: 0 },
+    })),
 
   addMealFromScan: (detections) =>
     set((state) => {

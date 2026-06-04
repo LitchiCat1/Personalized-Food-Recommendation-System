@@ -173,6 +173,20 @@ export type HealthyFoodResponse = {
   nutrition_note?: string;
 };
 
+export type RestaurantAiSummary = {
+  restaurant_type: string;
+  likely_foods: string[];
+  price_range_twd: { min: number; max: number };
+  budget_fit: '適合' | '可能超出' | '不確定';
+  health_tips: string[];
+  confidence: 'low' | 'medium' | 'high';
+  source_note: string;
+};
+
+export type RestaurantAiSummaryResponse = {
+  summary: RestaurantAiSummary;
+};
+
 export type UserProfileResponse = {
   user_id: string;
   name: string;
@@ -329,4 +343,21 @@ export async function fetchHealthyFoodRecommendations(
     }
     throw err;
   }
+}
+
+export async function fetchRestaurantAiSummary(
+  apiBaseUrl: string,
+  userId: string,
+  params: { restaurant: HealthyFoodRestaurant; budget: number; category: string },
+  auth?: ApiAuth
+): Promise<RestaurantAiSummaryResponse> {
+  if (!auth?.accessToken) {
+    throw new Error('登入 session 尚未就緒，請重新整理頁面或重新登入後再產生 AI 摘要');
+  }
+  const resp = await fetch(`${apiBaseUrl}/map-food-recommend/${encodeURIComponent(userId)}/restaurant-summary`, {
+    method: 'POST',
+    headers: buildHeaders(auth, 'application/json'),
+    body: JSON.stringify(params),
+  });
+  return parseJson<RestaurantAiSummaryResponse>(resp);
 }

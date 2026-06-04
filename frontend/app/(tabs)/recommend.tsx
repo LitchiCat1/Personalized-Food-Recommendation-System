@@ -9,9 +9,11 @@ import AppContainer from '@/components/AppContainer';
 import FoodMap from '@/components/maps/FoodMap';
 import {
   fetchHealthyFoodRecommendations,
+  fetchRestaurantAiSummary,
   fetchRecommendations,
   saveRecommendationFeedback,
   type HealthyFoodRestaurant,
+  type RestaurantAiSummary,
   type RecommendationFeedbackAction,
   type HealthyFoodResponse,
   type RecommendationItem,
@@ -44,6 +46,8 @@ export default function RecommendScreen() {
   const [healthyError, setHealthyError] = useState<string | null>(null);
   const [feedbackStatus, setFeedbackStatus] = useState<Record<string, RecommendationFeedbackAction>>({});
   const [feedbackSavingKey, setFeedbackSavingKey] = useState<string | null>(null);
+  const [summaryByRestaurant, setSummaryByRestaurant] = useState<Record<string, RestaurantAiSummary>>({});
+  const [summaryLoadingKey, setSummaryLoadingKey] = useState<string | null>(null);
   const [budget, setBudget] = useState('150');
   const [radiusKm, setRadiusKm] = useState(3);
   const [category, setCategory] = useState('all');
@@ -139,6 +143,24 @@ export default function RecommendScreen() {
       await Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${restaurant.lat},${restaurant.lng}&travelmode=walking`);
     } catch (err: any) {
       setHealthyError(err?.message || '無法開啟 Google Maps 導航');
+    }
+  };
+
+  const handleLoadRestaurantSummary = async (restaurant: HealthyFoodRestaurant) => {
+    setHealthyError(null);
+    setSummaryLoadingKey(restaurant.restaurant_id);
+    try {
+      const response = await fetchRestaurantAiSummary(
+        apiBaseUrl,
+        user.userId,
+        { restaurant, budget: Number(budget) || 150, category },
+        { accessToken }
+      );
+      setSummaryByRestaurant((current) => ({ ...current, [restaurant.restaurant_id]: response.summary }));
+    } catch (err: any) {
+      setHealthyError(err?.message || 'AI 店家摘要產生失敗');
+    } finally {
+      setSummaryLoadingKey(null);
     }
   };
 
@@ -494,11 +516,32 @@ export default function RecommendScreen() {
                       <Ionicons name="map-outline" size={rs(13)} color={Palette.accent.cyan} />
                       <Text style={[styles.secondaryButtonText, { fontSize: rs(11) }]}>在地圖標示</Text>
                     </Pressable>
+                    <Pressable onPress={() => handleLoadRestaurantSummary(restaurant)} style={styles.secondaryButton} disabled={summaryLoadingKey === restaurant.restaurant_id}>
+                      {summaryLoadingKey === restaurant.restaurant_id ? (
+                        <ActivityIndicator size="small" color={Palette.accent.pink} />
+                      ) : (
+                        <Ionicons name="sparkles-outline" size={rs(13)} color={Palette.accent.pink} />
+                      )}
+                      <Text style={[styles.secondaryButtonText, { fontSize: rs(11), color: Palette.accent.pink }]}>AI 摘要</Text>
+                    </Pressable>
                     <Pressable onPress={() => handleOpenNavigation(restaurant)} style={styles.secondaryButton}>
                       <Ionicons name="navigate-outline" size={rs(13)} color={Palette.accent.green} />
                       <Text style={[styles.secondaryButtonText, { fontSize: rs(11), color: Palette.accent.green }]}>導航</Text>
                     </Pressable>
                   </View>
+
+                  {summaryByRestaurant[restaurant.restaurant_id] ? (
+                    <View style={styles.aiSummaryBox}>
+                      <View style={styles.selectedMapTitleRow}>
+                        <Text style={[styles.mealName, { fontSize: rs(13) }]}>AI 推測：{summaryByRestaurant[restaurant.restaurant_id].restaurant_type}</Text>
+                        <Text style={[styles.scorePill, { fontSize: rs(10), color: Palette.accent.pink, backgroundColor: Palette.accent.pinkDim }]}>可信度 {summaryByRestaurant[restaurant.restaurant_id].confidence}</Text>
+                      </View>
+                      <Text style={[styles.filteredReason, { fontSize: rs(10) }]}>可能販售：{summaryByRestaurant[restaurant.restaurant_id].likely_foods.join('、') || '不確定'}</Text>
+                      <Text style={[styles.filteredReason, { fontSize: rs(10) }]}>價格：約 {summaryByRestaurant[restaurant.restaurant_id].price_range_twd.min}-{summaryByRestaurant[restaurant.restaurant_id].price_range_twd.max} 元 · 預算：{summaryByRestaurant[restaurant.restaurant_id].budget_fit}</Text>
+                      <Text style={[styles.filteredReason, { fontSize: rs(10) }]}>建議：{summaryByRestaurant[restaurant.restaurant_id].health_tips.join('、') || '到店後確認餐點內容'}</Text>
+                      <Text style={[styles.filteredReason, { fontSize: rs(9), color: Palette.status.warning }]}>{summaryByRestaurant[restaurant.restaurant_id].source_note}</Text>
+                    </View>
+                  ) : null}
                 </View>
               ))}
             </>
@@ -720,6 +763,15 @@ const styles = StyleSheet.create({
   },
   priceText: { ...Typography.bodyBold, color: Palette.accent.orange },
   restaurantActionRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
+  aiSummaryBox: {
+    marginTop: Spacing.md,
+    gap: Spacing.sm,
+    backgroundColor: 'rgba(244,114,182,0.08)',
+    borderColor: 'rgba(244,114,182,0.2)',
+    borderWidth: 1,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+  },
   secondaryButton: {
     flex: 1,
     flexDirection: 'row',

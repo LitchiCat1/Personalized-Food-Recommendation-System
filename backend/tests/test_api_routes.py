@@ -183,6 +183,31 @@ class ApiRouteTests(unittest.TestCase):
         self.assertFalse(data["nutrition_available"])
         self.assertEqual(data["restaurants"][0]["name"], "真實附近餐廳")
 
+    def test_restaurant_summary_route_returns_fixed_summary(self):
+        summary = {
+            "restaurant_type": "滷味小吃",
+            "likely_foods": ["滷味", "豆干", "青菜"],
+            "price_range_twd": {"min": 80, "max": 150},
+            "budget_fit": "適合",
+            "health_tips": ["少鹽", "湯不要喝"],
+            "confidence": "medium",
+            "source_note": "Google Places + Gemini 推測，非店家正式菜單；實際品項與價格請以店家現場為準。",
+        }
+
+        with self.mock_auth("user-a"):
+            with patch("app.build_restaurant_ai_summary", return_value=summary):
+                response = self.client.post(
+                    "/map-food-recommend/user-a/restaurant-summary",
+                    json={"budget": 150, "category": "小吃", "restaurant": {"name": "測試滷味", "tags": ["Google Places"]}},
+                    headers=self.auth_headers(),
+                )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()["summary"]
+        self.assertEqual(data["restaurant_type"], "滷味小吃")
+        self.assertEqual(data["price_range_twd"]["max"], 150)
+        self.assertEqual(data["budget_fit"], "適合")
+
 
 if __name__ == "__main__":
     unittest.main()

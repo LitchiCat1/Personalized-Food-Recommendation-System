@@ -35,6 +35,7 @@ from services.nutrition_label_service import (
 )
 from services.profile_service import build_bmr_response, build_user_profile
 from services.recommend_service import build_recommendation_response
+from services.restaurant_ai_service import build_restaurant_ai_summary
 from services.vision_food_service import (
     build_vision_food_response,
     call_gemini_food_recognition_with_rotation,
@@ -440,6 +441,29 @@ def map_food_recommend(user_id):
     if not result:
         return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
     return jsonify(result)
+
+
+@app.route("/map-food-recommend/<user_id>/restaurant-summary", methods=["POST"])
+def map_food_restaurant_summary(user_id):
+    require_user_access(user_id)
+    user = storage.get_user(user_id)
+    if not user:
+        return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
+
+    data = request.get_json(silent=True) or {}
+    restaurant = data.get("restaurant") or {}
+    if not restaurant.get("name"):
+        return jsonify({"error": "缺少 restaurant.name"}), 400
+    budget = int(data.get("budget") or 150)
+    category = data.get("category") or "all"
+    try:
+        summary = build_restaurant_ai_summary(restaurant, budget, category, user.get("health_conditions", []))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 503
+    except requests.HTTPError as e:
+        status_code = e.response.status_code if e.response is not None else "unknown"
+        return jsonify({"error": f"Gemini 店家摘要失敗: HTTP {status_code}"}), 502
+    return jsonify({"summary": summary}), 200
 
 
 @app.route("/recommend/<user_id>/feedback", methods=["POST"])

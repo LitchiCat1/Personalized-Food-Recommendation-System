@@ -209,12 +209,25 @@ function isLocalApiBaseUrl(apiBaseUrl: string) {
   return /^https?:\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2|192\.168\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(apiBaseUrl);
 }
 
+function isNetworkFetchError(err: any) {
+  return err instanceof TypeError || err?.message === 'Failed to fetch' || err?.message === 'Network request failed';
+}
+
+async function canReachBackendHealth(apiBaseUrl: string) {
+  try {
+    const resp = await fetch(`${apiBaseUrl}/health`);
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function fetchJsonWithNetworkMessage<T>(url: string, init?: RequestInit): Promise<T> {
   try {
     const resp = await fetch(url, init);
     return parseJson<T>(resp);
   } catch (err: any) {
-    if (err instanceof TypeError || err?.message === 'Failed to fetch' || err?.message === 'Network request failed') {
+    if (isNetworkFetchError(err)) {
       throw new Error(`無法連線到後端 API：${url.replace(/\?.*$/, '')}`);
     }
     throw err;
@@ -280,6 +293,10 @@ export async function fetchHealthyFoodRecommendations(
   params: { budget: number; lat: number; lng: number; radiusKm?: number; category?: string },
   auth?: ApiAuth
 ): Promise<HealthyFoodResponse> {
+  if (!auth?.accessToken) {
+    throw new Error('登入 session 尚未就緒，請重新整理頁面或重新登入後再定位推薦');
+  }
+
   const query = new URLSearchParams({
     budget: String(params.budget),
     lat: String(params.lat),
@@ -287,7 +304,7 @@ export async function fetchHealthyFoodRecommendations(
     radius_km: String(params.radiusKm || 5),
     category: params.category || 'all',
   });
-  const path = `/healthy-food-recommend/${encodeURIComponent(userId)}?${query.toString()}`;
+  const path = `/map-food-recommend/${encodeURIComponent(userId)}?${query.toString()}`;
   const requestInit = { headers: buildHeaders(auth) };
 
   try {
@@ -295,6 +312,12 @@ export async function fetchHealthyFoodRecommendations(
   } catch (err: any) {
     if (isLocalApiBaseUrl(apiBaseUrl) && apiBaseUrl !== RENDER_API_BASE_URL) {
       return fetchJsonWithNetworkMessage<HealthyFoodResponse>(`${RENDER_API_BASE_URL}${path}`, requestInit);
+    }
+    if (err?.message?.startsWith('無法連線到後端 API')) {
+      const healthReachable = await canReachBackendHealth(apiBaseUrl);
+      if (healthReachable) {
+        throw new Error('後端健康檢查可連線，但推薦 API request 失敗。請重新整理頁面或登出後重新登入，讓 Supabase session token 更新後再試一次。');
+      }
     }
     throw err;
   }

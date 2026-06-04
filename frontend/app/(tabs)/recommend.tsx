@@ -381,7 +381,13 @@ export default function RecommendScreen() {
               </View>
             </View>
             <Text style={[styles.filteredReason, { fontSize: rs(10), marginTop: 8 }]}>{locationLabel}</Text>
-            {healthyError ? <Text style={[styles.filteredReason, { fontSize: rs(10), color: Palette.status.warning, marginTop: 6 }]}>{healthyError}</Text> : null}
+            {healthyError ? (
+              <View style={styles.apiErrorBox}>
+                <Text style={[styles.filteredReason, { fontSize: rs(10), color: Palette.status.warning }]}>{healthyError}</Text>
+                <Text style={[styles.filteredReason, { fontSize: rs(9), marginTop: 4 }]}>API：{apiBaseUrl}</Text>
+                <Text style={[styles.filteredReason, { fontSize: rs(9), marginTop: 2 }]}>登入狀態：{accessToken ? 'Bearer token 已載入' : '尚未載入 Bearer token'}</Text>
+              </View>
+            ) : null}
           </View>
 
           {mapRestaurants.length && mapLocation ? (
@@ -630,6 +636,14 @@ const styles = StyleSheet.create({
   },
   locateButtonText: { ...Typography.bodyBold, color: Palette.text.inverse },
   reasonWrap: { marginTop: Spacing.md, gap: 4 },
+  apiErrorBox: {
+    marginTop: Spacing.sm,
+    backgroundColor: 'rgba(251,191,36,0.08)',
+    borderColor: 'rgba(251,191,36,0.2)',
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.sm,
+  },
   optionGroup: { marginTop: Spacing.md, gap: Spacing.sm },
   optionLabel: { ...Typography.small, color: Palette.text.tertiary },
   optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },

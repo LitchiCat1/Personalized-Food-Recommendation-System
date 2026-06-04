@@ -432,7 +432,7 @@ GET /map-food-recommend/<user_id>
 
 - `/healthy-food-recommend` 目前使用 `backend/data/restaurant_catalog.json`，也可用 `RESTAURANT_CATALOG_PATH` 指向替代 JSON 資料源。
 - `/map-food-recommend` 使用 Google Places 真實店家資料；Render backend 需設定 `GOOGLE_PLACES_API_KEY`。
-- Web 地圖使用 Google Maps JavaScript API；Render frontend 需設定 `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` 並在 Google Cloud Console 限制可用網域。
+- Web 地圖使用 Google Maps JavaScript API；Render frontend 同樣設定 `GOOGLE_PLACES_API_KEY`，build script 會注入前端可讀的 Maps key。因為 key 會進入 browser bundle，必須在 Google Cloud Console 限制 API 與可用網域。
 - Google Places 不提供可靠菜單價格、熱量、鈉、GI 等營養資料；系統會標示 `nutrition_available: false`，到店後仍需拍照掃描或手動搜尋餐點。
 - Native iOS/Android 真地圖尚未接 `react-native-maps` 或 native Google Maps SDK；目前正式真地圖以 Web Render 展示為主。
 

@@ -410,11 +410,18 @@ def healthy_food_recommend(user_id):
         "budget": request.args.get("budget", 150),
         "lat": request.args.get("lat", 25.0338),
         "lng": request.args.get("lng", 121.5645),
+        "radius_km": request.args.get("radius_km", 5),
+        "category": request.args.get("category", "all"),
     }
     result = build_healthy_food_recommendations(storage, DISEASE_RULES, RESTAURANT_CATALOG, user_id, params)
     if not result:
         return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
     return jsonify(result)
+
+
+@app.route("/map-food-recommend/<user_id>", methods=["GET"])
+def map_food_recommend(user_id):
+    return healthy_food_recommend(user_id)
 
 
 @app.route("/recommend/<user_id>/feedback", methods=["POST"])

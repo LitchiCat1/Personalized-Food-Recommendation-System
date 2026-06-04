@@ -112,8 +112,12 @@ export type RecommendationFeedbackResponse = {
 export type HealthyFoodRecommendation = {
   restaurant_id: string;
   restaurant_name: string;
+  restaurant_lat?: number;
+  restaurant_lng?: number;
+  address?: string;
   distance_km: number;
   tags: string[];
+  item_id?: string;
   item_name: string;
   price: number;
   calories: number;
@@ -126,9 +130,28 @@ export type HealthyFoodRecommendation = {
   reasons: string[];
 };
 
+export type HealthyFoodRestaurant = {
+  restaurant_id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  address?: string;
+  phone?: string;
+  google_place_id?: string;
+  distance_km: number;
+  tags: string[];
+  price_level?: number | null;
+  is_open: boolean;
+  match_score: number;
+  recommended_items: HealthyFoodRecommendation[];
+  filtered_items?: { restaurant_id?: string; restaurant_name: string; item_name: string; reasons: string[] }[];
+};
+
 export type HealthyFoodResponse = {
   user_id: string;
   budget: number;
+  radius_km?: number;
+  category?: string;
   location: { lat: number; lng: number };
   remaining: {
     calories: number;
@@ -138,6 +161,7 @@ export type HealthyFoodResponse = {
     sodium: number;
   };
   recommended: HealthyFoodRecommendation[];
+  restaurants?: HealthyFoodRestaurant[];
   filtered_out: { restaurant_name: string; item_name: string; reasons: string[] }[];
 };
 
@@ -164,6 +188,8 @@ export type ApiAuth = {
   accessToken?: string | null;
 };
 
+const RENDER_API_BASE_URL = 'https://personalized-food-recommendation-system-nq8t.onrender.com';
+
 function buildHeaders(auth?: ApiAuth, contentType?: string): HeadersInit {
   const headers: Record<string, string> = {};
   if (contentType) headers['Content-Type'] = contentType;
@@ -177,6 +203,22 @@ async function parseJson<T>(resp: Response): Promise<T> {
     throw new Error(data.error || 'API request failed');
   }
   return data as T;
+}
+
+function isLocalApiBaseUrl(apiBaseUrl: string) {
+  return /^https?:\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2|192\.168\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(apiBaseUrl);
+}
+
+async function fetchJsonWithNetworkMessage<T>(url: string, init?: RequestInit): Promise<T> {
+  try {
+    const resp = await fetch(url, init);
+    return parseJson<T>(resp);
+  } catch (err: any) {
+    if (err instanceof TypeError || err?.message === 'Failed to fetch' || err?.message === 'Network request failed') {
+      throw new Error(`無法連線到後端 API：${url.replace(/\?.*$/, '')}`);
+    }
+    throw err;
+  }
 }
 
 export async function fetchHistory(apiBaseUrl: string, userId: string, days = 7, auth?: ApiAuth): Promise<HistoryResponse> {
@@ -235,16 +277,25 @@ export async function saveUserProfile(apiBaseUrl: string, payload: Record<string
 export async function fetchHealthyFoodRecommendations(
   apiBaseUrl: string,
   userId: string,
-  params: { budget: number; lat: number; lng: number },
+  params: { budget: number; lat: number; lng: number; radiusKm?: number; category?: string },
   auth?: ApiAuth
 ): Promise<HealthyFoodResponse> {
   const query = new URLSearchParams({
     budget: String(params.budget),
     lat: String(params.lat),
     lng: String(params.lng),
+    radius_km: String(params.radiusKm || 5),
+    category: params.category || 'all',
   });
-  const resp = await fetch(`${apiBaseUrl}/healthy-food-recommend/${encodeURIComponent(userId)}?${query.toString()}`, {
-    headers: buildHeaders(auth),
-  });
-  return parseJson<HealthyFoodResponse>(resp);
+  const path = `/healthy-food-recommend/${encodeURIComponent(userId)}?${query.toString()}`;
+  const requestInit = { headers: buildHeaders(auth) };
+
+  try {
+    return await fetchJsonWithNetworkMessage<HealthyFoodResponse>(`${apiBaseUrl}${path}`, requestInit);
+  } catch (err: any) {
+    if (isLocalApiBaseUrl(apiBaseUrl) && apiBaseUrl !== RENDER_API_BASE_URL) {
+      return fetchJsonWithNetworkMessage<HealthyFoodResponse>(`${RENDER_API_BASE_URL}${path}`, requestInit);
+    }
+    throw err;
+  }
 }

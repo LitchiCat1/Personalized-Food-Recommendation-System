@@ -290,8 +290,13 @@ GET /recommend/<user_id>
 GET /healthy-food-recommend/<user_id>
   -> 取得定位與預算
   -> 載入 backend/data/restaurant_catalog.json 或 RESTAURANT_CATALOG_PATH 指定資料源
-  -> 過濾距離、營業時間、預算、疾病限制
+  -> 過濾距離、半徑、類型、營業時間、預算、疾病限制
   -> 依預算、距離、熱量契合、低鈉、高蛋白排序
+  -> 回傳扁平餐點列表與地圖友善 restaurants 分組
+
+GET /map-food-recommend/<user_id>
+  -> 與 /healthy-food-recommend 相同邏輯
+  -> 提供地圖推薦語意化 API alias
 ```
 
 ## 9. 疾病與過敏原規則
@@ -360,6 +365,7 @@ GET /healthy-food-recommend/<user_id>
 - 已完成疾病與過敏原切換後同步後端。
 - 已完成推薦頁呼叫 `/recommend` 與 `/healthy-food-recommend`。
 - 已完成定位、預算與附近健康餐點 UI。
+- 已完成附近餐廳推薦地圖 MVP：前端以跨平台 schematic map 顯示使用者位置、餐廳 marker、推薦餐點卡片與 Google Maps 外部導航。
 - 已完成 history 頁呼叫 `/history` 並顯示趨勢。
 - 已完成 API base URL 自動推導與 Render URL 環境變數支援。
 - 已完成 Expo Web static export 設定，Render 可部署 frontend static site 供同學以瀏覽器測試。
@@ -423,7 +429,8 @@ GET /healthy-food-recommend/<user_id>
 ### 11.5 餐廳與地圖資料
 
 - `/healthy-food-recommend` 目前使用 `backend/data/restaurant_catalog.json`，也可用 `RESTAURANT_CATALOG_PATH` 指向替代 JSON 資料源。
-- 尚未串接 Google Maps、外送平台、餐廳公開 API 或正式商家資料源。
+- 前端目前使用不需要 API key 的 schematic map MVP，尚未替換為正式 Google Maps SDK 或 `react-native-maps`。
+- 尚未串接 Google Places、外送平台、餐廳公開 API 或正式商家資料源。
 - 營業時間與距離計算只是 MVP 邏輯。
 
 ### 11.6 前端資料同步
@@ -581,7 +588,7 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 
 1. 同步可靠性：為待同步佇列補網路恢復事件重送、同步狀態詳情頁與失敗項目管理。
 2. 推薦模型：把目前啟發式回饋加權演進為可解釋的偏好模型或向量排序。
-3. 健康餐點資料來源：從 JSON 資料檔演進為資料庫或正式餐廳 API。
+3. 健康餐點資料來源：從 JSON 資料檔演進為資料庫或正式餐廳 API，並將 schematic map 替換或擴充為正式 Google Maps / native map 元件。
 
 ### 14.3 低優先級 / 研究型
 

@@ -34,6 +34,24 @@ def haversine_km(lat1, lon1, lat2, lon2):
     return radius * c
 
 
+def _normalize_category(value):
+    if value is None:
+        return ""
+    return str(value).strip().lower()
+
+
+def _restaurant_matches_category(restaurant: dict, category: str) -> bool:
+    if not category or category == "all":
+        return True
+    tags = [str(tag).lower() for tag in restaurant.get("tags", [])]
+    haystack = [str(restaurant.get("name", "")).lower(), *tags]
+    return any(category in value for value in haystack)
+
+
+def _sort_recommended_item(item: dict) -> tuple:
+    return (-item["match_score"], item["price"], item["sodium"])
+
+
 def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_catalog: list[dict], user_id: str, params: dict):
     user = storage.get_user(user_id)
     if not user:
@@ -42,6 +60,8 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
     budget = int(params.get("budget", 150))
     lat = float(params.get("lat", 25.0338))
     lng = float(params.get("lng", 121.5645))
+    radius_km = min(max(float(params.get("radius_km", 5)), 0.5), 10)
+    category = _normalize_category(params.get("category", "all"))
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     conditions = user.get("health_conditions", [])
     daily_target = user.get("daily_calorie_target", 2100)
@@ -65,14 +85,21 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
 
     recommendations = []
     filtered_out = []
+    restaurants = []
 
     for restaurant in restaurant_catalog:
-        distance_km = haversine_km(lat, lng, restaurant["lat"], restaurant["lng"])
-        if distance_km > 5:
-            continue
-        if not is_open_now(restaurant["open_hours"], now):
+        if not _restaurant_matches_category(restaurant, category):
             continue
 
+        distance_km = haversine_km(lat, lng, restaurant["lat"], restaurant["lng"])
+        if distance_km > radius_km:
+            continue
+        is_open = is_open_now(restaurant["open_hours"], now)
+        if not is_open:
+            continue
+
+        restaurant_recommended_items = []
+        restaurant_filtered_items = []
         for item in restaurant["items"]:
             reasons = []
             if item["price"] > budget:
@@ -87,11 +114,14 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                     reasons.append(f"脂肪偏高，不適合{condition}")
 
             if reasons:
-                filtered_out.append({
+                filtered_item = {
+                    "restaurant_id": restaurant["restaurant_id"],
                     "restaurant_name": restaurant["name"],
                     "item_name": item["name"],
                     "reasons": reasons,
-                })
+                }
+                filtered_out.append(filtered_item)
+                restaurant_filtered_items.append(filtered_item)
                 continue
 
             budget_score = max(0, 30 - abs(budget - item["price"]))
@@ -101,11 +131,15 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
             protein_bonus = 8 if item["protein"] >= 25 else 0
             total_score = min(99, budget_score + distance_score + calorie_fit + sodium_score + protein_bonus)
 
-            recommendations.append({
+            recommended_item = {
                 "restaurant_id": restaurant["restaurant_id"],
                 "restaurant_name": restaurant["name"],
+                "restaurant_lat": restaurant["lat"],
+                "restaurant_lng": restaurant["lng"],
+                "address": restaurant.get("address", ""),
                 "distance_km": round(distance_km, 2),
                 "tags": restaurant["tags"],
+                "item_id": item.get("item_id", item["name"]),
                 "item_name": item["name"],
                 "price": item["price"],
                 "calories": item["calories"],
@@ -120,14 +154,40 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                     f"距離約 {round(distance_km, 2)} km",
                     f"熱量與剩餘配額契合度高",
                 ],
+            }
+            recommendations.append(recommended_item)
+            restaurant_recommended_items.append(recommended_item)
+
+        if restaurant_recommended_items:
+            restaurant_recommended_items.sort(key=_sort_recommended_item)
+            best_score = restaurant_recommended_items[0]["match_score"]
+            restaurants.append({
+                "restaurant_id": restaurant["restaurant_id"],
+                "name": restaurant["name"],
+                "lat": restaurant["lat"],
+                "lng": restaurant["lng"],
+                "address": restaurant.get("address", ""),
+                "phone": restaurant.get("phone", ""),
+                "google_place_id": restaurant.get("google_place_id", ""),
+                "distance_km": round(distance_km, 2),
+                "tags": restaurant["tags"],
+                "price_level": restaurant.get("price_level"),
+                "is_open": is_open,
+                "match_score": best_score,
+                "recommended_items": restaurant_recommended_items[:4],
+                "filtered_items": restaurant_filtered_items[:4],
             })
 
     recommendations.sort(key=lambda item: item["match_score"], reverse=True)
+    restaurants.sort(key=lambda item: (-item["match_score"], item["distance_km"]))
     return {
         "user_id": user_id,
         "budget": budget,
+        "radius_km": radius_km,
+        "category": category or "all",
         "location": {"lat": lat, "lng": lng},
         "remaining": remaining,
         "recommended": recommendations[:12],
+        "restaurants": restaurants[:12],
         "filtered_out": filtered_out[:12],
     }

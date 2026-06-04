@@ -16,6 +16,8 @@ services:
         sync: false
       - key: EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
         sync: false
+      - key: EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+        sync: false
 
   - type: web
     name: personalized-food-recommendation-backend
@@ -36,4 +38,6 @@ services:
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: GOOGLE_PLACES_API_KEY
         sync: false

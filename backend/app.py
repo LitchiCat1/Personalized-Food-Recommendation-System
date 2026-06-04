@@ -19,7 +19,8 @@ from services.auth_service import AuthError, is_auth_required, verify_supabase_u
 from services.disease_rule_service import build_disease_rules_response, load_disease_rules
 from services.env_service import load_local_env
 from services.history_service import build_history_response
-from services.healthy_food_service import build_healthy_food_recommendations, load_restaurant_catalog
+from services.google_places_service import GooglePlacesAPIError, GooglePlacesConfigError
+from services.healthy_food_service import build_google_places_food_recommendations, build_healthy_food_recommendations, load_restaurant_catalog
 from services.food_service import build_custom_food_doc, search_foods
 from services.nutrition_label_service import (
     build_custom_food_search_result,
@@ -162,6 +163,7 @@ def health():
         "disease_rules": len(DISEASE_RULES),
         "disease_rule_review_status": build_disease_rules_response(DISEASE_RULES)["review_status_counts"],
         "restaurants": len(RESTAURANT_CATALOG),
+        "places_enabled": bool(os.environ.get("GOOGLE_PLACES_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY")),
         "custom_foods": len(storage.get_custom_foods()),
     })
 
@@ -421,7 +423,23 @@ def healthy_food_recommend(user_id):
 
 @app.route("/map-food-recommend/<user_id>", methods=["GET"])
 def map_food_recommend(user_id):
-    return healthy_food_recommend(user_id)
+    require_user_access(user_id)
+    params = {
+        "budget": request.args.get("budget", 150),
+        "lat": request.args.get("lat", 25.0338),
+        "lng": request.args.get("lng", 121.5645),
+        "radius_km": request.args.get("radius_km", 3),
+        "category": request.args.get("category", "all"),
+    }
+    try:
+        result = build_google_places_food_recommendations(storage, user_id, params)
+    except GooglePlacesConfigError as e:
+        return jsonify({"error": str(e), "places_enabled": False}), 503
+    except GooglePlacesAPIError as e:
+        return jsonify({"error": str(e), "places_enabled": True}), 502
+    if not result:
+        return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
+    return jsonify(result)
 
 
 @app.route("/recommend/<user_id>/feedback", methods=["POST"])

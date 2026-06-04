@@ -92,6 +92,7 @@ RESTAURANT_CATALOG_PATH=backend/data/restaurant_catalog.json
 SUPABASE_AUTH_REQUIRED=true
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+GOOGLE_PLACES_API_KEY=your-backend-only-google-places-key
 ```
 
 `RESTAURANT_CATALOG_PATH` 可省略；未設定時後端會使用 `backend/data/restaurant_catalog.json`。若要測試替代餐廳資料源，請指定 JSON 檔路徑，不要把 API token 或私有商家資料寫入 repo。
@@ -106,9 +107,12 @@ SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 EXPO_PUBLIC_API_BASE_URL=https://personalized-food-recommendation-system-nq8t.onrender.com
 EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your-browser-restricted-google-maps-key
 ```
 
 未設定 Supabase public env 時，前端會維持 demo 模式；正式 Render 驗收應設定 Supabase public env。
+
+`EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` 會被打包到前端，必須在 Google Cloud Console 設定 HTTP referrer 限制，只允許 Render frontend 網域。`GOOGLE_PLACES_API_KEY` 僅放後端 Render Web Service，用於 Google Places Nearby Search，不要寫入 repo 或聊天。
 
 ## 4. Gemini API Key 輪替
 
@@ -157,6 +161,7 @@ FLASK_DEBUG=false
 SUPABASE_AUTH_REQUIRED=true
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+GOOGLE_PLACES_API_KEY=your-backend-only-google-places-key
 ```
 
 `DATABASE_URL` value 必須直接以 `postgresql://` 開頭，不要包含 `DATABASE_URL=` 前綴。
@@ -167,6 +172,7 @@ Frontend Static Site 需要設定：
 EXPO_PUBLIC_API_BASE_URL=https://personalized-food-recommendation-system-nq8t.onrender.com
 EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your-browser-restricted-google-maps-key
 ```
 
 `render.yaml` 已設定 frontend build：`npm ci && npm run build:web`，publish path：`dist`，並加上 SPA rewrite `/* -> /index.html`。

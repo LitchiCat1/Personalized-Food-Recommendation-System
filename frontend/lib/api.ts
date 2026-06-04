@@ -127,6 +127,7 @@ export type HealthyFoodRecommendation = {
   sodium: number;
   gi?: 'low' | 'medium' | 'high' | null;
   match_score: number;
+  nutrition_available?: boolean;
   reasons: string[];
 };
 
@@ -142,7 +143,11 @@ export type HealthyFoodRestaurant = {
   tags: string[];
   price_level?: number | null;
   is_open: boolean;
+  rating?: number | null;
+  user_ratings_total?: number | null;
   match_score: number;
+  data_source?: string;
+  nutrition_available?: boolean;
   recommended_items: HealthyFoodRecommendation[];
   filtered_items?: { restaurant_id?: string; restaurant_name: string; item_name: string; reasons: string[] }[];
 };
@@ -163,6 +168,9 @@ export type HealthyFoodResponse = {
   recommended: HealthyFoodRecommendation[];
   restaurants?: HealthyFoodRestaurant[];
   filtered_out: { restaurant_name: string; item_name: string; reasons: string[] }[];
+  data_source?: string;
+  nutrition_available?: boolean;
+  nutrition_note?: string;
 };
 
 export type UserProfileResponse = {

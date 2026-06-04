@@ -32,7 +32,7 @@
 | 影像模型 | 原規劃為本機深度學習辨識 | Gemini Vision API + 後端資料庫營養對應 |
 | 營養資料 | 營養資料庫 | TFDA 台灣食品資料庫 + 手工 DB + 自訂食品 |
 | 資料庫 | MongoDB | PostgreSQL/Supabase 優先，MongoDB 備援，In-memory fallback |
-| 推薦 | 安全過濾 + 口味排序 + 地圖導向 | 安全過濾、候選擴展與歷史偏好加權已完成；真實地圖/餐廳 API 尚未完成 |
+| 推薦 | 安全過濾 + 口味排序 + 地圖導向 | 安全過濾、候選擴展與歷史偏好加權已完成；地圖導向已接 Google Maps Web 與 Google Places 真實店家搜尋，菜單營養仍需掃描/手動確認 |
 | OCR | 未明確細化 | 已使用 Gemini Vision API 做包裝食品營養標示 OCR |
 | 部署 | 雲端資料儲存 | Render Web Service + Supabase Postgres 已完成首次部署驗證 |
 
@@ -295,8 +295,10 @@ GET /healthy-food-recommend/<user_id>
   -> 回傳扁平餐點列表與地圖友善 restaurants 分組
 
 GET /map-food-recommend/<user_id>
-  -> 與 /healthy-food-recommend 相同邏輯
-  -> 提供地圖推薦語意化 API alias
+  -> 取得定位、預算、半徑、類型
+  -> 後端使用 GOOGLE_PLACES_API_KEY 查 Google Places Nearby Search
+  -> 回傳真實店家位置、評分、營業狀態、距離與導航資料
+  -> 不產生假菜單營養；回傳 nutrition_available: false，提示到店後掃描/手動搜尋
 ```
 
 ## 9. 疾病與過敏原規則
@@ -365,7 +367,7 @@ GET /map-food-recommend/<user_id>
 - 已完成疾病與過敏原切換後同步後端。
 - 已完成推薦頁呼叫 `/recommend` 與 `/healthy-food-recommend`。
 - 已完成定位、預算與附近健康餐點 UI。
-- 已完成附近餐廳推薦地圖 MVP：前端以跨平台 schematic map 顯示使用者位置、餐廳 marker、推薦餐點卡片與 Google Maps 外部導航。
+- 已完成附近餐廳推薦地圖：Web 前端使用 Google Maps JavaScript API 顯示真地圖，後端 `/map-food-recommend` 使用 Google Places 搜尋真實附近店家，並提供 Google Maps 外部導航。
 - 已完成 history 頁呼叫 `/history` 並顯示趨勢。
 - 已完成 API base URL 自動推導與 Render URL 環境變數支援。
 - 已完成 Expo Web static export 設定，Render 可部署 frontend static site 供同學以瀏覽器測試。
@@ -429,9 +431,10 @@ GET /map-food-recommend/<user_id>
 ### 11.5 餐廳與地圖資料
 
 - `/healthy-food-recommend` 目前使用 `backend/data/restaurant_catalog.json`，也可用 `RESTAURANT_CATALOG_PATH` 指向替代 JSON 資料源。
-- 前端目前使用不需要 API key 的 schematic map MVP，尚未替換為正式 Google Maps SDK 或 `react-native-maps`。
-- 尚未串接 Google Places、外送平台、餐廳公開 API 或正式商家資料源。
-- 營業時間與距離計算只是 MVP 邏輯。
+- `/map-food-recommend` 使用 Google Places 真實店家資料；Render backend 需設定 `GOOGLE_PLACES_API_KEY`。
+- Web 地圖使用 Google Maps JavaScript API；Render frontend 需設定 `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` 並在 Google Cloud Console 限制可用網域。
+- Google Places 不提供可靠菜單價格、熱量、鈉、GI 等營養資料；系統會標示 `nutrition_available: false`，到店後仍需拍照掃描或手動搜尋餐點。
+- Native iOS/Android 真地圖尚未接 `react-native-maps` 或 native Google Maps SDK；目前正式真地圖以 Web Render 展示為主。
 
 ### 11.6 前端資料同步
 
@@ -588,7 +591,7 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 
 1. 同步可靠性：為待同步佇列補網路恢復事件重送、同步狀態詳情頁與失敗項目管理。
 2. 推薦模型：把目前啟發式回饋加權演進為可解釋的偏好模型或向量排序。
-3. 健康餐點資料來源：從 JSON 資料檔演進為資料庫或正式餐廳 API，並將 schematic map 替換或擴充為正式 Google Maps / native map 元件。
+3. 健康餐點資料來源：已用 Google Places 取得真實店家；下一步是建立真實菜單/營養資料來源，或讓使用者到店後用掃描/手動搜尋補足餐點營養。
 
 ### 14.3 低優先級 / 研究型
 

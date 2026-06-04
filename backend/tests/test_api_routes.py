@@ -118,6 +118,71 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("action", response.get_json()["error"])
 
+    def test_map_food_recommend_requires_google_places_key(self):
+        with patch.dict(os.environ, {"GOOGLE_PLACES_API_KEY": "", "GOOGLE_MAPS_API_KEY": ""}, clear=False):
+            with self.mock_auth("user-a"):
+                response = self.client.get(
+                    "/map-food-recommend/user-a?budget=150&lat=24.9890&lng=121.3443&radius_km=3&category=all",
+                    headers=self.auth_headers(),
+                )
+
+        self.assertEqual(response.status_code, 503)
+        data = response.get_json()
+        self.assertFalse(data["places_enabled"])
+        self.assertIn("GOOGLE_PLACES_API_KEY", data["error"])
+
+    def test_map_food_recommend_uses_google_places_source(self):
+        fake_restaurants = [
+            {
+                "restaurant_id": "google_place_1",
+                "name": "真實附近餐廳",
+                "lat": 24.9891,
+                "lng": 121.3444,
+                "address": "桃園市龜山區示範路 1 號",
+                "phone": "",
+                "google_place_id": "place_1",
+                "distance_km": 0.02,
+                "tags": ["Google Places", "真實店家"],
+                "price_level": 1,
+                "is_open": True,
+                "rating": 4.3,
+                "user_ratings_total": 25,
+                "match_score": 88,
+                "data_source": "google_places",
+                "nutrition_available": False,
+                "recommended_items": [
+                    {
+                        "restaurant_id": "google_place_1",
+                        "restaurant_name": "真實附近餐廳",
+                        "item_name": "到店後選擇符合預算的餐點",
+                        "price": 120,
+                        "calories": 0,
+                        "protein": 0,
+                        "carbs": 0,
+                        "fat": 0,
+                        "sodium": 0,
+                        "match_score": 88,
+                        "nutrition_available": False,
+                        "reasons": ["Google Places 找到的真實店家"],
+                    }
+                ],
+                "filtered_items": [],
+            }
+        ]
+
+        with self.mock_auth("user-a"):
+            with patch("services.healthy_food_service.fetch_google_places_restaurants", return_value=fake_restaurants):
+                response = self.client.get(
+                    "/map-food-recommend/user-a?budget=150&lat=24.9890&lng=121.3443&radius_km=3&category=all",
+                    headers=self.auth_headers(),
+                )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["data_source"], "google_places")
+        self.assertFalse(data["nutrition_available"])
+        self.assertEqual(data["restaurants"][0]["name"], "真實附近餐廳")
+
 
 if __name__ == "__main__":
     unittest.main()

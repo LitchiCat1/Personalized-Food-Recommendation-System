@@ -334,7 +334,7 @@ export default function RecommendScreen() {
               <Ionicons name="navigate" size={rs(16)} color={Palette.accent.cyan} />
               <Text style={[styles.filteredTitle, { fontSize: rs(13), color: Palette.accent.cyan }]}>附近餐廳地圖推薦</Text>
             </View>
-            <Text style={[styles.filteredReason, { fontSize: rs(11), marginBottom: rs(12) }]}>輸入本餐預算與搜尋半徑後，會依定位、偏好、時段、剩餘營養與疾病史在地圖上標出附近店家。</Text>
+            <Text style={[styles.filteredReason, { fontSize: rs(11), marginBottom: rs(12) }]}>輸入本餐預算與搜尋半徑後，會透過 Google Places 搜尋附近真實店家；Google 不提供可靠菜單營養，餐點營養請到店後用掃描或手動搜尋確認。</Text>
             <View style={styles.budgetRow}>
               <TextInput
                 value={budget}
@@ -396,7 +396,7 @@ export default function RecommendScreen() {
                 <Text style={[styles.sectionTitle, { fontSize: rs(16) }]}>地圖上的推薦店家</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Ionicons name="location" size={rs(12)} color={Palette.accent.cyan} />
-                  <Text style={[styles.recSort, { fontSize: rs(10), color: Palette.accent.cyan }]}>依距離、預算、偏好與營養契合排序</Text>
+                  <Text style={[styles.recSort, { fontSize: rs(10), color: Palette.accent.cyan }]}>Google Places 真實店家，依距離、評分與預算估計排序</Text>
                 </View>
               </View>
 
@@ -437,6 +437,7 @@ export default function RecommendScreen() {
                         <Text style={[styles.mealMetaText, { fontSize: rs(10) }]}>{restaurant.distance_km} km</Text>
                         <Ionicons name="time-outline" size={rs(10)} color={Palette.text.tertiary} />
                         <Text style={[styles.mealMetaText, { fontSize: rs(10) }]}>{restaurant.is_open ? '營業中' : '未營業'}</Text>
+                        {restaurant.rating ? <Text style={[styles.mealMetaText, { fontSize: rs(10) }]}>評分 {restaurant.rating}</Text> : null}
                       </View>
                     </View>
                     <View style={styles.scoreContainer}>
@@ -458,21 +459,28 @@ export default function RecommendScreen() {
                     <View key={`${restaurant.restaurant_id}_${item.item_id || item.item_name}`} style={styles.recommendedItemBlock}>
                       <View style={styles.selectedMapTitleRow}>
                         <Text style={[styles.mealName, { fontSize: rs(13), flex: 1 }]}>{item.item_name}</Text>
-                        <Text style={[styles.priceText, { fontSize: rs(12) }]}>{item.price} 元</Text>
+                        <Text style={[styles.priceText, { fontSize: rs(12) }]}>{restaurant.price_level != null ? `$${restaurant.price_level}` : '價格待確認'}</Text>
                       </View>
-                      <View style={styles.mealNutritionRow}>
-                        {[
-                          { label: '熱量', value: `${item.calories} kcal`, color: Palette.accent.green },
-                          { label: '蛋白質', value: `${item.protein} g`, color: Palette.accent.blue },
-                          { label: '鈉', value: `${item.sodium} mg`, color: Palette.accent.pink },
-                          { label: '分數', value: `${item.match_score}`, color: Palette.accent.orange },
-                        ].map((n) => (
-                          <View key={n.label} style={styles.mealNutritionItem}>
-                            <Text style={[styles.mealNutritionLabel, { fontSize: rs(9) }]}>{n.label}</Text>
-                            <Text style={[styles.mealNutritionValue, { fontSize: rs(12), color: n.color }]}>{n.value}</Text>
-                          </View>
-                        ))}
-                      </View>
+                      {item.nutrition_available ? (
+                        <View style={styles.mealNutritionRow}>
+                          {[
+                            { label: '熱量', value: `${item.calories} kcal`, color: Palette.accent.green },
+                            { label: '蛋白質', value: `${item.protein} g`, color: Palette.accent.blue },
+                            { label: '鈉', value: `${item.sodium} mg`, color: Palette.accent.pink },
+                            { label: '分數', value: `${item.match_score}`, color: Palette.accent.orange },
+                          ].map((n) => (
+                            <View key={n.label} style={styles.mealNutritionItem}>
+                              <Text style={[styles.mealNutritionLabel, { fontSize: rs(9) }]}>{n.label}</Text>
+                              <Text style={[styles.mealNutritionValue, { fontSize: rs(12), color: n.color }]}>{n.value}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : (
+                        <View style={styles.nutritionUnavailableBox}>
+                          <Ionicons name="information-circle-outline" size={rs(13)} color={Palette.status.warning} />
+                          <Text style={[styles.filteredReason, { fontSize: rs(10), flex: 1 }]}>Google Places 已提供真實店家位置；菜單價格與營養資料需到店後用掃描或手動搜尋確認。</Text>
+                        </View>
+                      )}
                       <View style={styles.reasonWrap}>
                         {item.reasons.map((reason) => (
                           <Text key={reason} style={[styles.filteredReason, { fontSize: rs(10) }]}>{reason}</Text>
@@ -699,6 +707,16 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     marginTop: Spacing.sm,
     gap: Spacing.sm,
+  },
+  nutritionUnavailableBox: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(251,191,36,0.08)',
+    borderColor: 'rgba(251,191,36,0.18)',
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.sm,
   },
   priceText: { ...Typography.bodyBold, color: Palette.accent.orange },
   restaurantActionRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },

@@ -3,6 +3,8 @@ import os
 from datetime import datetime, timezone
 from math import cos, radians, sin, sqrt, atan2
 
+from services.google_places_service import fetch_google_places_restaurants
+
 
 def load_restaurant_catalog(base_dir: str) -> list[dict]:
     catalog_path = os.environ.get(
@@ -190,4 +192,53 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
         "recommended": recommendations[:12],
         "restaurants": restaurants[:12],
         "filtered_out": filtered_out[:12],
+    }
+
+
+def build_google_places_food_recommendations(storage, user_id: str, params: dict):
+    user = storage.get_user(user_id)
+    if not user:
+        return None
+
+    budget = int(params.get("budget", 150))
+    lat = float(params.get("lat", 25.0338))
+    lng = float(params.get("lng", 121.5645))
+    radius_km = min(max(float(params.get("radius_km", 3)), 0.5), 10)
+    category = _normalize_category(params.get("category", "all"))
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    today = now.strftime("%Y-%m-%d")
+    today_records = storage.get_records(user_id, today, limit=500)
+    consumed = {
+        "calories": sum(r.get("total_calories", 0) for r in today_records),
+        "protein": sum(r.get("total_protein", 0) for r in today_records),
+        "carbs": sum(r.get("total_carbs", 0) for r in today_records),
+        "fat": sum(r.get("total_fat", 0) for r in today_records),
+        "sodium": sum(r.get("total_sodium", 0) for r in today_records),
+    }
+    daily_target = user.get("daily_calorie_target", 2100)
+    remaining = {
+        "calories": max(0, daily_target - consumed["calories"]),
+        "protein": max(0, 130 - consumed["protein"]),
+        "carbs": max(0, 250 - consumed["carbs"]),
+        "fat": max(0, 70 - consumed["fat"]),
+        "sodium": max(0, 2000 - consumed["sodium"]),
+    }
+
+    restaurants = fetch_google_places_restaurants(lat, lng, radius_km, category, budget, limit=12)
+    recommendations = [item for restaurant in restaurants for item in restaurant.get("recommended_items", [])]
+    recommendations.sort(key=lambda item: item["match_score"], reverse=True)
+    return {
+        "user_id": user_id,
+        "budget": budget,
+        "radius_km": radius_km,
+        "category": category or "all",
+        "location": {"lat": lat, "lng": lng},
+        "remaining": remaining,
+        "data_source": "google_places",
+        "nutrition_available": False,
+        "nutrition_note": "Google Places 提供真實店家位置與評分，不提供可靠菜單營養與價格；請到店後用掃描或手動搜尋記錄餐點。",
+        "recommended": recommendations[:12],
+        "restaurants": restaurants,
+        "filtered_out": [],
     }

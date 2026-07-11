@@ -86,7 +86,6 @@ Personalized-Food-Recommendation-System/
 │   │
 │   ├── app/                            # Expo Router routes
 │   │   ├── _layout.tsx                 # Root layout
-│   │   ├── modal.tsx                   # Modal 頁面
 │   │   └── (tabs)/
 │   │       ├── _layout.tsx             # Tab layout
 │   │       ├── index.tsx               # 今日營養 Dashboard
@@ -485,7 +484,7 @@ POST /map-food-recommend/<user_id>/restaurant-summary
 - 後端仍保留 `backend/test_client.py` 類型的手動整合測試。
 - 前端尚未建立 e2e、component test 或 API mock 測試。
 - 已建立基礎 GitHub Actions CI，但目前只涵蓋後端 syntax check 與前端 typecheck。
-- `frontend/package.json` 已有 `typecheck` script，但尚未建立正式 test、build script。
+- `frontend/package.json` 已有 `typecheck`、`lint` 與 `build:web` scripts，但尚未建立正式 test/e2e/component test scripts。
 - 尚未建立 pytest/unit test、前端 component test 或 e2e test。
 
 ### 11.8 免費部署限制
@@ -610,7 +609,7 @@ GET https://personalized-food-recommendation-system-nq8t.onrender.com/health
 | 6 | Gemini/TFDA 名稱對應 | MVP 可用 | Gemini 會產生候選中文食品名稱，後端查 TFDA/自訂食品資料庫 | 尚未建立大型評測集與同義詞命中率分析，未命中時仍依賴手動搜尋/OCR |
 | 7 | 份量估算校正 | MVP 可用 | 掃描結果可調整重量並即時重算營養 | 尚未用校正資料反饋 density，也沒有參考物/深度感測自動校正 |
 | 8 | 測試與 CI | 基礎 CI 已完成 | `.github/workflows/ci.yml` 會跑後端 syntax check 與前端 `npm run typecheck` | 尚無 pytest/unit test、前端 test、e2e、正式 build check |
-| 9 | 使用者身份驗證 | MVP 可用 | 後端已強制驗證 Supabase Bearer token 與 `user_id` 權限；前端已支援 Supabase Auth session 與 Bearer token 傳遞 | 尚未完成登出 UI、session 過期提示、完整 profile 編輯與自動化測試 |
+| 9 | 使用者身份驗證 | MVP 可用 | 後端已強制驗證 Supabase Bearer token 與 `user_id` 權限；前端已支援 Supabase Auth session、Bearer token 傳遞、登出 UI 與完整 profile 編輯 | 尚未完成 session 過期提示、使用者管理 UI 與自動化測試 |
 | 10 | Render + Supabase 實測檢查流程 | 已完成 | 已記錄 Render URL、Supabase 實測結果、遠端 `/health` 摘要與 401/200/403 權限驗收 | 尚需維護後續部署紀錄與將 smoke tests 自動化 |
 
 ## 14. 重新標註的未完成清單

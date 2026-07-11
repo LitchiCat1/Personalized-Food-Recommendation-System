@@ -55,7 +55,7 @@ Personalized-Food-Recommendation-System/
 - **Render + Supabase 部署** — 後端已在 Render 強制 Supabase Auth，資料存於 Supabase Postgres
 - **跨平台響應式** — 手機/平板/桌面自適應
 
-目前仍未完成正式餐廳 API 串接、完整 profile 編輯表單與完整自動化測試；Render + Supabase 部署、Supabase Auth 登入與後端強制 user-scoped 權限檢查已完成驗證，GitHub Actions 已有基礎 CI。詳細狀態請以 `docs/Project_Architecture_and_Status.md` 的 roadmap 稽核表為準。
+目前仍未完成正式餐廳外部 API 串接、完整自動化測試、session 過期提示與使用者管理 UI；profile 編輯、登出、首次登入 onboarding、Render + Supabase 部署、Supabase Auth 登入與後端強制 user-scoped 權限檢查已完成驗證，GitHub Actions 已有基礎 CI。詳細狀態請以 `docs/Project_Architecture_and_Status.md` 的 roadmap 稽核表為準。
 
 ## 部署與驗證狀態
 

@@ -80,9 +80,8 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 
 ## 後續優化方向
 
-1. 補上可編輯的 profile 表單欄位：身高、體重、年齡、活動量、目標熱量、目標體重、飲食型態
-2. 完成 Supabase Auth 遠端驗收並將 Render `SUPABASE_AUTH_REQUIRED` 切為 `true`
-3. 補上新增餐點失敗時的重試或待同步狀態，目前 scanner 採 local-first UX
-4. 將健康餐點推薦資料源改成可更新的外部資料表或正式 API
-5. 把更多資料轉換邏輯從頁面搬到 `lib/` 或 hooks
-6. 補上 `typecheck`、測試與 CI workflow
+1. 補 session 過期提示、重新登入導引與使用者管理 UI
+2. 讓待同步佇列支援網路恢復事件自動重送與詳情頁管理
+3. 將健康餐點推薦資料源改成可更新的外部資料表或正式 API
+4. 把更多資料轉換邏輯從頁面搬到 `lib/` 或 hooks
+5. 補前端 component test、e2e test 與更完整的 API mock 測試

@@ -13,7 +13,7 @@
 - Gate 1: Passed. `codex mcp list` shows `figma` enabled with bearer-token auth.
 - Gate 2: Passed. New Figma design file was created.
 - Gate 3: Passed. Five 390x844 mobile app screen frames were created and validated with Figma screenshots.
-- Gate 4: Not started. Expo implementation should begin only after reviewing the Figma design.
+- Gate 4: Passed. The Expo implementation has translated the five Figma app screens into the current tab UI while preserving route names and existing data flow.
 
 Note: the active Figma plan is Starter and allows three pages. The design is therefore organized into three pages instead of the original six-page wish list.
 
@@ -95,21 +95,21 @@ Shows seven-day averages, calorie goal band, sodium risk trend, and concise demo
 
 Shows account summary, BMR/TDEE/BMI metrics, health-condition filters, allergen/safety chips, nutrition targets, and save profile CTA.
 
-## Implementation Handoff
+## Implementation Status
 
-When implementing the Expo UI:
+The Figma handoff has been implemented in the Expo app:
 
-1. Translate these Figma tokens into `frontend/constants/theme.ts`.
-2. Build shared UI components in `frontend/components/ui/`.
-3. Keep feature components under their feature folders.
-4. Preserve API calls, Zustand state shape, data schema, and Expo Router tab route names:
+1. Figma tokens are represented in `frontend/constants/theme.ts`.
+2. Shared UI components were added under `frontend/components/ui/`.
+3. Feature components remain under their feature folders.
+4. API calls, Zustand state shape, data schema, and Expo Router tab route names were preserved:
    - `index`
    - `scanner`
    - `recommend`
    - `history`
    - `profile`
-5. Use `@expo/vector-icons`; do not add a new UI kit.
-6. Verify with:
+5. The implementation uses existing Expo/React Native primitives and `@expo/vector-icons`; no new UI kit was added.
+6. Latest verification commands for this UI pass:
    - `cd frontend && npm run typecheck`
    - `cd frontend && npm run lint`
-   - `cd frontend && npm run web`
+   - `cd frontend && npm run build:web`

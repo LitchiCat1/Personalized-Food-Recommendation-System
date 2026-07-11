@@ -51,7 +51,7 @@ export default function ProfileScreen() {
 
     fetchUserProfile(apiBaseUrl, user.userId, { accessToken })
       .catch((err: Error) => {
-        if (!err.message.includes('雿輻')) throw err;
+        if (!err.message.includes('使用者不存在')) throw err;
         return saveUserProfile(apiBaseUrl, {
           user_id: seedUser.userId,
           name: seedUser.name,

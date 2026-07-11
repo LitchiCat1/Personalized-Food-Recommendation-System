@@ -2,7 +2,7 @@
   "diabetes": {
     "id": "diabetes",
     "label_zh": "糖尿病 / 血糖管理",
-    "aliases": ["糖尿病", "血糖管理", "diabetes", "蝟倏??"],
+    "aliases": ["糖尿病", "血糖管理", "diabetes"],
     "category": "metabolic",
     "description": "優先提醒高 GI、單餐碳水過高與含糖飲品，協助穩定餐後血糖。",
     "screening_focus": ["glycemic_load", "carbohydrate", "added_sugar"],
@@ -34,7 +34,7 @@
   "hypertension": {
     "id": "hypertension",
     "label_zh": "高血壓 / 鈉控制",
-    "aliases": ["高血壓", "鈉控制", "hypertension", "擃?憯?"],
+    "aliases": ["高血壓", "鈉控制", "hypertension"],
     "category": "cardiovascular",
     "description": "優先提醒單餐鈉含量與加工高鈉食物，降低整日鈉攝取超標風險。",
     "screening_focus": ["sodium", "processed_food"],
@@ -64,7 +64,7 @@
   "kidney_disease": {
     "id": "kidney_disease",
     "label_zh": "慢性腎臟病 / 腎臟照護",
-    "aliases": ["慢性腎臟病", "腎臟病", "腎臟照護", "kidney", "ckd", "?Ｘ扯???"],
+    "aliases": ["慢性腎臟病", "腎臟病", "腎臟照護", "kidney", "ckd"],
     "category": "renal",
     "description": "提醒鈉、蛋白質與高磷高鉀食物風險；實際限制需依 CKD 分期與抽血數值設定。",
     "screening_focus": ["sodium", "protein", "phosphorus", "potassium"],
@@ -93,7 +93,7 @@
   "gout": {
     "id": "gout",
     "label_zh": "痛風 / 尿酸管理",
-    "aliases": ["痛風", "高尿酸", "尿酸管理", "gout", "?◢"],
+    "aliases": ["痛風", "高尿酸", "尿酸管理", "gout"],
     "category": "metabolic",
     "description": "提醒高普林食物、酒精與含糖飲品；目前以食物標籤與品項名稱做篩選。",
     "screening_focus": ["purine", "alcohol", "sugar"],
@@ -119,7 +119,7 @@
   "hyperlipidemia": {
     "id": "hyperlipidemia",
     "label_zh": "高血脂 / 脂質管理",
-    "aliases": ["高血脂", "膽固醇", "脂質管理", "hyperlipidemia", "擃???"],
+    "aliases": ["高血脂", "膽固醇", "脂質管理", "hyperlipidemia"],
     "category": "cardiovascular",
     "description": "提醒單餐脂肪過高與油炸加工食物，作為心血管飲食管理輔助。",
     "screening_focus": ["fat", "saturated_fat", "fried_food"],

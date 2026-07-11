@@ -1,5 +1,7 @@
 import os
 
+from services.medical_risk_service import evaluate_medical_risk, risk_messages
+
 
 VISION_CONFIRMATION_CONFIDENCE = float(os.environ.get("VISION_CONFIRMATION_CONFIDENCE", "0.75"))
 PORTION_UNCERTAINTY_BY_CONFIDENCE = {
@@ -25,12 +27,12 @@ def build_detection_reliability(label: str, confidence: float, needs_confirmatio
         level = "high"
 
     reasons = [
-        f"Gemini Vision 食物辨識信心 {confidence:.0%}",
-        "營養值依 TFDA/資料庫每 100g 換算" if nutrients.get("source") == "TFDA" else "營養值依自訂食品資料庫換算",
-        "份量由 Gemini 依照片內容估算，未使用秤重或深度資訊",
+        f"Gemini Vision confidence {confidence:.0%}",
+        "TFDA / database grounding" if nutrients.get("source") == "TFDA" else "database-only grounding",
+        "Vision and database are combined to reduce false positives.",
     ]
     if needs_confirmation:
-        reasons.append("此結果已標記為需要人工確認")
+        reasons.append("Needs user confirmation because the match is uncertain.")
 
     return {
         "level": level,
@@ -39,33 +41,32 @@ def build_detection_reliability(label: str, confidence: float, needs_confirmatio
     }
 
 
-def check_food_safety(nutrients: dict, weight_g: float, user_conditions: list, user_allergens: list, disease_rules: dict) -> list:
-    warnings = []
+def check_food_safety(
+    nutrients: dict,
+    weight_g: float,
+    user_conditions: list,
+    user_allergens: list,
+    disease_rules: dict,
+    allergen_taxonomy: dict | None = None,
+) -> list:
     if not nutrients.get("calories"):
-        return warnings
+        return []
 
-    scale = weight_g / 100.0
-    actual_sodium = (nutrients.get("sodium") or 0) * scale
-    actual_carbs = (nutrients.get("carbs") or 0) * scale
-    actual_protein = (nutrients.get("protein") or 0) * scale
-    actual_fat = (nutrients.get("fat") or 0) * scale
-    gi = nutrients.get("gi")
-    food_allergens = nutrients.get("allergens", [])
-
-    for allergen in food_allergens:
-        if allergen in user_allergens:
-            warnings.append(f"含過敏原: {allergen}")
-
-    for condition in user_conditions:
-        rules = disease_rules.get(condition, {})
-        if "blocked_gi" in rules and gi in rules["blocked_gi"]:
-            warnings.append(f"高 GI 食物 - {condition}患者請注意")
-        if "max_sodium_per_meal" in rules and actual_sodium > rules["max_sodium_per_meal"]:
-            warnings.append(f"高鈉 ({actual_sodium:.0f}mg) - {condition}患者請注意")
-        if "max_carbs_per_meal" in rules and actual_carbs > rules["max_carbs_per_meal"]:
-            warnings.append(f"碳水過高 ({actual_carbs:.0f}g) - {condition}患者請注意")
-        if "max_protein_per_meal" in rules and actual_protein > rules["max_protein_per_meal"]:
-            warnings.append(f"蛋白質過高 ({actual_protein:.0f}g) - {condition}患者請注意")
-        if "max_fat_per_meal" in rules and actual_fat > rules["max_fat_per_meal"]:
-            warnings.append(f"脂肪過高 ({actual_fat:.0f}g) - {condition}患者請注意")
-    return warnings
+    risk_result = evaluate_medical_risk(
+        {
+            "label": nutrients.get("name_zh") or nutrients.get("label"),
+            "name_zh": nutrients.get("name_zh"),
+            "gi": nutrients.get("gi"),
+            "allergens": nutrients.get("allergens", []),
+            "sodium": nutrients.get("sodium"),
+            "carbs": nutrients.get("carbs"),
+            "protein": nutrients.get("protein"),
+            "fat": nutrients.get("fat"),
+        },
+        user_conditions,
+        user_allergens,
+        disease_rules,
+        allergen_taxonomy or {"groups": []},
+        portion_g=weight_g,
+    )
+    return risk_messages(risk_result)

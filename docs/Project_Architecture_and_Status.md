@@ -1,6 +1,6 @@
 # 專案架構與功能狀態總整理
 
-> 最後更新：2026-05-07
+> 最後更新：2026-06-17
 > 專案：NutriLens / Personalized Food Recommendation System
 
 ## 1. 文件目的
@@ -66,6 +66,8 @@ Personalized-Food-Recommendation-System/
 │   │   ├── nutrition_label_service.py  # Gemini Vision 營養標示 OCR
 │   │   ├── food_analysis_service.py    # 可信度、份量區間與健康警示共用邏輯
 │   │   ├── vision_food_service.py      # Gemini Vision 食物辨識與資料庫營養對應
+│   │   ├── google_places_service.py    # Google Places Nearby Search 真實店家搜尋
+│   │   ├── restaurant_ai_service.py   # Gemini AI 店家摘要（餐點/價格區間/健康建議推測）
 │   │   ├── profile_service.py          # 使用者 profile、BMR/TDEE/BMI
 │   │   └── recommend_service.py        # 規則型雙軌推薦
 │   │
@@ -96,6 +98,9 @@ Personalized-Food-Recommendation-System/
 │   ├── components/
 │   │   ├── AppContainer.tsx            # 共用頁面容器
 │   │   ├── dashboard/                  # Dashboard 元件
+│   │   ├── maps/                       # 跨平台地圖元件
+│   │   │   ├── FoodMap.tsx              # Native fallback 地圖
+│   │   │   └── FoodMap.web.tsx          # Web Google Maps JavaScript API
 │   │   ├── scanner/                    # Scanner 元件
 │   │   └── ui/                         # 通用 UI 元件
 │   │
@@ -127,10 +132,12 @@ Personalized-Food-Recommendation-System/
 | Frontend | Expo 54, React Native 0.81.5, React 19, TypeScript |
 | Routing | Expo Router |
 | State | Zustand |
-| UI / Device | expo-camera, expo-image-picker, expo-location, react-native-svg |
+| UI / Device | expo-camera, expo-image-picker, expo-location, react-native-svg, @vis.gl/react-google-maps |
 | Backend | Flask, Flask-CORS |
 | AI Detection | Google Gemini Vision API via REST |
+| AI Summary | Google Gemini API for restaurant menu/price/budget inference |
 | Nutrition Grounding | TFDA 台灣食品資料庫 + user scoped custom foods |
+| Map | Google Maps JavaScript API (frontend) + Google Places API (backend) |
 | OCR | Google Gemini Vision API via REST |
 | Database | PostgreSQL/Supabase, MongoDB fallback, In-memory fallback |
 | Deployment | Render Web Service free plan + Supabase Postgres free plan |
@@ -184,8 +191,13 @@ Personalized-Food-Recommendation-System/
 | `GET` | `/records/<user_id>?date=` | 查詢飲食紀錄 |
 | `GET` | `/history/<user_id>?days=` | 飲食歷史與趨勢彙整 |
 | `GET` | `/recommend/<user_id>` | 規則型食物推薦 |
-| `GET` | `/healthy-food-recommend/<user_id>` | 附近健康餐點推薦 MVP |
+| `POST` | `/recommend/<user_id>/feedback` | 推薦回饋（採納/略過/不喜歡） |
+| `GET` | `/recommend/<user_id>/feedback` | 列出推薦回饋 |
+| `GET` | `/healthy-food-recommend/<user_id>` | 附近健康餐點推薦（使用 restaurant_catalog.json） |
+| `GET` | `/map-food-recommend/<user_id>` | 地圖推薦：Google Places 真實店家搜尋 |
+| `POST` | `/map-food-recommend/<user_id>/restaurant-summary` | Gemini AI 店家摘要（餐點/價格/健康建議推測） |
 | `GET` | `/disease-rules` | 疾病規則版本、審核狀態、參考來源與醫療免責摘要 |
+| `GET` | `/medical-metadata` | 疾病規則與過敏原分類（allergen taxonomy）治理 metadata 合併查詢 |
 | `POST` | `/calculate/bmr` | BMR/TDEE/BMI 計算 |
 
 ## 7. 前端架構
@@ -299,6 +311,12 @@ GET /map-food-recommend/<user_id>
   -> 後端使用 GOOGLE_PLACES_API_KEY 查 Google Places Nearby Search
   -> 回傳真實店家位置、評分、營業狀態、距離與導航資料
   -> 不產生假菜單營養；回傳 nutrition_available: false，提示到店後掃描/手動搜尋
+
+POST /map-food-recommend/<user_id>/restaurant-summary
+  -> 接收單一店家資料（Google Places 欄位）與使用者預算、健康條件
+  -> Gemini 依店名、類型、價位等級、評分推測可能餐點與價格區間
+  -> 不假裝知道正式菜單；回傳固定 JSON schema 與 source_note 免責
+  -> 前端顯示「AI 推測」卡片，標明非店家正式菜單
 ```
 
 ## 9. 疾病與過敏原規則
@@ -325,6 +343,8 @@ GET /map-food-recommend/<user_id>
 
 ## 10. 已完成功能
 
+> 彙整日期：2026-06-17
+
 ### 10.1 後端
 
 - 已完成 Flask API 主服務。
@@ -333,6 +353,8 @@ GET /map-food-recommend/<user_id>
 - 已完成前端份量校正，掃描結果可調整重量並即時重算營養素。
 - 已完成 TFDA 台灣食品營養資料庫整合，約 2,181 筆食品。
 - 已完成 Gemini 候選食品名稱到 TFDA/自訂食品資料庫的查詢對應。
+- 已完成 TFDA 搜尋排序，避免「蘋果」命中加工乳品/飲料。
+- 已完成 Gemini model candidate rotation，`404 model not found` 視為可 fallback。
 - 已完成低信心辨識拒絕、需確認標記與手動搜尋提示。
 - 已完成疾病規則與過敏原警示。
 - 已完成疾病規則設定化，規則已從 `backend/app.py` 移到 `backend/config/disease_rules.json`。
@@ -348,11 +370,13 @@ GET /map-food-recommend/<user_id>
 - 已完成推薦候選擴展，`/recommend` 會納入 TFDA 與使用者自訂食品，並回傳來源統計。
 - 已完成歷史飲食偏好加權，`/recommend` 會參考近期紀錄產生 `preference_score` 與偏好原因。
 - 已完成推薦回饋記錄，使用者可標記採納、略過或不喜歡，`/recommend` 會把近期回饋納入排序。
-- 已完成附近健康餐點推薦 MVP。
-- 已完成健康餐點餐廳資料源資料化，預設由 `backend/data/restaurant_catalog.json` 載入。
+- 已完成附近健康餐點推薦 MVP（catalog-based，保留為 `/healthy-food-recommend` 相容）。
+- 已完成 Google Places 真實店家搜尋，`/map-food-recommend` 改用 Places，不再讀 catalog。
+- 已完成 Gemini AI 店家摘要，`POST /map-food-recommend/<user_id>/restaurant-summary` 產生餐點/價格/健康建議推測。
 - 已完成 PostgreSQL/MongoDB/In-memory 三層資料儲存 fallback。
 - 已完成 Render `PORT` 支援與 `render.yaml`。
 - 已完成 Gemini 多 API key 輪替，Render 建議使用 `GEMINI_API_KEYS`。
+- 已完成 backend health 檢查 `places_enabled` 欄位。
 
 ### 10.2 前端
 
@@ -367,20 +391,30 @@ GET /map-food-recommend/<user_id>
 - 已完成疾病與過敏原切換後同步後端。
 - 已完成推薦頁呼叫 `/recommend` 與 `/healthy-food-recommend`。
 - 已完成定位、預算與附近健康餐點 UI。
-- 已完成附近餐廳推薦地圖：Web 前端使用 Google Maps JavaScript API 顯示真地圖，後端 `/map-food-recommend` 使用 Google Places 搜尋真實附近店家，並提供 Google Maps 外部導航。
+- 已完成附近餐廳推薦地圖：
+  - Web 前端使用 Google Maps JavaScript API 顯示真地圖。
+  - 後端 `/map-food-recommend` 使用 Google Places 搜尋真實附近店家。
+  - 提供 Google Maps 外部導航。
+  - 單一 `GOOGLE_PLACES_API_KEY` 由 build script 注入前端 Maps public env。
+- 已完成 AI 店家摘要：
+  - 推薦頁店家卡片「AI 摘要」按鈕。
+  - 呼叫 `POST /map-food-recommend/<user_id>/restaurant-summary`。
+  - 顯示店家類型、可能餐點、價格區間、預算適合度、健康建議、可信度與來源提醒。
+  - 明確標示「Google Places + Gemini 推測，非店家正式菜單」。
 - 已完成 history 頁呼叫 `/history` 並顯示趨勢。
 - 已完成 API base URL 自動推導與 Render URL 環境變數支援。
 - 已完成 Expo Web static export 設定，Render 可部署 frontend static site 供同學以瀏覽器測試。
 - 已完成 Supabase Auth 登入/註冊基礎整合；有 Supabase public env 時會進入 AuthGate，登入後使用 Supabase Auth user id。
 - 已完成 Bearer token 傳遞，user-scoped API 會帶 `Authorization: Bearer <access_token>`。
 - 已完成首次登入 onboarding；若後端無 profile，使用者必須先填基本資料，避免看到預設示範資料。
-- 已完成 profile 完整可編輯表單與登出按鈕。
+- 已完成 profile 完整可編輯表單與登出按鈕（web 用 `window.confirm`）。
 - 已完成掃描/手動/OCR 新增紀錄本機持久化待同步佇列與重試入口。
 - 已完成新增紀錄 `client_record_id` 產生與待同步佇列保存。
 - 已完成 Scanner 聚焦時自動重送待同步紀錄，並設定自動重送最多 5 次。
 - 已完成推薦卡片採納、略過、不喜歡回饋按鈕。
 - 已完成健康狀況設定區塊的醫療免責提示。
 - 已完成手機、平板與 web 的基本響應式顯示。
+- 已完成附近餐點 fetch 失敗時自動 fallback 到 Render backend 並顯示診斷資訊。
 
 ### 10.3 部署與資料
 
@@ -463,15 +497,17 @@ GET /map-food-recommend/<user_id>
 
 ## 12. Render + Supabase 部署驗證狀態
 
-目前專案已完成免費方案跨網路部署驗證。
+目前專案已完成免費方案跨網路部署驗證，並已部署至 Google Maps/Places + AI 店家摘要版本。
 
-- Render URL：`https://personalized-food-recommendation-system-nq8t.onrender.com`
-- Render service id：`srv-d7u2qhdckfvc73ei96l0`
+- Render backend URL：`https://personalized-food-recommendation-system-nq8t.onrender.com`
+- Render frontend URL：`https://personalized-food-recommendation-frontend.onrender.com`
+- Render backend service id：`srv-d7u2qhdckfvc73ei96l0`
+- Render frontend service id：`srv-d87fffmq1p3s73b4u590`
 - 部署分支：`v0.0.3`
-- 驗證日期：2026-05-07
-- `/health` 驗證摘要：`status: ok`、`postgres: true`、`foods_in_tfda: 2181`、`disease_rules: 5`
+- 最新已驗證 commit：`dd9b6a4 add AI restaurant summaries`
+- `/health` 驗證摘要：`status: ok`、`postgres: true`、`places_enabled: true`、`foods_in_tfda: 2181`、`disease_rules: 5`、`restaurants: 10`
 - Auth 驗證摘要：未帶 token 回 `401`，正確 token 回 `200`，跨 `user_id` 回 `403`
-- 最新強制 Auth deploy：`dep-d7u8pb67r5hc73bfus20`
+- 環境變數已設定：`GEMINI_API_KEYS`、`DATABASE_URL`、`SUPABASE_AUTH_REQUIRED=true`、`SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`GOOGLE_PLACES_API_KEY`（backend 與 frontend 皆同一名稱）
 
 ### 12.1 後端 Render
 
@@ -513,7 +549,7 @@ Render 需要設定：
 
 Supabase 只需要提供 PostgreSQL connection string 給 Render 的 `DATABASE_URL`。Render 實測已使用 Supabase Session Pooler 成功連線；連線字串通常包含 pooler host、port、database、user 與 password。
 
-常見錯誤：Render 的 `DATABASE_URL` value 若誤填成 `DATABASE_URL=postgresql://...`，後端會將 `DATABASE_URL` 視為 connection option，可能出現 `invalid dsn: invalid connection option "DATABASE_URL"`。
+常見錯誤：Render 的 `DATABASE_URL` value 若把環境變數名稱也一起貼進欄位，例如以 `DATABASE_URL` 前綴加上 PostgreSQL DSN，後端會將 `DATABASE_URL` 視為 connection option，可能出現 `invalid dsn: invalid connection option "DATABASE_URL"`。
 
 後端啟動後會自動建立：
 

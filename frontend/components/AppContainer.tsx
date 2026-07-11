@@ -8,11 +8,11 @@
  */
 
 import React, { useRef, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useResponsive } from '@/hooks/useResponsive';
-import { Palette, Spacing } from '@/constants/theme';
+import { Palette } from '@/constants/theme';
 
 interface Props {
   children: React.ReactNode;
@@ -22,7 +22,7 @@ interface Props {
 
 export default function AppContainer({ children, bottomPadding = 80 }: Props) {
   const insets = useSafeAreaInsets();
-  const { isDesktop, maxContentWidth, rs, isWeb } = useResponsive();
+  const { isDesktop, maxContentWidth, rs } = useResponsive();
   const scrollRef = useRef<ScrollView>(null);
 
   // Fix #4: Reset scroll position when tab becomes focused
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
   },
   desktopOuter: {
     alignItems: 'center',
-    backgroundColor: '#050508', // slightly darker bg for desktop sides
+    backgroundColor: Palette.bg.secondary,
   },
   innerContainer: {
     flex: 1,

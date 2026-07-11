@@ -67,6 +67,7 @@ def build_custom_food_search_result(food_doc: dict) -> dict:
         "unit": food_doc.get("unit", "per serving"),
         "source": food_doc.get("source", "custom-food"),
         "serving_size_g": food_doc.get("serving_size_g"),
+        "allergens": food_doc.get("allergens", []) or [],
     }
 
 

@@ -1,0 +1,92 @@
+{
+  "version": "2026.06.1",
+  "review_status": "labeling-regulation-derived",
+  "last_reviewed": "2026-06-18",
+  "references": [
+    {
+      "title": "FDA - Food Allergies",
+      "url": "https://www.fda.gov/food/food-labeling-nutrition/food-allergies"
+    },
+    {
+      "title": "Taiwan Food Allergen Labeling Information",
+      "url": "https://www.fda.gov.tw/"
+    },
+    {
+      "title": "Open Food Facts API",
+      "url": "https://openfoodfacts.github.io/openfoodfacts-server/api/"
+    }
+  ],
+  "medical_disclaimer": "過敏原標示與交叉污染資訊可能不完整；嚴重過敏者應以產品標籤、店家確認與醫療建議為準。",
+  "groups": [
+    {
+      "id": "peanut",
+      "label_zh": "花生",
+      "severity": "high",
+      "aliases": ["花生", "peanut", "?梁?"],
+      "keywords": ["花生", "peanut", "groundnut"]
+    },
+    {
+      "id": "tree_nut",
+      "label_zh": "堅果",
+      "severity": "high",
+      "aliases": ["堅果", "tree nut", "tree_nut", "??"],
+      "keywords": ["堅果", "杏仁", "腰果", "核桃", "榛果", "almond", "cashew", "walnut", "hazelnut"]
+    },
+    {
+      "id": "milk",
+      "label_zh": "牛奶",
+      "severity": "high",
+      "aliases": ["牛奶", "乳製品", "milk", "dairy", "?西"],
+      "keywords": ["牛奶", "乳粉", "奶粉", "乳清", "奶油", "起司", "milk", "dairy", "whey", "casein", "cheese", "butter"]
+    },
+    {
+      "id": "egg",
+      "label_zh": "蛋",
+      "severity": "high",
+      "aliases": ["蛋", "雞蛋", "egg", "鞎?"],
+      "keywords": ["蛋", "雞蛋", "蛋白", "蛋黃", "egg", "albumin"]
+    },
+    {
+      "id": "soy",
+      "label_zh": "大豆",
+      "severity": "medium",
+      "aliases": ["大豆", "黃豆", "soy", "soybean", "擳?"],
+      "keywords": ["大豆", "黃豆", "豆漿", "豆腐", "soy", "soybean", "tofu"]
+    },
+    {
+      "id": "wheat_gluten",
+      "label_zh": "小麥 / 麩質",
+      "severity": "medium",
+      "aliases": ["小麥", "麩質", "gluten", "wheat", "??"],
+      "keywords": ["小麥", "麵粉", "麩質", "wheat", "gluten", "flour", "barley", "rye"]
+    },
+    {
+      "id": "fish",
+      "label_zh": "魚類",
+      "severity": "high",
+      "aliases": ["魚", "魚類", "fish", "?扒"],
+      "keywords": ["魚", "鮭", "鮪", "鱈", "fish", "salmon", "tuna", "cod"]
+    },
+    {
+      "id": "shellfish",
+      "label_zh": "甲殼類 / 蝦蟹",
+      "severity": "high",
+      "aliases": ["甲殼類", "蝦", "蟹", "shellfish", "crustacean", "憭扯?"],
+      "keywords": ["蝦", "蟹", "龍蝦", "甲殼", "shrimp", "crab", "lobster", "shellfish"]
+    },
+    {
+      "id": "sesame",
+      "label_zh": "芝麻",
+      "severity": "medium",
+      "aliases": ["芝麻", "sesame", "暻抵釭"],
+      "keywords": ["芝麻", "sesame", "tahini"]
+    },
+    {
+      "id": "sulfite",
+      "label_zh": "亞硫酸鹽",
+      "severity": "medium",
+      "aliases": ["亞硫酸鹽", "sulfite", "sulphite", "?獄"],
+      "keywords": ["亞硫酸", "sulfite", "sulphite", "SO2"]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { DarkTheme, ThemeProvider } from '@react-navigation/native';
+import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
@@ -6,14 +6,13 @@ import 'react-native-reanimated';
 import AuthGate from '@/components/AuthGate';
 import { Palette } from '@/constants/theme';
 
-// Force dark mode for the entire app
-const NutriLensDarkTheme = {
-  ...DarkTheme,
+const NutriLensTheme = {
+  ...DefaultTheme,
   colors: {
-    ...DarkTheme.colors,
+    ...DefaultTheme.colors,
     primary: Palette.accent.green,
     background: Palette.bg.primary,
-    card: Palette.bg.secondary,
+    card: Palette.bg.card,
     text: Palette.text.primary,
     border: Palette.border.subtle,
     notification: Palette.accent.orange,
@@ -26,13 +25,13 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   return (
-    <ThemeProvider value={NutriLensDarkTheme}>
+    <ThemeProvider value={NutriLensTheme}>
       <AuthGate>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
       </AuthGate>
     </ThemeProvider>
   );

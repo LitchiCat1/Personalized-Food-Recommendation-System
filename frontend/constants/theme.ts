@@ -1,75 +1,69 @@
 /**
  * NutriLens Design System
- * Premium dark-mode nutrition app theme
+ * Clean medical nutrition app theme.
  */
 
 import { Platform } from 'react-native';
 
-// ─── Color Palette ──────────────────────────────────────────
 export const Palette = {
-  // Backgrounds
   bg: {
-    primary: '#0A0A0F',
-    secondary: '#12121A',
-    card: '#1A1A2E',
-    cardHover: '#222240',
-    elevated: '#252540',
+    primary: '#F7FAF8',
+    secondary: '#EEF6F1',
+    card: '#FFFFFF',
+    cardHover: '#F2F8F5',
+    elevated: '#F0F6F3',
+    mint: '#EAF7F1',
+    wash: '#FDFEFC',
   },
 
-  // Accents
   accent: {
-    green: '#4ADE80',
-    greenDim: 'rgba(74, 222, 128, 0.15)',
-    blue: '#60A5FA',
-    blueDim: 'rgba(96, 165, 250, 0.15)',
-    orange: '#FB923C',
-    orangeDim: 'rgba(251, 146, 60, 0.15)',
-    purple: '#A78BFA',
-    purpleDim: 'rgba(167, 139, 250, 0.15)',
-    pink: '#F472B6',
-    pinkDim: 'rgba(244, 114, 182, 0.15)',
-    cyan: '#22D3EE',
-    cyanDim: 'rgba(34, 211, 238, 0.15)',
+    green: '#1F9D72',
+    greenDim: 'rgba(31, 157, 114, 0.12)',
+    blue: '#2F80ED',
+    blueDim: 'rgba(47, 128, 237, 0.12)',
+    orange: '#F59E0B',
+    orangeDim: 'rgba(245, 158, 11, 0.14)',
+    purple: '#7C6CF2',
+    purpleDim: 'rgba(124, 108, 242, 0.12)',
+    pink: '#D95F8D',
+    pinkDim: 'rgba(217, 95, 141, 0.12)',
+    cyan: '#1496A6',
+    cyanDim: 'rgba(20, 150, 166, 0.12)',
   },
 
-  // Text
   text: {
-    primary: '#F1F5F9',
-    secondary: '#94A3B8',
-    tertiary: '#64748B',
-    inverse: '#0F172A',
+    primary: '#14201B',
+    secondary: '#40524A',
+    tertiary: '#60716A',
+    inverse: '#FFFFFF',
+    muted: '#87958F',
   },
 
-  // Borders
   border: {
-    subtle: 'rgba(255, 255, 255, 0.06)',
-    medium: 'rgba(255, 255, 255, 0.12)',
-    strong: 'rgba(255, 255, 255, 0.20)',
+    subtle: '#DDE8E2',
+    medium: '#C7D8CF',
+    strong: '#A9C0B6',
   },
 
-  // Status
   status: {
-    success: '#4ADE80',
-    warning: '#FBBF24',
-    error: '#F87171',
-    info: '#60A5FA',
+    success: '#1F9D72',
+    warning: '#F59E0B',
+    error: '#E25555',
+    info: '#2F80ED',
   },
 
-  // Overlay
-  overlay: 'rgba(0, 0, 0, 0.5)',
+  overlay: 'rgba(20, 32, 27, 0.45)',
 } as const;
 
-// ─── Gradients ──────────────────────────────────────────────
 export const Gradients = {
-  greenBlue: ['#4ADE80', '#22D3EE'],
-  purplePink: ['#A78BFA', '#F472B6'],
-  orangeYellow: ['#FB923C', '#FBBF24'],
-  blueIndigo: ['#60A5FA', '#818CF8'],
-  cardGlow: ['rgba(74, 222, 128, 0.08)', 'rgba(34, 211, 238, 0.02)'],
-  hero: ['rgba(74, 222, 128, 0.12)', 'rgba(96, 165, 250, 0.06)', 'transparent'],
+  greenBlue: ['#1F9D72', '#1496A6'],
+  purplePink: ['#7C6CF2', '#D95F8D'],
+  orangeYellow: ['#F59E0B', '#FBC02D'],
+  blueIndigo: ['#2F80ED', '#7C6CF2'],
+  cardGlow: ['rgba(31, 157, 114, 0.12)', 'rgba(255, 255, 255, 0.92)'],
+  hero: ['rgba(31, 157, 114, 0.16)', 'rgba(47, 128, 237, 0.08)', 'rgba(255,255,255,0.92)'],
 } as const;
 
-// ─── Spacing ────────────────────────────────────────────────
 export const Spacing = {
   xs: 4,
   sm: 8,
@@ -82,7 +76,6 @@ export const Spacing = {
   '5xl': 48,
 } as const;
 
-// ─── Border Radius ──────────────────────────────────────────
 export const Radius = {
   sm: 8,
   md: 12,
@@ -92,51 +85,61 @@ export const Radius = {
   full: 9999,
 } as const;
 
-// ─── Typography ─────────────────────────────────────────────
 export const Typography = {
-  hero: { fontSize: 32, fontWeight: '800' as const, letterSpacing: -0.5 },
-  h1: { fontSize: 26, fontWeight: '700' as const, letterSpacing: -0.3 },
-  h2: { fontSize: 20, fontWeight: '700' as const, letterSpacing: -0.2 },
-  h3: { fontSize: 17, fontWeight: '600' as const },
-  body: { fontSize: 15, fontWeight: '400' as const },
-  bodyBold: { fontSize: 15, fontWeight: '600' as const },
-  caption: { fontSize: 13, fontWeight: '500' as const },
-  small: { fontSize: 11, fontWeight: '500' as const },
-  label: { fontSize: 12, fontWeight: '600' as const, letterSpacing: 0.8, textTransform: 'uppercase' as const },
+  hero: { fontSize: 32, fontWeight: '800' as const, letterSpacing: 0, fontVariant: ['tabular-nums'] as any },
+  h1: { fontSize: 26, fontWeight: '800' as const, letterSpacing: 0 },
+  h2: { fontSize: 20, fontWeight: '700' as const, letterSpacing: 0 },
+  h3: { fontSize: 17, fontWeight: '700' as const, letterSpacing: 0 },
+  body: { fontSize: 15, fontWeight: '400' as const, lineHeight: 22 },
+  bodyBold: { fontSize: 15, fontWeight: '700' as const, lineHeight: 22 },
+  caption: { fontSize: 13, fontWeight: '500' as const, lineHeight: 18 },
+  small: { fontSize: 11, fontWeight: '600' as const, lineHeight: 15 },
+  label: { fontSize: 12, fontWeight: '700' as const, letterSpacing: 0, textTransform: 'uppercase' as const },
+  number: { fontWeight: '800' as const, letterSpacing: 0, fontVariant: ['tabular-nums'] as any },
 } as const;
 
-// ─── Shadows ────────────────────────────────────────────────
 export const Shadows = {
   card: Platform.select({
     web: {
-      boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.3)',
+      boxShadow: '0px 10px 26px rgba(22, 65, 48, 0.08)',
     },
     default: {
-      shadowColor: '#000',
+      shadowColor: '#164130',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.08,
+      shadowRadius: 18,
+      elevation: 3,
+    },
+  }) as any,
+  soft: Platform.select({
+    web: {
+      boxShadow: '0px 4px 14px rgba(22, 65, 48, 0.06)',
+    },
+    default: {
+      shadowColor: '#164130',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
+      shadowOpacity: 0.06,
       shadowRadius: 12,
-      elevation: 8,
+      elevation: 2,
     },
   }) as any,
   glow: (color: string) =>
     Platform.select({
       web: {
-        boxShadow: `0px 0px 16px ${color}4D`,
+        boxShadow: `0px 0px 18px ${color}33`,
       },
       default: {
         shadowColor: color,
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-        elevation: 8,
+        shadowOpacity: 0.16,
+        shadowRadius: 18,
+        elevation: 4,
       },
     }) as any,
 } as const;
 
-// ─── Legacy Colors export (for compatibility with template) ─
-const tintColorLight = '#4ADE80';
-const tintColorDark = '#4ADE80';
+const tintColorLight = Palette.accent.green;
+const tintColorDark = Palette.accent.green;
 
 export const Colors = {
   light: {
@@ -173,7 +176,7 @@ export const Fonts = Platform.select({
   web: {
     sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
+    rounded: "'SF Pro Rounded', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
   },
 });

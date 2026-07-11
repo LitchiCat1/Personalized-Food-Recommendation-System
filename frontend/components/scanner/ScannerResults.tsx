@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
+import DataPill from '@/components/ui/data-pill';
+import PrimaryButton from '@/components/ui/primary-button';
 import type { DetectedFood } from '@/constants/mock-data';
 
 type Props = {
@@ -16,42 +17,41 @@ type Props = {
 export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightChange }: Props) {
   if (results.length === 0) {
     return (
-      <View style={[styles.placeholderCard, { padding: rs(32) }]}> 
-        <Ionicons name="image-outline" size={rs(36)} color={Palette.text.tertiary} />
-        <Text style={[styles.placeholderText, { fontSize: rs(13) }]}>尚未辨識，請拍攝或上傳食物照片</Text>
+      <View style={styles.placeholderCard}>
+        <Ionicons name="image-outline" size={rs(34)} color={Palette.text.tertiary} />
+        <Text style={styles.placeholderTitle}>尚未產生辨識結果</Text>
+        <Text style={styles.placeholderText}>拍攝餐點、上傳相簿或使用手動搜尋後，結果會出現在這裡。</Text>
       </View>
     );
   }
 
   const totalCal = results.reduce((sum, f) => sum + f.nutrition.calories, 0);
+  const totalProtein = Math.round(results.reduce((s, f) => s + f.nutrition.protein, 0) * 10) / 10;
   const totalSodium = results.reduce((sum, f) => sum + f.nutrition.sodium, 0);
 
   return (
     <>
       {results.map((food) => (
-        <View key={food.id} style={[styles.foodCard, { padding: rs(16) }]}> 
+        <View key={food.id} style={styles.foodCard}>
           <View style={styles.foodTop}>
-            <View style={styles.foodNameRow}>
-              <Text style={[styles.foodName, { fontSize: rs(16) }]}>{food.foodName}</Text>
-              <View style={styles.confidenceBadge}>
-                <Text style={[styles.confidenceText, { fontSize: rs(11) }]}>{food.confidence}%</Text>
-              </View>
+            <View style={styles.foodInfo}>
+              <Text style={styles.foodName}>{food.foodName}</Text>
+              <Text style={styles.foodWeight}>
+                {food.portionAdjusted ? '已校正份量' : '估算份量'} {food.estimatedWeight}g
+              </Text>
             </View>
-            <Text style={[styles.foodWeight, { fontSize: rs(11) }]}> 
-              {food.portionAdjusted ? '已校正份量' : '估算份量'} {food.estimatedWeight}g · Bounding Box ({(food.boundingBox.w * 100).toFixed(0)}×{(food.boundingBox.h * 100).toFixed(0)})
-            </Text>
-            {food.source ? <Text style={[styles.foodMeta, { fontSize: rs(10) }]}>資料來源：{food.source}</Text> : null}
+            <DataPill tone={food.confidence >= 80 ? 'success' : 'warning'}>{food.confidence}%</DataPill>
           </View>
 
           <View style={styles.portionCard}>
             <View style={styles.portionHeader}>
-              <Ionicons name="scale-outline" size={rs(13)} color={Palette.accent.cyan} />
-              <Text style={[styles.portionTitle, { fontSize: rs(12) }]}>份量校正</Text>
-              {food.portionAdjusted ? <Text style={[styles.portionAdjustedText, { fontSize: rs(10) }]}>已重算營養</Text> : null}
+              <Ionicons name="scale-outline" size={14} color={Palette.accent.green} />
+              <Text style={styles.portionTitle}>份量校正</Text>
+              {food.portionAdjusted ? <Text style={styles.portionAdjustedText}>已重算營養</Text> : null}
             </View>
             <View style={styles.portionControls}>
               <Pressable onPress={() => onWeightChange(food.id, food.estimatedWeight - 10)} style={styles.portionButton}>
-                <Text style={[styles.portionButtonText, { fontSize: rs(13) }]}>-10g</Text>
+                <Text style={styles.portionButtonText}>-10g</Text>
               </Pressable>
               <TextInput
                 value={String(Math.round(food.estimatedWeight))}
@@ -61,57 +61,35 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
                 }}
                 keyboardType="numeric"
                 selectTextOnFocus
-                style={[styles.portionInput, { fontSize: rs(13) }]}
+                style={styles.portionInput}
               />
-              <Text style={[styles.portionUnit, { fontSize: rs(11) }]}>g</Text>
+              <Text style={styles.portionUnit}>g</Text>
               <Pressable onPress={() => onWeightChange(food.id, food.estimatedWeight + 10)} style={styles.portionButton}>
-                <Text style={[styles.portionButtonText, { fontSize: rs(13) }]}>+10g</Text>
+                <Text style={styles.portionButtonText}>+10g</Text>
               </Pressable>
               {food.portionAdjusted ? (
                 <Pressable onPress={() => onWeightChange(food.id, food.originalEstimatedWeight || food.estimatedWeight)} style={styles.resetButton}>
-                  <Text style={[styles.resetButtonText, { fontSize: rs(11) }]}>還原</Text>
+                  <Text style={styles.resetButtonText}>還原</Text>
                 </Pressable>
               ) : null}
             </View>
           </View>
 
           <View style={styles.tagsRow}>
-            <View style={[
-              styles.giTag,
-              food.gi === 'high' && styles.giHigh,
-              food.gi === 'medium' && styles.giMedium,
-              food.gi === 'low' && styles.giLow,
-            ]}>
-              <Text style={[
-                styles.giText,
-                { fontSize: rs(11) },
-                food.gi === 'high' && { color: Palette.status.error },
-                food.gi === 'medium' && { color: Palette.status.warning },
-                food.gi === 'low' && { color: Palette.accent.green },
-              ]}>
-                GI {food.gi === 'high' ? '高' : food.gi === 'medium' ? '中' : '低'}
-              </Text>
-            </View>
-            {food.allergens.map((a) => (
-              <View key={a} style={styles.allergenTag}>
-                <Ionicons name="alert-circle" size={rs(10)} color={Palette.accent.orange} />
-                <Text style={[styles.allergenText, { fontSize: rs(10) }]}>{a}</Text>
-              </View>
-            ))}
-            {food.needsConfirmation && (
-              <View style={styles.confirmTag}>
-                <Ionicons name="help-circle" size={rs(10)} color={Palette.status.warning} />
-                <Text style={[styles.confirmTagText, { fontSize: rs(10) }]}>需人工確認</Text>
-              </View>
-            )}
+            <DataPill tone={food.gi === 'high' ? 'danger' : food.gi === 'medium' ? 'warning' : 'success'}>
+              GI {food.gi === 'high' ? '高' : food.gi === 'medium' ? '中' : '低'}
+            </DataPill>
+            {food.source ? <DataPill tone="info">{food.source}</DataPill> : null}
+            {food.needsConfirmation ? <DataPill tone="warning">需人工確認</DataPill> : null}
+            {food.allergens.map((a) => <DataPill key={a} tone="warning">{a}</DataPill>)}
           </View>
 
-          {food.warnings.length > 0 && (
+          {food.warnings.length > 0 ? (
             <View style={styles.warningBanner}>
-              <Ionicons name="warning" size={rs(14)} color={Palette.status.warning} />
-              <Text style={[styles.warningText, { fontSize: rs(11) }]}>{food.warnings.join('；')}</Text>
+              <Ionicons name="warning-outline" size={15} color={Palette.status.warning} />
+              <Text style={styles.warningText}>{food.warnings.join('；')}</Text>
             </View>
-          )}
+          ) : null}
 
           <View style={styles.nutritionGrid}>
             {[
@@ -119,15 +97,14 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
               { label: '蛋白質', value: food.nutrition.protein, unit: 'g', color: Palette.accent.blue },
               { label: '碳水', value: food.nutrition.carbs, unit: 'g', color: Palette.accent.orange },
               { label: '脂肪', value: food.nutrition.fat, unit: 'g', color: Palette.accent.purple },
-              { label: '鈉', value: food.nutrition.sodium, unit: 'mg', color: Palette.accent.pink },
+              { label: '鈉', value: food.nutrition.sodium, unit: 'mg', color: food.nutrition.sodium > 800 ? Palette.status.warning : Palette.accent.pink },
               { label: '纖維', value: food.nutrition.fiber, unit: 'g', color: Palette.accent.cyan },
             ].map((item) => (
-              <View key={item.label} style={[styles.nutritionItem, { minWidth: wp(26) }]}> 
-                <View style={[styles.nutritionDot, { backgroundColor: item.color }]} />
-                <Text style={[styles.nutritionLabel, { fontSize: rs(10) }]}>{item.label}</Text>
-                <Text style={[styles.nutritionValue, { color: item.color, fontSize: rs(13) }]}> 
+              <View key={item.label} style={[styles.nutritionItem, { minWidth: wp(26) }]}>
+                <Text style={styles.nutritionLabel}>{item.label}</Text>
+                <Text style={[styles.nutritionValue, { color: item.color }]}>
                   {item.value}
-                  <Text style={[styles.nutritionUnit, { fontSize: rs(9) }]}> {item.unit}</Text>
+                  <Text style={styles.nutritionUnit}> {item.unit}</Text>
                 </Text>
               </View>
             ))}
@@ -135,28 +112,26 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
         </View>
       ))}
 
-      <View style={[styles.totalCard, { padding: rs(20) }]}> 
-        <Text style={[styles.totalTitle, { fontSize: rs(16) }]}>合計攝取</Text>
+      <View style={styles.totalCard}>
+        <View style={styles.totalHeader}>
+          <Text style={styles.totalTitle}>合計攝取</Text>
+          <DataPill tone={totalSodium > 1200 ? 'warning' : 'success'}>鈉 {totalSodium}mg</DataPill>
+        </View>
         <View style={styles.totalRow}>
           <View style={styles.totalItem}>
-            <Text style={[styles.totalLabel, { fontSize: rs(10) }]}>熱量</Text>
-            <Text style={[styles.totalValue, { color: Palette.accent.green, fontSize: rs(15) }]}>{totalCal} kcal</Text>
+            <Text style={styles.totalLabel}>熱量</Text>
+            <Text style={[styles.totalValue, { color: Palette.accent.green }]}>{totalCal} kcal</Text>
           </View>
           <View style={styles.totalItem}>
-            <Text style={[styles.totalLabel, { fontSize: rs(10) }]}>蛋白質</Text>
-            <Text style={[styles.totalValue, { color: Palette.accent.blue, fontSize: rs(15) }]}>{results.reduce((s, f) => s + f.nutrition.protein, 0)}g</Text>
+            <Text style={styles.totalLabel}>蛋白質</Text>
+            <Text style={[styles.totalValue, { color: Palette.accent.blue }]}>{totalProtein} g</Text>
           </View>
           <View style={styles.totalItem}>
-            <Text style={[styles.totalLabel, { fontSize: rs(10) }]}>鈉</Text>
-            <Text style={[styles.totalValue, { color: totalSodium > 800 ? Palette.status.warning : Palette.accent.pink, fontSize: rs(15) }]}>{totalSodium}mg</Text>
+            <Text style={styles.totalLabel}>項目</Text>
+            <Text style={[styles.totalValue, { color: Palette.text.primary }]}>{results.length} 項</Text>
           </View>
         </View>
-        <Pressable onPress={onAddRecord} style={styles.addButton}>
-          <LinearGradient colors={['#4ADE80', '#22D3EE']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.addButtonInner, { paddingVertical: rs(14) }]}> 
-            <Ionicons name="add-circle" size={rs(18)} color={Palette.text.inverse} />
-            <Text style={[styles.addButtonText, { fontSize: rs(14) }]}>加入今日紀錄</Text>
-          </LinearGradient>
-        </Pressable>
+        <PrimaryButton label="加入今日紀錄" onPress={onAddRecord} icon={<Ionicons name="add-circle-outline" size={18} color={Palette.text.inverse} />} />
       </View>
     </>
   );
@@ -164,118 +139,99 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
 
 const styles = StyleSheet.create({
   placeholderCard: {
-    backgroundColor: Palette.bg.card, borderRadius: Radius.xl,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Palette.border.subtle, gap: Spacing.md,
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    gap: Spacing.sm,
+    padding: Spacing['3xl'],
+    marginBottom: Spacing.xl,
+    ...Shadows.soft,
   },
-  placeholderText: { ...Typography.body, color: Palette.text.tertiary },
+  placeholderTitle: { ...Typography.bodyBold, color: Palette.text.primary },
+  placeholderText: { ...Typography.caption, color: Palette.text.tertiary, textAlign: 'center' },
   foodCard: {
-    backgroundColor: Palette.bg.card, borderRadius: Radius.xl, marginBottom: Spacing.md,
-    borderWidth: 1, borderColor: Palette.border.subtle, ...Shadows.card,
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius.xl,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    padding: Spacing.xl,
+    gap: Spacing.md,
+    ...Shadows.card,
   },
-  foodTop: { marginBottom: Spacing.md },
-  foodNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  foodTop: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
+  foodInfo: { flex: 1, gap: 4 },
   foodName: { ...Typography.h3, color: Palette.text.primary },
-  confidenceBadge: { backgroundColor: Palette.accent.greenDim, paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: Radius.full },
-  confidenceText: { ...Typography.small, color: Palette.accent.green },
-  foodWeight: { ...Typography.small, color: Palette.text.tertiary },
-  foodMeta: { ...Typography.small, color: Palette.text.tertiary, marginTop: 4 },
-  reliabilityCard: {
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    borderWidth: 1,
-  },
-  reliabilityHigh: { backgroundColor: Palette.accent.greenDim, borderColor: 'rgba(74, 222, 128, 0.24)' },
-  reliabilityMedium: { backgroundColor: 'rgba(251, 191, 36, 0.08)', borderColor: 'rgba(251, 191, 36, 0.24)' },
-  reliabilityLow: { backgroundColor: 'rgba(248, 113, 113, 0.08)', borderColor: 'rgba(248, 113, 113, 0.24)' },
-  reliabilityHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: 4 },
-  reliabilityTitle: { ...Typography.bodyBold },
-  reliabilityText: { ...Typography.small, color: Palette.text.tertiary, lineHeight: 16 },
+  foodWeight: { ...Typography.caption, color: Palette.text.tertiary },
   portionCard: {
-    backgroundColor: 'rgba(34, 211, 238, 0.06)',
-    borderRadius: Radius.md,
+    backgroundColor: Palette.bg.mint,
+    borderRadius: Radius.lg,
     padding: Spacing.md,
-    marginBottom: Spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(34, 211, 238, 0.18)',
+    borderColor: 'rgba(31,157,114,0.16)',
+    gap: Spacing.sm,
   },
-  portionHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: Spacing.sm },
+  portionHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   portionTitle: { ...Typography.bodyBold, color: Palette.text.secondary, flex: 1 },
   portionAdjustedText: { ...Typography.small, color: Palette.accent.green },
   portionControls: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' },
   portionButton: {
-    backgroundColor: Palette.bg.elevated,
-    borderRadius: Radius.sm,
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius.md,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
   },
-  portionButtonText: { ...Typography.bodyBold, color: Palette.accent.cyan },
+  portionButtonText: { ...Typography.bodyBold, color: Palette.accent.green },
   portionInput: {
     width: 72,
     backgroundColor: Palette.bg.card,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
     color: Palette.text.primary,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 6,
+    paddingVertical: 7,
     textAlign: 'center',
+    ...Typography.caption,
   },
   portionUnit: { ...Typography.caption, color: Palette.text.tertiary, marginLeft: -4 },
-  resetButton: { paddingHorizontal: Spacing.sm, paddingVertical: 6 },
+  resetButton: { paddingHorizontal: Spacing.sm, paddingVertical: 7 },
   resetButtonText: { ...Typography.caption, color: Palette.status.warning },
-  tagsRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md, flexWrap: 'wrap' },
-  giTag: { paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.sm },
-  giHigh: { backgroundColor: 'rgba(248, 113, 113, 0.12)' },
-  giMedium: { backgroundColor: 'rgba(251, 191, 36, 0.12)' },
-  giLow: { backgroundColor: Palette.accent.greenDim },
-  giText: { ...Typography.small, fontWeight: '600' },
-  allergenTag: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: Palette.accent.orangeDim, paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.sm,
-  },
-  allergenText: { ...Typography.small, color: Palette.accent.orange },
-  confirmTag: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(251, 191, 36, 0.12)', paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.sm,
-  },
-  confirmTagText: { ...Typography.small, color: Palette.status.warning },
+  tagsRow: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' },
   warningBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
-    backgroundColor: 'rgba(251, 191, 36, 0.08)', borderRadius: Radius.md,
-    padding: Spacing.md, marginBottom: Spacing.md, borderWidth: 1, borderColor: 'rgba(251, 191, 36, 0.2)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Palette.accent.orangeDim,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.2)',
   },
   warningText: { ...Typography.caption, color: Palette.status.warning, flex: 1 },
   nutritionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   nutritionItem: { backgroundColor: Palette.bg.elevated, borderRadius: Radius.md, padding: Spacing.sm, flex: 1 },
-  nutritionDot: { width: 6, height: 6, borderRadius: 3, marginBottom: 4 },
   nutritionLabel: { ...Typography.small, color: Palette.text.tertiary, marginBottom: 2 },
-  nutritionValue: { ...Typography.caption, fontWeight: '700' },
+  nutritionValue: { ...Typography.caption, ...Typography.number },
   nutritionUnit: { ...Typography.small, color: Palette.text.tertiary },
   totalCard: {
-    backgroundColor: Palette.bg.card, borderRadius: Radius.xl,
-    borderWidth: 1, borderColor: Palette.accent.greenDim, ...Shadows.card,
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(31,157,114,0.18)',
+    padding: Spacing.xl,
+    gap: Spacing.lg,
+    ...Shadows.card,
   },
-  totalTitle: { ...Typography.h3, color: Palette.text.primary, marginBottom: Spacing.md },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: Spacing.xl },
-  totalItem: { alignItems: 'center' },
+  totalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md },
+  totalTitle: { ...Typography.h3, color: Palette.text.primary },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.sm },
+  totalItem: { flex: 1, backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, padding: Spacing.md },
   totalLabel: { ...Typography.small, color: Palette.text.tertiary, marginBottom: 4 },
-  totalValue: { ...Typography.bodyBold },
-  addButton: { borderRadius: Radius.lg, overflow: 'hidden' },
-  addButtonInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
-  addButtonText: { ...Typography.bodyBold, color: Palette.text.inverse },
+  totalValue: { ...Typography.bodyBold, ...Typography.number },
 });
-
-function getReliabilityLabel(level: NonNullable<DetectedFood['reliability']>['level']): string {
-  if (level === 'high') return '高';
-  if (level === 'medium') return '中';
-  return '低';
-}
-
-function getReliabilityColor(level: NonNullable<DetectedFood['reliability']>['level']): string {
-  if (level === 'high') return Palette.accent.green;
-  if (level === 'medium') return Palette.status.warning;
-  return Palette.status.error;
-}

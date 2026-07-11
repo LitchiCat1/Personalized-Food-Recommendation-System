@@ -1,57 +1,71 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, TextInput, Alert, Platform } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, TextInput, Alert, Platform, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { AVAILABLE_CONDITIONS, AVAILABLE_ALLERGENS, DIET_GOALS } from '@/constants/mock-data';
 import { useStore } from '@/store/useStore';
 import { useResponsive } from '@/hooks/useResponsive';
 import AppContainer from '@/components/AppContainer';
-import { fetchUserProfile, saveUserProfile } from '@/lib/api';
+import ScreenHeader from '@/components/ui/screen-header';
+import SectionBlock from '@/components/ui/section-block';
+import MetricCard from '@/components/ui/metric-card';
+import DataPill from '@/components/ui/data-pill';
+import PrimaryButton from '@/components/ui/primary-button';
+import SecondaryButton from '@/components/ui/secondary-button';
+import { fetchMedicalMetadata, fetchUserProfile, saveUserProfile } from '@/lib/api';
 import { isSupabaseAuthConfigured, supabase } from '@/lib/supabase';
 
+type MedicalMetadata = Awaited<ReturnType<typeof fetchMedicalMetadata>>;
+
 export default function ProfileScreen() {
-  const { rs, isSmall, gridCol2 } = useResponsive();
+  const { gridCol2 } = useResponsive();
   const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser } = useStore();
+  const initialUserRef = useRef(user);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [medicalMetadata, setMedicalMetadata] = useState<MedicalMetadata | null>(null);
   const [profileDraft, setProfileDraft] = useState({
     name: user.name,
     height: String(user.height),
     weight: String(user.weight),
     age: String(user.age),
-    activityMultiplier: String(user.activityMultiplier),
     dailyCalorieTarget: String(user.dailyCalorieTarget),
     targetWeight: String(user.targetWeight || ''),
     dietType: user.dietType,
   });
-  const fallbackTargetWeight = user.targetWeight;
-  const userEmail = user.email;
-  const userStreak = user.streak;
-  const userTotalMeals = user.totalMeals;
 
   useEffect(() => {
     let cancelled = false;
+    const seedUser = initialUserRef.current;
+
+    fetchMedicalMetadata(apiBaseUrl)
+      .then((metadata) => {
+        if (!cancelled) setMedicalMetadata(metadata);
+      })
+      .catch(() => {
+        if (!cancelled) setMedicalMetadata(null);
+      });
 
     fetchUserProfile(apiBaseUrl, user.userId, { accessToken })
       .catch((err: Error) => {
-        if (!err.message.includes('使用者不存在')) throw err;
+        if (!err.message.includes('雿輻')) throw err;
         return saveUserProfile(apiBaseUrl, {
-          user_id: user.userId,
-          name: user.name,
-          gender: user.gender,
-          weight: user.weight,
-          height: user.height,
-          age: user.age,
-          activity_level: user.activityLevel,
-          activity_multiplier: user.activityMultiplier,
-          daily_calorie_target: user.dailyCalorieTarget,
-          health_conditions: user.healthConditions,
-          allergens: user.allergens,
-          target_weight: user.targetWeight,
-          diet_type: user.dietType,
+          user_id: seedUser.userId,
+          name: seedUser.name,
+          gender: seedUser.gender,
+          weight: seedUser.weight,
+          height: seedUser.height,
+          age: seedUser.age,
+          activity_level: seedUser.activityLevel,
+          activity_multiplier: seedUser.activityMultiplier,
+          daily_calorie_target: seedUser.dailyCalorieTarget,
+          health_conditions: seedUser.healthConditions,
+          allergens: seedUser.allergens,
+          target_weight: seedUser.targetWeight,
+          diet_type: seedUser.dietType,
         }, { accessToken }).then((response) => response.user);
       })
       .then((data) => {
@@ -59,7 +73,7 @@ export default function ProfileScreen() {
         replaceUser({
           userId: data.user_id,
           name: data.name,
-          email: userEmail,
+          email: seedUser.email,
           gender: data.gender,
           height: data.height,
           weight: data.weight,
@@ -72,28 +86,24 @@ export default function ProfileScreen() {
           healthConditions: data.health_conditions,
           allergens: data.allergens,
           dailyCalorieTarget: data.daily_calorie_target,
-          targetWeight: data.target_weight || fallbackTargetWeight,
+          targetWeight: data.target_weight || seedUser.targetWeight,
           dietType: data.diet_type,
-          streak: userStreak,
-          totalMeals: userTotalMeals,
+          streak: seedUser.streak,
+          totalMeals: seedUser.totalMeals,
         });
         setError(null);
       })
       .catch((err: Error) => {
-        if (!cancelled) {
-          setError(err.message);
-        }
+        if (!cancelled) setError(err.message);
       })
       .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [accessToken, apiBaseUrl, fallbackTargetWeight, replaceUser, user.userId, userEmail, userStreak, userTotalMeals]);
+  }, [accessToken, apiBaseUrl, replaceUser, user.userId]);
 
   useEffect(() => {
     setProfileDraft({
@@ -101,12 +111,11 @@ export default function ProfileScreen() {
       height: String(user.height),
       weight: String(user.weight),
       age: String(user.age),
-      activityMultiplier: String(user.activityMultiplier),
       dailyCalorieTarget: String(user.dailyCalorieTarget),
       targetWeight: String(user.targetWeight || ''),
       dietType: user.dietType,
     });
-  }, [user.name, user.height, user.weight, user.age, user.activityMultiplier, user.dailyCalorieTarget, user.targetWeight, user.dietType]);
+  }, [user.name, user.height, user.weight, user.age, user.dailyCalorieTarget, user.targetWeight, user.dietType]);
 
   const syncProfile = async (nextUser = user) => {
     setSaving(true);
@@ -151,26 +160,76 @@ export default function ProfileScreen() {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   };
 
+  const isPositiveDraftNumber = (value: string) => {
+    const parsed = Number(value);
+    return value.trim().length > 0 && Number.isFinite(parsed) && parsed > 0;
+  };
+
+  const isProfileDraftValid =
+    profileDraft.name.trim().length > 0 &&
+    isPositiveDraftNumber(profileDraft.height) &&
+    isPositiveDraftNumber(profileDraft.weight) &&
+    isPositiveDraftNumber(profileDraft.age) &&
+    isPositiveDraftNumber(profileDraft.dailyCalorieTarget) &&
+    isPositiveDraftNumber(profileDraft.targetWeight) &&
+    (profileDraft.dietType === '葷食' || profileDraft.dietType === '素食');
+
+  const conditionCatalog = useMemo(() => {
+    if (medicalMetadata?.disease_rules.conditions?.length) return medicalMetadata.disease_rules.conditions;
+    return AVAILABLE_CONDITIONS.map((cond) => ({
+      id: cond.id,
+      condition: cond.id,
+      label_zh: cond.label,
+      aliases: [cond.label],
+      category: null,
+      description: cond.description,
+      screening_focus: [],
+      severity_options: [],
+      rule_version: null,
+      review_status: null,
+      last_reviewed: null,
+      reviewed_by: null,
+      evidence_level: null,
+      references: [],
+      medical_disclaimer: medicalMetadata?.medical_disclaimer || '',
+      limits: {},
+      risk_nutrients: {},
+    }));
+  }, [medicalMetadata]);
+
+  const allergenCatalog = useMemo(() => {
+    if (medicalMetadata?.allergen_taxonomy.groups?.length) return medicalMetadata.allergen_taxonomy.groups;
+    return AVAILABLE_ALLERGENS.map((label, index) => ({
+      id: `legacy-${index}`,
+      label_zh: label,
+      severity: 'medium',
+      aliases: [label],
+      keywords: [label],
+    }));
+  }, [medicalMetadata]);
+
   const handleSaveProfileFields = async () => {
+    if (!isProfileDraftValid) return;
+
     const nextUser = {
       ...user,
       name: profileDraft.name.trim() || user.name,
       height: parsePositiveNumber(profileDraft.height, user.height),
       weight: parsePositiveNumber(profileDraft.weight, user.weight),
       age: Math.round(parsePositiveNumber(profileDraft.age, user.age)),
-      activityMultiplier: parsePositiveNumber(profileDraft.activityMultiplier, user.activityMultiplier),
       dailyCalorieTarget: Math.round(parsePositiveNumber(profileDraft.dailyCalorieTarget, user.dailyCalorieTarget)),
       targetWeight: parsePositiveNumber(profileDraft.targetWeight, user.targetWeight),
-      dietType: profileDraft.dietType.trim() || user.dietType,
+      dietType: profileDraft.dietType,
     };
 
     await syncProfile(nextUser);
-    Alert.alert('個人檔案已更新', '身體數據與飲食目標已同步到後端。');
+    setProfileModalVisible(false);
+    Alert.alert('健康檔案已更新', '個人資料已同步到後端。');
   };
 
   const performSignOut = async () => {
     if (!isSupabaseAuthConfigured || !supabase) {
-      Alert.alert('Demo 模式', '目前未設定 Supabase Auth，無需登出。');
+      Alert.alert('Demo 模式', '目前未啟用 Supabase Auth。');
       return;
     }
     const supabaseClient = supabase;
@@ -181,7 +240,7 @@ export default function ProfileScreen() {
       if (signOutError) throw signOutError;
       useStore.getState().setAuthSession(null);
     } catch (err: any) {
-      Alert.alert('登出失敗', err?.message || '請稍後再試。');
+      Alert.alert('登出失敗', err?.message || '無法登出。');
     } finally {
       setSigningOut(false);
     }
@@ -189,322 +248,219 @@ export default function ProfileScreen() {
 
   const handleSignOut = () => {
     if (!isSupabaseAuthConfigured || !supabase) {
-      Alert.alert('Demo 模式', '目前未設定 Supabase Auth，無需登出。');
+      Alert.alert('Demo 模式', '目前未啟用 Supabase Auth。');
       return;
     }
 
     if (Platform.OS === 'web') {
-      const confirmed = typeof window === 'undefined'
-        ? true
-        : window.confirm('登出後需要重新登入才能讀取你的雲端資料。');
-      if (confirmed) {
-        void performSignOut();
-      }
+      const confirmed = typeof window === 'undefined' ? true : window.confirm('確定要登出嗎？');
+      if (confirmed) void performSignOut();
       return;
     }
 
-    Alert.alert('登出 NutriLens', '登出後需要重新登入才能讀取你的雲端資料。', [
+    Alert.alert('登出 NutriLens', '確定要登出嗎？', [
       { text: '取消', style: 'cancel' },
-      {
-        text: '登出',
-        style: 'destructive',
-        onPress: () => { void performSignOut(); },
-      },
+      { text: '登出', style: 'destructive', onPress: () => { void performSignOut(); } },
     ]);
   };
 
   const savingMessage = useMemo(() => {
-    if (saving) return '同步到後端中...';
-    if (error) return `同步狀態：${error}`;
-    return '目前頁面會將健康條件與過敏原同步到後端';
-  }, [saving, error]);
+    if (loading) return '載入健康檔案中';
+    if (saving) return '同步中';
+    if (error) return `同步失敗：${error}`;
+    return '健康條件與過敏原會同步到後端';
+  }, [error, loading, saving]);
 
   return (
     <AppContainer>
-      {loading ? (
-        <View style={[styles.syncBanner, { padding: rs(16) }]}> 
-          <ActivityIndicator size="small" color={Palette.accent.cyan} />
-          <Text style={[styles.syncText, { fontSize: rs(12) }]}>讀取個人檔案中...</Text>
+      <ScreenHeader title="我的健康檔案" subtitle="管理身體資料、飲食目標、疾病條件與過敏原。" badge={isSupabaseAuthConfigured ? 'Auth 已登入' : 'Demo 模式'} badgeTone={isSupabaseAuthConfigured ? 'success' : 'warning'} />
+
+      <View style={[styles.syncBanner, error && styles.syncWarning]}>
+        {loading || saving ? <ActivityIndicator size="small" color={Palette.accent.green} /> : <Ionicons name={error ? 'cloud-offline-outline' : 'cloud-done-outline'} size={16} color={error ? Palette.status.warning : Palette.accent.green} />}
+        <Text style={[styles.syncText, error && styles.syncWarningText]}>{savingMessage}</Text>
+      </View>
+
+      <View style={styles.accountCard}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarInitial}>{user.name.slice(0, 1).toUpperCase()}</Text>
         </View>
-      ) : (
-        <View style={[styles.syncBanner, { padding: rs(16) }]}> 
-          {saving ? <ActivityIndicator size="small" color={Palette.accent.cyan} /> : <Ionicons name="cloud-done-outline" size={rs(16)} color={error ? Palette.status.warning : Palette.accent.green} />}
-          <Text style={[styles.syncText, { fontSize: rs(12), color: error ? Palette.status.warning : Palette.text.secondary }]}>{savingMessage}</Text>
-        </View>
-      )}
-
-      {/* Profile Header */}
-      <View style={styles.profileHeader}>
-        <LinearGradient
-          colors={['rgba(167, 139, 250, 0.15)', 'rgba(244, 114, 182, 0.08)', 'transparent']}
-          style={[styles.avatarGlow, { width: rs(110), height: rs(110), borderRadius: rs(55) }]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <View style={styles.avatarContainer}>
-            <View style={[styles.avatar, { width: rs(88), height: rs(88), borderRadius: rs(44) }]}>
-              <Text style={[styles.avatarEmoji, { fontSize: rs(36) }]}>👤</Text>
-            </View>
-            <View style={[styles.avatarBadge, { width: rs(26), height: rs(26), borderRadius: rs(13) }]}>
-              <Ionicons name="camera" size={rs(11)} color={Palette.text.primary} />
-            </View>
-          </View>
-        </LinearGradient>
-
-        <Text style={[styles.userName, { fontSize: rs(isSmall ? 22 : 26) }]}>{user.name}</Text>
-        <Text style={[styles.userEmail, { fontSize: rs(13) }]}>{user.email}</Text>
-
-        <View style={styles.sessionBadge}>
-          <Ionicons
-            name={isSupabaseAuthConfigured ? 'lock-closed-outline' : 'flask-outline'}
-            size={rs(12)}
-            color={isSupabaseAuthConfigured ? Palette.accent.green : Palette.status.warning}
-          />
-          <Text style={[styles.sessionBadgeText, { fontSize: rs(10), color: isSupabaseAuthConfigured ? Palette.accent.green : Palette.status.warning }]}>
-            {isSupabaseAuthConfigured ? 'Supabase Auth 已登入' : 'Demo 模式'}
-          </Text>
-        </View>
-
-        <View style={styles.streakRow}>
-          <View style={styles.streakBadge}>
-            <Text style={styles.streakEmoji}>🔥</Text>
-            <Text style={[styles.streakText, { fontSize: rs(11) }]}>連續 {user.streak} 天</Text>
-          </View>
-          <View style={styles.streakBadge}>
-            <Text style={styles.streakEmoji}>📊</Text>
-            <Text style={[styles.streakText, { fontSize: rs(11) }]}>共 {user.totalMeals} 餐</Text>
+        <View style={styles.accountCopy}>
+          <Text style={styles.userName}>{user.name}</Text>
+          <Text style={styles.userEmail}>{user.email}</Text>
+          <View style={styles.badgeRow}>
+            <DataPill tone="success">連續 {user.streak} 天</DataPill>
+            <DataPill tone="info">累積 {user.totalMeals} 餐</DataPill>
           </View>
         </View>
       </View>
 
-      {/* BMR/TDEE */}
-      <Text style={[styles.sectionTitle, { fontSize: rs(16) }]}>代謝數據</Text>
-      <View style={[styles.metabolismCard, { padding: rs(20) }]}>
-        <View style={styles.metabRow}>
-          <View style={styles.metabItem}>
-            <Text style={[styles.metabLabel, { fontSize: rs(10) }]}>BMR</Text>
-            <Text style={[styles.metabValue, { fontSize: rs(22), color: Palette.accent.blue }]}>{user.bmr}</Text>
-            <Text style={[styles.metabUnit, { fontSize: rs(10) }]}>kcal/日</Text>
-          </View>
-          <View style={styles.metabDivider} />
-          <View style={styles.metabItem}>
-            <Text style={[styles.metabLabel, { fontSize: rs(10) }]}>TDEE</Text>
-            <Text style={[styles.metabValue, { fontSize: rs(22), color: Palette.accent.cyan }]}>{user.tdee}</Text>
-            <Text style={[styles.metabUnit, { fontSize: rs(10) }]}>kcal/日</Text>
-          </View>
-        </View>
-        <View style={styles.metabFormula}>
-          <Ionicons name="calculator-outline" size={rs(13)} color={Palette.text.tertiary} />
-          <Text style={[styles.metabFormulaText, { fontSize: rs(10) }]}>
-            Mifflin-St Jeor · {user.gender === 'male' ? '男性' : '女性'} · 活動量 ×{user.activityMultiplier}
-          </Text>
-        </View>
+      <View style={styles.metricRow}>
+        <MetricCard label="BMR" value={user.bmr} unit="kcal" accent={Palette.accent.blue} />
+        <MetricCard label="TDEE" value={user.tdee} unit="kcal" accent={Palette.accent.green} />
       </View>
 
-      {/* Body Stats Grid */}
-      <Text style={[styles.sectionTitle, { fontSize: rs(16) }]}>身體數據</Text>
-      <View style={[styles.editProfileCard, { padding: rs(16) }]}>
-        <View style={styles.editHeader}>
-          <Ionicons name="create-outline" size={rs(15)} color={Palette.accent.cyan} />
-          <Text style={[styles.editTitle, { fontSize: rs(13) }]}>編輯基本資料與目標</Text>
+      <View style={styles.profileSetupCard}>
+        <View style={styles.profileSetupCopy}>
+          <Text style={styles.profileSetupTitle}>個人基本資料</Text>
+          <Text style={styles.profileSetupMeta}>{user.height}cm · {user.weight}kg · {user.dietType}</Text>
         </View>
-        <View style={styles.formGrid}>
-          {[
-            { key: 'name', label: '姓名', keyboardType: 'default' as const },
-            { key: 'height', label: '身高 cm', keyboardType: 'numeric' as const },
-            { key: 'weight', label: '體重 kg', keyboardType: 'numeric' as const },
-            { key: 'age', label: '年齡', keyboardType: 'numeric' as const },
-            { key: 'activityMultiplier', label: '活動係數', keyboardType: 'decimal-pad' as const },
-            { key: 'dailyCalorieTarget', label: '目標熱量 kcal', keyboardType: 'numeric' as const },
-            { key: 'targetWeight', label: '目標體重 kg', keyboardType: 'numeric' as const },
-            { key: 'dietType', label: '飲食型態', keyboardType: 'default' as const },
-          ].map((field) => (
-            <View key={field.key} style={[styles.inputGroup, { width: gridCol2(Spacing.sm) }]}>
-              <Text style={[styles.inputLabel, { fontSize: rs(10) }]}>{field.label}</Text>
-              <TextInput
-                value={profileDraft[field.key as keyof typeof profileDraft]}
-                onChangeText={(value) => updateDraft(field.key as keyof typeof profileDraft, value)}
-                keyboardType={field.keyboardType}
-                placeholderTextColor={Palette.text.tertiary}
-                style={[styles.profileInput, { fontSize: rs(13), padding: rs(10) }]}
-              />
-            </View>
-          ))}
-        </View>
-        <Pressable
-          disabled={saving}
-          onPress={handleSaveProfileFields}
-          style={({ pressed }) => [styles.saveProfileButton, { padding: rs(12) }, (pressed || saving) && { opacity: 0.75 }]}
-        >
-          {saving ? <ActivityIndicator size="small" color={Palette.bg.primary} /> : <Text style={[styles.saveProfileText, { fontSize: rs(13) }]}>儲存基本資料</Text>}
-        </Pressable>
-      </View>
-      <View style={styles.statsGrid}>
-        {[
-          { label: '身高', value: `${user.height}`, unit: 'cm', icon: '📏', color: Palette.accent.blue },
-          { label: '體重', value: `${user.weight}`, unit: 'kg', icon: '⚖️', color: Palette.accent.orange },
-          { label: 'BMI', value: `${user.bmi}`, unit: '', icon: '💪', color: Palette.accent.green },
-          { label: '年齡', value: `${user.age}`, unit: '歲', icon: '🎂', color: Palette.accent.purple },
-        ].map((stat) => (
-          <View key={stat.label} style={[styles.statCard, { width: gridCol2(Spacing.md), padding: rs(14) }]}>
-            <View style={[styles.statIconBg, { backgroundColor: stat.color + '18', width: rs(32), height: rs(32), borderRadius: rs(8) }]}>
-              <Text style={{ fontSize: rs(16) }}>{stat.icon}</Text>
-            </View>
-            <Text style={[styles.statLabel, { fontSize: rs(10) }]}>{stat.label}</Text>
-            <View style={styles.statValueRow}>
-              <Text style={[styles.statValue, { fontSize: rs(20), color: stat.color }]}>{stat.value}</Text>
-              {stat.unit ? <Text style={[styles.statUnit, { fontSize: rs(11) }]}> {stat.unit}</Text> : null}
-            </View>
-          </View>
-        ))}
+        <SecondaryButton label="編輯資料" onPress={() => setProfileModalVisible(true)} icon={<Ionicons name="create-outline" size={17} color={Palette.accent.green} />} />
       </View>
 
-      {/* Gender + Activity */}
-      <View style={styles.infoRow}>
-        <View style={[styles.infoCard, { padding: rs(14) }]}>
-          <Ionicons name={user.gender === 'male' ? 'male' : 'female'} size={rs(18)}
-            color={user.gender === 'male' ? Palette.accent.blue : Palette.accent.pink} />
-          <Text style={[styles.infoLabel, { fontSize: rs(10) }]}>性別</Text>
-          <Text style={[styles.infoValue, { fontSize: rs(14) }]}>{user.gender === 'male' ? '男性' : '女性'}</Text>
-        </View>
-        <View style={[styles.infoCard, { padding: rs(14) }]}>
-          <Ionicons name="walk-outline" size={rs(18)} color={Palette.accent.cyan} />
-          <Text style={[styles.infoLabel, { fontSize: rs(10) }]}>活動量</Text>
-          <Text style={[styles.infoValue, { fontSize: rs(isSmall ? 11 : 14) }]}>{user.activityLevel}</Text>
-        </View>
+      <View style={styles.metricRow}>
+        <MetricCard label="身高" value={user.height} unit="cm" accent={Palette.accent.blue} />
+        <MetricCard label="體重" value={user.weight} unit="kg" accent={Palette.accent.orange} />
+        <MetricCard label="BMI" value={user.bmi} accent={Palette.accent.green} />
       </View>
 
-      {/* Disease Conditions */}
-      <Text style={[styles.sectionTitle, { fontSize: rs(16) }]}>健康狀況管理</Text>
-      <View style={[styles.conditionsCard, { padding: rs(16) }]}>
-        <View style={styles.conditionsHeader}>
-          <Ionicons name="shield-checkmark" size={rs(14)} color={Palette.accent.orange} />
-          <Text style={[styles.conditionsSubtitle, { fontSize: rs(11) }]}>點擊切換疾病配置，影響推薦過濾規則</Text>
-        </View>
-        <View style={[styles.medicalDisclaimer, { padding: rs(12) }]}>
-          <Ionicons name="medical-outline" size={rs(14)} color={Palette.status.warning} />
-          <Text style={[styles.medicalDisclaimerText, { fontSize: rs(11) }]}>疾病與營養提醒僅供健康管理參考，不可取代醫師或營養師的個人化建議。</Text>
+      <SectionBlock title="健康狀況管理" subtitle="影響推薦與掃描風險提示。">
+        <View style={styles.medicalDisclaimer}>
+          <Ionicons name="medical-outline" size={16} color={Palette.status.warning} />
+          <Text style={styles.medicalDisclaimerText}>{medicalMetadata?.medical_disclaimer || '疾病與營養提醒僅供健康管理參考，不可取代醫療專業建議。'}</Text>
         </View>
         <View style={styles.conditionsGrid}>
-          {AVAILABLE_CONDITIONS.map((cond) => {
-            const isActive = user.healthConditions.includes(cond.label);
+          {conditionCatalog.map((cond) => {
+            const isActive = user.healthConditions.includes(cond.id) || user.healthConditions.includes(cond.label_zh);
+            const fallback = AVAILABLE_CONDITIONS.find((item) => item.id === cond.id);
+            const accent = fallback?.color || Palette.accent.green;
+            const icon = fallback?.icon || '•';
             return (
               <Pressable
                 key={cond.id}
                 onPress={() => {
                   const nextConditions = isActive
-                    ? user.healthConditions.filter((c) => c !== cond.label)
-                    : [...user.healthConditions, cond.label];
-                  toggleCondition(cond.label);
+                    ? user.healthConditions.filter((c) => c !== cond.id && c !== cond.label_zh)
+                    : [...user.healthConditions.filter((c) => c !== cond.label_zh), cond.id];
+                  toggleCondition(cond.id);
                   void syncProfile({ ...user, healthConditions: nextConditions });
                 }}
-                style={({ pressed }) => [
-                  styles.conditionChip,
-                  { padding: rs(14) },
-                  isActive && { backgroundColor: cond.color + '20', borderColor: cond.color + '40' },
-                  pressed && { opacity: 0.8 },
-                ]}
+                style={[styles.conditionChip, isActive && styles.conditionChipActive]}
               >
-                <Text style={{ fontSize: rs(20) }}>{cond.icon}</Text>
+                <View style={[styles.conditionIcon, isActive && { backgroundColor: `${accent}22` }]}>
+                  <Text style={styles.conditionEmoji}>{icon}</Text>
+                </View>
                 <View style={styles.conditionInfo}>
-                  <Text style={[styles.conditionLabel, { fontSize: rs(14) }, isActive && { color: cond.color }]}>
-                    {cond.label}
-                  </Text>
-                  <Text style={[styles.conditionDesc, { fontSize: rs(10) }]}>{cond.description}</Text>
+                  <Text style={[styles.conditionLabel, isActive && { color: accent }]}>{cond.label_zh}</Text>
+                  <Text style={styles.conditionDesc}>{cond.description}</Text>
                 </View>
-                <View style={[
-                  styles.conditionToggle,
-                  { width: rs(26), height: rs(26), borderRadius: rs(13) },
-                  isActive && { backgroundColor: cond.color, borderColor: cond.color },
-                ]}>
-                  <Ionicons
-                    name={isActive ? 'checkmark' : 'add'}
-                    size={rs(13)}
-                    color={isActive ? '#fff' : Palette.text.tertiary}
-                  />
-                </View>
+                <Ionicons name={isActive ? 'checkmark-circle' : 'add-circle-outline'} size={22} color={isActive ? accent : Palette.text.tertiary} />
               </Pressable>
             );
           })}
         </View>
-      </View>
+      </SectionBlock>
 
-      {/* Allergens */}
-      <Text style={[styles.sectionTitle, { fontSize: rs(16) }]}>過敏原設定</Text>
-      <View style={[styles.allergensCard, { padding: rs(16) }]}>
-        <View style={styles.allergensHeader}>
-          <Ionicons name="alert-circle" size={rs(14)} color={Palette.status.warning} />
-          <Text style={[styles.allergensSubtitle, { fontSize: rs(11) }]}>標記的過敏原將從推薦中自動排除</Text>
-        </View>
+      <SectionBlock title="過敏原設定" subtitle="選取後會從掃描與推薦中自動排除。">
         <View style={styles.allergenChipsWrap}>
-          {AVAILABLE_ALLERGENS.map((allergen) => {
-            const isActive = user.allergens.includes(allergen);
+          {allergenCatalog.map((allergen) => {
+            const isActive = user.allergens.includes(allergen.id) || user.allergens.includes(allergen.label_zh);
             return (
               <Pressable
-                key={allergen}
+                key={allergen.id}
                 onPress={() => {
                   const nextAllergens = isActive
-                    ? user.allergens.filter((a) => a !== allergen)
-                    : [...user.allergens, allergen];
-                  toggleAllergen(allergen);
+                    ? user.allergens.filter((a) => a !== allergen.id && a !== allergen.label_zh)
+                    : [...user.allergens.filter((a) => a !== allergen.label_zh), allergen.id];
+                  toggleAllergen(allergen.id);
                   void syncProfile({ ...user, allergens: nextAllergens });
                 }}
-                style={({ pressed }) => [
-                  styles.allergenChip,
-                  { paddingHorizontal: rs(12), paddingVertical: rs(6) },
-                  isActive && styles.allergenChipActive,
-                  pressed && { opacity: 0.7 },
-                ]}
+                style={[styles.allergenChip, isActive && styles.allergenChipActive]}
               >
-                <Text style={[styles.allergenChipText, { fontSize: rs(12) }, isActive && styles.allergenChipTextActive]}>
-                  {allergen}
-                </Text>
-                {isActive && <Ionicons name="close-circle" size={rs(13)} color={Palette.status.error} />}
+                <Text style={[styles.allergenChipText, isActive && styles.allergenChipTextActive]}>{allergen.label_zh}</Text>
+                <Ionicons name={isActive ? 'close-circle' : 'add-circle-outline'} size={15} color={isActive ? Palette.status.error : Palette.text.tertiary} />
               </Pressable>
             );
           })}
         </View>
-      </View>
+      </SectionBlock>
 
-      {/* Diet Goals */}
-      <Text style={[styles.sectionTitle, { fontSize: rs(16) }]}>飲食目標設定</Text>
-      <View style={styles.goalsContainer}>
-        {DIET_GOALS.map((goal) => (
-          <Pressable
-            key={goal.id}
-            style={({ pressed }) => [styles.goalItem, { padding: rs(14) }, pressed && styles.goalItemPressed]}
-          >
-            <View style={[styles.goalIconBg, { backgroundColor: goal.color + '18', width: rs(36), height: rs(36), borderRadius: rs(10) }]}>
-              <Text style={{ fontSize: rs(16) }}>{goal.icon}</Text>
+      <SectionBlock title="飲食目標" subtitle="用於顯示目前設定與提醒。">
+        <View style={styles.goalList}>
+          {DIET_GOALS.map((goal) => (
+            <View key={goal.id} style={styles.goalItem}>
+              <View style={[styles.goalIcon, { backgroundColor: `${goal.color}18` }]}>
+                <Text style={styles.goalEmoji}>{goal.icon}</Text>
+              </View>
+              <View style={styles.goalInfo}>
+                <Text style={styles.goalLabel}>{goal.label}</Text>
+                <Text style={[styles.goalValue, { color: goal.color }]}>{goal.value}</Text>
+              </View>
             </View>
-            <View style={styles.goalInfo}>
-              <Text style={[styles.goalLabel, { fontSize: rs(11) }]}>{goal.label}</Text>
-              <Text style={[styles.goalValue, { fontSize: rs(14), color: goal.color }]}>{goal.value}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={rs(16)} color={Palette.text.tertiary} />
-          </Pressable>
-        ))}
-      </View>
-
-      {/* Settings */}
-      <Pressable
-        disabled={signingOut}
-        onPress={handleSignOut}
-        style={({ pressed }) => [styles.signOutButton, { padding: rs(14) }, (pressed || signingOut) && { opacity: 0.7 }]}
-      >
-        <Ionicons name="log-out-outline" size={rs(18)} color={Palette.status.error} />
-        <View style={styles.signOutTextWrap}>
-          <Text style={[styles.signOutText, { fontSize: rs(14) }]}>{signingOut ? '登出中...' : '登出'}</Text>
-          <Text style={[styles.signOutHint, { fontSize: rs(10) }]}>清除本機 Supabase session，保護個人資料</Text>
+          ))}
         </View>
-        {signingOut ? <ActivityIndicator size="small" color={Palette.status.error} /> : <Ionicons name="chevron-forward" size={rs(16)} color={Palette.text.tertiary} />}
-      </Pressable>
+      </SectionBlock>
 
-      <Pressable style={({ pressed }) => [styles.settingsButton, { padding: rs(14) }, pressed && { opacity: 0.7 }]}>
-        <Ionicons name="settings-outline" size={rs(18)} color={Palette.text.secondary} />
-        <Text style={[styles.settingsText, { fontSize: rs(14) }]}>應用程式設定</Text>
-        <Ionicons name="chevron-forward" size={rs(16)} color={Palette.text.tertiary} />
-      </Pressable>
+      <View style={styles.accountActions}>
+        <SecondaryButton label={signingOut ? '登出中' : '登出'} onPress={handleSignOut} icon={<Ionicons name="log-out-outline" size={17} color={Palette.status.error} />} />
+        <SecondaryButton label="設定" icon={<Ionicons name="settings-outline" size={17} color={Palette.text.secondary} />} />
+      </View>
+
+      <Modal visible={profileModalVisible} transparent animationType="fade" onRequestClose={() => setProfileModalVisible(false)}>
+        <View style={styles.modalLayer}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setProfileModalVisible(false)} />
+          <View style={styles.profileModal}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleWrap}>
+                <Text style={styles.modalTitle}>編輯基本資料</Text>
+                <Text style={styles.modalSubtitle}>個人資料變更會影響 BMR、TDEE 與每日建議目標。</Text>
+              </View>
+              <Pressable onPress={() => setProfileModalVisible(false)} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={20} color={Palette.text.secondary} />
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
+              <View style={styles.formGrid}>
+                {[
+                  { key: 'name', label: '姓名', keyboardType: 'default' as const },
+                  { key: 'height', label: '身高 cm', keyboardType: 'numeric' as const },
+                  { key: 'weight', label: '體重 kg', keyboardType: 'numeric' as const },
+                  { key: 'age', label: '年齡', keyboardType: 'numeric' as const },
+                  { key: 'dailyCalorieTarget', label: '每日熱量 kcal', keyboardType: 'numeric' as const },
+                  { key: 'targetWeight', label: '目標體重 kg', keyboardType: 'numeric' as const },
+                ].map((field) => (
+                  <View key={field.key} style={[styles.inputGroup, { width: gridCol2(Spacing.sm) }]}>
+                    <Text style={styles.inputLabel}>{field.label}</Text>
+                    <TextInput
+                      value={profileDraft[field.key as keyof typeof profileDraft]}
+                      onChangeText={(value) => updateDraft(field.key as keyof typeof profileDraft, value)}
+                      keyboardType={field.keyboardType}
+                      placeholderTextColor={Palette.text.muted}
+                      style={styles.profileInput}
+                    />
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>飲食類型</Text>
+                <View style={styles.dietOptions}>
+                  {(['葷食', '素食'] as const).map((option) => {
+                    const active = profileDraft.dietType === option;
+                    return (
+                      <Pressable
+                        key={option}
+                        onPress={() => updateDraft('dietType', option)}
+                        style={[styles.dietOption, active && styles.dietOptionActive]}
+                      >
+                        <Ionicons name={active ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={active ? Palette.accent.green : Palette.text.tertiary} />
+                        <Text style={[styles.dietOptionText, active && styles.dietOptionTextActive]}>{option}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <PrimaryButton
+                label={saving ? '儲存中' : '儲存健康檔案'}
+                onPress={handleSaveProfileFields}
+                disabled={saving || !isProfileDraftValid}
+                icon={saving ? <ActivityIndicator size="small" color={Palette.text.inverse} /> : <Ionicons name="save-outline" size={17} color={Palette.text.inverse} />}
+              />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </AppContainer>
   );
 }
@@ -515,195 +471,178 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
     backgroundColor: Palette.bg.card,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Palette.border.subtle,
-    marginTop: Spacing.lg,
-    marginBottom: Spacing.lg,
-  },
-  syncText: { ...Typography.caption, flex: 1 },
-  profileHeader: { alignItems: 'center', marginTop: Spacing.xl, marginBottom: Spacing['2xl'] },
-  avatarGlow: { alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.lg },
-  avatarContainer: { position: 'relative' },
-  avatar: {
-    backgroundColor: Palette.bg.card, borderWidth: 2, borderColor: Palette.accent.purple,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarEmoji: {},
-  avatarBadge: {
-    position: 'absolute', bottom: 2, right: 2,
-    backgroundColor: Palette.accent.purple, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: Palette.bg.primary,
-  },
-  userName: { ...Typography.h1, color: Palette.text.primary, marginBottom: Spacing.xs },
-  userEmail: { ...Typography.body, color: Palette.text.tertiary, marginBottom: Spacing.lg },
-  sessionBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    backgroundColor: Palette.bg.card,
     borderRadius: Radius.full,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    marginBottom: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.lg,
   },
-  sessionBadgeText: { ...Typography.small },
-  streakRow: { flexDirection: 'row', gap: Spacing.md },
-  streakBadge: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: Palette.bg.card, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
-    borderRadius: Radius.full, borderWidth: 1, borderColor: Palette.border.subtle, gap: Spacing.xs,
-  },
-  streakEmoji: { fontSize: 14 },
-  streakText: { ...Typography.caption, color: Palette.text.secondary },
-
-  sectionTitle: { ...Typography.h3, color: Palette.text.primary, marginBottom: Spacing.lg },
-
-  editProfileCard: {
+  syncWarning: { borderColor: 'rgba(245,158,11,0.24)', backgroundColor: Palette.accent.orangeDim },
+  syncText: { ...Typography.caption, color: Palette.text.secondary, flex: 1 },
+  syncWarningText: { color: Palette.status.warning },
+  accountCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.lg,
     backgroundColor: Palette.bg.card,
-    borderRadius: Radius.xl,
+    borderRadius: Radius['2xl'],
+    padding: Spacing.xl,
     marginBottom: Spacing.xl,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
     ...Shadows.card,
   },
-  editHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md },
-  editTitle: { ...Typography.bodyBold, color: Palette.text.primary },
-  formGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.md },
+  avatar: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: Palette.bg.mint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: { ...Typography.h1, color: Palette.accent.green },
+  accountCopy: { flex: 1, gap: Spacing.xs },
+  userName: { ...Typography.h2, color: Palette.text.primary },
+  userEmail: { ...Typography.caption, color: Palette.text.tertiary },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.xs },
+  metricRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl },
+  profileSetupCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    padding: Spacing.lg,
+    marginBottom: Spacing.xl,
+    ...Shadows.soft,
+  },
+  profileSetupCopy: { flex: 1, gap: Spacing.xs },
+  profileSetupTitle: { ...Typography.bodyBold, color: Palette.text.primary },
+  profileSetupMeta: { ...Typography.caption, color: Palette.text.tertiary },
+  formGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.lg },
   inputGroup: { gap: Spacing.xs },
   inputLabel: { ...Typography.small, color: Palette.text.tertiary },
   profileInput: {
+    minHeight: 46,
     color: Palette.text.primary,
     backgroundColor: Palette.bg.elevated,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.md,
+    ...Typography.caption,
   },
-  saveProfileButton: {
+  dietOptions: { flexDirection: 'row', gap: Spacing.sm },
+  dietOption: {
+    flex: 1,
+    minHeight: 46,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: Radius.md,
-    backgroundColor: Palette.accent.green,
+    gap: Spacing.sm,
+    backgroundColor: Palette.bg.elevated,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    paddingHorizontal: Spacing.md,
   },
-  saveProfileText: { ...Typography.bodyBold, color: Palette.bg.primary },
-
-  metabolismCard: {
-    backgroundColor: Palette.bg.card, borderRadius: Radius.xl,
-    marginBottom: Spacing.xl, borderWidth: 1, borderColor: Palette.border.subtle, ...Shadows.card,
+  dietOptionActive: { backgroundColor: Palette.accent.greenDim, borderColor: 'rgba(31,157,114,0.26)' },
+  dietOptionText: { ...Typography.bodyBold, color: Palette.text.secondary },
+  dietOptionTextActive: { color: Palette.accent.green },
+  modalLayer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.xl,
   },
-  metabRow: { flexDirection: 'row', marginBottom: Spacing.lg },
-  metabItem: { flex: 1, alignItems: 'center' },
-  metabLabel: { ...Typography.small, color: Palette.text.tertiary, marginBottom: Spacing.xs },
-  metabValue: { ...Typography.h1 },
-  metabUnit: { ...Typography.small, color: Palette.text.tertiary, marginTop: 2 },
-  metabDivider: { width: 1, backgroundColor: Palette.border.subtle },
-  metabFormula: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.xs,
-    paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Palette.border.subtle,
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Palette.overlay,
   },
-  metabFormulaText: { ...Typography.small, color: Palette.text.tertiary },
-
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, marginBottom: Spacing.xl },
-  statCard: {
-    backgroundColor: Palette.bg.card, borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Palette.border.subtle, ...Shadows.card,
+  profileModal: {
+    width: '100%',
+    maxWidth: 430,
+    maxHeight: '86%',
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius['2xl'],
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    padding: Spacing.xl,
+    ...Shadows.card,
   },
-  statIconBg: { alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.md },
-  statLabel: { ...Typography.small, color: Palette.text.tertiary, marginBottom: Spacing.xs },
-  statValueRow: { flexDirection: 'row', alignItems: 'baseline' },
-  statValue: { ...Typography.h2 },
-  statUnit: { ...Typography.caption, color: Palette.text.tertiary },
-
-  infoRow: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing['2xl'] },
-  infoCard: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: Palette.bg.card, borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Palette.border.subtle, gap: Spacing.sm,
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
   },
-  infoLabel: { ...Typography.small, color: Palette.text.tertiary },
-  infoValue: { ...Typography.bodyBold, color: Palette.text.primary, flex: 1, textAlign: 'right' },
-
-  conditionsCard: {
-    backgroundColor: Palette.bg.card, borderRadius: Radius.xl,
-    marginBottom: Spacing.xl, borderWidth: 1, borderColor: Palette.border.subtle, ...Shadows.card,
+  modalTitleWrap: { flex: 1, gap: Spacing.xs },
+  modalTitle: { ...Typography.h2, color: Palette.text.primary },
+  modalSubtitle: { ...Typography.caption, color: Palette.text.secondary },
+  modalCloseButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Palette.bg.elevated,
   },
-  conditionsHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.lg },
-  conditionsSubtitle: { ...Typography.small, color: Palette.text.tertiary, flex: 1 },
+  modalScrollContent: { gap: Spacing.lg, paddingBottom: Spacing.xs },
   medicalDisclaimer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.sm,
-    backgroundColor: 'rgba(251, 191, 36, 0.08)',
+    backgroundColor: Palette.accent.orangeDim,
     borderRadius: Radius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(251, 191, 36, 0.18)',
+    borderColor: 'rgba(245,158,11,0.18)',
+    padding: Spacing.md,
     marginBottom: Spacing.lg,
   },
-  medicalDisclaimerText: { ...Typography.small, color: Palette.text.secondary, flex: 1, lineHeight: 18 },
+  medicalDisclaimerText: { ...Typography.caption, color: Palette.text.secondary, flex: 1 },
   conditionsGrid: { gap: Spacing.md },
   conditionChip: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Palette.border.subtle,
-  },
-  conditionInfo: { flex: 1 },
-  conditionLabel: { ...Typography.bodyBold, color: Palette.text.secondary, marginBottom: 2 },
-  conditionDesc: { ...Typography.small, color: Palette.text.tertiary },
-  conditionToggle: {
-    backgroundColor: Palette.bg.card, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: Palette.border.subtle,
-  },
-
-  allergensCard: {
-    backgroundColor: Palette.bg.card, borderRadius: Radius.xl,
-    marginBottom: Spacing.xl, borderWidth: 1, borderColor: Palette.border.subtle, ...Shadows.card,
-  },
-  allergensHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.lg },
-  allergensSubtitle: { ...Typography.small, color: Palette.text.tertiary, flex: 1 },
-  allergenChipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  allergenChip: {
-    borderRadius: Radius.full, backgroundColor: Palette.bg.elevated,
-    borderWidth: 1, borderColor: Palette.border.subtle,
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.xs,
-  },
-  allergenChipActive: { backgroundColor: 'rgba(248, 113, 113, 0.10)', borderColor: 'rgba(248, 113, 113, 0.30)' },
-  allergenChipText: { ...Typography.caption, color: Palette.text.secondary },
-  allergenChipTextActive: { color: Palette.status.error },
-
-  goalsContainer: {
-    backgroundColor: Palette.bg.card, borderRadius: Radius.xl,
-    borderWidth: 1, borderColor: Palette.border.subtle, overflow: 'hidden', marginBottom: Spacing.xl, ...Shadows.card,
-  },
-  goalItem: {
-    flexDirection: 'row', alignItems: 'center',
-    borderBottomWidth: 1, borderBottomColor: Palette.border.subtle,
-  },
-  goalItemPressed: { backgroundColor: Palette.bg.cardHover },
-  goalIconBg: { alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md },
-  goalInfo: { flex: 1 },
-  goalLabel: { ...Typography.caption, color: Palette.text.tertiary, marginBottom: 2 },
-  goalValue: { ...Typography.bodyBold },
-
-  signOutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(248,113,113,0.08)',
+    gap: Spacing.md,
+    backgroundColor: Palette.bg.elevated,
     borderRadius: Radius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(248,113,113,0.22)',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
+    borderColor: Palette.border.subtle,
+    padding: Spacing.md,
   },
-  signOutTextWrap: { flex: 1 },
-  signOutText: { ...Typography.bodyBold, color: Palette.status.error, marginBottom: 2 },
-  signOutHint: { ...Typography.small, color: Palette.text.tertiary },
-
-  settingsButton: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: Palette.bg.card, borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Palette.border.subtle, gap: Spacing.sm,
+  conditionChipActive: { backgroundColor: Palette.bg.card, borderColor: 'rgba(31,157,114,0.22)' },
+  conditionIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: Palette.bg.card, alignItems: 'center', justifyContent: 'center' },
+  conditionEmoji: { fontSize: 18 },
+  conditionInfo: { flex: 1 },
+  conditionLabel: { ...Typography.bodyBold, color: Palette.text.secondary },
+  conditionDesc: { ...Typography.small, color: Palette.text.tertiary },
+  allergenChipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  allergenChip: {
+    minHeight: 40,
+    borderRadius: Radius.full,
+    backgroundColor: Palette.bg.elevated,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.md,
   },
-  settingsText: { ...Typography.body, color: Palette.text.secondary, flex: 1 },
+  allergenChipActive: { backgroundColor: 'rgba(226,85,85,0.10)', borderColor: 'rgba(226,85,85,0.24)' },
+  allergenChipText: { ...Typography.caption, color: Palette.text.secondary },
+  allergenChipTextActive: { color: Palette.status.error },
+  goalList: { gap: Spacing.md },
+  goalItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, padding: Spacing.md },
+  goalIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  goalEmoji: { fontSize: 17 },
+  goalInfo: { flex: 1 },
+  goalLabel: { ...Typography.caption, color: Palette.text.tertiary },
+  goalValue: { ...Typography.bodyBold },
+  accountActions: { gap: Spacing.md, marginBottom: Spacing.xl },
 });

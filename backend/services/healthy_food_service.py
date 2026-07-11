@@ -1,9 +1,10 @@
 import json
 import os
 from datetime import datetime, timezone
-from math import cos, radians, sin, sqrt, atan2
+from math import atan2, cos, radians, sin, sqrt
 
 from services.google_places_service import fetch_google_places_restaurants
+from services.medical_risk_service import evaluate_medical_risk
 
 
 def load_restaurant_catalog(base_dir: str) -> list[dict]:
@@ -54,7 +55,7 @@ def _sort_recommended_item(item: dict) -> tuple:
     return (-item["match_score"], item["price"], item["sodium"])
 
 
-def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_catalog: list[dict], user_id: str, params: dict):
+def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_catalog: list[dict], user_id: str, params: dict, allergen_taxonomy: dict | None = None):
     user = storage.get_user(user_id)
     if not user:
         return None
@@ -66,6 +67,7 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
     category = _normalize_category(params.get("category", "all"))
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     conditions = user.get("health_conditions", [])
+    allergens = user.get("allergens", [])
     daily_target = user.get("daily_calorie_target", 2100)
 
     today = now.strftime("%Y-%m-%d")
@@ -88,6 +90,7 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
     recommendations = []
     filtered_out = []
     restaurants = []
+    taxonomy = allergen_taxonomy or {"groups": []}
 
     for restaurant in restaurant_catalog:
         if not _restaurant_matches_category(restaurant, category):
@@ -103,17 +106,19 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
         restaurant_recommended_items = []
         restaurant_filtered_items = []
         for item in restaurant["items"]:
-            reasons = []
-            if item["price"] > budget:
-                reasons.append("超出預算")
-            for condition in conditions:
-                rules = disease_rules.get(condition, {})
-                if "blocked_gi" in rules and item.get("gi") in rules["blocked_gi"]:
-                    reasons.append(f"高 GI，不適合{condition}")
-                if "max_sodium_per_meal" in rules and item["sodium"] > rules["max_sodium_per_meal"]:
-                    reasons.append(f"鈉過高，不適合{condition}")
-                if "max_fat_per_meal" in rules and item["fat"] > rules["max_fat_per_meal"]:
-                    reasons.append(f"脂肪偏高，不適合{condition}")
+            candidate = {
+                "label": item.get("item_id", item["name"]),
+                "name_zh": item["name"],
+                "gi": item.get("gi"),
+                "allergens": item.get("allergens", []),
+                "sodium": item.get("sodium"),
+                "carbs": item.get("carbs"),
+                "protein": item.get("protein"),
+                "fat": item.get("fat"),
+            }
+            medical_risk = evaluate_medical_risk(candidate, conditions, allergens, disease_rules, taxonomy)
+            reasons = [f"超出預算 {budget} 元"] if item["price"] > budget else []
+            reasons.extend(medical_risk["block_reasons"])
 
             if reasons:
                 filtered_item = {
@@ -152,10 +157,11 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                 "gi": item.get("gi"),
                 "match_score": total_score,
                 "reasons": [
-                    f"符合預算 {budget} 元內",
+                    f"符合預算 {budget} 元",
                     f"距離約 {round(distance_km, 2)} km",
-                    f"熱量與剩餘配額契合度高",
+                    "營養與安全條件相符",
                 ],
+                "medical_risk": medical_risk,
             }
             recommendations.append(recommended_item)
             restaurant_recommended_items.append(recommended_item)
@@ -237,7 +243,7 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
         "remaining": remaining,
         "data_source": "google_places",
         "nutrition_available": False,
-        "nutrition_note": "Google Places 提供真實店家位置與評分，不提供可靠菜單營養與價格；請到店後用掃描或手動搜尋記錄餐點。",
+        "nutrition_note": "Google Places does not expose nutritional data; use it for location discovery only.",
         "recommended": recommendations[:12],
         "restaurants": restaurants,
         "filtered_out": [],

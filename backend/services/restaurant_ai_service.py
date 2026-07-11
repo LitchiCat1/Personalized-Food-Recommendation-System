@@ -8,6 +8,31 @@ from services.nutrition_label_service import extract_json_block, get_gemini_api_
 RETRYABLE_GEMINI_STATUS_CODES = {401, 403, 404, 429, 500, 502, 503, 504}
 
 
+def validate_restaurant_summary_input(restaurant: dict, budget: int, category: str, health_conditions: list[str]) -> tuple[dict, int, str, list[str]]:
+    if not isinstance(restaurant, dict):
+        raise ValueError("restaurant must be an object")
+
+    normalized = dict(restaurant)
+    name = str(normalized.get("name") or normalized.get("restaurant_name") or "").strip()
+    if not name:
+        raise ValueError("缺少 restaurant.name")
+
+    normalized["name"] = name
+    try:
+        normalized_budget = int(budget)
+    except (TypeError, ValueError):
+        normalized_budget = 0
+    normalized_category = str(category or "all").strip() or "all"
+    normalized_health_conditions = []
+    for item in health_conditions or []:
+        if item is None:
+            continue
+        value = str(item).strip()
+        if value:
+            normalized_health_conditions.append(value)
+    return normalized, normalized_budget, normalized_category, normalized_health_conditions
+
+
 def normalize_restaurant_summary(parsed: dict, budget: int) -> dict:
     price = parsed.get("price_range_twd") or {}
     try:

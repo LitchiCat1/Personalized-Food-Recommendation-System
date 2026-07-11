@@ -74,11 +74,21 @@ def build_vision_food_response(
     storage,
     tfda_db: dict,
     disease_rules: dict,
-    user_conditions: list,
-    user_allergens: list,
-    user_id: str | None,
-    build_custom_food_search_result,
+    *args,
 ) -> dict:
+    if len(args) == 4:
+        allergen_taxonomy = None
+        user_conditions, user_allergens, user_id, build_custom_food_search_result = args
+    elif len(args) == 5:
+        allergen_taxonomy, user_conditions, user_allergens, user_id, build_custom_food_search_result = args
+    else:
+        raise TypeError(
+            "build_vision_food_response expected 4 or 5 trailing arguments "
+            "(user_conditions, user_allergens, user_id, build_custom_food_search_result"
+            " or allergen_taxonomy, user_conditions, user_allergens, user_id, build_custom_food_search_result)"
+        )
+
+    allergen_taxonomy = allergen_taxonomy or {"groups": []}
     detections = []
     rejected_detections = []
     total_calories = 0
@@ -131,7 +141,7 @@ def build_vision_food_response(
             "sodium": matched_food.get("sodium", 0),
             "fiber": matched_food.get("fiber", 0),
             "source": matched_food.get("source", "TFDA"),
-            "allergens": [],
+            "allergens": matched_food.get("allergens", []),
             "gi": "medium",
         }
         reliability = build_detection_reliability(name_zh, confidence, needs_confirmation, nutrients)
@@ -153,7 +163,16 @@ def build_vision_food_response(
             warnings.append("Gemini Vision 初判結果，請確認食品名稱與份量")
         if item.get("portion_description"):
             warnings.append(f"份量描述：{item['portion_description']}")
-        warnings.extend(check_food_safety(nutrients, estimated_weight, user_conditions, user_allergens, disease_rules))
+        warnings.extend(
+            check_food_safety(
+                nutrients,
+                estimated_weight,
+                user_conditions,
+                user_allergens,
+                disease_rules,
+                allergen_taxonomy,
+            )
+        )
 
         detections.append(
             {

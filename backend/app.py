@@ -16,7 +16,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from repositories.storage import StorageRepository
 from services.auth_service import AuthError, is_auth_required, verify_supabase_user
-from services.disease_rule_service import build_disease_rules_response, load_disease_rules
+from services.disease_rule_service import build_disease_rules_response, build_medical_metadata_response, load_allergen_taxonomy, load_disease_rules
 from services.env_service import load_local_env
 from services.history_service import build_history_response
 from services.google_places_service import GooglePlacesAPIError, GooglePlacesConfigError
@@ -127,6 +127,8 @@ except FileNotFoundError:
 # ─── Disease filter rules (PRD: 硬性排除規則) ────────────────
 DISEASE_RULES = load_disease_rules(BASE_DIR)
 print(f"[OK] Disease rules loaded: {len(DISEASE_RULES)} conditions")
+ALLERGEN_TAXONOMY = load_allergen_taxonomy(BASE_DIR)
+print(f"[OK] Allergen taxonomy loaded: {len(ALLERGEN_TAXONOMY.get('groups', []))} groups")
 
 RESTAURANT_CATALOG = load_restaurant_catalog(BASE_DIR)
 print(f"[OK] Restaurant catalog loaded: {len(RESTAURANT_CATALOG)} restaurants")
@@ -174,6 +176,11 @@ def disease_rules():
     return jsonify(build_disease_rules_response(DISEASE_RULES))
 
 
+@app.route("/medical-metadata", methods=["GET"])
+def medical_metadata():
+    return jsonify(build_medical_metadata_response(DISEASE_RULES, ALLERGEN_TAXONOMY))
+
+
 # ─── 0. Food Search (TFDA 中文食品搜尋) ──────────────────────
 @app.route("/search/food", methods=["GET"])
 def search_food():
@@ -200,10 +207,15 @@ def search_food():
 @app.route("/food/<path:food_key>", methods=["GET"])
 def get_food_detail(food_key):
     """取得 TFDA 單筆食品完整營養資訊"""
-    custom_food = storage.get_custom_food(food_key)
-    if custom_food:
-        require_user_access(custom_food.get("user_id"))
-        return jsonify(custom_food)
+    user_id = request.args.get("user_id")
+    if is_auth_required():
+        user_id = user_id or get_request_user_id()
+        require_user_access(user_id)
+
+    if user_id:
+        custom_food = storage.get_custom_food(food_key, user_id)
+        if custom_food:
+            return jsonify(custom_food)
 
     food = TFDA_DB.get(food_key)
     if not food:
@@ -304,6 +316,7 @@ def predict_vision_food():
                 storage,
                 TFDA_DB,
                 DISEASE_RULES,
+                ALLERGEN_TAXONOMY,
                 user_conditions,
                 user_allergens,
                 user_id,
@@ -335,7 +348,7 @@ def create_or_update_user():
     if is_auth_required():
         data["user_id"] = require_user_access(data.get("user_id"))
 
-    user_doc = build_user_profile(data)
+    user_doc = build_user_profile(data, DISEASE_RULES, ALLERGEN_TAXONOMY)
 
     storage.upsert_user(user_doc)
 
@@ -350,6 +363,8 @@ def add_record():
         return jsonify({"error": "缺少資料"}), 400
     if is_auth_required():
         data["user_id"] = require_user_access(data.get("user_id"))
+    if not data.get("client_record_id"):
+        data["client_record_id"] = f"server_record_{uuid.uuid4().hex}"
 
     record = {
         "user_id": data.get("user_id"),
@@ -400,7 +415,7 @@ def recommend(user_id):
     2. 口味排序層: 餘弦相似度 (placeholder, 目前用隨機分數)
     """
     require_user_access(user_id)
-    result = build_recommendation_response(storage, NUTRITION_DB, TFDA_DB, DISEASE_RULES, user_id)
+    result = build_recommendation_response(storage, NUTRITION_DB, TFDA_DB, DISEASE_RULES, user_id, ALLERGEN_TAXONOMY)
     if not result:
         return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
     return jsonify(result)
@@ -416,7 +431,7 @@ def healthy_food_recommend(user_id):
         "radius_km": request.args.get("radius_km", 5),
         "category": request.args.get("category", "all"),
     }
-    result = build_healthy_food_recommendations(storage, DISEASE_RULES, RESTAURANT_CATALOG, user_id, params)
+    result = build_healthy_food_recommendations(storage, DISEASE_RULES, RESTAURANT_CATALOG, user_id, params, ALLERGEN_TAXONOMY)
     if not result:
         return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
     return jsonify(result)

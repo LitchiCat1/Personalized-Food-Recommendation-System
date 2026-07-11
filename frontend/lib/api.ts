@@ -71,6 +71,15 @@ export type RecommendationItem = {
   preference_reasons?: string[];
   safety_badges?: string[];
   reasons?: string[];
+  medical_risk?: {
+    is_safe: boolean;
+    has_caution: boolean;
+    risks: Array<Record<string, unknown>>;
+    block_reasons: string[];
+    caution_reasons: string[];
+    normalized_conditions?: string[];
+    normalized_allergens?: string[];
+  };
 };
 
 export type RecommendationResponse = {
@@ -206,6 +215,55 @@ export type UserProfileResponse = {
   diet_type: string;
 };
 
+export type MedicalConditionRule = {
+  id: string;
+  condition: string;
+  label_zh: string;
+  aliases: string[];
+  category?: string | null;
+  description: string;
+  screening_focus: string[];
+  severity_options: string[];
+  rule_version?: string | null;
+  review_status?: string | null;
+  last_reviewed?: string | null;
+  reviewed_by?: string | null;
+  evidence_level?: string | null;
+  references: { title: string; url: string }[];
+  medical_disclaimer?: string | null;
+  limits: Record<string, unknown>;
+  risk_nutrients: Record<string, { caution?: number; block?: number; unit?: string; label_zh?: string }>;
+};
+
+export type AllergenGroup = {
+  id: string;
+  label_zh: string;
+  severity: 'high' | 'medium' | 'low' | string;
+  aliases: string[];
+  keywords: string[];
+};
+
+export type MedicalMetadataResponse = {
+  disease_rules: {
+    count: number;
+    versions: string[];
+    review_status_counts: Record<string, number>;
+    conditions: MedicalConditionRule[];
+    medical_disclaimer: string;
+  };
+  allergen_taxonomy: {
+    version?: string;
+    review_status?: string;
+    last_reviewed?: string;
+    references: { title: string; url: string }[];
+    medical_disclaimer?: string;
+    count: number;
+    groups: AllergenGroup[];
+  };
+  medical_disclaimer: string;
+  data_sources: { name: string; role: string }[];
+};
+
 export type ApiAuth = {
   accessToken?: string | null;
 };
@@ -298,6 +356,11 @@ export async function fetchUserProfile(apiBaseUrl: string, userId: string, auth?
     headers: buildHeaders(auth),
   });
   return parseJson<UserProfileResponse>(resp);
+}
+
+export async function fetchMedicalMetadata(apiBaseUrl: string): Promise<MedicalMetadataResponse> {
+  const resp = await fetch(`${apiBaseUrl}/medical-metadata`);
+  return parseJson<MedicalMetadataResponse>(resp);
 }
 
 export async function saveUserProfile(apiBaseUrl: string, payload: Record<string, unknown>, auth?: ApiAuth) {

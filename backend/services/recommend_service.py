@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+from services.medical_risk_service import evaluate_medical_risk
+
 
 def normalize_number(value) -> float:
     try:
@@ -118,10 +120,10 @@ def compute_preference_score(candidate: dict, profile: dict) -> tuple[int, list[
 
     if any(name and (name in food_name or food_name in name) for food_name in name_pool):
         score += 18
-        reasons.append("與近期常記錄食品相似")
+        reasons.append("matches recent meal names")
     elif any(label and label in food_name for food_name in name_pool):
         score += 10
-        reasons.append("與近期食品標籤相近")
+        reasons.append("shares recent search terms")
 
     avg = profile["avg"]
     calories = normalize_number(candidate.get("calories"))
@@ -129,19 +131,19 @@ def compute_preference_score(candidate: dict, profile: dict) -> tuple[int, list[
         calorie_gap = abs(avg["calories"] - calories)
         if calorie_gap <= 120:
             score += 12
-            reasons.append("熱量接近你的近期餐點")
+            reasons.append("close to recent calorie profile")
         elif calorie_gap <= 250:
             score += 6
 
     protein = normalize_number(candidate.get("protein"))
     if avg["protein"] > 0 and protein >= avg["protein"] * 0.8:
         score += 8
-        reasons.append("蛋白質符合近期偏好")
+        reasons.append("similar protein balance")
 
     sodium = normalize_number(candidate.get("sodium"))
     if avg["sodium"] > 0 and sodium <= avg["sodium"]:
         score += 6
-        reasons.append("鈉含量不高於近期平均")
+        reasons.append("lower sodium than recent average")
 
     if candidate.get("source") in profile["favorite_sources"]:
         score += 4
@@ -181,18 +183,18 @@ def compute_feedback_adjustment(candidate: dict, feedback_profile: dict) -> tupl
 
     if accepted:
         score += min(18, accepted * 9)
-        reasons.append("你曾採納這項推薦")
+        reasons.append("previously accepted")
     if skipped:
         score -= min(10, skipped * 5)
-        reasons.append("你曾略過這項推薦")
+        reasons.append("previously skipped")
     if disliked:
         score -= min(35, disliked * 18)
-        reasons.append("你曾標記不喜歡")
+        reasons.append("previously disliked")
 
     return score, reasons[:2]
 
 
-def build_recommendation_response(storage, nutrition_db: dict, tfda_db: dict, disease_rules: dict, user_id: str):
+def build_recommendation_response(storage, nutrition_db: dict, tfda_db: dict, disease_rules: dict, user_id: str, allergen_taxonomy: dict | None = None):
     user = storage.get_user(user_id)
     if not user:
         return None
@@ -214,80 +216,63 @@ def build_recommendation_response(storage, nutrition_db: dict, tfda_db: dict, di
     feedback_docs = storage.get_recommendation_feedback(user_id, limit=100)
     feedback_profile = build_feedback_profile(feedback_docs)
 
+    taxonomy = allergen_taxonomy or {"groups": []}
+
     for nutrients in candidates:
         label = nutrients["label"]
-        food_allergens = nutrients.get("allergens", [])
-        gi = nutrients.get("gi")
-        is_safe = True
-        block_reasons = []
-
-        for allergen in food_allergens:
-            if allergen in allergens:
-                is_safe = False
-                block_reasons.append(f"含過敏原: {allergen}")
-
-        for condition in conditions:
-            rules = disease_rules.get(condition, {})
-            if "blocked_gi" in rules and gi in rules["blocked_gi"]:
-                is_safe = False
-                block_reasons.append(f"高 GI — 不適合{condition}患者")
-            if "max_sodium_per_meal" in rules and (nutrients.get("sodium") or 0) > rules["max_sodium_per_meal"]:
-                is_safe = False
-                block_reasons.append(f"高鈉 — 不適合{condition}患者")
-            if "blocked_labels" in rules and label in rules["blocked_labels"]:
-                is_safe = False
-                block_reasons.append(f"不適合{condition}患者")
-
-        if is_safe:
-            calories = nutrients.get("calories", 0)
-            fit_score = max(0, 100 - abs(remaining_calories - calories) // 8)
-            lower_sodium_bonus = max(0, 25 - int((nutrients.get("sodium", 0) or 0) / 80))
-            macro_bonus = 0
-            if (nutrients.get("protein") or 0) >= 15:
-                macro_bonus += 8
-            if gi == "low":
-                macro_bonus += 10
-            elif gi == "medium":
-                macro_bonus += 4
-            preference_score, preference_reasons = compute_preference_score(nutrients, preference_profile)
-            feedback_adjustment, feedback_reasons = compute_feedback_adjustment(nutrients, feedback_profile)
-
-            safety_badges = []
-            if (nutrients.get("sodium") or 0) <= 400:
-                safety_badges.append("低鈉")
-            if gi == "low":
-                safety_badges.append("低 GI")
-            elif gi == "medium":
-                safety_badges.append("中 GI")
-            if (nutrients.get("protein") or 0) >= 15:
-                safety_badges.append("高蛋白")
-
-            safe_candidates.append(
-                {
-                    "label": label,
-                    "name_zh": nutrients.get("name_zh", label),
-                    "calories": calories,
-                    "protein": nutrients.get("protein", 0),
-                    "carbs": nutrients.get("carbs", 0),
-                    "fat": nutrients.get("fat", 0),
-                    "sodium": nutrients.get("sodium", 0),
-                    "gi": gi,
-                    "source": nutrients.get("source"),
-                    "match_score": max(0, min(99, int(fit_score + lower_sodium_bonus + macro_bonus + preference_score + feedback_adjustment))),
-                    "preference_score": preference_score,
-                    "feedback_adjustment": feedback_adjustment,
-                    "preference_reasons": (feedback_reasons + preference_reasons)[:4],
-                    "safety_badges": safety_badges,
-                }
-            )
-        else:
+        medical_risk = evaluate_medical_risk(nutrients, conditions, allergens, disease_rules, taxonomy)
+        if not medical_risk["is_safe"]:
             filtered_out.append(
                 {
                     "label": label,
                     "name_zh": nutrients.get("name_zh", label),
-                    "reasons": block_reasons,
+                    "reasons": medical_risk["block_reasons"],
                 }
             )
+            continue
+
+        calories = nutrients.get("calories", 0)
+        fit_score = max(0, 100 - abs(remaining_calories - calories) // 8)
+        lower_sodium_bonus = max(0, 25 - int((nutrients.get("sodium", 0) or 0) / 80))
+        macro_bonus = 0
+        if (nutrients.get("protein") or 0) >= 15:
+            macro_bonus += 8
+        if nutrients.get("gi") == "low":
+            macro_bonus += 10
+        elif nutrients.get("gi") == "medium":
+            macro_bonus += 4
+        preference_score, preference_reasons = compute_preference_score(nutrients, preference_profile)
+        feedback_adjustment, feedback_reasons = compute_feedback_adjustment(nutrients, feedback_profile)
+
+        safety_badges = []
+        if (nutrients.get("sodium") or 0) <= 400:
+            safety_badges.append("low sodium")
+        if nutrients.get("gi") == "low":
+            safety_badges.append("low GI")
+        elif nutrients.get("gi") == "medium":
+            safety_badges.append("medium GI")
+        if (nutrients.get("protein") or 0) >= 15:
+            safety_badges.append("protein rich")
+
+        safe_candidates.append(
+            {
+                "label": label,
+                "name_zh": nutrients.get("name_zh", label),
+                "calories": calories,
+                "protein": nutrients.get("protein", 0),
+                "carbs": nutrients.get("carbs", 0),
+                "fat": nutrients.get("fat", 0),
+                "sodium": nutrients.get("sodium", 0),
+                "gi": nutrients.get("gi"),
+                "source": nutrients.get("source"),
+                "match_score": max(0, min(99, int(fit_score + lower_sodium_bonus + macro_bonus + preference_score + feedback_adjustment))),
+                "preference_score": preference_score,
+                "feedback_adjustment": feedback_adjustment,
+                "preference_reasons": (feedback_reasons + preference_reasons)[:4],
+                "safety_badges": safety_badges,
+                "medical_risk": medical_risk,
+            }
+        )
 
     safe_candidates.sort(key=lambda x: x["match_score"], reverse=True)
     return {

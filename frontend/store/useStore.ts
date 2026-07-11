@@ -143,7 +143,7 @@ export const useStore = create<NutriLensState>((set, get) => ({
     set((state) => {
       const conditions = state.user.healthConditions.includes(condition)
         ? state.user.healthConditions.filter((c) => c !== condition)
-        : [...state.user.healthConditions, condition];
+        : [...state.user.healthConditions.filter((c) => c !== condition), condition];
       return { user: { ...state.user, healthConditions: conditions } };
     }),
 
@@ -151,7 +151,7 @@ export const useStore = create<NutriLensState>((set, get) => ({
     set((state) => {
       const allergens = state.user.allergens.includes(allergen)
         ? state.user.allergens.filter((a) => a !== allergen)
-        : [...state.user.allergens, allergen];
+        : [...state.user.allergens.filter((a) => a !== allergen), allergen];
       return { user: { ...state.user, allergens } };
     }),
 

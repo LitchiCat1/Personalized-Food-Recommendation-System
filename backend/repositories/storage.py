@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+import uuid
 
 from psycopg2.extras import Json, RealDictCursor
 
@@ -33,7 +34,7 @@ class StorageRepository:
                 CREATE TABLE IF NOT EXISTS records (
                     id BIGSERIAL PRIMARY KEY,
                     user_id TEXT NOT NULL,
-                    client_record_id TEXT,
+                    client_record_id TEXT NOT NULL,
                     timestamp TEXT NOT NULL,
                     meal_type TEXT,
                     foods JSONB,
@@ -47,17 +48,42 @@ class StorageRepository:
                 );
                 """
             )
-            cursor.execute("ALTER TABLE records ADD COLUMN IF NOT EXISTS client_record_id TEXT;")
+            cursor.execute(
+                """
+                UPDATE records
+                SET client_record_id = COALESCE(
+                    client_record_id,
+                    'legacy_record_' || id::text || '_' || substr(md5(random()::text), 1, 8)
+                )
+                WHERE client_record_id IS NULL;
+                """
+            )
+            cursor.execute("ALTER TABLE records ALTER COLUMN client_record_id SET NOT NULL;")
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS custom_foods (
-                    food_id TEXT PRIMARY KEY,
+                    owner_key TEXT PRIMARY KEY,
+                    food_id TEXT NOT NULL,
                     user_id TEXT NOT NULL,
                     doc JSONB NOT NULL,
                     updated_at TIMESTAMPTZ DEFAULT NOW()
                 );
                 """
             )
+            cursor.execute("ALTER TABLE custom_foods ADD COLUMN IF NOT EXISTS owner_key TEXT;")
+            cursor.execute("ALTER TABLE custom_foods ADD COLUMN IF NOT EXISTS food_id TEXT;")
+            cursor.execute(
+                """
+                UPDATE custom_foods
+                SET owner_key = COALESCE(owner_key, user_id || ':' || food_id)
+                WHERE owner_key IS NULL
+                  AND user_id IS NOT NULL
+                  AND food_id IS NOT NULL;
+                """
+            )
+            cursor.execute("ALTER TABLE custom_foods DROP CONSTRAINT IF EXISTS custom_foods_pkey;")
+            cursor.execute("ALTER TABLE custom_foods ALTER COLUMN owner_key SET NOT NULL;")
+            cursor.execute("ALTER TABLE custom_foods ADD PRIMARY KEY (owner_key);")
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS recommendation_feedback (
@@ -73,8 +99,9 @@ class StorageRepository:
                 """
             )
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_records_user_timestamp ON records (user_id, timestamp DESC);")
-            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_records_user_client_record ON records (user_id, client_record_id) WHERE client_record_id IS NOT NULL;")
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_records_user_client_record ON records (user_id, client_record_id);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_custom_foods_user_id ON custom_foods (user_id);")
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_foods_owner_key ON custom_foods (owner_key);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_recommendation_feedback_user_created ON recommendation_feedback (user_id, created_at DESC);")
 
     def _fetch_json_doc(self, table: str, key_field: str, key_value: str):
@@ -110,6 +137,8 @@ class StorageRepository:
         return user_doc
 
     def insert_record(self, record: dict):
+        if not record.get("client_record_id"):
+            record = {**record, "client_record_id": f"server_record_{uuid.uuid4().hex}"}
         existing = self.get_record_by_client_record_id(record.get("user_id"), record.get("client_record_id"))
         if existing:
             return {**existing, "_deduplicated": True}
@@ -145,6 +174,9 @@ class StorageRepository:
         else:
             self.mem_records.append(record)
         return record
+
+    def upsert_record(self, record: dict):
+        return self.insert_record(record)
 
     def get_record_by_client_record_id(self, user_id: str | None, client_record_id: str | None):
         if not user_id or not client_record_id:
@@ -316,39 +348,53 @@ class StorageRepository:
             docs = [doc for doc in docs if doc.get("user_id") == user_id]
         return docs
 
-    def get_custom_food(self, food_id: str):
+    def _custom_food_owner_key(self, user_id: str | None, food_id: str) -> str:
+        normalized_user_id = user_id or "demo_user"
+        return f"{normalized_user_id}:{food_id}"
+
+    def get_custom_food(self, food_id: str, user_id: str | None = None):
+        if not user_id:
+            return None
         if self.use_postgres:
-            return self._fetch_json_doc("custom_foods", "food_id", food_id)
+            with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    "SELECT doc FROM custom_foods WHERE owner_key = %s LIMIT 1",
+                    (self._custom_food_owner_key(user_id, food_id),),
+                )
+                row = cursor.fetchone()
+            return row["doc"] if row else None
         if self.use_mongo:
-            return self.db.custom_foods.find_one({"food_id": food_id}, {"_id": 0})
+            return self.db.custom_foods.find_one({"food_id": food_id, "user_id": user_id}, {"_id": 0})
         for doc in self.mem_custom_foods:
-            if doc.get("food_id") == food_id:
+            if doc.get("food_id") == food_id and doc.get("user_id") == user_id:
                 return doc
         return None
 
     def upsert_custom_food(self, food_doc: dict):
+        owner_key = self._custom_food_owner_key(food_doc.get("user_id"), food_doc["food_id"])
+        stored_doc = {**food_doc, "owner_key": owner_key}
         if self.use_postgres:
             with self.pg_conn.cursor() as cursor:
                 cursor.execute(
                     """
-                    INSERT INTO custom_foods (food_id, user_id, doc, updated_at)
-                    VALUES (%s, %s, %s, NOW())
-                    ON CONFLICT (food_id)
-                    DO UPDATE SET user_id = EXCLUDED.user_id, doc = EXCLUDED.doc, updated_at = NOW()
+                    INSERT INTO custom_foods (owner_key, food_id, user_id, doc, updated_at)
+                    VALUES (%s, %s, %s, %s, NOW())
+                    ON CONFLICT (owner_key)
+                    DO UPDATE SET food_id = EXCLUDED.food_id, user_id = EXCLUDED.user_id, doc = EXCLUDED.doc, updated_at = NOW()
                     """,
-                    (food_doc["food_id"], food_doc.get("user_id"), Json(food_doc)),
+                    (owner_key, stored_doc["food_id"], stored_doc.get("user_id"), Json(stored_doc)),
                 )
-            return food_doc
+            return stored_doc
         if self.use_mongo:
-            self.db.custom_foods.update_one({"food_id": food_doc["food_id"]}, {"$set": food_doc}, upsert=True)
+            self.db.custom_foods.update_one({"owner_key": owner_key}, {"$set": stored_doc}, upsert=True)
         else:
             for idx, existing in enumerate(self.mem_custom_foods):
-                if existing.get("food_id") == food_doc["food_id"]:
-                    self.mem_custom_foods[idx] = food_doc
+                if existing.get("owner_key") == owner_key:
+                    self.mem_custom_foods[idx] = stored_doc
                     break
             else:
-                self.mem_custom_foods.append(food_doc)
-        return food_doc
+                self.mem_custom_foods.append(stored_doc)
+        return stored_doc
 
     def insert_recommendation_feedback(self, feedback_doc: dict):
         if self.use_postgres:

@@ -2,7 +2,6 @@ import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, Alert, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -12,6 +11,11 @@ import type { DetectedFood } from '@/constants/mock-data';
 import { useStore } from '@/store/useStore';
 import { useResponsive } from '@/hooks/useResponsive';
 import AppContainer from '@/components/AppContainer';
+import ScreenHeader from '@/components/ui/screen-header';
+import SectionBlock from '@/components/ui/section-block';
+import DataPill from '@/components/ui/data-pill';
+import PrimaryButton from '@/components/ui/primary-button';
+import SecondaryButton from '@/components/ui/secondary-button';
 import ScannerCameraView from '@/components/scanner/ScannerCameraView';
 import ScannerManualTools from '@/components/scanner/ScannerManualTools';
 import ScannerResults from '@/components/scanner/ScannerResults';
@@ -37,27 +41,21 @@ import {
 } from '@/lib/recordSyncQueue';
 
 function OCRDraftCard({
-  rs,
-  wp,
   draft,
   onSaveCustomFood,
   onQuickAdd,
 }: {
-  rs: (value: number) => number;
-  wp: (value: number) => number;
   draft: OCRDraft;
   onSaveCustomFood: () => void;
   onQuickAdd: () => void;
 }) {
   return (
-    <View style={[styles.manualCard, { padding: rs(16) }]}> 
-      <View style={styles.manualHeader}>
-        <Ionicons name="document-text" size={rs(16)} color={Palette.accent.green} />
-        <Text style={[styles.manualTitle, { fontSize: rs(15) }]}>營養標示辨識結果</Text>
+    <SectionBlock title="營養標示辨識結果" subtitle="可直接加入今日紀錄，或儲存成自訂食品供下次搜尋。">
+      <View style={styles.ocrHeader}>
+        <Text style={styles.ocrProductName}>{draft.product_name || '未命名食品'}</Text>
+        {draft.brand ? <DataPill tone="info">{draft.brand}</DataPill> : null}
       </View>
-      <Text style={[styles.ocrProductName, { fontSize: rs(15) }]}>{draft.product_name || '未命名食品'}</Text>
-      {draft.brand ? <Text style={[styles.ocrMetaText, { fontSize: rs(11) }]}>品牌：{draft.brand}</Text> : null}
-      {draft.serving_size_g ? <Text style={[styles.ocrMetaText, { fontSize: rs(11) }]}>每份：{draft.serving_size_g} g</Text> : null}
+      {draft.serving_size_g ? <Text style={styles.ocrMetaText}>每份 {draft.serving_size_g} g</Text> : null}
       <View style={styles.nutritionGrid}>
         {[
           { label: '熱量', value: draft.nutrition_per_serving?.calories ?? '--', unit: 'kcal', color: Palette.accent.green },
@@ -67,85 +65,59 @@ function OCRDraftCard({
           { label: '鈉', value: draft.nutrition_per_serving?.sodium ?? '--', unit: 'mg', color: Palette.accent.pink },
           { label: '糖', value: draft.nutrition_per_serving?.sugar ?? '--', unit: 'g', color: Palette.accent.cyan },
         ].map((item) => (
-          <View key={item.label} style={[styles.nutritionItem, { minWidth: wp(26) }]}> 
-            <View style={[styles.nutritionDot, { backgroundColor: item.color }]} />
-            <Text style={[styles.nutritionLabel, { fontSize: rs(10) }]}>{item.label}</Text>
-            <Text style={[styles.nutritionValue, { color: item.color, fontSize: rs(13) }]}> 
+          <View key={item.label} style={styles.nutritionItem}>
+            <Text style={styles.nutritionLabel}>{item.label}</Text>
+            <Text style={[styles.nutritionValue, { color: item.color }]}>
               {item.value}
-              <Text style={[styles.nutritionUnit, { fontSize: rs(9) }]}> {item.unit}</Text>
+              <Text style={styles.nutritionUnit}> {item.unit}</Text>
             </Text>
           </View>
         ))}
       </View>
       <View style={styles.ocrActions}>
-        <Pressable onPress={onSaveCustomFood} style={styles.manualAddButton}>
-          <Text style={[styles.manualAddButtonText, { fontSize: rs(12) }]}>儲存成自訂食品</Text>
-        </Pressable>
-        <Pressable onPress={onQuickAdd} style={styles.ocrQuickAddButton}>
-          <Text style={[styles.ocrQuickAddText, { fontSize: rs(12) }]}>直接加入今日紀錄</Text>
-        </Pressable>
+        <SecondaryButton label="儲存成自訂食品" onPress={onSaveCustomFood} icon={<Ionicons name="bookmark-outline" size={15} color={Palette.accent.green} />} />
+        <PrimaryButton label="直接加入今日紀錄" onPress={onQuickAdd} icon={<Ionicons name="add-circle-outline" size={18} color={Palette.text.inverse} />} />
       </View>
-    </View>
+    </SectionBlock>
   );
 }
 
 function ManualResultsList({
-  rs,
-  wp,
   foods,
   onAddFood,
 }: {
-  rs: (value: number) => number;
-  wp: (value: number) => number;
   foods: DetectedFood[];
   onAddFood: (food: DetectedFood) => void;
 }) {
   if (foods.length === 0) return null;
 
   return (
-    <View style={styles.manualResultsWrap}>
-      {foods.map((food) => (
-        <View key={food.id} style={[styles.foodCard, { padding: rs(16) }]}> 
-          <View style={styles.foodTop}>
-            <View style={styles.foodNameRow}>
-              <Text style={[styles.foodName, { fontSize: rs(16) }]}>{food.foodName}</Text>
-              <View style={styles.manualBadge}>
-                <Text style={[styles.manualBadgeText, { fontSize: rs(10) }]}>手動 TFDA</Text>
+    <SectionBlock title="手動搜尋結果" subtitle="以每 100g 營養資料顯示，加入後仍可在紀錄中校正。">
+      <View style={styles.manualResultsWrap}>
+        {foods.map((food) => (
+          <View key={food.id} style={styles.manualFoodCard}>
+            <View style={styles.manualFoodTop}>
+              <View style={styles.manualFoodCopy}>
+                <Text style={styles.manualFoodName}>{food.foodName}</Text>
+                <Text style={styles.manualFoodHint}>每 100g · TFDA/自訂食品資料</Text>
               </View>
+              <SecondaryButton label="加入" onPress={() => onAddFood(food)} />
             </View>
-            <Text style={[styles.foodWeight, { fontSize: rs(11) }]}>以每 100g 營養資料顯示，可先加入紀錄再後續校正份量</Text>
+            <View style={styles.macroRow}>
+              <Text style={styles.macro}>熱量 {food.nutrition.calories} kcal</Text>
+              <Text style={styles.macro}>蛋白質 {food.nutrition.protein}g</Text>
+              <Text style={styles.macro}>鈉 {food.nutrition.sodium}mg</Text>
+            </View>
           </View>
-          <View style={styles.nutritionGrid}>
-            {[
-              { label: '熱量', value: food.nutrition.calories, unit: 'kcal', color: Palette.accent.green },
-              { label: '蛋白質', value: food.nutrition.protein, unit: 'g', color: Palette.accent.blue },
-              { label: '碳水', value: food.nutrition.carbs, unit: 'g', color: Palette.accent.orange },
-              { label: '脂肪', value: food.nutrition.fat, unit: 'g', color: Palette.accent.purple },
-              { label: '鈉', value: food.nutrition.sodium, unit: 'mg', color: Palette.accent.pink },
-              { label: '纖維', value: food.nutrition.fiber, unit: 'g', color: Palette.accent.cyan },
-            ].map((item) => (
-              <View key={item.label} style={[styles.nutritionItem, { minWidth: wp(26) }]}> 
-                <View style={[styles.nutritionDot, { backgroundColor: item.color }]} />
-                <Text style={[styles.nutritionLabel, { fontSize: rs(10) }]}>{item.label}</Text>
-                <Text style={[styles.nutritionValue, { color: item.color, fontSize: rs(13) }]}> 
-                  {item.value}
-                  <Text style={[styles.nutritionUnit, { fontSize: rs(9) }]}> {item.unit}</Text>
-                </Text>
-              </View>
-            ))}
-          </View>
-          <Pressable onPress={() => onAddFood(food)} style={styles.manualAddButton}>
-            <Text style={[styles.manualAddButtonText, { fontSize: rs(12) }]}>加入今日紀錄</Text>
-          </Pressable>
-        </View>
-      ))}
-    </View>
+        ))}
+      </View>
+    </SectionBlock>
   );
 }
 
 export default function ScannerScreen() {
   const insets = useSafeAreaInsets();
-  const { rs, wp, isSmall, isWeb } = useResponsive();
+  const { rs, wp, isWeb } = useResponsive();
   const {
     scanResult,
     setScanResult,
@@ -382,7 +354,7 @@ export default function ScannerScreen() {
       if (!ok) Alert.alert('已加入本機畫面', '後端同步失敗，請稍後在辨識頁重試。');
     });
     clearScan();
-    Alert.alert('✅ 已加入', `${results.length} 項食物已加入今日紀錄`);
+    Alert.alert('已加入', `${results.length} 項食物已加入今日紀錄`);
   };
 
   const handleAddManualFood = (food: DetectedFood) => {
@@ -427,92 +399,73 @@ export default function ScannerScreen() {
 
   return (
     <AppContainer>
-      <View style={styles.header}>
-        <Text style={[styles.title, { fontSize: rs(isSmall ? 22 : 26) }]}>AI 食物辨識</Text>
-        <Text style={[styles.subtitle, { fontSize: rs(13) }]}>拍攝或上傳食物照片，Gemini 判斷食物，後端查 TFDA/自訂資料庫換算營養</Text>
-      </View>
+      <ScreenHeader
+        title="AI 食物辨識"
+        subtitle="拍照、上傳相簿或掃描營養標示，系統會套用健康條件和過敏原做安全檢查。"
+        badge="Gemini + TFDA"
+        badgeTone="info"
+      />
 
-      <View style={styles.contextCard}>
-        <Text style={[styles.contextTitle, { fontSize: rs(12) }]}>目前辨識會套用你的健康條件</Text>
-        <Text style={[styles.contextText, { fontSize: rs(11) }]}>疾病：{user.healthConditions.length > 0 ? user.healthConditions.join('、') : '未設定'}</Text>
-        <Text style={[styles.contextText, { fontSize: rs(11) }]}>過敏原：{user.allergens.length > 0 ? user.allergens.join('、') : '未設定'}</Text>
-      </View>
-
-      {(syncingRecord || firstPendingRecord) && (
+      {(syncingRecord || firstPendingRecord) ? (
         <View style={[styles.syncStatusCard, firstPendingRecord && styles.syncStatusWarning]}>
           {syncingRecord ? (
-            <ActivityIndicator size="small" color={Palette.accent.cyan} />
+            <ActivityIndicator size="small" color={Palette.accent.green} />
           ) : (
-            <Ionicons name="cloud-offline-outline" size={rs(16)} color={Palette.status.warning} />
+            <Ionicons name="cloud-offline-outline" size={16} color={Palette.status.warning} />
           )}
           <View style={styles.syncStatusTextWrap}>
-            <Text style={[styles.syncStatusTitle, { fontSize: rs(12) }]}>
-              {syncingRecord ? '正在同步飲食紀錄...' : `有 ${userPendingRecords.length} 筆餐點尚未同步`}
+            <Text style={styles.syncStatusTitle}>
+              {syncingRecord ? '正在同步飲食紀錄' : `有 ${userPendingRecords.length} 筆餐點尚未同步`}
             </Text>
             {firstPendingRecord ? (
-              <Text style={[styles.syncStatusMessage, { fontSize: rs(10) }]}>
+              <Text style={styles.syncStatusMessage}>
                 {firstPendingRecord.error}，已重試 {firstPendingRecord.attempts}/{MAX_RECORD_SYNC_ATTEMPTS} 次
               </Text>
             ) : null}
           </View>
           {firstPendingRecord && !syncingRecord ? (
-            <Pressable onPress={retryPendingRecordSync} style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.75 }]}>
-              <Text style={[styles.retryButtonText, { fontSize: rs(11) }]}>重試</Text>
+            <Pressable onPress={retryPendingRecordSync} style={styles.retryButton}>
+              <Text style={styles.retryButtonText}>重試</Text>
             </Pressable>
           ) : null}
         </View>
-      )}
+      ) : null}
 
-      <View style={styles.viewfinderContainer}>
-        <LinearGradient colors={['rgba(167, 139, 250, 0.08)', 'rgba(96, 165, 250, 0.04)', 'transparent']} style={[styles.viewfinder, { height: rs(180) }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-          <View style={[styles.corner, styles.cornerTL]} />
-          <View style={[styles.corner, styles.cornerTR]} />
-          <View style={[styles.corner, styles.cornerBL]} />
-          <View style={[styles.corner, styles.cornerBR]} />
-
+      <View style={styles.scanHero}>
+        <View style={styles.scanIcon}>
           {scanResult.isScanning ? (
-            <View style={styles.viewfinderInner}>
-              <ActivityIndicator size="large" color={Palette.accent.cyan} />
-              <Text style={[styles.viewfinderText, { fontSize: rs(14) }]}>辨識中...</Text>
-            </View>
-          ) : results.length === 0 ? (
-            <View style={styles.viewfinderInner}>
-              <View style={[styles.iconCircle, { width: rs(70), height: rs(70), borderRadius: rs(35) }]}>
-                <Ionicons name="scan-outline" size={rs(40)} color={Palette.accent.purple} />
-              </View>
-              <Text style={[styles.viewfinderText, { fontSize: rs(14) }]}>將食物對準框內</Text>
-              <Text style={[styles.viewfinderHint, { fontSize: rs(11) }]}>Gemini Vision + 資料庫營養對應</Text>
-            </View>
+            <ActivityIndicator size="large" color={Palette.accent.green} />
+          ) : results.length > 0 ? (
+            <Ionicons name="checkmark-circle-outline" size={42} color={Palette.accent.green} />
           ) : (
-            <View style={styles.viewfinderInner}>
-              <Ionicons name="checkmark-circle" size={rs(40)} color={Palette.accent.green} />
-              <Text style={[styles.viewfinderText, { fontSize: rs(14) }]}>偵測到 {results.length} 項食物</Text>
-              <Text style={[styles.viewfinderHint, { fontSize: rs(11) }]}>總計 {totalCal} kcal · 鈉 {totalSodium}mg</Text>
-            </View>
+            <Ionicons name="scan-outline" size={42} color={Palette.accent.green} />
           )}
-        </LinearGradient>
+        </View>
+        <Text style={styles.scanTitle}>
+          {scanResult.isScanning ? '正在分析照片' : results.length > 0 ? `已辨識 ${results.length} 項食物` : '掃描餐點建立今日紀錄'}
+        </Text>
+        <Text style={styles.scanHint}>
+          {results.length > 0 ? `合計 ${totalCal} kcal，鈉 ${totalSodium}mg。請確認份量後加入。` : '建議拍攝完整餐盤，避免反光與遮擋。'}
+        </Text>
+        <PrimaryButton label={isWeb ? '載入 Web Demo 結果' : '啟動相機掃描'} onPress={handleCamera} icon={<Ionicons name="camera-outline" size={18} color={Palette.text.inverse} />} />
+        <View style={styles.secondaryActions}>
+          <SecondaryButton label="相簿上傳" onPress={handleGallery} icon={<Ionicons name="images-outline" size={16} color={Palette.accent.blue} />} />
+          <SecondaryButton label="清除結果" onPress={clearScan} icon={<Ionicons name="refresh-outline" size={16} color={Palette.text.secondary} />} />
+        </View>
       </View>
 
-      <View style={styles.actionsContainer}>
-        <Pressable onPress={handleCamera} style={({ pressed }) => [pressed && { transform: [{ scale: 0.95 }] }, { flex: 1 }]}>
-          <LinearGradient colors={['#4ADE80', '#22D3EE']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.cameraButton, { paddingVertical: rs(14) }]}> 
-            <Ionicons name="camera" size={rs(20)} color={Palette.text.inverse} />
-            <Text style={[styles.cameraButtonText, { fontSize: rs(14) }]}>啟動相機</Text>
-          </LinearGradient>
-        </Pressable>
+      <SectionBlock title="健康條件套用" subtitle="辨識與推薦會使用這些條件做安全過濾。">
+        <View style={styles.conditionRow}>
+          <DataPill tone={user.healthConditions.length ? 'warning' : 'success'}>疾病：{user.healthConditions.length > 0 ? user.healthConditions.join('、') : '未設定'}</DataPill>
+          <DataPill tone={user.allergens.length ? 'warning' : 'success'}>過敏原：{user.allergens.length > 0 ? user.allergens.join('、') : '未設定'}</DataPill>
+        </View>
+      </SectionBlock>
 
-        <Pressable onPress={handleGallery} style={({ pressed }) => [styles.galleryButton, { paddingVertical: rs(14), flex: 1 }, pressed && styles.galleryButtonPressed]}>
-          <Ionicons name="images-outline" size={rs(18)} color={Palette.accent.purple} />
-          <Text style={[styles.galleryButtonText, { fontSize: rs(14) }]}>相簿上傳</Text>
-        </Pressable>
+      <View style={styles.resultHeader}>
+        <Text style={styles.sectionTitle}>辨識結果</Text>
+        {results.length > 0 ? <DataPill tone="success">{results.length} 項</DataPill> : null}
       </View>
-
-      {results.length > 0 && (
-        <Pressable onPress={clearScan} style={styles.clearButton}>
-          <Ionicons name="refresh" size={rs(14)} color={Palette.text.tertiary} />
-          <Text style={[styles.clearText, { fontSize: rs(11) }]}>清除結果</Text>
-        </Pressable>
-      )}
+      <ScannerResults rs={rs} wp={wp} results={results} onAddRecord={handleAddRecord} onWeightChange={updateScanFoodWeight} />
 
       <ScannerManualTools
         rs={rs}
@@ -525,29 +478,15 @@ export default function ScannerScreen() {
         rejectedDetections={rejectedDetections}
       />
 
-      {ocrDraft && (
+      {ocrDraft ? (
         <OCRDraftCard
-          rs={rs}
-          wp={wp}
           draft={ocrDraft}
           onSaveCustomFood={handleSaveCustomFood}
           onQuickAdd={handleQuickAddOCRFood}
         />
-      )}
+      ) : null}
 
-      <ManualResultsList rs={rs} wp={wp} foods={manualResults} onAddFood={handleAddManualFood} />
-
-      <View style={styles.resultHeader}>
-        <Ionicons name="nutrition-outline" size={rs(16)} color={Palette.accent.cyan} />
-        <Text style={[styles.resultTitle, { fontSize: rs(16) }]}>辨識結果</Text>
-        {results.length > 0 && (
-          <View style={styles.resultCountBadge}>
-            <Text style={[styles.resultCountText, { fontSize: rs(11) }]}>{results.length} 項</Text>
-          </View>
-        )}
-      </View>
-
-      <ScannerResults rs={rs} wp={wp} results={results} onAddRecord={handleAddRecord} onWeightChange={updateScanFoodWeight} />
+      <ManualResultsList foods={manualResults} onAddFood={handleAddManualFood} />
     </AppContainer>
   );
 }
@@ -556,138 +495,72 @@ function buildClientRecordId(): string {
   return `record_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-const CORNER_SIZE = 24;
-const CORNER_WIDTH = 3;
-
 const styles = StyleSheet.create({
-  header: { marginTop: Spacing.lg, marginBottom: Spacing.xl },
-  title: { ...Typography.h1, color: Palette.text.primary, marginBottom: Spacing.xs },
-  subtitle: { ...Typography.body, color: Palette.text.tertiary, lineHeight: 22 },
-
-  viewfinderContainer: { marginBottom: Spacing.xl },
-  viewfinder: {
-    borderRadius: Radius.xl, borderWidth: 1, borderColor: Palette.border.medium,
-    justifyContent: 'center', alignItems: 'center', position: 'relative', overflow: 'hidden',
-  },
-  viewfinderInner: { alignItems: 'center' },
-  iconCircle: {
-    backgroundColor: Palette.accent.purpleDim, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.md,
-  },
-  viewfinderText: { ...Typography.bodyBold, color: Palette.text.secondary, marginTop: Spacing.sm, marginBottom: Spacing.xs },
-  viewfinderHint: { ...Typography.small, color: Palette.text.tertiary },
-  corner: { position: 'absolute', width: CORNER_SIZE, height: CORNER_SIZE },
-  cornerTL: { top: 12, left: 12, borderTopWidth: CORNER_WIDTH, borderLeftWidth: CORNER_WIDTH, borderColor: Palette.accent.purple, borderTopLeftRadius: 4 },
-  cornerTR: { top: 12, right: 12, borderTopWidth: CORNER_WIDTH, borderRightWidth: CORNER_WIDTH, borderColor: Palette.accent.purple, borderTopRightRadius: 4 },
-  cornerBL: { bottom: 12, left: 12, borderBottomWidth: CORNER_WIDTH, borderLeftWidth: CORNER_WIDTH, borderColor: Palette.accent.cyan, borderBottomLeftRadius: 4 },
-  cornerBR: { bottom: 12, right: 12, borderBottomWidth: CORNER_WIDTH, borderRightWidth: CORNER_WIDTH, borderColor: Palette.accent.cyan, borderBottomRightRadius: 4 },
-
-  actionsContainer: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.lg },
-  cameraButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    borderRadius: Radius.lg, gap: Spacing.sm, ...Shadows.card,
-  },
-  cameraButtonText: { ...Typography.bodyBold, color: Palette.text.inverse },
-  galleryButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    borderRadius: Radius.lg, backgroundColor: Palette.accent.purpleDim,
-    borderWidth: 1, borderColor: 'rgba(167, 139, 250, 0.25)', gap: Spacing.sm,
-  },
-  galleryButtonPressed: { backgroundColor: 'rgba(167, 139, 250, 0.25)', transform: [{ scale: 0.95 }] },
-  galleryButtonText: { ...Typography.bodyBold, color: Palette.accent.purple },
-
-  clearButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 4, marginBottom: Spacing.lg, alignSelf: 'center',
-  },
-  clearText: { ...Typography.small, color: Palette.text.tertiary },
-
-  contextCard: {
-    backgroundColor: Palette.bg.card,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Palette.border.subtle,
-  },
-  contextTitle: { ...Typography.caption, color: Palette.text.primary, marginBottom: 4 },
-  contextText: { ...Typography.small, color: Palette.text.tertiary },
-
   syncStatusCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
     backgroundColor: Palette.bg.card,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
     marginBottom: Spacing.lg,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
   },
-  syncStatusWarning: { borderColor: 'rgba(251,191,36,0.32)', backgroundColor: 'rgba(251,191,36,0.06)' },
+  syncStatusWarning: { borderColor: 'rgba(245,158,11,0.26)', backgroundColor: Palette.accent.orangeDim },
   syncStatusTextWrap: { flex: 1 },
   syncStatusTitle: { ...Typography.caption, color: Palette.text.primary },
-  syncStatusMessage: { ...Typography.small, color: Palette.text.tertiary, marginTop: 2 },
+  syncStatusMessage: { ...Typography.small, color: Palette.text.tertiary },
   retryButton: {
-    backgroundColor: Palette.accent.cyanDim,
+    backgroundColor: Palette.bg.card,
     borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
   },
-  retryButtonText: { ...Typography.caption, color: Palette.accent.cyan },
-
-  manualCard: {
-    backgroundColor: Palette.bg.card, borderRadius: Radius.xl, marginBottom: Spacing.xl,
-    borderWidth: 1, borderColor: Palette.border.subtle, ...Shadows.card,
+  retryButtonText: { ...Typography.caption, color: Palette.status.warning },
+  scanHero: {
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius['2xl'],
+    padding: Spacing.xl,
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginBottom: Spacing.xl,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    ...Shadows.card,
   },
-  manualHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
-  manualTitle: { ...Typography.h3, color: Palette.text.primary, flex: 1 },
-  manualResultsWrap: { marginBottom: Spacing.xl },
-  manualBadge: {
-    backgroundColor: Palette.accent.cyanDim,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radius.full,
-  },
-  manualBadgeText: { ...Typography.small, color: Palette.accent.cyan },
-  manualAddButton: {
-    marginTop: Spacing.md,
-    borderRadius: Radius.md,
-    backgroundColor: Palette.accent.greenDim,
+  scanIcon: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    backgroundColor: Palette.bg.mint,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.md,
   },
-  manualAddButtonText: { ...Typography.bodyBold, color: Palette.accent.green },
-  ocrProductName: { ...Typography.bodyBold, color: Palette.text.primary, marginBottom: Spacing.xs },
-  ocrMetaText: { ...Typography.small, color: Palette.text.tertiary, marginBottom: 2 },
-  ocrActions: { gap: Spacing.sm, marginTop: Spacing.md },
-  ocrQuickAddButton: {
-    borderRadius: Radius.md,
-    backgroundColor: Palette.accent.cyanDim,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
-  },
-  ocrQuickAddText: { ...Typography.bodyBold, color: Palette.accent.cyan },
-
-  foodCard: {
-    backgroundColor: Palette.bg.card, borderRadius: Radius.xl, marginBottom: Spacing.md,
-    borderWidth: 1, borderColor: Palette.border.subtle, ...Shadows.card,
-  },
-  foodTop: { marginBottom: Spacing.md },
-  foodNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  foodName: { ...Typography.h3, color: Palette.text.primary },
-  foodWeight: { ...Typography.small, color: Palette.text.tertiary },
-
+  scanTitle: { ...Typography.h2, color: Palette.text.primary, textAlign: 'center' },
+  scanHint: { ...Typography.caption, color: Palette.text.secondary, textAlign: 'center' },
+  secondaryActions: { flexDirection: 'row', gap: Spacing.sm, width: '100%' },
+  conditionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  resultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.lg },
+  sectionTitle: { ...Typography.h3, color: Palette.text.primary },
+  ocrHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, marginBottom: Spacing.xs },
+  ocrProductName: { ...Typography.bodyBold, color: Palette.text.primary, flex: 1 },
+  ocrMetaText: { ...Typography.caption, color: Palette.text.tertiary, marginBottom: Spacing.md },
   nutritionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  nutritionItem: { backgroundColor: Palette.bg.elevated, borderRadius: Radius.md, padding: Spacing.sm, flex: 1 },
-  nutritionDot: { width: 6, height: 6, borderRadius: 3, marginBottom: 4 },
-  nutritionLabel: { ...Typography.small, color: Palette.text.tertiary, marginBottom: 2 },
-  nutritionValue: { ...Typography.caption, fontWeight: '700' },
+  nutritionItem: { flex: 1, minWidth: '30%', backgroundColor: Palette.bg.elevated, borderRadius: Radius.md, padding: Spacing.sm },
+  nutritionLabel: { ...Typography.small, color: Palette.text.tertiary },
+  nutritionValue: { ...Typography.caption, ...Typography.number },
   nutritionUnit: { ...Typography.small, color: Palette.text.tertiary },
-
-  resultHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.lg },
-  resultTitle: { ...Typography.h3, color: Palette.text.primary, flex: 1 },
-  resultCountBadge: { backgroundColor: Palette.accent.cyanDim, paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: Radius.full },
-  resultCountText: { ...Typography.small, color: Palette.accent.cyan },
+  ocrActions: { gap: Spacing.sm, marginTop: Spacing.lg },
+  manualResultsWrap: { gap: Spacing.md },
+  manualFoodCard: { backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, padding: Spacing.md, gap: Spacing.md },
+  manualFoodTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  manualFoodCopy: { flex: 1 },
+  manualFoodName: { ...Typography.bodyBold, color: Palette.text.primary },
+  manualFoodHint: { ...Typography.small, color: Palette.text.tertiary },
+  macroRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  macro: { ...Typography.small, color: Palette.text.secondary, backgroundColor: Palette.bg.card, borderRadius: Radius.full, paddingHorizontal: Spacing.sm, paddingVertical: 4 },
 });

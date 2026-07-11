@@ -4,8 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
-import { useResponsive } from '@/hooks/useResponsive';
 import AppContainer from '@/components/AppContainer';
+import ScreenHeader from '@/components/ui/screen-header';
+import SectionBlock from '@/components/ui/section-block';
+import MetricCard from '@/components/ui/metric-card';
+import DataPill from '@/components/ui/data-pill';
+import PrimaryButton from '@/components/ui/primary-button';
+import SecondaryButton from '@/components/ui/secondary-button';
+import SegmentedControl from '@/components/ui/segmented-control';
 import FoodMap from '@/components/maps/FoodMap';
 import {
   fetchHealthyFoodRecommendations,
@@ -25,7 +31,12 @@ function formatReason(item: RecommendationItem) {
   return item.reasons.join('、');
 }
 
-const RADIUS_OPTIONS = [1, 3, 5];
+const RADIUS_OPTIONS = [
+  { value: '1', label: '1 km' },
+  { value: '3', label: '3 km' },
+  { value: '5', label: '5 km' },
+];
+
 const CATEGORY_OPTIONS = [
   { value: 'all', label: '全部' },
   { value: '便當', label: '便當' },
@@ -36,7 +47,6 @@ const CATEGORY_OPTIONS = [
 ];
 
 export default function RecommendScreen() {
-  const { rs, isSmall } = useResponsive();
   const { user, apiBaseUrl, accessToken } = useStore();
   const [data, setData] = useState<RecommendationResponse | null>(null);
   const [healthyData, setHealthyData] = useState<HealthyFoodResponse | null>(null);
@@ -61,19 +71,13 @@ export default function RecommendScreen() {
 
     fetchRecommendations(apiBaseUrl, user.userId, { accessToken })
       .then((result) => {
-        if (!cancelled) {
-          setData(result);
-        }
+        if (!cancelled) setData(result);
       })
       .catch((err: Error) => {
-        if (!cancelled) {
-          setError(err.message);
-        }
+        if (!cancelled) setError(err.message);
       })
       .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       });
 
     return () => {
@@ -87,15 +91,16 @@ export default function RecommendScreen() {
   const sourceCounts = data?.source_counts;
   const preferenceProfile = data?.preference_profile;
   const remaining = data?.remaining_calories ?? user.dailyCalorieTarget;
+  const mapRestaurants = healthyData?.restaurants || [];
+  const mapLocation = healthyData?.location || null;
+  const selectedRestaurant = mapRestaurants.find((restaurant) => restaurant.restaurant_id === selectedRestaurantId) || mapRestaurants[0] || null;
 
   const handleHealthyFoodSearch = async () => {
     setHealthyLoading(true);
     setHealthyError(null);
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
-      if (!permission.granted) {
-        throw new Error('未授權定位權限');
-      }
+      if (!permission.granted) throw new Error('未授權定位權限');
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
@@ -103,13 +108,7 @@ export default function RecommendScreen() {
       const result = await fetchHealthyFoodRecommendations(
         apiBaseUrl,
         user.userId,
-        {
-          budget: Number(budget) || 150,
-          lat,
-          lng,
-          radiusKm,
-          category,
-        },
+        { budget: Number(budget) || 150, lat, lng, radiusKm, category },
         { accessToken }
       );
       setHealthyData(result);
@@ -134,10 +133,6 @@ export default function RecommendScreen() {
     }
   };
 
-  const mapRestaurants = healthyData?.restaurants || [];
-  const mapLocation = healthyData?.location || null;
-  const selectedRestaurant = mapRestaurants.find((restaurant) => restaurant.restaurant_id === selectedRestaurantId) || mapRestaurants[0] || null;
-
   const handleOpenNavigation = async (restaurant: HealthyFoodRestaurant) => {
     try {
       await Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${restaurant.lat},${restaurant.lng}&travelmode=walking`);
@@ -150,12 +145,7 @@ export default function RecommendScreen() {
     setHealthyError(null);
     setSummaryLoadingKey(restaurant.restaurant_id);
     try {
-      const response = await fetchRestaurantAiSummary(
-        apiBaseUrl,
-        user.userId,
-        { restaurant, budget: Number(budget) || 150, category },
-        { accessToken }
-      );
+      const response = await fetchRestaurantAiSummary(apiBaseUrl, user.userId, { restaurant, budget: Number(budget) || 150, category }, { accessToken });
       setSummaryByRestaurant((current) => ({ ...current, [restaurant.restaurant_id]: response.summary }));
     } catch (err: any) {
       setHealthyError(err?.message || 'AI 店家摘要產生失敗');
@@ -166,263 +156,100 @@ export default function RecommendScreen() {
 
   return (
     <AppContainer>
-      <View style={styles.header}>
-        <Text style={[styles.title, { fontSize: rs(isSmall ? 22 : 26) }]}>智慧推薦</Text>
-        <Text style={[styles.subtitle, { fontSize: rs(13) }]}>基於健康條件與今日剩餘熱量，篩選更安全的餐點</Text>
-      </View>
+      <ScreenHeader
+        title="智慧推薦"
+        subtitle="先看通過安全規則的餐點，再用定位找附近可行店家。"
+        badge="安全過濾"
+        badgeTone="success"
+      />
 
       {loading ? (
-        <View style={[styles.emptyCard, { padding: rs(24) }]}> 
-          <ActivityIndicator size="large" color={Palette.accent.cyan} />
-          <Text style={[styles.emptyText, { fontSize: rs(13) }]}>讀取推薦中...</Text>
-        </View>
+        <StateCard icon="sparkles-outline" text="讀取推薦中..." loading />
       ) : error ? (
-        <View style={[styles.emptyCard, { padding: rs(24) }]}> 
-          <Ionicons name="cloud-offline-outline" size={rs(30)} color={Palette.status.warning} />
-          <Text style={[styles.emptyText, { fontSize: rs(13) }]}>無法載入推薦資料：{error}</Text>
-        </View>
+        <StateCard icon="cloud-offline-outline" text={`無法載入推薦資料：${error}`} tone="warning" />
       ) : (
         <>
-          <View style={[styles.summaryCard, { padding: rs(16) }]}> 
-            <View style={styles.summaryRow}>
-              <View style={styles.summaryItem}>
-                <Text style={[styles.summaryLabel, { fontSize: rs(10) }]}>剩餘熱量</Text>
-                <Text style={[styles.summaryValue, { fontSize: rs(18), color: Palette.accent.green }]}>{remaining} kcal</Text>
-              </View>
-              <View style={styles.summaryDivider} />
-              <View style={styles.summaryItem}>
-                <Text style={[styles.summaryLabel, { fontSize: rs(10) }]}>健康狀況</Text>
-                <View style={styles.conditionTags}>
-                  {user.healthConditions.length > 0 ? user.healthConditions.map((c) => (
-                    <View key={c} style={styles.conditionTag}>
-                      <Text style={[styles.conditionTagText, { fontSize: rs(10) }]}>{c}</Text>
-                    </View>
-                  )) : (
-                    <Text style={[styles.noCondText, { fontSize: rs(11) }]}>無設定</Text>
-                  )}
-                </View>
-              </View>
-            </View>
-            <View style={styles.filterNotice}>
-              <Ionicons name="shield-checkmark" size={rs(14)} color={Palette.accent.green} />
-              <Text style={[styles.filterNoticeText, { fontSize: rs(11) }]}>已自動排除 {totalFiltered} 項不適合的餐點</Text>
-            </View>
+          <View style={styles.metricRow}>
+            <MetricCard label="剩餘熱量" value={remaining} unit="kcal" accent={Palette.accent.green} />
+            <MetricCard label="已排除" value={totalFiltered} unit="項" accent={Palette.status.warning} />
+            <MetricCard label="可推薦" value={recommended.length} unit="項" accent={Palette.accent.blue} />
           </View>
 
-          {sourceCounts ? (
-            <View style={[styles.sourceCard, { padding: rs(12) }]}> 
-              <Ionicons name="layers-outline" size={rs(14)} color={Palette.accent.cyan} />
-              <Text style={[styles.sourceText, { fontSize: rs(11) }]}>推薦池：TFDA {sourceCounts.tfda} 筆、自訂食品 {sourceCounts.custom_foods} 筆、基礎資料 {sourceCounts.manual_db} 筆</Text>
+          <SectionBlock title="安全餐點推薦" subtitle="依熱量契合、疾病禁忌、過敏原和近期偏好排序。">
+            <View style={styles.sourceSummary}>
+              {sourceCounts ? <DataPill tone="info">TFDA {sourceCounts.tfda} · 自訂 {sourceCounts.custom_foods} · 基礎 {sourceCounts.manual_db}</DataPill> : null}
+              {preferenceProfile && preferenceProfile.food_count > 0 ? <DataPill tone="success">參考 {preferenceProfile.record_count} 筆紀錄</DataPill> : null}
+              <DataPill tone={user.healthConditions.length ? 'warning' : 'success'}>{user.healthConditions.length ? user.healthConditions.join('、') : '未設定疾病'}</DataPill>
             </View>
-          ) : null}
 
-          {preferenceProfile && preferenceProfile.food_count > 0 ? (
-            <View style={[styles.sourceCard, { padding: rs(12), borderColor: 'rgba(244,114,182,0.22)' }]}> 
-              <Ionicons name="heart-outline" size={rs(14)} color={Palette.accent.pink} />
-              <Text style={[styles.sourceText, { fontSize: rs(11) }]}>已參考近期 {preferenceProfile.record_count} 筆紀錄、{preferenceProfile.food_count} 個食品與 {preferenceProfile.feedback_count || 0} 筆推薦回饋建立偏好分數</Text>
+            <View style={styles.filteredSummary}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={Palette.accent.green} />
+              <Text style={styles.filteredSummaryText}>安全過濾層已排除 {totalFiltered} 項不適合的餐點。</Text>
             </View>
-          ) : null}
-
-          <View style={[styles.filteredCard, { padding: rs(16) }]}> 
-            <View style={styles.filteredHeader}>
-              <Ionicons name="close-circle" size={rs(16)} color={Palette.status.error} />
-              <Text style={[styles.filteredTitle, { fontSize: rs(13) }]}>安全過濾層已排除</Text>
-            </View>
-            {filteredOut.length === 0 ? (
-              <Text style={[styles.filteredReason, { fontSize: rs(11) }]}>目前沒有額外被排除的餐點。</Text>
-            ) : (
-              filteredOut.slice(0, 6).map((item, i) => (
-                <View key={`${item.label}_${i}`} style={[styles.filteredRow, i < Math.min(filteredOut.length, 6) - 1 && styles.filteredRowBordered]}>
-                  <Text style={styles.filteredEmoji}>🚫</Text>
-                  <View style={styles.filteredInfo}>
-                    <Text style={[styles.filteredName, { fontSize: rs(14) }]}>{item.name_zh}</Text>
-                    <Text style={[styles.filteredReason, { fontSize: rs(11) }]}>{formatReason(item)}</Text>
-                  </View>
-                </View>
-              ))
-            )}
-            {totalFiltered > filteredOut.length ? (
-              <Text style={[styles.filteredReason, { fontSize: rs(10), marginTop: rs(8) }]}>僅顯示前 {filteredOut.length} 筆排除範例，完整排除數已計入上方統計。</Text>
-            ) : null}
-          </View>
-
-          <View style={styles.recHeader}>
-            <Text style={[styles.sectionTitle, { fontSize: rs(16) }]}>為你推薦</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name="sparkles" size={rs(12)} color={Palette.accent.pink} />
-              <Text style={[styles.recSort, { fontSize: rs(10) }]}>依熱量契合與安全規則排序</Text>
-            </View>
-          </View>
-
-          {recommended.length === 0 ? (
-            <View style={[styles.emptyCard, { padding: rs(24) }]}> 
-              <Ionicons name="restaurant-outline" size={rs(30)} color={Palette.text.tertiary} />
-              <Text style={[styles.emptyText, { fontSize: rs(13) }]}>目前找不到符合條件的推薦，請先調整個人條件或新增更多食品資料。</Text>
-            </View>
-          ) : (
-            recommended.map((meal, index) => (
-              <View key={`${meal.label}_${index}`} style={[styles.mealCard, { padding: rs(16) }]}> 
-                <View style={styles.mealTop}>
-                  <View style={[styles.mealEmoji, { width: rs(40), height: rs(40), borderRadius: rs(12) }]}>
-                    <Text style={{ fontSize: rs(18) }}>🍽️</Text>
-                  </View>
-                  <View style={styles.mealInfo}>
-                    <Text style={[styles.mealName, { fontSize: rs(15) }]}>{meal.name_zh}</Text>
-                    <View style={styles.mealMeta}>
-                      <Ionicons name="shield-checkmark-outline" size={rs(10)} color={Palette.text.tertiary} />
-                      <Text style={[styles.mealMetaText, { fontSize: rs(10) }]}>{meal.source === 'TFDA' ? 'TFDA 官方資料' : meal.source === 'manual-db' ? '基礎資料庫' : '自訂食品'}</Text>
-                      {(meal.preference_score || 0) > 0 ? <Text style={[styles.mealMetaText, { fontSize: rs(10), color: Palette.accent.pink }]}>偏好 +{meal.preference_score}</Text> : null}
-                      {(meal.feedback_adjustment || 0) !== 0 ? <Text style={[styles.mealMetaText, { fontSize: rs(10), color: (meal.feedback_adjustment || 0) > 0 ? Palette.accent.green : Palette.status.warning }]}>回饋 {meal.feedback_adjustment! > 0 ? '+' : ''}{meal.feedback_adjustment}</Text> : null}
-                      {meal.gi ? <Text style={[styles.mealMetaText, { fontSize: rs(10) }]}>GI {meal.gi === 'low' ? '低' : meal.gi === 'medium' ? '中' : '高'}</Text> : null}
-                    </View>
-                  </View>
-                  <View style={styles.scoreContainer}>
-                    <Text style={[styles.scoreValue, { fontSize: rs(20), color: Palette.accent.pink }]}>{meal.match_score}</Text>
-                    <Text style={[styles.scoreLabel, { fontSize: rs(9) }]}>契合</Text>
-                  </View>
-                </View>
-
-                <View style={styles.badgesRow}>
-                  {(meal.safety_badges || []).length > 0 ? (meal.safety_badges || []).map((badge) => (
-                    <View key={badge} style={styles.safetyBadge}>
-                      <Ionicons name="checkmark-circle" size={rs(10)} color={Palette.accent.green} />
-                      <Text style={[styles.safetyBadgeText, { fontSize: rs(10) }]}>{badge}</Text>
-                    </View>
-                  )) : (
-                    <View style={styles.safetyBadge}>
-                      <Ionicons name="checkmark-circle" size={rs(10)} color={Palette.accent.green} />
-                      <Text style={[styles.safetyBadgeText, { fontSize: rs(10) }]}>已通過安全篩選</Text>
-                    </View>
-                  )}
-                </View>
-
-                {(meal.preference_reasons || []).length > 0 ? (
-                  <View style={styles.preferenceReasonWrap}>
-                    {(meal.preference_reasons || []).map((reason) => (
-                      <Text key={reason} style={[styles.preferenceReasonText, { fontSize: rs(10) }]}>因為 {reason}</Text>
-                    ))}
-                  </View>
-                ) : null}
-
-                <View style={styles.mealNutritionRow}>
-                  {[
-                    { label: '熱量', value: `${meal.calories} kcal`, color: Palette.accent.green },
-                    { label: '蛋白質', value: `${meal.protein} g`, color: Palette.accent.blue },
-                    { label: '碳水', value: `${meal.carbs} g`, color: Palette.accent.orange },
-                    { label: '鈉', value: `${meal.sodium} mg`, color: Palette.accent.pink },
-                  ].map((n) => (
-                    <View key={n.label} style={styles.mealNutritionItem}>
-                      <Text style={[styles.mealNutritionLabel, { fontSize: rs(9) }]}>{n.label}</Text>
-                      <Text style={[styles.mealNutritionValue, { fontSize: rs(12), color: n.color }]}>{n.value}</Text>
-                    </View>
-                  ))}
-                </View>
-
-                <View style={styles.feedbackRow}>
-                  {[
-                    { action: 'accepted' as const, label: '採納', icon: 'checkmark-circle-outline' as const },
-                    { action: 'skipped' as const, label: '略過', icon: 'play-skip-forward-outline' as const },
-                    { action: 'disliked' as const, label: '不喜歡', icon: 'thumbs-down-outline' as const },
-                  ].map((item) => {
-                    const active = feedbackStatus[meal.label] === item.action;
-                    const saving = feedbackSavingKey === meal.label;
-                    return (
-                      <Pressable
-                        key={item.action}
-                        disabled={saving}
-                        onPress={() => handleRecommendationFeedback(meal, item.action)}
-                        style={({ pressed }) => [
-                          styles.feedbackButton,
-                          active && styles.feedbackButtonActive,
-                          (pressed || saving) && { opacity: 0.72 },
-                        ]}
-                      >
-                        {saving && item.action === 'accepted' ? (
-                          <ActivityIndicator size="small" color={Palette.accent.cyan} />
-                        ) : (
-                          <Ionicons name={item.icon} size={rs(12)} color={active ? Palette.accent.green : Palette.text.tertiary} />
-                        )}
-                        <Text style={[styles.feedbackButtonText, { fontSize: rs(10) }, active && styles.feedbackButtonTextActive]}>{item.label}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+            {filteredOut.slice(0, 3).map((item, i) => (
+              <View key={`${item.label}_${i}`} style={styles.filteredExample}>
+                <Text style={styles.filteredName}>{item.name_zh}</Text>
+                <Text style={styles.filteredReason}>{formatReason(item)}</Text>
               </View>
-            ))
-          )}
+            ))}
 
-          <View style={[styles.summaryCard, { padding: rs(16) }]}> 
-            <View style={styles.filteredHeader}>
-              <Ionicons name="navigate" size={rs(16)} color={Palette.accent.cyan} />
-              <Text style={[styles.filteredTitle, { fontSize: rs(13), color: Palette.accent.cyan }]}>附近餐廳地圖推薦</Text>
+            <View style={styles.recommendList}>
+              {recommended.length === 0 ? (
+                <Text style={styles.emptyText}>目前找不到符合條件的推薦，請先調整個人條件或新增更多食品資料。</Text>
+              ) : (
+                recommended.map((meal, index) => (
+                  <RecommendationCard
+                    key={`${meal.label}_${index}`}
+                    meal={meal}
+                    feedbackStatus={feedbackStatus[meal.label]}
+                    saving={feedbackSavingKey === meal.label}
+                    onFeedback={(action) => handleRecommendationFeedback(meal, action)}
+                  />
+                ))
+              )}
             </View>
-            <Text style={[styles.filteredReason, { fontSize: rs(11), marginBottom: rs(12) }]}>輸入本餐預算與搜尋半徑後，會透過 Google Places 搜尋附近真實店家；Google 不提供可靠菜單營養，餐點營養請到店後用掃描或手動搜尋確認。</Text>
+          </SectionBlock>
+
+          <SectionBlock title="附近店家推薦" subtitle="Google Places 只提供真實店家位置；實際餐點營養仍建議用掃描確認。">
             <View style={styles.budgetRow}>
               <TextInput
                 value={budget}
                 onChangeText={setBudget}
                 keyboardType="numeric"
-                placeholder="預算"
-                placeholderTextColor={Palette.text.tertiary}
-                style={[styles.budgetInput, { fontSize: rs(13) }]}
+                placeholder="本餐預算"
+                placeholderTextColor={Palette.text.muted}
+                style={styles.budgetInput}
               />
-              <Pressable onPress={handleHealthyFoodSearch} style={styles.locateButton}>
-                {healthyLoading ? (
-                  <ActivityIndicator size="small" color={Palette.text.inverse} />
-                ) : (
-                  <Text style={[styles.locateButtonText, { fontSize: rs(12) }]}>更新地圖</Text>
-                )}
-              </Pressable>
+              <PrimaryButton
+                label={healthyLoading ? '搜尋中' : '更新地圖'}
+                onPress={handleHealthyFoodSearch}
+                fullWidth={false}
+                icon={healthyLoading ? <ActivityIndicator size="small" color={Palette.text.inverse} /> : <Ionicons name="location-outline" size={17} color={Palette.text.inverse} />}
+              />
             </View>
-            <View style={styles.optionGroup}>
-              <Text style={[styles.optionLabel, { fontSize: rs(10) }]}>搜尋半徑</Text>
-              <View style={styles.optionRow}>
-                {RADIUS_OPTIONS.map((option) => (
-                  <Pressable
-                    key={option}
-                    onPress={() => setRadiusKm(option)}
-                    style={[styles.optionChip, radiusKm === option && styles.optionChipActive]}
-                  >
-                    <Text style={[styles.optionChipText, { fontSize: rs(10) }, radiusKm === option && styles.optionChipTextActive]}>{option} km</Text>
-                  </Pressable>
-                ))}
-              </View>
+            <Text style={styles.optionLabel}>搜尋半徑</Text>
+            <SegmentedControl options={RADIUS_OPTIONS} value={String(radiusKm)} onChange={(value) => setRadiusKm(Number(value))} />
+            <Text style={styles.optionLabel}>店家類型</Text>
+            <View style={styles.categoryWrap}>
+              {CATEGORY_OPTIONS.map((option) => (
+                <Pressable key={option.value} onPress={() => setCategory(option.value)} style={[styles.categoryChip, category === option.value && styles.categoryChipActive]}>
+                  <Text style={[styles.categoryText, category === option.value && styles.categoryTextActive]}>{option.label}</Text>
+                </Pressable>
+              ))}
             </View>
-            <View style={styles.optionGroup}>
-              <Text style={[styles.optionLabel, { fontSize: rs(10) }]}>店家類型</Text>
-              <View style={styles.optionRow}>
-                {CATEGORY_OPTIONS.map((option) => (
-                  <Pressable
-                    key={option.value}
-                    onPress={() => setCategory(option.value)}
-                    style={[styles.optionChip, category === option.value && styles.optionChipActive]}
-                  >
-                    <Text style={[styles.optionChipText, { fontSize: rs(10) }, category === option.value && styles.optionChipTextActive]}>{option.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-            <Text style={[styles.filteredReason, { fontSize: rs(10), marginTop: 8 }]}>{locationLabel}</Text>
+            <Text style={styles.locationText}>{locationLabel}</Text>
             {healthyError ? (
               <View style={styles.apiErrorBox}>
-                <Text style={[styles.filteredReason, { fontSize: rs(10), color: Palette.status.warning }]}>{healthyError}</Text>
-                <Text style={[styles.filteredReason, { fontSize: rs(9), marginTop: 4 }]}>API：{apiBaseUrl}</Text>
-                <Text style={[styles.filteredReason, { fontSize: rs(9), marginTop: 2 }]}>登入狀態：{accessToken ? 'Bearer token 已載入' : '尚未載入 Bearer token'}</Text>
+                <Text style={styles.errorText}>{healthyError}</Text>
+                <Text style={styles.errorMeta}>API：{apiBaseUrl}</Text>
+                <Text style={styles.errorMeta}>登入狀態：{accessToken ? 'Bearer token 已載入' : '尚未載入 Bearer token'}</Text>
               </View>
             ) : null}
-          </View>
+          </SectionBlock>
 
           {mapRestaurants.length && mapLocation ? (
             <>
-              <View style={styles.recHeader}>
-                <Text style={[styles.sectionTitle, { fontSize: rs(16) }]}>地圖上的推薦店家</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="location" size={rs(12)} color={Palette.accent.cyan} />
-                  <Text style={[styles.recSort, { fontSize: rs(10), color: Palette.accent.cyan }]}>Google Places 真實店家，依距離、評分與預算估計排序</Text>
-                </View>
-              </View>
-
-              <View style={[styles.mapCard, { padding: rs(12) }]}>
+              <View style={styles.mapCard}>
                 <FoodMap
                   location={mapLocation}
                   restaurants={mapRestaurants}
@@ -431,118 +258,28 @@ export default function RecommendScreen() {
                 />
                 {selectedRestaurant ? (
                   <View style={styles.selectedMapInfo}>
-                    <View style={styles.selectedMapTitleRow}>
-                      <Text style={[styles.mealName, { fontSize: rs(15) }]}>{selectedRestaurant.name}</Text>
-                      <Text style={[styles.scorePill, { fontSize: rs(10) }]}>推薦 {selectedRestaurant.match_score}</Text>
+                    <View style={styles.mapTitleRow}>
+                      <Text style={styles.restaurantName}>{selectedRestaurant.name}</Text>
+                      <DataPill tone="info">推薦 {selectedRestaurant.match_score}</DataPill>
                     </View>
-                    <Text style={[styles.filteredReason, { fontSize: rs(10) }]}>{selectedRestaurant.address || '尚無地址'} · {selectedRestaurant.distance_km} km</Text>
-                    <Pressable onPress={() => handleOpenNavigation(selectedRestaurant)} style={styles.navigationButton}>
-                      <Ionicons name="navigate-circle-outline" size={rs(14)} color={Palette.text.inverse} />
-                      <Text style={[styles.navigationButtonText, { fontSize: rs(11) }]}>開啟 Google Maps 導航</Text>
-                    </Pressable>
+                    <Text style={styles.restaurantMeta}>{selectedRestaurant.address || '尚無地址'} · {selectedRestaurant.distance_km} km</Text>
+                    <SecondaryButton label="開啟 Google Maps 導航" onPress={() => handleOpenNavigation(selectedRestaurant)} icon={<Ionicons name="navigate-outline" size={15} color={Palette.accent.green} />} />
                   </View>
                 ) : null}
               </View>
 
               {mapRestaurants.map((restaurant, index) => (
-                <View key={restaurant.restaurant_id} style={[styles.mealCard, selectedRestaurantId === restaurant.restaurant_id && styles.mealCardSelected, { padding: rs(16) }]}>
-                  <View style={styles.mealTop}>
-                    <View style={[styles.mealEmoji, { width: rs(40), height: rs(40), borderRadius: rs(12) }]}>
-                      <Text style={{ fontSize: rs(18) }}>{index + 1}</Text>
-                    </View>
-                    <View style={styles.mealInfo}>
-                      <Text style={[styles.mealName, { fontSize: rs(15) }]}>{restaurant.name}</Text>
-                      <View style={styles.mealMeta}>
-                        <Ionicons name="storefront-outline" size={rs(10)} color={Palette.text.tertiary} />
-                        <Text style={[styles.mealMetaText, { fontSize: rs(10) }]}>{restaurant.tags.slice(0, 2).join('、')}</Text>
-                        <Ionicons name="location-outline" size={rs(10)} color={Palette.text.tertiary} />
-                        <Text style={[styles.mealMetaText, { fontSize: rs(10) }]}>{restaurant.distance_km} km</Text>
-                        <Ionicons name="time-outline" size={rs(10)} color={Palette.text.tertiary} />
-                        <Text style={[styles.mealMetaText, { fontSize: rs(10) }]}>{restaurant.is_open ? '營業中' : '未營業'}</Text>
-                        {restaurant.rating ? <Text style={[styles.mealMetaText, { fontSize: rs(10) }]}>評分 {restaurant.rating}</Text> : null}
-                      </View>
-                    </View>
-                    <View style={styles.scoreContainer}>
-                      <Text style={[styles.scoreValue, { fontSize: rs(20), color: Palette.accent.cyan }]}>{restaurant.match_score}</Text>
-                      <Text style={[styles.scoreLabel, { fontSize: rs(9) }]}>推薦</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.badgesRow}>
-                    {restaurant.tags.map((badge) => (
-                      <View key={badge} style={styles.safetyBadge}>
-                        <Ionicons name="leaf-outline" size={rs(10)} color={Palette.accent.green} />
-                        <Text style={[styles.safetyBadgeText, { fontSize: rs(10) }]}>{badge}</Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  {restaurant.recommended_items.slice(0, 2).map((item) => (
-                    <View key={`${restaurant.restaurant_id}_${item.item_id || item.item_name}`} style={styles.recommendedItemBlock}>
-                      <View style={styles.selectedMapTitleRow}>
-                        <Text style={[styles.mealName, { fontSize: rs(13), flex: 1 }]}>{item.item_name}</Text>
-                        <Text style={[styles.priceText, { fontSize: rs(12) }]}>{restaurant.price_level != null ? `$${restaurant.price_level}` : '價格待確認'}</Text>
-                      </View>
-                      {item.nutrition_available ? (
-                        <View style={styles.mealNutritionRow}>
-                          {[
-                            { label: '熱量', value: `${item.calories} kcal`, color: Palette.accent.green },
-                            { label: '蛋白質', value: `${item.protein} g`, color: Palette.accent.blue },
-                            { label: '鈉', value: `${item.sodium} mg`, color: Palette.accent.pink },
-                            { label: '分數', value: `${item.match_score}`, color: Palette.accent.orange },
-                          ].map((n) => (
-                            <View key={n.label} style={styles.mealNutritionItem}>
-                              <Text style={[styles.mealNutritionLabel, { fontSize: rs(9) }]}>{n.label}</Text>
-                              <Text style={[styles.mealNutritionValue, { fontSize: rs(12), color: n.color }]}>{n.value}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      ) : (
-                        <View style={styles.nutritionUnavailableBox}>
-                          <Ionicons name="information-circle-outline" size={rs(13)} color={Palette.status.warning} />
-                          <Text style={[styles.filteredReason, { fontSize: rs(10), flex: 1 }]}>Google Places 已提供真實店家位置；菜單價格與營養資料需到店後用掃描或手動搜尋確認。</Text>
-                        </View>
-                      )}
-                      <View style={styles.reasonWrap}>
-                        {item.reasons.map((reason) => (
-                          <Text key={reason} style={[styles.filteredReason, { fontSize: rs(10) }]}>{reason}</Text>
-                        ))}
-                      </View>
-                    </View>
-                  ))}
-
-                  <View style={styles.restaurantActionRow}>
-                    <Pressable onPress={() => setSelectedRestaurantId(restaurant.restaurant_id)} style={styles.secondaryButton}>
-                      <Ionicons name="map-outline" size={rs(13)} color={Palette.accent.cyan} />
-                      <Text style={[styles.secondaryButtonText, { fontSize: rs(11) }]}>在地圖標示</Text>
-                    </Pressable>
-                    <Pressable onPress={() => handleLoadRestaurantSummary(restaurant)} style={styles.secondaryButton} disabled={summaryLoadingKey === restaurant.restaurant_id}>
-                      {summaryLoadingKey === restaurant.restaurant_id ? (
-                        <ActivityIndicator size="small" color={Palette.accent.pink} />
-                      ) : (
-                        <Ionicons name="sparkles-outline" size={rs(13)} color={Palette.accent.pink} />
-                      )}
-                      <Text style={[styles.secondaryButtonText, { fontSize: rs(11), color: Palette.accent.pink }]}>AI 摘要</Text>
-                    </Pressable>
-                    <Pressable onPress={() => handleOpenNavigation(restaurant)} style={styles.secondaryButton}>
-                      <Ionicons name="navigate-outline" size={rs(13)} color={Palette.accent.green} />
-                      <Text style={[styles.secondaryButtonText, { fontSize: rs(11), color: Palette.accent.green }]}>導航</Text>
-                    </Pressable>
-                  </View>
-
-                  {summaryByRestaurant[restaurant.restaurant_id] ? (
-                    <View style={styles.aiSummaryBox}>
-                      <View style={styles.selectedMapTitleRow}>
-                        <Text style={[styles.mealName, { fontSize: rs(13) }]}>AI 推測：{summaryByRestaurant[restaurant.restaurant_id].restaurant_type}</Text>
-                        <Text style={[styles.scorePill, { fontSize: rs(10), color: Palette.accent.pink, backgroundColor: Palette.accent.pinkDim }]}>可信度 {summaryByRestaurant[restaurant.restaurant_id].confidence}</Text>
-                      </View>
-                      <Text style={[styles.filteredReason, { fontSize: rs(10) }]}>可能販售：{summaryByRestaurant[restaurant.restaurant_id].likely_foods.join('、') || '不確定'}</Text>
-                      <Text style={[styles.filteredReason, { fontSize: rs(10) }]}>價格：約 {summaryByRestaurant[restaurant.restaurant_id].price_range_twd.min}-{summaryByRestaurant[restaurant.restaurant_id].price_range_twd.max} 元 · 預算：{summaryByRestaurant[restaurant.restaurant_id].budget_fit}</Text>
-                      <Text style={[styles.filteredReason, { fontSize: rs(10) }]}>建議：{summaryByRestaurant[restaurant.restaurant_id].health_tips.join('、') || '到店後確認餐點內容'}</Text>
-                      <Text style={[styles.filteredReason, { fontSize: rs(9), color: Palette.status.warning }]}>{summaryByRestaurant[restaurant.restaurant_id].source_note}</Text>
-                    </View>
-                  ) : null}
-                </View>
+                <RestaurantCard
+                  key={restaurant.restaurant_id}
+                  restaurant={restaurant}
+                  index={index}
+                  selected={selectedRestaurantId === restaurant.restaurant_id}
+                  summary={summaryByRestaurant[restaurant.restaurant_id]}
+                  summaryLoading={summaryLoadingKey === restaurant.restaurant_id}
+                  onSelect={() => setSelectedRestaurantId(restaurant.restaurant_id)}
+                  onSummary={() => handleLoadRestaurantSummary(restaurant)}
+                  onNavigate={() => handleOpenNavigation(restaurant)}
+                />
               ))}
             </>
           ) : null}
@@ -552,12 +289,148 @@ export default function RecommendScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  header: { marginTop: Spacing.lg, marginBottom: Spacing.xl },
-  title: { ...Typography.h1, color: Palette.text.primary, marginBottom: Spacing.xs },
-  subtitle: { ...Typography.body, color: Palette.text.tertiary, lineHeight: 22 },
+function StateCard({ icon, text, loading, tone }: { icon: keyof typeof Ionicons.glyphMap; text: string; loading?: boolean; tone?: 'warning' }) {
+  return (
+    <View style={styles.stateCard}>
+      {loading ? <ActivityIndicator size="large" color={Palette.accent.green} /> : <Ionicons name={icon} size={30} color={tone === 'warning' ? Palette.status.warning : Palette.text.tertiary} />}
+      <Text style={styles.emptyText}>{text}</Text>
+    </View>
+  );
+}
 
-  emptyCard: {
+function RecommendationCard({
+  meal,
+  feedbackStatus,
+  saving,
+  onFeedback,
+}: {
+  meal: RecommendationItem;
+  feedbackStatus?: RecommendationFeedbackAction;
+  saving: boolean;
+  onFeedback: (action: RecommendationFeedbackAction) => void;
+}) {
+  return (
+    <View style={styles.mealCard}>
+      <View style={styles.mealTop}>
+        <View style={styles.mealInfo}>
+          <Text style={styles.mealName}>{meal.name_zh}</Text>
+          <View style={styles.pillRow}>
+            <DataPill tone="success">{meal.source === 'TFDA' ? 'TFDA 官方資料' : meal.source === 'manual-db' ? '基礎資料庫' : '自訂食品'}</DataPill>
+            {meal.gi ? <DataPill tone={meal.gi === 'high' ? 'danger' : meal.gi === 'medium' ? 'warning' : 'success'}>GI {meal.gi === 'low' ? '低' : meal.gi === 'medium' ? '中' : '高'}</DataPill> : null}
+          </View>
+        </View>
+        <View style={styles.scoreBox}>
+          <Text style={styles.scoreValue}>{meal.match_score}</Text>
+          <Text style={styles.scoreLabel}>契合</Text>
+        </View>
+      </View>
+      <View style={styles.reasonBox}>
+        {(meal.preference_reasons || []).length > 0 ? (
+          (meal.preference_reasons || []).map((reason) => <Text key={reason} style={styles.reasonText}>因為 {reason}</Text>)
+        ) : (
+          <Text style={styles.reasonText}>已通過健康條件與過敏原安全篩選。</Text>
+        )}
+      </View>
+      <View style={styles.nutritionRow}>
+        <NutritionMini label="熱量" value={`${meal.calories} kcal`} color={Palette.accent.green} />
+        <NutritionMini label="蛋白質" value={`${meal.protein} g`} color={Palette.accent.blue} />
+        <NutritionMini label="鈉" value={`${meal.sodium} mg`} color={meal.sodium > 800 ? Palette.status.warning : Palette.accent.pink} />
+      </View>
+      <View style={styles.feedbackRow}>
+        {[
+          { action: 'accepted' as const, label: '採納', icon: 'checkmark-circle-outline' as const },
+          { action: 'skipped' as const, label: '略過', icon: 'play-skip-forward-outline' as const },
+          { action: 'disliked' as const, label: '不喜歡', icon: 'thumbs-down-outline' as const },
+        ].map((item) => {
+          const active = feedbackStatus === item.action;
+          return (
+            <Pressable key={item.action} disabled={saving} onPress={() => onFeedback(item.action)} style={[styles.feedbackButton, active && styles.feedbackButtonActive]}>
+              {saving && item.action === 'accepted' ? <ActivityIndicator size="small" color={Palette.accent.green} /> : <Ionicons name={item.icon} size={13} color={active ? Palette.accent.green : Palette.text.tertiary} />}
+              <Text style={[styles.feedbackButtonText, active && styles.feedbackButtonTextActive]}>{item.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function RestaurantCard({
+  restaurant,
+  index,
+  selected,
+  summary,
+  summaryLoading,
+  onSelect,
+  onSummary,
+  onNavigate,
+}: {
+  restaurant: HealthyFoodRestaurant;
+  index: number;
+  selected: boolean;
+  summary?: RestaurantAiSummary;
+  summaryLoading: boolean;
+  onSelect: () => void;
+  onSummary: () => void;
+  onNavigate: () => void;
+}) {
+  return (
+    <View style={[styles.restaurantCard, selected && styles.restaurantCardSelected]}>
+      <View style={styles.mealTop}>
+        <View style={styles.rankBadge}><Text style={styles.rankText}>{index + 1}</Text></View>
+        <View style={styles.mealInfo}>
+          <Text style={styles.restaurantName}>{restaurant.name}</Text>
+          <Text style={styles.restaurantMeta}>{restaurant.tags.slice(0, 2).join('、')} · {restaurant.distance_km} km · {restaurant.is_open ? '營業中' : '未營業'}</Text>
+        </View>
+        <DataPill tone="info">{restaurant.match_score}</DataPill>
+      </View>
+      <View style={styles.pillRow}>
+        {restaurant.tags.slice(0, 4).map((tag) => <DataPill key={tag} tone="success">{tag}</DataPill>)}
+      </View>
+      {restaurant.recommended_items.slice(0, 2).map((item) => (
+        <View key={`${restaurant.restaurant_id}_${item.item_id || item.item_name}`} style={styles.restaurantItem}>
+          <Text style={styles.itemName}>{item.item_name}</Text>
+          {item.nutrition_available ? (
+            <View style={styles.nutritionRow}>
+              <NutritionMini label="熱量" value={`${item.calories} kcal`} color={Palette.accent.green} />
+              <NutritionMini label="蛋白質" value={`${item.protein} g`} color={Palette.accent.blue} />
+              <NutritionMini label="鈉" value={`${item.sodium} mg`} color={Palette.accent.pink} />
+            </View>
+          ) : (
+            <Text style={styles.restaurantMeta}>菜單價格與營養資料需到店後用掃描或手動搜尋確認。</Text>
+          )}
+        </View>
+      ))}
+      <View style={styles.restaurantActions}>
+        <SecondaryButton label="地圖標示" onPress={onSelect} />
+        <SecondaryButton label={summaryLoading ? '產生中' : 'AI 摘要'} onPress={onSummary} />
+        <SecondaryButton label="導航" onPress={onNavigate} />
+      </View>
+      {summary ? (
+        <View style={styles.aiSummaryBox}>
+          <Text style={styles.itemName}>AI 推測：{summary.restaurant_type}</Text>
+          <Text style={styles.restaurantMeta}>可能販售：{summary.likely_foods.join('、') || '不確定'}</Text>
+          <Text style={styles.restaurantMeta}>價格：約 {summary.price_range_twd.min}-{summary.price_range_twd.max} 元 · 預算：{summary.budget_fit}</Text>
+          <Text style={styles.restaurantMeta}>建議：{summary.health_tips.join('、') || '到店後確認餐點內容'}</Text>
+          <Text style={styles.errorMeta}>{summary.source_note}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function NutritionMini({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <View style={styles.nutritionMini}>
+      <Text style={styles.nutritionMiniLabel}>{label}</Text>
+      <Text style={[styles.nutritionMiniValue, { color }]}>{value}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  metricRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl },
+  stateCard: {
     backgroundColor: Palette.bg.card,
     borderRadius: Radius.xl,
     marginBottom: Spacing.xl,
@@ -565,83 +438,50 @@ const styles = StyleSheet.create({
     borderColor: Palette.border.subtle,
     alignItems: 'center',
     gap: Spacing.md,
+    padding: Spacing['3xl'],
     ...Shadows.card,
   },
   emptyText: { ...Typography.body, color: Palette.text.tertiary, textAlign: 'center' },
-
-  summaryCard: {
-    backgroundColor: Palette.bg.card, borderRadius: Radius.xl, marginBottom: Spacing.xl,
-    borderWidth: 1, borderColor: Palette.border.subtle, ...Shadows.card,
-  },
-  summaryRow: { flexDirection: 'row', marginBottom: Spacing.md },
-  summaryItem: { flex: 1, alignItems: 'center' },
-  summaryLabel: { ...Typography.small, color: Palette.text.tertiary, marginBottom: 4 },
-  summaryValue: { ...Typography.h2 },
-  summaryDivider: { width: 1, backgroundColor: Palette.border.subtle },
-  conditionTags: { flexDirection: 'row', gap: 4, flexWrap: 'wrap', justifyContent: 'center' },
-  conditionTag: { backgroundColor: 'rgba(248,113,113,0.12)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.sm },
-  conditionTagText: { ...Typography.small, color: Palette.status.error },
-  noCondText: { ...Typography.caption, color: Palette.text.tertiary },
-  filterNotice: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Palette.border.subtle },
-  filterNoticeText: { ...Typography.caption, color: Palette.accent.green },
-
-  filteredCard: {
-    backgroundColor: Palette.bg.card, borderRadius: Radius.xl, marginBottom: Spacing.xl,
-    borderWidth: 1, borderColor: Palette.border.subtle,
-  },
-  sourceCard: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
-    backgroundColor: Palette.bg.card, borderRadius: Radius.lg,
-    marginBottom: Spacing.xl, borderWidth: 1, borderColor: Palette.border.subtle,
-  },
-  sourceText: { ...Typography.caption, color: Palette.text.secondary, flex: 1 },
-  filteredHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md },
-  filteredTitle: { ...Typography.bodyBold, color: Palette.status.error },
-  filteredRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md },
-  filteredRowBordered: { borderBottomWidth: 1, borderBottomColor: Palette.border.subtle },
-  filteredEmoji: { fontSize: 24 },
-  filteredInfo: { flex: 1 },
-  filteredName: { ...Typography.bodyBold, color: Palette.text.primary, marginBottom: 2 },
-  filteredReason: { ...Typography.caption, color: Palette.text.tertiary },
-
-  recHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.lg },
-  sectionTitle: { ...Typography.h3, color: Palette.text.primary },
-  recSort: { ...Typography.small, color: Palette.accent.pink },
-
-  mealCard: {
-    backgroundColor: Palette.bg.card, borderRadius: Radius.xl, marginBottom: Spacing.md,
-    borderWidth: 1, borderColor: Palette.border.subtle, ...Shadows.card,
-  },
-  mealCardSelected: { borderColor: 'rgba(34,211,238,0.45)' },
-  mealTop: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md },
-  mealEmoji: { backgroundColor: Palette.bg.elevated, alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md },
-  mealInfo: { flex: 1 },
-  mealName: { ...Typography.bodyBold, color: Palette.text.primary, marginBottom: 4 },
-  mealMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
-  mealMetaText: { ...Typography.small, color: Palette.text.tertiary },
-  scoreContainer: { alignItems: 'center' },
-  scoreValue: { ...Typography.h2, fontWeight: '800' },
-  scoreLabel: { ...Typography.small, color: Palette.text.tertiary },
-
-  badgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.md },
-  safetyBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: Palette.accent.greenDim, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full,
-  },
-  safetyBadgeText: { ...Typography.small, color: Palette.accent.green },
-  preferenceReasonWrap: {
-    backgroundColor: 'rgba(244,114,182,0.08)',
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+  sourceSummary: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.lg },
+  filteredSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Palette.bg.mint,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
     marginBottom: Spacing.md,
-    gap: 2,
   },
-  preferenceReasonText: { ...Typography.small, color: Palette.accent.pink },
-
-  feedbackRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
+  filteredSummaryText: { ...Typography.caption, color: Palette.text.secondary, flex: 1 },
+  filteredExample: { borderTopWidth: 1, borderTopColor: Palette.border.subtle, paddingVertical: Spacing.sm },
+  filteredName: { ...Typography.caption, color: Palette.text.primary },
+  filteredReason: { ...Typography.small, color: Palette.text.tertiary },
+  recommendList: { gap: Spacing.md, marginTop: Spacing.lg },
+  mealCard: {
+    backgroundColor: Palette.bg.wash,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  mealTop: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
+  mealInfo: { flex: 1, gap: Spacing.sm },
+  mealName: { ...Typography.bodyBold, color: Palette.text.primary },
+  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  scoreBox: { alignItems: 'center', minWidth: 48 },
+  scoreValue: { ...Typography.h2, ...Typography.number, color: Palette.accent.green },
+  scoreLabel: { ...Typography.small, color: Palette.text.tertiary },
+  reasonBox: { backgroundColor: Palette.bg.mint, borderRadius: Radius.lg, padding: Spacing.md, gap: 2 },
+  reasonText: { ...Typography.caption, color: Palette.text.secondary },
+  nutritionRow: { flexDirection: 'row', gap: Spacing.sm },
+  nutritionMini: { flex: 1, backgroundColor: Palette.bg.card, borderRadius: Radius.lg, padding: Spacing.sm },
+  nutritionMiniLabel: { ...Typography.small, color: Palette.text.tertiary },
+  nutritionMiniValue: { ...Typography.caption, ...Typography.number },
+  feedbackRow: { flexDirection: 'row', gap: Spacing.sm },
   feedbackButton: {
     flex: 1,
+    minHeight: 40,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -649,140 +489,83 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
-    backgroundColor: Palette.bg.elevated,
-    paddingVertical: Spacing.sm,
+    backgroundColor: Palette.bg.card,
   },
-  feedbackButtonActive: { borderColor: 'rgba(74,222,128,0.35)', backgroundColor: Palette.accent.greenDim },
+  feedbackButtonActive: { borderColor: 'rgba(31,157,114,0.26)', backgroundColor: Palette.accent.greenDim },
   feedbackButtonText: { ...Typography.small, color: Palette.text.tertiary },
   feedbackButtonTextActive: { color: Palette.accent.green },
-
-  mealNutritionRow: {
-    flexDirection: 'row', backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, overflow: 'hidden',
-  },
-  mealNutritionItem: {
-    flex: 1, alignItems: 'center', paddingVertical: Spacing.md,
-    borderRightWidth: 1, borderRightColor: Palette.border.subtle,
-  },
-  mealNutritionLabel: { ...Typography.small, color: Palette.text.tertiary, marginBottom: 4 },
-  mealNutritionValue: { ...Typography.bodyBold },
-  budgetRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
+  budgetRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center', marginBottom: Spacing.md },
   budgetInput: {
     flex: 1,
+    minHeight: 48,
     backgroundColor: Palette.bg.elevated,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
     color: Palette.text.primary,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    ...Typography.caption,
   },
-  locateButton: {
-    minWidth: 96,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Palette.accent.cyan,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-  },
-  locateButtonText: { ...Typography.bodyBold, color: Palette.text.inverse },
-  reasonWrap: { marginTop: Spacing.md, gap: 4 },
-  apiErrorBox: {
-    marginTop: Spacing.sm,
-    backgroundColor: 'rgba(251,191,36,0.08)',
-    borderColor: 'rgba(251,191,36,0.2)',
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    padding: Spacing.sm,
-  },
-  optionGroup: { marginTop: Spacing.md, gap: Spacing.sm },
-  optionLabel: { ...Typography.small, color: Palette.text.tertiary },
-  optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  optionChip: {
+  optionLabel: { ...Typography.small, color: Palette.text.tertiary, marginTop: Spacing.md, marginBottom: Spacing.sm },
+  categoryWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  categoryChip: {
+    minHeight: 38,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
     backgroundColor: Palette.bg.elevated,
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    justifyContent: 'center',
   },
-  optionChipActive: { borderColor: 'rgba(34,211,238,0.45)', backgroundColor: Palette.accent.cyanDim },
-  optionChipText: { ...Typography.small, color: Palette.text.tertiary },
-  optionChipTextActive: { color: Palette.accent.cyan },
+  categoryChipActive: { borderColor: 'rgba(31,157,114,0.26)', backgroundColor: Palette.accent.greenDim },
+  categoryText: { ...Typography.small, color: Palette.text.secondary },
+  categoryTextActive: { color: Palette.accent.green },
+  locationText: { ...Typography.small, color: Palette.text.tertiary, marginTop: Spacing.md },
+  apiErrorBox: {
+    marginTop: Spacing.sm,
+    backgroundColor: Palette.accent.orangeDim,
+    borderColor: 'rgba(245,158,11,0.2)',
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.sm,
+  },
+  errorText: { ...Typography.small, color: Palette.status.warning },
+  errorMeta: { ...Typography.small, color: Palette.text.tertiary, marginTop: 2 },
   mapCard: {
     backgroundColor: Palette.bg.card,
     borderRadius: Radius.xl,
     marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
+    padding: Spacing.md,
     ...Shadows.card,
   },
-  selectedMapInfo: {
-    marginTop: Spacing.md,
-    gap: Spacing.sm,
-    backgroundColor: Palette.bg.elevated,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-  },
-  selectedMapTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
-  scorePill: {
-    ...Typography.small,
-    color: Palette.accent.green,
-    backgroundColor: Palette.accent.greenDim,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-  },
-  navigationButton: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Palette.accent.cyan,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-  },
-  navigationButtonText: { ...Typography.bodyBold, color: Palette.text.inverse },
-  recommendedItemBlock: {
-    backgroundColor: Palette.bg.elevated,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    marginTop: Spacing.sm,
-    gap: Spacing.sm,
-  },
-  nutritionUnavailableBox: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    alignItems: 'flex-start',
-    backgroundColor: 'rgba(251,191,36,0.08)',
-    borderColor: 'rgba(251,191,36,0.18)',
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    padding: Spacing.sm,
-  },
-  priceText: { ...Typography.bodyBold, color: Palette.accent.orange },
-  restaurantActionRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
-  aiSummaryBox: {
-    marginTop: Spacing.md,
-    gap: Spacing.sm,
-    backgroundColor: 'rgba(244,114,182,0.08)',
-    borderColor: 'rgba(244,114,182,0.2)',
-    borderWidth: 1,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-  },
-  secondaryButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    borderRadius: Radius.full,
+  selectedMapInfo: { marginTop: Spacing.md, gap: Spacing.sm, backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, padding: Spacing.md },
+  mapTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
+  restaurantCard: {
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius.xl,
+    marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
-    backgroundColor: Palette.bg.elevated,
-    paddingVertical: Spacing.sm,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+    ...Shadows.soft,
   },
-  secondaryButtonText: { ...Typography.small, color: Palette.accent.cyan },
+  restaurantCardSelected: { borderColor: 'rgba(31,157,114,0.36)' },
+  rankBadge: { width: 38, height: 38, borderRadius: 19, backgroundColor: Palette.bg.mint, alignItems: 'center', justifyContent: 'center' },
+  rankText: { ...Typography.bodyBold, color: Palette.accent.green },
+  restaurantName: { ...Typography.bodyBold, color: Palette.text.primary, flex: 1 },
+  restaurantMeta: { ...Typography.caption, color: Palette.text.secondary },
+  restaurantItem: { backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, padding: Spacing.md, gap: Spacing.sm },
+  itemName: { ...Typography.caption, color: Palette.text.primary, fontWeight: '700' },
+  restaurantActions: { flexDirection: 'row', gap: Spacing.sm },
+  aiSummaryBox: {
+    gap: Spacing.sm,
+    backgroundColor: Palette.accent.blueDim,
+    borderColor: 'rgba(47,128,237,0.18)',
+    borderWidth: 1,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+  },
 });

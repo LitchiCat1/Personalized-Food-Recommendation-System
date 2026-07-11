@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+from services.disease_rule_service import normalize_allergen_ids, normalize_condition_ids
+
 
 def compute_bmr(gender: str, weight: float, height: float, age: int) -> float:
     if gender == "male":
@@ -11,7 +13,7 @@ def compute_tdee(bmr: float, activity_multiplier: float) -> float:
     return round(bmr * activity_multiplier)
 
 
-def build_user_profile(data: dict) -> dict:
+def build_user_profile(data: dict, disease_rules: dict | None = None, allergen_taxonomy: dict | None = None) -> dict:
     user_id = data["user_id"]
     gender = data.get("gender", "male")
     weight = data.get("weight", 70)
@@ -21,6 +23,13 @@ def build_user_profile(data: dict) -> dict:
 
     bmr = compute_bmr(gender, weight, height, age)
     tdee = compute_tdee(bmr, activity_multiplier)
+
+    health_conditions = data.get("health_conditions", [])
+    allergens = data.get("allergens", [])
+    if disease_rules:
+        health_conditions = normalize_condition_ids(health_conditions, disease_rules)
+    if allergen_taxonomy:
+        allergens = normalize_allergen_ids(allergens, allergen_taxonomy)
 
     return {
         "user_id": user_id,
@@ -35,8 +44,8 @@ def build_user_profile(data: dict) -> dict:
         "bmr": bmr,
         "tdee": tdee,
         "daily_calorie_target": data.get("daily_calorie_target", tdee),
-        "health_conditions": data.get("health_conditions", []),
-        "allergens": data.get("allergens", []),
+        "health_conditions": health_conditions,
+        "allergens": allergens,
         "target_weight": data.get("target_weight"),
         "diet_type": data.get("diet_type", "均衡飲食"),
         "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),

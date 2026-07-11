@@ -15,6 +15,15 @@ web-build/
 .vscode/
 .idea/
 
+# Codex internal
+.agents/
+.opencode/
+tmp/
+task_plan.md
+findings.md
+progress.md
+skills-lock.json
+
 # OS
 .DS_Store
 Thumbs.db

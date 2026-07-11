@@ -7,17 +7,18 @@ def search_foods(storage, tfda_db: dict, query: str, limit: int, user_id: str | 
     q_lower = q.lower()
     results = []
 
-    for food in storage.get_custom_foods(user_id):
-        haystacks = [
-            food.get("food_id", ""),
-            food.get("name_zh", ""),
-            food.get("name_en", ""),
-            food.get("brand", ""),
-        ]
-        if any(q in value or q_lower in value.lower() for value in haystacks if isinstance(value, str)):
-            results.append(build_custom_food_search_result(food))
-            if len(results) >= limit:
-                return results
+    if user_id:
+        for food in storage.get_custom_foods(user_id):
+            haystacks = [
+                food.get("food_id", ""),
+                food.get("name_zh", ""),
+                food.get("name_en", ""),
+                food.get("brand", ""),
+            ]
+            if any(q in value or q_lower in value.lower() for value in haystacks if isinstance(value, str)):
+                results.append(build_custom_food_search_result(food))
+                if len(results) >= limit:
+                    return results
 
     tfda_candidates = []
     for key, food in tfda_db.items():
@@ -39,6 +40,7 @@ def search_foods(storage, tfda_db: dict, query: str, limit: int, user_id: str | 
                 "fiber": food.get("fiber", 0),
                 "unit": food.get("unit", "per 100g"),
                 "source": "TFDA",
+                "allergens": food.get("allergens", []) or [],
             }
         )
 
@@ -71,6 +73,9 @@ def build_custom_food_doc(data: dict, normalize_nutrition_payload, scale_nutriti
     name_zh = (data.get("name_zh") or "").strip()
     if not name_zh:
         raise ValueError("缺少 name_zh")
+    user_id = (data.get("user_id") or "").strip()
+    if not user_id:
+        raise ValueError("缺少 user_id")
 
     nutrition_per_serving = normalize_nutrition_payload(data.get("nutrition_per_serving") or {})
     nutrition_per_100g = normalize_nutrition_payload(data.get("nutrition_per_100g") or {})
@@ -87,7 +92,7 @@ def build_custom_food_doc(data: dict, normalize_nutrition_payload, scale_nutriti
     now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     return {
         "food_id": data.get("food_id") or f"custom_{uuid.uuid4().hex[:10]}",
-        "user_id": data.get("user_id", "demo_user"),
+        "user_id": user_id,
         "name_zh": name_zh,
         "name_en": (data.get("name_en") or "").strip(),
         "brand": (data.get("brand") or "").strip(),

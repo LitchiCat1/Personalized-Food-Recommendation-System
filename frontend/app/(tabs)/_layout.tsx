@@ -80,7 +80,7 @@ export default function TabLayout() {
               position: 'absolute',
               borderTopWidth: 1,
               borderTopColor: Palette.border.subtle,
-              backgroundColor: Platform.OS === 'ios' ? 'transparent' : Palette.bg.secondary,
+              backgroundColor: Platform.OS === 'ios' ? 'transparent' : Palette.bg.card,
               height: tabBarHeight,
               paddingTop: Spacing.xs,
               paddingBottom: bottomInset, // Fix #2: Samsung safe area
@@ -89,9 +89,9 @@ export default function TabLayout() {
         tabBarLabelStyle: styles.tabBarLabel,
         tabBarBackground: () =>
           Platform.OS === 'ios' ? (
-            <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={88} tint="light" style={StyleSheet.absoluteFill} />
           ) : (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: Palette.bg.secondary }]} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: Palette.bg.card }]} />
           ),
       }}
     >

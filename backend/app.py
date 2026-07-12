@@ -3,7 +3,6 @@ NutriLens Backend — Flask API
 PRD-aligned: Gemini Vision food recognition + nutrition analysis + user management + recommendations
 """
 
-import base64
 import json
 import math
 import os
@@ -26,7 +25,7 @@ from services.nutrition_label_service import (
     build_custom_food_search_result,
     call_gemini_nutrition_ocr,
     call_gemini_nutrition_ocr_with_rotation,
-    detect_image_mime,
+    decode_image_base64,
     extract_number,
     get_gemini_api_keys,
     normalize_nutrition_payload,
@@ -258,14 +257,17 @@ def ocr_nutrition_label():
     if "image" not in data:
         return jsonify({"error": "缺少 image 欄位（Base64）"}), 400
 
+    try:
+        _, image_base64, mime_type = decode_image_base64(data["image"])
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
     api_keys = get_gemini_api_keys(data.get("api_key"))
     if not api_keys:
         return jsonify({"error": "缺少 Gemini API key，請設定 GEMINI_API_KEYS 或 GEMINI_API_KEY 環境變數"}), 400
 
     try:
-        img_bytes = base64.b64decode(data["image"])
-        mime_type = detect_image_mime(img_bytes)
-        parsed = call_gemini_nutrition_ocr_with_rotation(data["image"], mime_type, api_keys)
+        parsed = call_gemini_nutrition_ocr_with_rotation(image_base64, mime_type, api_keys)
         normalized = normalize_ocr_result(parsed)
         return jsonify(
             {
@@ -295,6 +297,11 @@ def predict_vision_food():
     if "image" not in data:
         return jsonify({"error": "缺少 image 欄位（Base64）"}), 400
 
+    try:
+        _, image_base64, mime_type = decode_image_base64(data["image"])
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
     api_keys = get_gemini_api_keys(data.get("api_key"))
     if not api_keys:
         return jsonify({"error": "缺少 Gemini API key，請設定 GEMINI_API_KEYS 或 GEMINI_API_KEY 環境變數"}), 400
@@ -307,9 +314,7 @@ def predict_vision_food():
         require_user_access(user_id)
 
     try:
-        img_bytes = base64.b64decode(data["image"])
-        mime_type = detect_image_mime(img_bytes)
-        parsed = call_gemini_food_recognition_with_rotation(data["image"], mime_type, api_keys)
+        parsed = call_gemini_food_recognition_with_rotation(image_base64, mime_type, api_keys)
         return jsonify(
             build_vision_food_response(
                 parsed,

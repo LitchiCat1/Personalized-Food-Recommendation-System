@@ -1,3 +1,4 @@
+import base64
 import importlib
 import os
 import sys
@@ -47,6 +48,36 @@ class ApiRouteTests(unittest.TestCase):
         with self.mock_auth("user-a"):
             response = self.client.get("/user/user-b", headers=self.auth_headers())
         self.assertEqual(response.status_code, 403)
+
+    def test_vision_food_accepts_raw_base64_and_browser_data_uri(self):
+        image_base64 = base64.b64encode(b"\x89PNG\r\n\x1a\nmock-image").decode("ascii")
+
+        for image_payload in (image_base64, f"data:image/png;base64,{image_base64}"):
+            with self.subTest(data_uri=image_payload.startswith("data:")):
+                with self.mock_auth("user-a"):
+                    with patch.object(self.app_module, "get_gemini_api_keys", return_value=["test-key"]):
+                        with patch.object(
+                            self.app_module,
+                            "call_gemini_food_recognition_with_rotation",
+                            return_value={"items": []},
+                        ) as recognize:
+                            response = self.client.post(
+                                "/predict/vision-food",
+                                json={"image": image_payload, "user_id": "user-a"},
+                                headers=self.auth_headers(),
+                            )
+
+                self.assertEqual(response.status_code, 200)
+                recognize.assert_called_once_with(image_base64, "image/png", ["test-key"])
+
+    def test_vision_food_rejects_invalid_image_payloads(self):
+        invalid_payloads = ("", "not-base64", "data:text/plain;base64,SGVsbG8=")
+
+        for image_payload in invalid_payloads:
+            with self.subTest(image_payload=image_payload):
+                response = self.client.post("/predict/vision-food", json={"image": image_payload})
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("error", response.get_json())
 
     def test_record_route_deduplicates_client_record_id(self):
         payload = {

@@ -13,6 +13,7 @@ import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
 import FoodMap from '@/components/maps/FoodMap';
+import { useResponsive } from '@/hooks/useResponsive';
 import {
   fetchHealthyFoodRecommendations,
   fetchRestaurantAiSummary,
@@ -46,7 +47,13 @@ const CATEGORY_OPTIONS = [
   { value: '沙拉', label: '沙拉' },
 ];
 
+const RECOMMEND_MODE_OPTIONS = [
+  { value: 'meals', label: '安全餐點' },
+  { value: 'nearby', label: '附近店家' },
+];
+
 export default function RecommendScreen() {
+  const { isDesktop } = useResponsive();
   const { user, apiBaseUrl, accessToken } = useStore();
   const [data, setData] = useState<RecommendationResponse | null>(null);
   const [healthyData, setHealthyData] = useState<HealthyFoodResponse | null>(null);
@@ -63,6 +70,9 @@ export default function RecommendScreen() {
   const [category, setCategory] = useState('all');
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [locationLabel, setLocationLabel] = useState('尚未取得定位');
+  const [activeMode, setActiveMode] = useState('meals');
+  const [showAllMeals, setShowAllMeals] = useState(false);
+  const [showFiltered, setShowFiltered] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,6 +185,12 @@ export default function RecommendScreen() {
             <MetricCard label="可推薦" value={recommended.length} unit="項" accent={Palette.accent.blue} />
           </View>
 
+          <SegmentedControl options={RECOMMEND_MODE_OPTIONS} value={activeMode} onChange={setActiveMode} />
+          <View style={isDesktop ? styles.desktopColumns : styles.modeContent}>
+
+          {isDesktop || activeMode === 'meals' ? (
+          <View style={isDesktop ? styles.desktopPane : undefined}>
+
           <SectionBlock title="安全餐點推薦" subtitle="依熱量契合、疾病禁忌、過敏原和近期偏好排序。">
             <View style={styles.sourceSummary}>
               {sourceCounts ? <DataPill tone="info">TFDA {sourceCounts.tfda} · 自訂 {sourceCounts.custom_foods} · 基礎 {sourceCounts.manual_db}</DataPill> : null}
@@ -185,19 +201,24 @@ export default function RecommendScreen() {
             <View style={styles.filteredSummary}>
               <Ionicons name="shield-checkmark-outline" size={18} color={Palette.accent.green} />
               <Text style={styles.filteredSummaryText}>安全過濾層已排除 {totalFiltered} 項不適合的餐點。</Text>
+              {filteredOut.length > 0 ? (
+                <Pressable accessibilityRole="button" accessibilityState={{ expanded: showFiltered }} onPress={() => setShowFiltered((value) => !value)} style={styles.compactToggle}>
+                  <Ionicons name={showFiltered ? 'chevron-up' : 'chevron-down'} size={18} color={Palette.text.secondary} />
+                </Pressable>
+              ) : null}
             </View>
-            {filteredOut.slice(0, 3).map((item, i) => (
+            {showFiltered ? filteredOut.slice(0, 3).map((item, i) => (
               <View key={`${item.label}_${i}`} style={styles.filteredExample}>
                 <Text style={styles.filteredName}>{item.name_zh}</Text>
                 <Text style={styles.filteredReason}>{formatReason(item)}</Text>
               </View>
-            ))}
+            )) : null}
 
             <View style={styles.recommendList}>
               {recommended.length === 0 ? (
                 <Text style={styles.emptyText}>目前找不到符合條件的推薦，請先調整個人條件或新增更多食品資料。</Text>
               ) : (
-                recommended.map((meal, index) => (
+                (showAllMeals ? recommended : recommended.slice(0, 3)).map((meal, index) => (
                   <RecommendationCard
                     key={`${meal.label}_${index}`}
                     meal={meal}
@@ -207,9 +228,16 @@ export default function RecommendScreen() {
                   />
                 ))
               )}
+              {recommended.length > 3 ? (
+                <SecondaryButton label={showAllMeals ? '收合推薦' : `查看其餘 ${recommended.length - 3} 項`} onPress={() => setShowAllMeals((value) => !value)} icon={<Ionicons name={showAllMeals ? 'chevron-up' : 'chevron-down'} size={16} color={Palette.accent.green} />} />
+              ) : null}
             </View>
           </SectionBlock>
+          </View>
+          ) : null}
 
+          {isDesktop || activeMode === 'nearby' ? (
+          <View style={isDesktop ? styles.desktopPane : undefined}>
           <SectionBlock title="附近店家推薦" subtitle="Google Places 只提供真實店家位置；實際餐點營養仍建議用掃描確認。">
             <View style={styles.budgetRow}>
               <TextInput
@@ -232,7 +260,7 @@ export default function RecommendScreen() {
             <Text style={styles.optionLabel}>店家類型</Text>
             <View style={styles.categoryWrap}>
               {CATEGORY_OPTIONS.map((option) => (
-                <Pressable key={option.value} onPress={() => setCategory(option.value)} style={[styles.categoryChip, category === option.value && styles.categoryChipActive]}>
+                <Pressable key={option.value} accessibilityRole="button" accessibilityState={{ selected: category === option.value }} onPress={() => setCategory(option.value)} style={[styles.categoryChip, category === option.value && styles.categoryChipActive]}>
                   <Text style={[styles.categoryText, category === option.value && styles.categoryTextActive]}>{option.label}</Text>
                 </Pressable>
               ))}
@@ -283,6 +311,9 @@ export default function RecommendScreen() {
               ))}
             </>
           ) : null}
+          </View>
+          ) : null}
+          </View>
         </>
       )}
     </AppContainer>
@@ -344,7 +375,15 @@ function RecommendationCard({
         ].map((item) => {
           const active = feedbackStatus === item.action;
           return (
-            <Pressable key={item.action} disabled={saving} onPress={() => onFeedback(item.action)} style={[styles.feedbackButton, active && styles.feedbackButtonActive]}>
+            <Pressable
+              key={item.action}
+              disabled={saving}
+              accessibilityRole="button"
+              accessibilityLabel={`推薦回饋：${item.label}`}
+              accessibilityState={{ selected: active, disabled: saving }}
+              onPress={() => onFeedback(item.action)}
+              style={[styles.feedbackButton, active && styles.feedbackButtonActive]}
+            >
               {saving && item.action === 'accepted' ? <ActivityIndicator size="small" color={Palette.accent.green} /> : <Ionicons name={item.icon} size={13} color={active ? Palette.accent.green : Palette.text.tertiary} />}
               <Text style={[styles.feedbackButtonText, active && styles.feedbackButtonTextActive]}>{item.label}</Text>
             </Pressable>
@@ -430,6 +469,9 @@ function NutritionMini({ label, value, color }: { label: string; value: string; 
 
 const styles = StyleSheet.create({
   metricRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl },
+  modeContent: { marginTop: Spacing.xl },
+  desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xl, marginTop: Spacing.xl },
+  desktopPane: { flex: 1, minWidth: 0 },
   stateCard: {
     backgroundColor: Palette.bg.card,
     borderRadius: Radius.xl,
@@ -453,6 +495,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   filteredSummaryText: { ...Typography.caption, color: Palette.text.secondary, flex: 1 },
+  compactToggle: { width: 44, height: 44, marginVertical: -10, marginRight: -8, alignItems: 'center', justifyContent: 'center' },
   filteredExample: { borderTopWidth: 1, borderTopColor: Palette.border.subtle, paddingVertical: Spacing.sm },
   filteredName: { ...Typography.caption, color: Palette.text.primary },
   filteredReason: { ...Typography.small, color: Palette.text.tertiary },
@@ -481,7 +524,7 @@ const styles = StyleSheet.create({
   feedbackRow: { flexDirection: 'row', gap: Spacing.sm },
   feedbackButton: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -509,7 +552,7 @@ const styles = StyleSheet.create({
   optionLabel: { ...Typography.small, color: Palette.text.tertiary, marginTop: Spacing.md, marginBottom: Spacing.sm },
   categoryWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   categoryChip: {
-    minHeight: 38,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
     backgroundColor: Palette.bg.elevated,

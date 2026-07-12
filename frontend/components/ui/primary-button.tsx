@@ -43,6 +43,9 @@ export default function PrimaryButton({ label, onPress, tone = 'green', icon, di
     <Animated.View style={[fullWidth && styles.fullWidth, animatedStyle]}>
       <Pressable
         onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ disabled: Boolean(disabled) }}
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
         disabled={disabled}

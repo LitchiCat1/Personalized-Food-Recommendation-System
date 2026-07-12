@@ -12,13 +12,20 @@ import MetricCard from '@/components/ui/metric-card';
 import DataPill from '@/components/ui/data-pill';
 import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
+import SegmentedControl from '@/components/ui/segmented-control';
 import { fetchMedicalMetadata, fetchUserProfile, saveUserProfile } from '@/lib/api';
 import { isSupabaseAuthConfigured, supabase } from '@/lib/supabase';
 
 type MedicalMetadata = Awaited<ReturnType<typeof fetchMedicalMetadata>>;
 
+const PROFILE_SECTIONS = [
+  { value: 'personal', label: '個人資料' },
+  { value: 'safety', label: '安全條件' },
+  { value: 'goals', label: '飲食目標' },
+];
+
 export default function ProfileScreen() {
-  const { gridCol2 } = useResponsive();
+  const { gridCol2, isDesktop } = useResponsive();
   const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser } = useStore();
   const initialUserRef = useRef(user);
   const [loading, setLoading] = useState(true);
@@ -26,6 +33,7 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [activeSection, setActiveSection] = useState('personal');
   const [medicalMetadata, setMedicalMetadata] = useState<MedicalMetadata | null>(null);
   const [profileDraft, setProfileDraft] = useState({
     name: user.name,
@@ -280,39 +288,47 @@ export default function ProfileScreen() {
         <Text style={[styles.syncText, error && styles.syncWarningText]}>{savingMessage}</Text>
       </View>
 
-      <View style={styles.accountCard}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarInitial}>{user.name.slice(0, 1).toUpperCase()}</Text>
-        </View>
-        <View style={styles.accountCopy}>
-          <Text style={styles.userName}>{user.name}</Text>
-          <Text style={styles.userEmail}>{user.email}</Text>
-          <View style={styles.badgeRow}>
-            <DataPill tone="success">連續 {user.streak} 天</DataPill>
-            <DataPill tone="info">累積 {user.totalMeals} 餐</DataPill>
+      {!isDesktop ? <SegmentedControl options={PROFILE_SECTIONS} value={activeSection} onChange={setActiveSection} /> : null}
+
+      <View style={isDesktop ? styles.desktopColumns : styles.mobileSectionContent}>
+      {isDesktop || activeSection === 'personal' ? (
+      <View style={isDesktop ? styles.desktopPane : undefined}>
+        <View style={styles.accountCard}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarInitial}>{user.name.slice(0, 1).toUpperCase()}</Text>
+          </View>
+          <View style={styles.accountCopy}>
+            <Text style={styles.userName}>{user.name}</Text>
+            <Text style={styles.userEmail}>{user.email}</Text>
+            <View style={styles.badgeRow}>
+              <DataPill tone="success">連續 {user.streak} 天</DataPill>
+              <DataPill tone="info">累積 {user.totalMeals} 餐</DataPill>
+            </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.metricRow}>
-        <MetricCard label="BMR" value={user.bmr} unit="kcal" accent={Palette.accent.blue} />
-        <MetricCard label="TDEE" value={user.tdee} unit="kcal" accent={Palette.accent.green} />
-      </View>
-
-      <View style={styles.profileSetupCard}>
-        <View style={styles.profileSetupCopy}>
-          <Text style={styles.profileSetupTitle}>個人基本資料</Text>
-          <Text style={styles.profileSetupMeta}>{user.height}cm · {user.weight}kg · {user.dietType}</Text>
+        <View style={styles.metricRow}>
+          <MetricCard label="BMR" value={user.bmr} unit="kcal" accent={Palette.accent.blue} />
+          <MetricCard label="TDEE" value={user.tdee} unit="kcal" accent={Palette.accent.green} />
+          <MetricCard label="BMI" value={user.bmi} accent={Palette.accent.orange} />
         </View>
-        <SecondaryButton label="編輯資料" onPress={() => setProfileModalVisible(true)} icon={<Ionicons name="create-outline" size={17} color={Palette.accent.green} />} />
-      </View>
 
-      <View style={styles.metricRow}>
-        <MetricCard label="身高" value={user.height} unit="cm" accent={Palette.accent.blue} />
-        <MetricCard label="體重" value={user.weight} unit="kg" accent={Palette.accent.orange} />
-        <MetricCard label="BMI" value={user.bmi} accent={Palette.accent.green} />
-      </View>
+        <View style={styles.profileSetupCard}>
+          <View style={styles.profileSetupCopy}>
+            <Text style={styles.profileSetupTitle}>個人基本資料</Text>
+            <Text style={styles.profileSetupMeta}>{user.height}cm · {user.weight}kg · {user.age} 歲 · {user.dietType}</Text>
+          </View>
+          <SecondaryButton label="編輯資料" onPress={() => setProfileModalVisible(true)} icon={<Ionicons name="create-outline" size={17} color={Palette.accent.green} />} />
+        </View>
 
+        <View style={styles.accountActions}>
+          <SecondaryButton label={signingOut ? '登出中' : '登出'} onPress={handleSignOut} disabled={signingOut} icon={<Ionicons name="log-out-outline" size={17} color={Palette.status.error} />} />
+        </View>
+      </View>
+      ) : null}
+
+      {isDesktop || activeSection === 'safety' ? (
+      <View style={isDesktop ? styles.desktopPane : undefined}>
       <SectionBlock title="健康狀況管理" subtitle="影響推薦與掃描風險提示。">
         <View style={styles.medicalDisclaimer}>
           <Ionicons name="medical-outline" size={16} color={Palette.status.warning} />
@@ -323,10 +339,12 @@ export default function ProfileScreen() {
             const isActive = user.healthConditions.includes(cond.id) || user.healthConditions.includes(cond.label_zh);
             const fallback = AVAILABLE_CONDITIONS.find((item) => item.id === cond.id);
             const accent = fallback?.color || Palette.accent.green;
-            const icon = fallback?.icon || '•';
             return (
               <Pressable
                 key={cond.id}
+                accessibilityRole="checkbox"
+                accessibilityLabel={cond.label_zh}
+                accessibilityState={{ checked: isActive }}
                 onPress={() => {
                   const nextConditions = isActive
                     ? user.healthConditions.filter((c) => c !== cond.id && c !== cond.label_zh)
@@ -337,7 +355,7 @@ export default function ProfileScreen() {
                 style={[styles.conditionChip, isActive && styles.conditionChipActive]}
               >
                 <View style={[styles.conditionIcon, isActive && { backgroundColor: `${accent}22` }]}>
-                  <Text style={styles.conditionEmoji}>{icon}</Text>
+                  <Ionicons name="medical-outline" size={18} color={isActive ? accent : Palette.text.tertiary} />
                 </View>
                 <View style={styles.conditionInfo}>
                   <Text style={[styles.conditionLabel, isActive && { color: accent }]}>{cond.label_zh}</Text>
@@ -357,6 +375,9 @@ export default function ProfileScreen() {
             return (
               <Pressable
                 key={allergen.id}
+                accessibilityRole="checkbox"
+                accessibilityLabel={allergen.label_zh}
+                accessibilityState={{ checked: isActive }}
                 onPress={() => {
                   const nextAllergens = isActive
                     ? user.allergens.filter((a) => a !== allergen.id && a !== allergen.label_zh)
@@ -373,13 +394,17 @@ export default function ProfileScreen() {
           })}
         </View>
       </SectionBlock>
+      </View>
+      ) : null}
 
+      {isDesktop || activeSection === 'goals' ? (
+      <View style={isDesktop ? styles.desktopPane : undefined}>
       <SectionBlock title="飲食目標" subtitle="用於顯示目前設定與提醒。">
         <View style={styles.goalList}>
           {DIET_GOALS.map((goal) => (
             <View key={goal.id} style={styles.goalItem}>
               <View style={[styles.goalIcon, { backgroundColor: `${goal.color}18` }]}>
-                <Text style={styles.goalEmoji}>{goal.icon}</Text>
+                <Ionicons name="flag-outline" size={18} color={goal.color} />
               </View>
               <View style={styles.goalInfo}>
                 <Text style={styles.goalLabel}>{goal.label}</Text>
@@ -389,10 +414,8 @@ export default function ProfileScreen() {
           ))}
         </View>
       </SectionBlock>
-
-      <View style={styles.accountActions}>
-        <SecondaryButton label={signingOut ? '登出中' : '登出'} onPress={handleSignOut} icon={<Ionicons name="log-out-outline" size={17} color={Palette.status.error} />} />
-        <SecondaryButton label="設定" icon={<Ionicons name="settings-outline" size={17} color={Palette.text.secondary} />} />
+      </View>
+      ) : null}
       </View>
 
       <Modal visible={profileModalVisible} transparent animationType="fade" onRequestClose={() => setProfileModalVisible(false)}>
@@ -404,7 +427,7 @@ export default function ProfileScreen() {
                 <Text style={styles.modalTitle}>編輯基本資料</Text>
                 <Text style={styles.modalSubtitle}>個人資料變更會影響 BMR、TDEE 與每日建議目標。</Text>
               </View>
-              <Pressable onPress={() => setProfileModalVisible(false)} style={styles.modalCloseButton}>
+              <Pressable accessibilityRole="button" accessibilityLabel="關閉編輯視窗" onPress={() => setProfileModalVisible(false)} style={styles.modalCloseButton}>
                 <Ionicons name="close" size={20} color={Palette.text.secondary} />
               </Pressable>
             </View>
@@ -440,6 +463,9 @@ export default function ProfileScreen() {
                     return (
                       <Pressable
                         key={option}
+                        accessibilityRole="radio"
+                        accessibilityLabel={option}
+                        accessibilityState={{ checked: active }}
                         onPress={() => updateDraft('dietType', option)}
                         style={[styles.dietOption, active && styles.dietOptionActive]}
                       >
@@ -506,6 +532,9 @@ const styles = StyleSheet.create({
   userName: { ...Typography.h2, color: Palette.text.primary },
   userEmail: { ...Typography.caption, color: Palette.text.tertiary },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.xs },
+  mobileSectionContent: { marginTop: Spacing.xl },
+  desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.lg },
+  desktopPane: { flex: 1, minWidth: 0 },
   metricRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl },
   profileSetupCard: {
     flexDirection: 'row',
@@ -624,7 +653,7 @@ const styles = StyleSheet.create({
   conditionDesc: { ...Typography.small, color: Palette.text.tertiary },
   allergenChipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   allergenChip: {
-    minHeight: 40,
+    minHeight: 44,
     borderRadius: Radius.full,
     backgroundColor: Palette.bg.elevated,
     borderWidth: 1,

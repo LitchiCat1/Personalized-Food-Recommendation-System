@@ -16,7 +16,7 @@ type Props = {
 
 export default function SegmentedControl({ options, value, onChange }: Props) {
   return (
-    <View style={styles.wrap}>
+    <View style={styles.wrap} accessibilityRole="tablist">
       {options.map((option) => {
         const active = option.value === value;
         return (
@@ -42,7 +42,13 @@ function Segment({ label, active, onPress }: { label: string; active: boolean; o
   }));
 
   return (
-    <Pressable onPress={onPress} style={styles.segment}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
+      style={styles.segment}
+    >
       <Animated.View style={[styles.segmentInner, active && styles.active, animatedStyle]}>
         <Text style={[styles.label, active && styles.activeLabel]}>{label}</Text>
       </Animated.View>
@@ -60,10 +66,10 @@ const styles = StyleSheet.create({
   },
   segment: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 44,
   },
   segmentInner: {
-    minHeight: 40,
+    minHeight: 44,
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',

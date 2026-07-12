@@ -8,9 +8,11 @@ import { HapticTab } from '@/components/haptic-tab';
 import { Palette, Spacing } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
 import { fetchUserProfile } from '@/lib/api';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { isDesktop } = useResponsive();
   const isCameraActive = useStore((s) => s.isCameraActive);
   const apiBaseUrl = useStore((s) => s.apiBaseUrl);
   const accessToken = useStore((s) => s.accessToken);
@@ -74,7 +76,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: Palette.accent.green,
         tabBarInactiveTintColor: Palette.text.tertiary,
         // Fix #3: Hide tab bar when camera is active
-        tabBarStyle: isCameraActive
+        tabBarStyle: isCameraActive || isDesktop
           ? { display: 'none' }
           : {
               position: 'absolute',

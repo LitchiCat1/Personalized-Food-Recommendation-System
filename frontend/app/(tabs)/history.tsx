@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Link } from 'expo-router';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -10,6 +11,7 @@ import SectionBlock from '@/components/ui/section-block';
 import MetricCard from '@/components/ui/metric-card';
 import DataPill from '@/components/ui/data-pill';
 import ProgressBar from '@/components/ui/progress-bar';
+import PrimaryButton from '@/components/ui/primary-button';
 import { fetchHistory, type HistoryDay, type HistoryResponse } from '@/lib/api';
 
 function buildInsights(summary: HistoryResponse['summary'], daily: HistoryDay[], target: number) {
@@ -33,7 +35,7 @@ function buildInsights(summary: HistoryResponse['summary'], daily: HistoryDay[],
 }
 
 export default function HistoryScreen() {
-  const { rs, isSmall } = useResponsive();
+  const { rs, isSmall, isDesktop } = useResponsive();
   const { user, apiBaseUrl, accessToken } = useStore();
   const target = user.dailyCalorieTarget;
   const [history, setHistory] = useState<HistoryResponse | null>(null);
@@ -79,7 +81,13 @@ export default function HistoryScreen() {
       ) : error ? (
         <StateCard icon="cloud-offline-outline" text={`無法載入歷史資料：${error}`} tone="warning" />
       ) : daily.length === 0 ? (
-        <StateCard icon="bar-chart-outline" text="尚未建立足夠的飲食紀錄，先加入幾筆餐點吧。" />
+        <View style={styles.stateCard}>
+          <Ionicons name="bar-chart-outline" size={30} color={Palette.text.tertiary} />
+          <Text style={styles.emptyText}>尚未建立飲食趨勢，先新增第一筆餐點。</Text>
+          <Link href="/scanner" asChild>
+            <PrimaryButton label="新增第一筆餐點" icon={<Ionicons name="scan-outline" size={18} color={Palette.text.inverse} />} />
+          </Link>
+        </View>
       ) : (
         <>
           <View style={styles.metricRow}>
@@ -87,6 +95,19 @@ export default function HistoryScreen() {
             <MetricCard label="紀錄餐數" value={totalRecords} unit={`/${recordedDays}天`} accent={Palette.accent.blue} />
             <MetricCard label="鈉超標" value={sodiumOverDays} unit="天" accent={sodiumOverDays > 0 ? Palette.status.warning : Palette.accent.green} />
           </View>
+
+          <View style={[isDesktop && styles.desktopColumns]}>
+            <View style={isDesktop && styles.desktopMain}>
+          <SectionBlock title="近期重點" subtitle="先看可採取的飲食調整，再檢視詳細趨勢。">
+            <View style={styles.insightStack}>
+              {insights.map((insight, i) => (
+                <View key={i} style={styles.insightRow}>
+                  <View style={styles.noteIndex}><Text style={styles.noteIndexText}>{i + 1}</Text></View>
+                  <Text style={styles.insightText}>{insight}</Text>
+                </View>
+              ))}
+            </View>
+          </SectionBlock>
 
           <SectionBlock title="每日熱量追蹤" subtitle={`目標 ${target} kcal，達標 ${calorieGoalHitDays}/${daily.length} 天。`}>
             <View style={styles.chartTitleRow}>
@@ -110,6 +131,9 @@ export default function HistoryScreen() {
               })}
             </View>
           </SectionBlock>
+
+            </View>
+            <View style={isDesktop && styles.desktopAside}>
 
           <SectionBlock title="營養素週均值" subtitle="比對週平均與建議目標，找出長期偏差。">
             <View style={styles.progressStack}>
@@ -137,17 +161,8 @@ export default function HistoryScreen() {
               })}
             </View>
           </SectionBlock>
-
-          <SectionBlock title="Clinical notes" subtitle="客觀整理近期飲食資料，協助下一餐選擇。">
-            <View style={styles.insightStack}>
-              {insights.map((insight, i) => (
-                <View key={i} style={styles.insightRow}>
-                  <View style={styles.noteIndex}><Text style={styles.noteIndexText}>{i + 1}</Text></View>
-                  <Text style={styles.insightText}>{insight}</Text>
-                </View>
-              ))}
             </View>
-          </SectionBlock>
+          </View>
         </>
       )}
     </AppContainer>
@@ -165,6 +180,9 @@ function StateCard({ icon, text, loading, tone }: { icon: keyof typeof Ionicons.
 
 const styles = StyleSheet.create({
   metricRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl },
+  desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xl },
+  desktopMain: { flex: 1.25, minWidth: 0 },
+  desktopAside: { flex: 1, minWidth: 0 },
   stateCard: {
     backgroundColor: Palette.bg.card,
     borderRadius: Radius.xl,

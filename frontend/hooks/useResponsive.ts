@@ -24,21 +24,30 @@ export function useResponsive() {
       ? width >= 1024 ? 'desktop' : width >= 600 ? 'tablet' : 'phone'
       : width >= 600 ? 'tablet' : 'phone';
 
-  // Content max width — on desktop, cap the app to phone-like width
-  const maxContentWidth = isWeb && deviceType === 'desktop' ? 430 : width;
+  // Web uses a real application shell. Compact controls still use a phone-sized
+  // scale so desktop spacing does not grow with the viewport.
+  const maxContentWidth = isWeb
+    ? deviceType === 'desktop'
+      ? 1280
+      : deviceType === 'tablet'
+        ? Math.min(width, 960)
+        : width
+    : width;
 
   // Effective width for layout calculations (capped on desktop)
   const effectiveWidth = Math.min(width, maxContentWidth);
 
-  // Breakpoints based on effective width
+  const compactWidth = Math.min(effectiveWidth, 430);
+
+  // Breakpoints based on compact control width
   const screenSize: ScreenSize =
-    effectiveWidth < 375 ? 'small' : effectiveWidth <= 413 ? 'medium' : 'large';
+    compactWidth < 375 ? 'small' : compactWidth <= 413 ? 'medium' : 'large';
 
   // Scale factor relative to design base (390px = iPhone 14)
-  const scale = effectiveWidth / 390;
+  const scale = compactWidth / 390;
 
   // Responsive scaling functions
-  const wp = (percentage: number) => Math.round((effectiveWidth * percentage) / 100);
+  const wp = (percentage: number) => Math.round((compactWidth * percentage) / 100);
   const hp = (percentage: number) => Math.round((height * percentage) / 100);
 
   // Scale a value proportionally to screen width
@@ -55,8 +64,8 @@ export function useResponsive() {
   };
 
   // Grid column width for 2-column layout with gap
-  const gridCol2 = (gap: number) => (effectiveWidth - gap * 3 - 40) / 2;
-  const gridCol3 = (gap: number) => (effectiveWidth - gap * 4 - 40) / 3;
+  const gridCol2 = (gap: number) => (compactWidth - gap * 3 - 40) / 2;
+  const gridCol3 = (gap: number) => (compactWidth - gap * 4 - 40) / 3;
 
   // Tab bar safe height
   const tabBarHeight = isIOS ? 88 : isAndroid ? 68 : 64;
@@ -65,6 +74,7 @@ export function useResponsive() {
     width,
     height,
     effectiveWidth,
+    compactWidth,
     maxContentWidth,
     screenSize,
     scale,

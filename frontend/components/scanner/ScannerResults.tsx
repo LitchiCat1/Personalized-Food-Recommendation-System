@@ -50,7 +50,12 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
               {food.portionAdjusted ? <Text style={styles.portionAdjustedText}>已重算營養</Text> : null}
             </View>
             <View style={styles.portionControls}>
-              <Pressable onPress={() => onWeightChange(food.id, food.estimatedWeight - 10)} style={styles.portionButton}>
+              <Pressable
+                onPress={() => onWeightChange(food.id, food.estimatedWeight - 10)}
+                accessibilityRole="button"
+                accessibilityLabel={`${food.foodName} 減少 10 克`}
+                style={styles.portionButton}
+              >
                 <Text style={styles.portionButtonText}>-10g</Text>
               </Pressable>
               <TextInput
@@ -64,11 +69,21 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
                 style={styles.portionInput}
               />
               <Text style={styles.portionUnit}>g</Text>
-              <Pressable onPress={() => onWeightChange(food.id, food.estimatedWeight + 10)} style={styles.portionButton}>
+              <Pressable
+                onPress={() => onWeightChange(food.id, food.estimatedWeight + 10)}
+                accessibilityRole="button"
+                accessibilityLabel={`${food.foodName} 增加 10 克`}
+                style={styles.portionButton}
+              >
                 <Text style={styles.portionButtonText}>+10g</Text>
               </Pressable>
               {food.portionAdjusted ? (
-                <Pressable onPress={() => onWeightChange(food.id, food.originalEstimatedWeight || food.estimatedWeight)} style={styles.resetButton}>
+                <Pressable
+                  onPress={() => onWeightChange(food.id, food.originalEstimatedWeight || food.estimatedWeight)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${food.foodName} 還原估算份量`}
+                  style={styles.resetButton}
+                >
                   <Text style={styles.resetButtonText}>還原</Text>
                 </Pressable>
               ) : null}
@@ -179,28 +194,30 @@ const styles = StyleSheet.create({
   portionAdjustedText: { ...Typography.small, color: Palette.accent.green },
   portionControls: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' },
   portionButton: {
+    minHeight: 44,
     backgroundColor: Palette.bg.card,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 7,
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: Palette.border.subtle,
   },
   portionButtonText: { ...Typography.bodyBold, color: Palette.accent.green },
   portionInput: {
     width: 72,
+    minHeight: 44,
     backgroundColor: Palette.bg.card,
     borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
     color: Palette.text.primary,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 7,
+    paddingVertical: 10,
     textAlign: 'center',
     ...Typography.caption,
   },
   portionUnit: { ...Typography.caption, color: Palette.text.tertiary, marginLeft: -4 },
-  resetButton: { paddingHorizontal: Spacing.sm, paddingVertical: 7 },
+  resetButton: { minHeight: 44, paddingHorizontal: Spacing.sm, justifyContent: 'center' },
   resetButtonText: { ...Typography.caption, color: Palette.status.warning },
   tagsRow: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' },
   warningBanner: {

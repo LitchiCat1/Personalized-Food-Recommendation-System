@@ -6,7 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
-import { SCANNER_DEMO_RESULTS } from '@/constants/mock-data';
 import type { DetectedFood } from '@/constants/mock-data';
 import { useStore } from '@/store/useStore';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -16,6 +15,7 @@ import SectionBlock from '@/components/ui/section-block';
 import DataPill from '@/components/ui/data-pill';
 import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
+import SegmentedControl from '@/components/ui/segmented-control';
 import ScannerCameraView from '@/components/scanner/ScannerCameraView';
 import ScannerManualTools from '@/components/scanner/ScannerManualTools';
 import ScannerResults from '@/components/scanner/ScannerResults';
@@ -39,6 +39,15 @@ import {
   type PendingRecordSync,
   type RecordSource,
 } from '@/lib/recordSyncQueue';
+
+type ScanMode = 'camera' | 'gallery' | 'label' | 'manual';
+
+const SCAN_MODE_OPTIONS = [
+  { value: 'camera', label: '拍照' },
+  { value: 'gallery', label: '相簿' },
+  { value: 'label', label: '營養標示' },
+  { value: 'manual', label: '手動搜尋' },
+];
 
 function OCRDraftCard({
   draft,
@@ -117,7 +126,7 @@ function ManualResultsList({
 
 export default function ScannerScreen() {
   const insets = useSafeAreaInsets();
-  const { rs, wp, isWeb } = useResponsive();
+  const { rs, wp, isWeb, isDesktop } = useResponsive();
   const {
     scanResult,
     setScanResult,
@@ -139,8 +148,12 @@ export default function ScannerScreen() {
   const [rejectedDetections, setRejectedDetections] = useState<RejectedDetection[]>([]);
   const [ocrQuerying, setOcrQuerying] = useState(false);
   const [ocrDraft, setOcrDraft] = useState<OCRDraft | null>(null);
+  const [scanMode, setScanMode] = useState<ScanMode>('camera');
   const [syncingRecord, setSyncingRecord] = useState(false);
   const [pendingRecordQueue, setPendingRecordQueue] = useState<PendingRecordSync[]>([]);
+  const [isCameraReady, setCameraReady] = useState(false);
+  const [isCapturing, setCapturing] = useState(false);
+  const captureInFlightRef = useRef(false);
 
   const results = scanResult.detections;
   const totalCal = results.reduce((sum, f) => sum + f.nutrition.calories, 0);
@@ -149,19 +162,36 @@ export default function ScannerScreen() {
   const firstPendingRecord = userPendingRecords[0];
 
   const handleCamera = async () => {
-    if (isWeb) {
-      setScanResult(SCANNER_DEMO_RESULTS);
-      return;
-    }
-
-    if (!permission?.granted) {
-      const res = await requestPermission();
-      if (!res.granted) {
-        Alert.alert('需要相機權限', '請在設定中允許 NutriLens 存取相機');
+    try {
+      const isAvailable = await CameraView.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert(
+          '無法使用相機',
+          isWeb
+            ? '請使用支援相機的瀏覽器，並透過 HTTPS 或 localhost 開啟 NutriLens。你仍可改用相簿上傳。'
+            : '此裝置沒有可用的相機，你仍可改用相簿上傳。'
+        );
         return;
       }
+
+      if (!permission?.granted) {
+        const res = await requestPermission();
+        if (!res.granted) {
+          Alert.alert(
+            '需要相機權限',
+            res.canAskAgain
+              ? '請允許 NutriLens 存取相機後再試一次。'
+              : '相機權限已被封鎖，請到瀏覽器或系統設定中允許 NutriLens 使用相機。'
+          );
+          return;
+        }
+      }
+
+      setCameraReady(false);
+      setCameraActive(true);
+    } catch (error: any) {
+      Alert.alert('相機啟動失敗', error?.message || '請重新整理後再試，或改用相簿上傳。');
     }
-    setCameraActive(true);
   };
 
   const handlePrediction = async (imageBase64: string) => {
@@ -182,27 +212,47 @@ export default function ScannerScreen() {
     return false;
   };
 
-  const takePicture = async () => {
-    if (!cameraRef.current) return;
+  const analyzeImage = async (imageBase64: string) => {
     setScanning(true);
     try {
-      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.7 });
-      setCameraActive(false);
-
-      if (photo?.base64) {
-        try {
-          const ok = await handlePrediction(photo.base64);
-          if (ok) return;
-        } catch (error: any) {
-          Alert.alert('AI 辨識暫時不可用', error?.message || '請先使用手動搜尋加入餐點。');
-        }
+      const ok = await handlePrediction(imageBase64);
+      if (!ok) {
+        clearScan();
+        Alert.alert('未辨識到可記錄的食物', '請拍攝完整餐盤、保持光線充足，或改用相簿與手動搜尋。');
       }
-
+      return ok;
+    } catch (error: any) {
       setRejectedDetections([]);
       clearScan();
-    } catch {
-      Alert.alert('拍照失敗', '請再試一次');
+      Alert.alert('AI 辨識暫時不可用', error?.message || '請先使用手動搜尋加入餐點。');
+      return false;
+    } finally {
       setScanning(false);
+    }
+  };
+
+  const takePicture = async () => {
+    if (!cameraRef.current || !isCameraReady || captureInFlightRef.current) return;
+    captureInFlightRef.current = true;
+    setCapturing(true);
+    try {
+      const photo = await cameraRef.current.takePictureAsync({
+        base64: true,
+        quality: 0.7,
+        ...(isWeb ? { imageType: 'jpg' as const, scale: 0.8 } : {}),
+      });
+      setCameraActive(false);
+      const imageBase64 = photo?.base64 || (isWeb ? photo?.uri : undefined);
+      if (!imageBase64) {
+        throw new Error('相機沒有回傳可辨識的圖片，請重新拍照。');
+      }
+      await analyzeImage(imageBase64);
+    } catch (error: any) {
+      setScanning(false);
+      Alert.alert('拍照失敗', error?.message || '請再試一次，或改用相簿上傳。');
+    } finally {
+      captureInFlightRef.current = false;
+      setCapturing(false);
     }
   };
 
@@ -214,20 +264,12 @@ export default function ScannerScreen() {
     });
 
     if (result.canceled) return;
-    setScanning(true);
-
     const asset = result.assets[0];
     if (asset.base64) {
-      try {
-        const ok = await handlePrediction(asset.base64);
-        if (ok) return;
-      } catch (error: any) {
-        Alert.alert('AI 辨識暫時不可用', error?.message || '請先使用手動搜尋加入餐點。');
-      }
+      await analyzeImage(asset.base64);
+      return;
     }
-
-    setRejectedDetections([]);
-    clearScan();
+    Alert.alert('圖片無法讀取', '請改選另一張圖片，或直接使用相機拍攝。');
   };
 
   const handleLabelOCRFromGallery = async () => {
@@ -385,17 +427,87 @@ export default function ScannerScreen() {
     Alert.alert('已加入今日紀錄', `${food.foodName} 已依包裝營養標示加入紀錄`);
   };
 
-  if (isCameraActive && !isWeb) {
+  if (isCameraActive) {
     return (
       <ScannerCameraView
         cameraRef={cameraRef}
         rs={rs}
         topInset={insets.top}
-        onClose={() => setCameraActive(false)}
+        isReady={isCameraReady}
+        isCapturing={isCapturing}
+        onClose={() => {
+          setCameraReady(false);
+          setCameraActive(false);
+        }}
         onCapture={takePicture}
+        onReady={() => setCameraReady(true)}
+        onError={(message) => {
+          setCameraReady(false);
+          setCameraActive(false);
+          Alert.alert('相機啟動失敗', message || '請確認權限後再試，或改用相簿上傳。');
+        }}
       />
     );
   }
+
+  const modeConfig = {
+    camera: { icon: 'camera-outline' as const, title: '拍攝完整餐盤', hint: '保持光線充足並避免遮擋，拍攝後會立即送出 AI 分析。', action: '啟動相機', onPress: handleCamera },
+    gallery: { icon: 'images-outline' as const, title: '從相簿選擇餐點', hint: '可使用已拍攝的餐點照片，不需要重新開啟相機。', action: '選擇餐點照片', onPress: handleGallery },
+    label: { icon: 'document-text-outline' as const, title: '辨識包裝營養標示', hint: '選擇清晰的營養標示照片，可建立自訂食品或直接加入紀錄。', action: ocrQuerying ? '辨識中' : '選擇標示照片', onPress: handleLabelOCRFromGallery },
+    manual: { icon: 'search-outline' as const, title: '從食品資料庫搜尋', hint: '辨識結果不確定時，可直接從 TFDA 與自訂食品中補上餐點。', action: '', onPress: handleManualSearch },
+  }[scanMode];
+
+  const captureWorkspace = (
+    <>
+      <SegmentedControl options={SCAN_MODE_OPTIONS} value={scanMode} onChange={(value) => setScanMode(value as ScanMode)} />
+      <View style={styles.scanHero}>
+        <View style={styles.scanIcon}>
+          {scanResult.isScanning || ocrQuerying ? (
+            <ActivityIndicator size="large" color={Palette.accent.green} />
+          ) : results.length > 0 ? (
+            <Ionicons name="checkmark-circle-outline" size={42} color={Palette.accent.green} />
+          ) : (
+            <Ionicons name={modeConfig.icon} size={42} color={Palette.accent.green} />
+          )}
+        </View>
+        <Text style={styles.scanTitle}>{scanResult.isScanning ? '正在分析照片' : results.length > 0 ? `已辨識 ${results.length} 項食物` : modeConfig.title}</Text>
+        <Text style={styles.scanHint}>{results.length > 0 ? `合計 ${totalCal} kcal，鈉 ${totalSodium}mg。請確認份量後加入。` : modeConfig.hint}</Text>
+        {scanMode !== 'manual' ? (
+          <PrimaryButton label={modeConfig.action} onPress={modeConfig.onPress} disabled={scanResult.isScanning || ocrQuerying} icon={<Ionicons name={modeConfig.icon} size={18} color={Palette.text.inverse} />} />
+        ) : null}
+        {results.length > 0 ? (
+          <SecondaryButton label="清除辨識結果" onPress={clearScan} icon={<Ionicons name="trash-outline" size={16} color={Palette.text.secondary} />} />
+        ) : null}
+      </View>
+    </>
+  );
+
+  const resultWorkspace = (
+    <View style={styles.resultWorkspace}>
+      <View style={styles.resultHeader}>
+        <Text style={styles.sectionTitle}>辨識結果</Text>
+        {results.length > 0 ? <DataPill tone="success">{results.length} 項</DataPill> : null}
+      </View>
+      <ScannerResults rs={rs} wp={wp} results={results} onAddRecord={handleAddRecord} onWeightChange={updateScanFoodWeight} />
+      {ocrDraft ? <OCRDraftCard draft={ocrDraft} onSaveCustomFood={handleSaveCustomFood} onQuickAdd={handleQuickAddOCRFood} /> : null}
+      <ManualResultsList foods={manualResults} onAddFood={handleAddManualFood} />
+    </View>
+  );
+
+  const safetyAndManual = (
+    <>
+      <View style={styles.conditionSummary}>
+        <Ionicons name="shield-checkmark-outline" size={18} color={Palette.accent.green} />
+        <View style={styles.conditionCopy}>
+          <Text style={styles.conditionTitle}>安全條件已套用</Text>
+          <Text style={styles.conditionText} numberOfLines={2}>疾病：{user.healthConditions.length ? user.healthConditions.join('、') : '未設定'} · 過敏原：{user.allergens.length ? user.allergens.join('、') : '未設定'}</Text>
+        </View>
+      </View>
+      {scanMode === 'manual' ? (
+        <ScannerManualTools rs={rs} manualQuery={manualQuery} onManualQueryChange={setManualQuery} manualSearching={manualSearching} onManualSearch={handleManualSearch} ocrQuerying={ocrQuerying} onOCRSearch={handleLabelOCRFromGallery} rejectedDetections={rejectedDetections} />
+      ) : null}
+    </>
+  );
 
   return (
     <AppContainer>
@@ -431,62 +543,14 @@ export default function ScannerScreen() {
         </View>
       ) : null}
 
-      <View style={styles.scanHero}>
-        <View style={styles.scanIcon}>
-          {scanResult.isScanning ? (
-            <ActivityIndicator size="large" color={Palette.accent.green} />
-          ) : results.length > 0 ? (
-            <Ionicons name="checkmark-circle-outline" size={42} color={Palette.accent.green} />
-          ) : (
-            <Ionicons name="scan-outline" size={42} color={Palette.accent.green} />
-          )}
+      {isDesktop ? (
+        <View style={styles.desktopColumns}>
+          <View style={styles.desktopCapture}>{captureWorkspace}{safetyAndManual}</View>
+          <View style={styles.desktopResults}>{resultWorkspace}</View>
         </View>
-        <Text style={styles.scanTitle}>
-          {scanResult.isScanning ? '正在分析照片' : results.length > 0 ? `已辨識 ${results.length} 項食物` : '掃描餐點建立今日紀錄'}
-        </Text>
-        <Text style={styles.scanHint}>
-          {results.length > 0 ? `合計 ${totalCal} kcal，鈉 ${totalSodium}mg。請確認份量後加入。` : '建議拍攝完整餐盤，避免反光與遮擋。'}
-        </Text>
-        <PrimaryButton label={isWeb ? '載入 Web Demo 結果' : '啟動相機掃描'} onPress={handleCamera} icon={<Ionicons name="camera-outline" size={18} color={Palette.text.inverse} />} />
-        <View style={styles.secondaryActions}>
-          <SecondaryButton label="相簿上傳" onPress={handleGallery} icon={<Ionicons name="images-outline" size={16} color={Palette.accent.blue} />} />
-          <SecondaryButton label="清除結果" onPress={clearScan} icon={<Ionicons name="refresh-outline" size={16} color={Palette.text.secondary} />} />
-        </View>
-      </View>
-
-      <SectionBlock title="健康條件套用" subtitle="辨識與推薦會使用這些條件做安全過濾。">
-        <View style={styles.conditionRow}>
-          <DataPill tone={user.healthConditions.length ? 'warning' : 'success'}>疾病：{user.healthConditions.length > 0 ? user.healthConditions.join('、') : '未設定'}</DataPill>
-          <DataPill tone={user.allergens.length ? 'warning' : 'success'}>過敏原：{user.allergens.length > 0 ? user.allergens.join('、') : '未設定'}</DataPill>
-        </View>
-      </SectionBlock>
-
-      <View style={styles.resultHeader}>
-        <Text style={styles.sectionTitle}>辨識結果</Text>
-        {results.length > 0 ? <DataPill tone="success">{results.length} 項</DataPill> : null}
-      </View>
-      <ScannerResults rs={rs} wp={wp} results={results} onAddRecord={handleAddRecord} onWeightChange={updateScanFoodWeight} />
-
-      <ScannerManualTools
-        rs={rs}
-        manualQuery={manualQuery}
-        onManualQueryChange={setManualQuery}
-        manualSearching={manualSearching}
-        onManualSearch={handleManualSearch}
-        ocrQuerying={ocrQuerying}
-        onOCRSearch={handleLabelOCRFromGallery}
-        rejectedDetections={rejectedDetections}
-      />
-
-      {ocrDraft ? (
-        <OCRDraftCard
-          draft={ocrDraft}
-          onSaveCustomFood={handleSaveCustomFood}
-          onQuickAdd={handleQuickAddOCRFood}
-        />
-      ) : null}
-
-      <ManualResultsList foods={manualResults} onAddFood={handleAddManualFood} />
+      ) : (
+        <>{captureWorkspace}{resultWorkspace}{safetyAndManual}</>
+      )}
     </AppContainer>
   );
 }
@@ -527,11 +591,16 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
     alignItems: 'center',
     gap: Spacing.md,
+    marginTop: Spacing.md,
     marginBottom: Spacing.xl,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
     ...Shadows.card,
   },
+  desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xl },
+  desktopCapture: { flex: 1, minWidth: 0 },
+  desktopResults: { flex: 1.08, minWidth: 0 },
+  resultWorkspace: { minWidth: 0 },
   scanIcon: {
     width: 82,
     height: 82,
@@ -542,8 +611,10 @@ const styles = StyleSheet.create({
   },
   scanTitle: { ...Typography.h2, color: Palette.text.primary, textAlign: 'center' },
   scanHint: { ...Typography.caption, color: Palette.text.secondary, textAlign: 'center' },
-  secondaryActions: { flexDirection: 'row', gap: Spacing.sm, width: '100%' },
-  conditionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  conditionSummary: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, backgroundColor: Palette.bg.card, borderWidth: 1, borderColor: Palette.border.subtle, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.xl },
+  conditionCopy: { flex: 1, gap: 2 },
+  conditionTitle: { ...Typography.caption, color: Palette.text.primary },
+  conditionText: { ...Typography.small, color: Palette.text.tertiary },
   resultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.lg },
   sectionTitle: { ...Typography.h3, color: Palette.text.primary },
   ocrHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, marginBottom: Spacing.xs },

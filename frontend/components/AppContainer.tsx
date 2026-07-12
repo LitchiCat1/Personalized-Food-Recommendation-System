@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useResponsive } from '@/hooks/useResponsive';
 import { Palette } from '@/constants/theme';
+import DesktopSidebar from '@/components/ui/desktop-sidebar';
 
 interface Props {
   children: React.ReactNode;
@@ -22,7 +23,7 @@ interface Props {
 
 export default function AppContainer({ children, bottomPadding = 80 }: Props) {
   const insets = useSafeAreaInsets();
-  const { isDesktop, maxContentWidth, rs } = useResponsive();
+  const { isDesktop, rs } = useResponsive();
   const scrollRef = useRef<ScrollView>(null);
 
   // Fix #4: Reset scroll position when tab becomes focused
@@ -38,13 +39,11 @@ export default function AppContainer({ children, bottomPadding = 80 }: Props) {
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       {/* Fix #5: On desktop web, center the app with max-width */}
-      <View style={[
-        styles.outerContainer,
-        isDesktop && styles.desktopOuter,
-      ]}>
+      <View style={[styles.outerContainer, isDesktop && styles.desktopOuter]}>
+        {isDesktop ? <DesktopSidebar /> : null}
         <View style={[
           styles.innerContainer,
-          isDesktop && { maxWidth: maxContentWidth },
+          isDesktop && styles.desktopContent,
         ]}>
           <ScrollView
             ref={scrollRef}
@@ -52,8 +51,8 @@ export default function AppContainer({ children, bottomPadding = 80 }: Props) {
             contentContainerStyle={[
               styles.scrollContent,
               {
-                paddingHorizontal: rs(20),
-                paddingBottom: safeBottom + rs(bottomPadding),
+                paddingHorizontal: isDesktop ? 32 : rs(20),
+                paddingBottom: isDesktop ? 32 : safeBottom + rs(bottomPadding),
               },
             ]}
           >
@@ -74,12 +73,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   desktopOuter: {
-    alignItems: 'center',
+    flexDirection: 'row',
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 1280,
     backgroundColor: Palette.bg.secondary,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: Palette.border.subtle,
   },
   innerContainer: {
     flex: 1,
     width: '100%',
+  },
+  desktopContent: {
+    flex: 1,
+    width: 0,
+    minWidth: 0,
   },
   scrollContent: {},
 });

@@ -25,15 +25,23 @@ Note: the active Figma plan is Starter and allows three pages. The design is the
 
 ## Created Screen Frames
 
-All app frames are 390x844:
+Mobile app frames are 390x844 and use the `v0.0.3 Mobile` prefix:
 
-- `01 Dashboard`
-- `02 Scanner`
-- `03 Recommend`
-- `04 History`
-- `05 Profile`
+- `v0.0.3 Mobile / 01 Dashboard`
+- `v0.0.3 Mobile / 02 Scanner`
+- `v0.0.3 Mobile / 03 Recommend`
+- `v0.0.3 Mobile / 04 History`
+- `v0.0.3 Mobile / 05 Profile`
 
-The `02 App Screens` page also includes `Responsive implementation notes` for 375, 390, 430, 768, and centered desktop web adaptation.
+Desktop Web frames are 1280x800 and use the `v0.0.3 Web` prefix:
+
+- `v0.0.3 Web / 01 Dashboard`
+- `v0.0.3 Web / 02 Scanner`
+- `v0.0.3 Web / 03 Recommend`
+- `v0.0.3 Web / 04 History`
+- `v0.0.3 Web / 05 Profile`
+
+The `02 App Screens` page also includes `v0.0.3 Responsive UI Specification` for 375, 390, 430, 768, and 1280 widths. Mobile and tablet retain bottom tabs; desktop Web uses a persistent sidebar and multi-column task layouts.
 
 ## Design Thesis
 
@@ -77,7 +85,7 @@ Signature components:
 
 ### Dashboard
 
-First viewport shows today's food safety radar, calories, sodium risk, protein status, meal count, scan CTA, BMR/TDEE/sodium metrics, and a meal timeline.
+First viewport shows today's food safety radar, calories, sodium risk, scan CTA, safety alerts, and recent meals. BMR/TDEE are kept in the profile instead of the primary dashboard flow.
 
 ### Scanner
 
@@ -97,7 +105,7 @@ Shows account summary, BMR/TDEE/BMI metrics, health-condition filters, allergen/
 
 ## Implementation Status
 
-The Figma handoff has been implemented in the Expo app:
+The `v0.0.3` Figma handoff has been implemented in the Expo app:
 
 1. Figma tokens are represented in `frontend/constants/theme.ts`.
 2. Shared UI components were added under `frontend/components/ui/`.
@@ -113,3 +121,4 @@ The Figma handoff has been implemented in the Expo app:
    - `cd frontend && npm run typecheck`
    - `cd frontend && npm run lint`
    - `cd frontend && npm run build:web`
+7. Desktop Web uses a 1280px application shell with persistent navigation at 1024px and above; mobile and tablet controls remain width-adaptive with 44px minimum touch targets.

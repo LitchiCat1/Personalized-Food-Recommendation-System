@@ -8,9 +8,10 @@ type Props = {
   onPress?: () => void;
   icon?: React.ReactNode;
   active?: boolean;
+  disabled?: boolean;
 };
 
-export default function SecondaryButton({ label, onPress, icon, active }: Props) {
+export default function SecondaryButton({ label, onPress, icon, active, disabled }: Props) {
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -27,9 +28,13 @@ export default function SecondaryButton({ label, onPress, icon, active }: Props)
     <Animated.View style={animatedStyle}>
       <Pressable
         onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ selected: Boolean(active), disabled: Boolean(disabled) }}
+        disabled={disabled}
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
-        style={({ pressed }) => [styles.button, active && styles.active, pressed && { opacity: 0.86 }]}
+        style={({ pressed }) => [styles.button, active && styles.active, pressed && { opacity: 0.86 }, disabled && styles.disabled]}
       >
         <View style={styles.content}>
           {icon}
@@ -58,4 +63,5 @@ const styles = StyleSheet.create({
   content: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   label: { ...Typography.bodyBold, color: Palette.text.secondary },
   activeLabel: { color: Palette.accent.green },
+  disabled: { opacity: 0.48 },
 });

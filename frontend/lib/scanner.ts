@@ -9,6 +9,18 @@ function buildHeaders(auth?: ApiAuth, contentType?: string): HeadersInit {
   return headers;
 }
 
+export function normalizeImageBase64(value: string): string {
+  const trimmed = value.trim();
+  const dataUri = trimmed.match(/^data:image\/(?:png|jpe?g|gif|webp);base64,([\s\S]*)$/i);
+  const payload = (dataUri?.[1] ?? trimmed).replace(/\s/g, '');
+
+  if (!payload || (trimmed.startsWith('data:') && !dataUri)) {
+    throw new Error('圖片資料格式不正確，請重新拍照或選擇另一張圖片');
+  }
+
+  return payload;
+}
+
 export type RejectedDetection = {
   label: string;
   confidence: number;
@@ -72,7 +84,7 @@ export async function runPrediction(params: {
   auth?: ApiAuth;
 }): Promise<{ detections: DetectedFood[]; rejectedDetections: RejectedDetection[] }> {
   const body = {
-    image: params.imageBase64,
+    image: normalizeImageBase64(params.imageBase64),
     health_conditions: params.healthConditions,
     allergens: params.allergens,
     user_id: params.userId,
@@ -197,7 +209,7 @@ export async function runNutritionLabelOCR(params: {
   const resp = await fetch(`${params.apiBaseUrl}/ocr/nutrition-label`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image: params.imageBase64 }),
+    body: JSON.stringify({ image: normalizeImageBase64(params.imageBase64) }),
   });
   const data = await resp.json();
   if (!resp.ok) {

@@ -1,3 +1,5 @@
+import base64
+import binascii
 import json
 import os
 import re
@@ -7,6 +9,7 @@ import requests
 
 RETRYABLE_GEMINI_STATUS_CODES = {401, 403, 404, 429, 500, 502, 503, 504}
 DEFAULT_GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
 
 
 def extract_number(value, as_int: bool = False):
@@ -85,7 +88,7 @@ def extract_json_block(text: str) -> dict:
         return json.loads(match.group(0))
 
 
-def detect_image_mime(img_bytes: bytes) -> str:
+def detect_image_mime(img_bytes: bytes) -> str | None:
     if img_bytes.startswith(b"\x89PNG"):
         return "image/png"
     if img_bytes.startswith(b"\xff\xd8"):
@@ -94,7 +97,44 @@ def detect_image_mime(img_bytes: bytes) -> str:
         return "image/gif"
     if img_bytes.startswith(b"RIFF") and b"WEBP" in img_bytes[:16]:
         return "image/webp"
-    return "image/jpeg"
+    return None
+
+
+def decode_image_base64(value, max_bytes: int = MAX_IMAGE_BYTES) -> tuple[bytes, str, str]:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("image 必須是非空的 Base64 圖片")
+
+    encoded = value.strip()
+    if encoded.lower().startswith("data:"):
+        match = re.fullmatch(
+            r"data:image/(?:png|jpe?g|gif|webp);base64,([\s\S]+)",
+            encoded,
+            flags=re.IGNORECASE,
+        )
+        if not match:
+            raise ValueError("image Data URI 格式不正確或不是支援的圖片類型")
+        encoded = match.group(1)
+
+    encoded = "".join(encoded.split())
+    max_encoded_length = ((max_bytes + 2) // 3) * 4
+    if len(encoded) > max_encoded_length:
+        raise ValueError(f"圖片大小不可超過 {max_bytes // (1024 * 1024)} MB")
+
+    try:
+        img_bytes = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError) as error:
+        raise ValueError("image 不是有效的 Base64 圖片") from error
+
+    if not img_bytes:
+        raise ValueError("image 不可為空圖片")
+    if len(img_bytes) > max_bytes:
+        raise ValueError(f"圖片大小不可超過 {max_bytes // (1024 * 1024)} MB")
+
+    mime_type = detect_image_mime(img_bytes)
+    if not mime_type:
+        raise ValueError("僅支援 JPEG、PNG、GIF 或 WebP 圖片")
+
+    return img_bytes, encoded, mime_type
 
 
 def get_gemini_api_keys(explicit_key: str | None = None) -> list[str]:

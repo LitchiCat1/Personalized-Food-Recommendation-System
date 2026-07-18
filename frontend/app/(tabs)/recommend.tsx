@@ -27,11 +27,6 @@ import {
   type RecommendationResponse,
 } from '@/lib/api';
 
-function formatReason(item: RecommendationItem) {
-  if (!item.reasons || item.reasons.length === 0) return '已由安全規則排除';
-  return item.reasons.join('、');
-}
-
 const RADIUS_OPTIONS = [
   { value: '1', label: '1 km' },
   { value: '3', label: '3 km' },
@@ -45,11 +40,6 @@ const CATEGORY_OPTIONS = [
   { value: '早餐', label: '早餐' },
   { value: '飲料', label: '飲料' },
   { value: '沙拉', label: '沙拉' },
-];
-
-const RECOMMEND_MODE_OPTIONS = [
-  { value: 'meals', label: '安全餐點' },
-  { value: 'nearby', label: '附近店家' },
 ];
 
 export default function RecommendScreen() {
@@ -70,9 +60,7 @@ export default function RecommendScreen() {
   const [category, setCategory] = useState('all');
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [locationLabel, setLocationLabel] = useState('尚未取得定位');
-  const [activeMode, setActiveMode] = useState('meals');
   const [showAllMeals, setShowAllMeals] = useState(false);
-  const [showFiltered, setShowFiltered] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,8 +84,6 @@ export default function RecommendScreen() {
   }, [accessToken, apiBaseUrl, user.userId]);
 
   const recommended = data?.recommended || [];
-  const filteredOut = data?.filtered_out || [];
-  const totalFiltered = data?.total_filtered ?? filteredOut.length;
   const sourceCounts = data?.source_counts;
   const preferenceProfile = data?.preference_profile;
   const remaining = data?.remaining_calories ?? user.dailyCalorieTarget;
@@ -168,7 +154,7 @@ export default function RecommendScreen() {
     <AppContainer>
       <ScreenHeader
         title="智慧推薦"
-        subtitle="先看通過安全規則的餐點，再用定位找附近可行店家。"
+        subtitle="查看符合個人條件的餐點，再用定位找附近可行店家。"
         badge="安全過濾"
         badgeTone="success"
       />
@@ -181,38 +167,19 @@ export default function RecommendScreen() {
         <>
           <View style={styles.metricRow}>
             <MetricCard label="剩餘熱量" value={remaining} unit="kcal" accent={Palette.accent.green} />
-            <MetricCard label="已排除" value={totalFiltered} unit="項" accent={Palette.status.warning} />
             <MetricCard label="可推薦" value={recommended.length} unit="項" accent={Palette.accent.blue} />
           </View>
 
-          <SegmentedControl options={RECOMMEND_MODE_OPTIONS} value={activeMode} onChange={setActiveMode} />
-          <View style={isDesktop ? styles.desktopColumns : styles.modeContent}>
+          <View style={isDesktop ? styles.desktopColumns : styles.recommendSections}>
 
-          {isDesktop || activeMode === 'meals' ? (
           <View style={isDesktop ? styles.desktopPane : undefined}>
 
-          <SectionBlock title="安全餐點推薦" subtitle="依熱量契合、疾病禁忌、過敏原和近期偏好排序。">
+          <SectionBlock title="餐點推薦" subtitle="依熱量契合、疾病禁忌、過敏原和近期偏好排序。">
             <View style={styles.sourceSummary}>
               {sourceCounts ? <DataPill tone="info">TFDA {sourceCounts.tfda} · 自訂 {sourceCounts.custom_foods} · 基礎 {sourceCounts.manual_db}</DataPill> : null}
               {preferenceProfile && preferenceProfile.food_count > 0 ? <DataPill tone="success">參考 {preferenceProfile.record_count} 筆紀錄</DataPill> : null}
               <DataPill tone={user.healthConditions.length ? 'warning' : 'success'}>{user.healthConditions.length ? user.healthConditions.join('、') : '未設定疾病'}</DataPill>
             </View>
-
-            <View style={styles.filteredSummary}>
-              <Ionicons name="shield-checkmark-outline" size={18} color={Palette.accent.green} />
-              <Text style={styles.filteredSummaryText}>安全過濾層已排除 {totalFiltered} 項不適合的餐點。</Text>
-              {filteredOut.length > 0 ? (
-                <Pressable accessibilityRole="button" accessibilityState={{ expanded: showFiltered }} onPress={() => setShowFiltered((value) => !value)} style={styles.compactToggle}>
-                  <Ionicons name={showFiltered ? 'chevron-up' : 'chevron-down'} size={18} color={Palette.text.secondary} />
-                </Pressable>
-              ) : null}
-            </View>
-            {showFiltered ? filteredOut.slice(0, 3).map((item, i) => (
-              <View key={`${item.label}_${i}`} style={styles.filteredExample}>
-                <Text style={styles.filteredName}>{item.name_zh}</Text>
-                <Text style={styles.filteredReason}>{formatReason(item)}</Text>
-              </View>
-            )) : null}
 
             <View style={styles.recommendList}>
               {recommended.length === 0 ? (
@@ -234,9 +201,7 @@ export default function RecommendScreen() {
             </View>
           </SectionBlock>
           </View>
-          ) : null}
 
-          {isDesktop || activeMode === 'nearby' ? (
           <View style={isDesktop ? styles.desktopPane : undefined}>
           <SectionBlock title="附近店家推薦" subtitle="Google Places 只提供真實店家位置；實際餐點營養仍建議用掃描確認。">
             <View style={styles.budgetRow}>
@@ -312,7 +277,6 @@ export default function RecommendScreen() {
             </>
           ) : null}
           </View>
-          ) : null}
           </View>
         </>
       )}
@@ -450,6 +414,20 @@ function RestaurantCard({
           <Text style={styles.itemName}>AI 推測：{summary.restaurant_type}</Text>
           <Text style={styles.restaurantMeta}>可能販售：{summary.likely_foods.join('、') || '不確定'}</Text>
           <Text style={styles.restaurantMeta}>價格：約 {summary.price_range_twd.min}-{summary.price_range_twd.max} 元 · 預算：{summary.budget_fit}</Text>
+          {(summary.recommended_foods || []).length ? (
+            <View style={styles.personalizedRecommendations}>
+              <View style={styles.personalizedTitleRow}>
+                <Ionicons name="sparkles-outline" size={16} color={Palette.accent.green} />
+                <Text style={styles.personalizedTitle}>依疾病與今日進度推薦</Text>
+              </View>
+              {(summary.recommended_foods || []).map((item, itemIndex) => (
+                <View key={`${item.name}_${itemIndex}`} style={styles.personalizedItem}>
+                  <Text style={styles.personalizedFood}>{item.name}</Text>
+                  <Text style={styles.restaurantMeta}>{item.reason}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
           <Text style={styles.restaurantMeta}>建議：{summary.health_tips.join('、') || '到店後確認餐點內容'}</Text>
           <Text style={styles.errorMeta}>{summary.source_note}</Text>
         </View>
@@ -469,8 +447,8 @@ function NutritionMini({ label, value, color }: { label: string; value: string; 
 
 const styles = StyleSheet.create({
   metricRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl },
-  modeContent: { marginTop: Spacing.xl },
-  desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xl, marginTop: Spacing.xl },
+  recommendSections: { gap: Spacing.xl },
+  desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xl },
   desktopPane: { flex: 1, minWidth: 0 },
   stateCard: {
     backgroundColor: Palette.bg.card,
@@ -485,20 +463,6 @@ const styles = StyleSheet.create({
   },
   emptyText: { ...Typography.body, color: Palette.text.tertiary, textAlign: 'center' },
   sourceSummary: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.lg },
-  filteredSummary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: Palette.bg.mint,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  filteredSummaryText: { ...Typography.caption, color: Palette.text.secondary, flex: 1 },
-  compactToggle: { width: 44, height: 44, marginVertical: -10, marginRight: -8, alignItems: 'center', justifyContent: 'center' },
-  filteredExample: { borderTopWidth: 1, borderTopColor: Palette.border.subtle, paddingVertical: Spacing.sm },
-  filteredName: { ...Typography.caption, color: Palette.text.primary },
-  filteredReason: { ...Typography.small, color: Palette.text.tertiary },
   recommendList: { gap: Spacing.md, marginTop: Spacing.lg },
   mealCard: {
     backgroundColor: Palette.bg.wash,
@@ -611,4 +575,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     padding: Spacing.md,
   },
+  personalizedRecommendations: { borderTopWidth: 1, borderTopColor: Palette.border.subtle, paddingTop: Spacing.sm, gap: Spacing.sm },
+  personalizedTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  personalizedTitle: { ...Typography.caption, color: Palette.text.primary, fontWeight: '700' },
+  personalizedItem: { gap: 2 },
+  personalizedFood: { ...Typography.caption, color: Palette.accent.green, fontWeight: '700' },
 });

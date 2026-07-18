@@ -5,6 +5,7 @@ from math import atan2, cos, radians, sin, sqrt
 
 from services.google_places_service import fetch_google_places_restaurants
 from services.medical_risk_service import evaluate_medical_risk
+from services.nutrition_progress_service import build_daily_nutrition_progress
 
 
 def load_restaurant_catalog(base_dir: str) -> list[dict]:
@@ -68,24 +69,8 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     conditions = user.get("health_conditions", [])
     allergens = user.get("allergens", [])
-    daily_target = user.get("daily_calorie_target", 2100)
 
-    today = now.strftime("%Y-%m-%d")
-    today_records = storage.get_records(user_id, today, limit=500)
-    consumed = {
-        "calories": sum(r.get("total_calories", 0) for r in today_records),
-        "protein": sum(r.get("total_protein", 0) for r in today_records),
-        "carbs": sum(r.get("total_carbs", 0) for r in today_records),
-        "fat": sum(r.get("total_fat", 0) for r in today_records),
-        "sodium": sum(r.get("total_sodium", 0) for r in today_records),
-    }
-    remaining = {
-        "calories": max(0, daily_target - consumed["calories"]),
-        "protein": max(0, 130 - consumed["protein"]),
-        "carbs": max(0, 250 - consumed["carbs"]),
-        "fat": max(0, 70 - consumed["fat"]),
-        "sodium": max(0, 2000 - consumed["sodium"]),
-    }
+    remaining = build_daily_nutrition_progress(storage, user_id, user, now)["remaining"]
 
     recommendations = []
     filtered_out = []
@@ -213,23 +198,7 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
     category = _normalize_category(params.get("category", "all"))
     now = datetime.now(timezone.utc).replace(tzinfo=None)
 
-    today = now.strftime("%Y-%m-%d")
-    today_records = storage.get_records(user_id, today, limit=500)
-    consumed = {
-        "calories": sum(r.get("total_calories", 0) for r in today_records),
-        "protein": sum(r.get("total_protein", 0) for r in today_records),
-        "carbs": sum(r.get("total_carbs", 0) for r in today_records),
-        "fat": sum(r.get("total_fat", 0) for r in today_records),
-        "sodium": sum(r.get("total_sodium", 0) for r in today_records),
-    }
-    daily_target = user.get("daily_calorie_target", 2100)
-    remaining = {
-        "calories": max(0, daily_target - consumed["calories"]),
-        "protein": max(0, 130 - consumed["protein"]),
-        "carbs": max(0, 250 - consumed["carbs"]),
-        "fat": max(0, 70 - consumed["fat"]),
-        "sodium": max(0, 2000 - consumed["sodium"]),
-    }
+    remaining = build_daily_nutrition_progress(storage, user_id, user, now)["remaining"]
 
     restaurants = fetch_google_places_restaurants(lat, lng, radius_km, category, budget, limit=12)
     recommendations = [item for restaurant in restaurants for item in restaurant.get("recommended_items", [])]

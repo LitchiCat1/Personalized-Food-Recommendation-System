@@ -32,6 +32,7 @@ from services.nutrition_label_service import (
     normalize_ocr_result,
     scale_nutrition_per_100g,
 )
+from services.nutrition_progress_service import build_daily_nutrition_progress
 from services.profile_service import build_bmr_response, build_user_profile
 from services.recommend_service import build_recommendation_response
 from services.restaurant_ai_service import build_restaurant_ai_summary
@@ -474,10 +475,18 @@ def map_food_restaurant_summary(user_id):
     restaurant = data.get("restaurant") or {}
     if not restaurant.get("name"):
         return jsonify({"error": "缺少 restaurant.name"}), 400
-    budget = int(data.get("budget") or 150)
+    budget = data.get("budget") or 150
     category = data.get("category") or "all"
     try:
-        summary = build_restaurant_ai_summary(restaurant, budget, category, user.get("health_conditions", []))
+        nutrition_progress = build_daily_nutrition_progress(storage, user_id, user)
+        summary = build_restaurant_ai_summary(
+            restaurant,
+            budget,
+            category,
+            user.get("health_conditions", []),
+            nutrition_progress,
+            DISEASE_RULES,
+        )
     except ValueError as e:
         return jsonify({"error": str(e)}), 503
     except requests.HTTPError as e:

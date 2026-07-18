@@ -1,5 +1,6 @@
 import os
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 from services.disease_rule_service import build_allergen_taxonomy_response, build_disease_rules_response, build_medical_metadata_response, load_allergen_taxonomy, load_disease_rules, normalize_allergen_ids, normalize_condition_ids
@@ -8,9 +9,10 @@ from services.food_service import search_foods
 from services.healthy_food_service import build_healthy_food_recommendations, load_restaurant_catalog
 from services.history_service import build_history_response
 from services.open_food_facts_service import build_open_food_facts_product
+from services.nutrition_progress_service import build_daily_nutrition_progress
 from services.profile_service import build_bmr_response, build_user_profile
 from services.recommend_service import build_feedback_profile, build_preference_profile, compute_feedback_adjustment, compute_preference_score
-from services.restaurant_ai_service import validate_restaurant_summary_input
+from services.restaurant_ai_service import build_restaurant_summary_prompt, normalize_restaurant_summary, validate_restaurant_summary_input
 from services.vision_food_service import build_vision_food_response
 from repositories.storage import StorageRepository
 
@@ -266,6 +268,79 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertEqual(budget, 0)
         self.assertEqual(category, "bento")
         self.assertEqual(health_conditions, ["hypertension"])
+
+    def test_daily_nutrition_progress_preserves_over_target_amounts(self):
+        class OverTargetStorage:
+            def get_records(self, user_id: str, date: str | None = None, limit: int = 500):
+                return [
+                    {
+                        "total_calories": 2200,
+                        "total_protein": 90,
+                        "total_carbs": 210,
+                        "total_fat": 72,
+                        "total_sodium": 2300,
+                        "total_fiber": 10,
+                    }
+                ]
+
+        progress = build_daily_nutrition_progress(
+            OverTargetStorage(),
+            "user-a",
+            {"daily_calorie_target": 2000},
+            datetime(2026, 7, 18, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(progress["date"], "2026-07-18")
+        self.assertEqual(progress["remaining"]["sodium"], 0)
+        self.assertEqual(progress["over_by"]["sodium"], 300)
+        self.assertEqual(progress["status"]["sodium"], "over")
+        self.assertEqual(progress["status"]["protein"], "within_target")
+        self.assertGreater(progress["progress_percent"]["calories"], 100)
+
+    def test_restaurant_prompt_includes_disease_rules_and_over_target_progress(self):
+        rules = load_disease_rules(os.path.dirname(os.path.dirname(__file__)))
+        progress = {
+            "targets": {"sodium": 2000, "protein": 130},
+            "consumed": {"sodium": 2300, "protein": 70},
+            "remaining": {"sodium": 0, "protein": 60},
+            "over_by": {"sodium": 300, "protein": 0},
+            "progress_percent": {"sodium": 115, "protein": 53.8},
+            "status": {"sodium": "over", "protein": "within_target"},
+        }
+
+        prompt = build_restaurant_summary_prompt(
+            {"name": "Taiwan Bento", "tags": ["bento"]},
+            150,
+            "bento",
+            ["hypertension"],
+            progress,
+            rules,
+        )
+
+        self.assertIn("hypertension", prompt)
+        self.assertIn("高血壓 / 鈉控制", prompt)
+        self.assertIn('"sodium": "over"', prompt)
+        self.assertIn('"sodium": 300', prompt)
+        self.assertIn("不得為了補足其他營養素", prompt)
+        self.assertIn("recommended_foods", prompt)
+
+    def test_normalize_restaurant_summary_returns_personalized_foods(self):
+        summary = normalize_restaurant_summary(
+            {
+                "restaurant_type": "便當店",
+                "likely_foods": ["排骨便當"],
+                "recommended_foods": [
+                    {"name": "烤雞蔬菜便當", "reason": "若店內有供應，少醬可降低已超標鈉的增加。"}
+                ],
+                "price_range_twd": {"min": 100, "max": 140},
+                "health_tips": ["醬汁另外放"],
+                "confidence": "medium",
+            },
+            150,
+        )
+
+        self.assertEqual(summary["recommended_foods"][0]["name"], "烤雞蔬菜便當")
+        self.assertEqual(summary["budget_fit"], "適合")
 
 
 if __name__ == "__main__":

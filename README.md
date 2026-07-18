@@ -48,20 +48,20 @@ Personalized-Food-Recommendation-System/
 - **個人化營養追蹤** — BMR/TDEE 計算、三大營養素 + 鈉/纖維進度
 - **安全過濾引擎** — 5 種疾病禁忌規則 + 過敏原比對
 - **智慧餐點推薦 MVP** — 安全過濾 + TFDA/自訂食品候選 + 歷史飲食偏好加權
-- **健康餐點推薦 MVP** — 預算 + 定位 + 時段 + 疾病史 + 剩餘營養素排序附近餐點
+- **Google Places 店家推薦** — 預算 + 定位 + 半徑 + 店家類型搜尋，支援 Google Maps 導航與個人化 AI 店家摘要
 - **飲食趨勢分析** — 週熱量柱狀圖 + 營養素均值 + AI 洞察
 - **未知食品備援** — TFDA 搜尋 + 自訂食品 + 營養標示 OCR
 - **Supabase Auth** — 前端登入/註冊、Bearer token 傳遞、後端 user_id 權限檢查
 - **Render + Supabase 部署** — 後端已在 Render 強制 Supabase Auth，資料存於 Supabase Postgres
 - **跨平台響應式** — 手機/平板/桌面自適應
 
-目前仍未完成正式餐廳外部 API 串接、完整自動化測試、session 過期提示與使用者管理 UI；profile 編輯、登出、首次登入 onboarding、Render + Supabase 部署、Supabase Auth 登入與後端強制 user-scoped 權限檢查已完成驗證，GitHub Actions 已有基礎 CI。詳細狀態請以 `docs/Project_Architecture_and_Status.md` 的 roadmap 稽核表為準。
+目前仍未完成 iOS/Android 原生 Google Maps、完整 CI 自動化測試、session 過期提示與使用者管理 UI；Google Places 店家搜尋、Web Google Maps、個人化 AI 店家摘要、profile 編輯、登出、首次登入 onboarding、Render + Supabase 部署、Supabase Auth 登入與後端強制 user-scoped 權限檢查已完成驗證，GitHub Actions 已有基礎 CI。詳細狀態請以 `docs/Project_Architecture_and_Status.md` 的 roadmap 稽核表為準。
 
 ## 部署與驗證狀態
 
 - Render URL：`https://personalized-food-recommendation-system-nq8t.onrender.com`
 - Render service id：`srv-d7u2qhdckfvc73ei96l0`
-- 部署分支：`v0.0.3`
+- 部署分支：`v0.0.4`
 - 後端儲存：Supabase Postgres Session Pooler
 - 後端 Auth：`SUPABASE_AUTH_REQUIRED=true`
 - 權限驗證：無 token 回 `401`，正確 token 回 `200`，跨 `user_id` 回 `403`

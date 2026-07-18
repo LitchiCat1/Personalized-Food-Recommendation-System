@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - v0.0.3
+      - v0.0.4
   pull_request:
 
 jobs:
@@ -34,10 +34,12 @@ jobs:
             backend/services/food_service.py \
             backend/services/history_service.py \
             backend/services/nutrition_label_service.py \
+            backend/services/nutrition_progress_service.py \
             backend/services/predict_service.py \
             backend/services/profile_service.py \
             backend/services/recommend_service.py \
-            backend/services/healthy_food_service.py
+            backend/services/healthy_food_service.py \
+            backend/services/restaurant_ai_service.py
 
   frontend:
     name: Frontend typecheck

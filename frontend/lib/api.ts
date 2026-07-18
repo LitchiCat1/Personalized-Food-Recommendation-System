@@ -173,6 +173,7 @@ export type HealthyFoodResponse = {
     carbs: number;
     fat: number;
     sodium: number;
+    fiber?: number;
   };
   recommended: HealthyFoodRecommendation[];
   restaurants?: HealthyFoodRestaurant[];
@@ -185,6 +186,7 @@ export type HealthyFoodResponse = {
 export type RestaurantAiSummary = {
   restaurant_type: string;
   likely_foods: string[];
+  recommended_foods?: { name: string; reason: string }[];
   price_range_twd: { min: number; max: number };
   budget_fit: '適合' | '可能超出' | '不確定';
   health_tips: string[];

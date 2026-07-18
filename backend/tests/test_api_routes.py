@@ -3,6 +3,7 @@ import importlib
 import os
 import sys
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 
@@ -224,6 +225,55 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(data["data_source"], "google_places")
+
+    def test_restaurant_summary_uses_profile_disease_and_current_over_target_progress(self):
+        self.app_module.storage.upsert_user(
+            {
+                "user_id": "user-a",
+                "name": "User A",
+                "health_conditions": ["hypertension"],
+                "allergens": [],
+                "daily_calorie_target": 1800,
+            }
+        )
+        self.app_module.storage.insert_record(
+            {
+                "user_id": "user-a",
+                "client_record_id": "over-target-record",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "total_calories": 1900,
+                "total_protein": 80,
+                "total_carbs": 200,
+                "total_fat": 60,
+                "total_sodium": 2300,
+                "total_fiber": 12,
+            }
+        )
+        fake_summary = {
+            "restaurant_type": "便當店",
+            "likely_foods": ["便當"],
+            "recommended_foods": [{"name": "少醬蔬菜餐", "reason": "鈉已超標"}],
+            "price_range_twd": {"min": 100, "max": 150},
+            "budget_fit": "適合",
+            "health_tips": ["醬汁另外放"],
+            "confidence": "medium",
+            "source_note": "test",
+        }
+
+        with self.mock_auth("user-a"):
+            with patch.object(self.app_module, "build_restaurant_ai_summary", return_value=fake_summary) as build_summary:
+                response = self.client.post(
+                    "/map-food-recommend/user-a/restaurant-summary",
+                    json={"restaurant": {"name": "Healthy Bento"}, "budget": 150, "category": "bento"},
+                    headers=self.auth_headers(),
+                )
+
+        self.assertEqual(response.status_code, 200)
+        args = build_summary.call_args.args
+        self.assertEqual(args[3], ["hypertension"])
+        self.assertEqual(args[4]["status"]["sodium"], "over")
+        self.assertEqual(args[4]["over_by"]["sodium"], 300)
+        self.assertIn("hypertension", args[5])
 
 
 if __name__ == "__main__":

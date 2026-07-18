@@ -2,7 +2,7 @@
   "expo": {
     "name": "NutriLens",
     "slug": "nutrilens",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "nutrilens",

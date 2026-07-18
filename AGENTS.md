@@ -1,11 +1,11 @@
-# NutriLens Figma-First UI Rules
+# NutriLens UI Rules
 
 These rules apply to frontend UI work for this Expo React Native project.
 
 ## Current Direction
 
-- The existing app UI is considered disposable. Do not treat the current visual styling as the target design.
-- Generate the next UI in Figma first, then implement the Expo screens from that Figma source of truth.
+- Treat the current Expo implementation, design tokens, shared components, and recorded Figma redesign as the baseline design system.
+- Make incremental UI changes directly in Expo when they preserve the established visual language and product behavior. Figma may be used for larger redesigns, but it is not a prerequisite for implementation.
 - Preserve product behavior, API contracts, data schema, Zustand state shape, and Expo Router tab route names:
   - `index`
   - `scanner`
@@ -13,26 +13,18 @@ These rules apply to frontend UI work for this Expo React Native project.
   - `history`
   - `profile`
 
-## Required Figma Workflow
+## Required UI Workflow
 
-Before modifying UI code from a design:
+Before modifying UI code:
 
-1. Confirm Figma MCP tools are available in the active Codex session.
-2. If creating a new file, use `figma-create-new-file` / `create_new_file`.
-3. Use `figma-use` and `figma-generate-design` for Figma canvas writes.
-4. Build the Figma design as a mobile-first app system:
-   - Design tokens page
-   - Component library page
-   - Five app screen frames
-   - Optional presentation/demo flow frame
-5. Validate with Figma screenshots before implementing code.
-6. Implement the Expo UI by translating the Figma frames into React Native components and StyleSheet tokens.
-7. Verify with:
+1. Inspect the affected route, shared components, design tokens, data source, and responsive behavior.
+2. Keep domain decisions in typed helpers or services instead of embedding them in route-level presentation code.
+3. Implement with the existing Expo/React Native primitives and shared design tokens.
+4. Validate the rendered result at mobile and desktop widths. Check text wrapping, touch targets, overflow, loading, empty, error, and data-driven states that the change affects.
+5. Verify with:
    - `cd frontend && npm run typecheck`
    - `cd frontend && npm run lint`
-   - `cd frontend && npm run web`
-
-If Figma tools are unavailable, stop before UI implementation and fix MCP/plugin loading first.
+   - `cd frontend && npm run build:web`
 
 ## Project Styling Conventions
 
@@ -67,29 +59,23 @@ Preferred traits:
 - Clear risk colors for sodium/allergen/condition warnings.
 - UI suitable for live demo: scanner, safety filtering, nutrition tracking, map recommendation, Supabase/Render integration should be obvious.
 
-## Figma Implementation Gates
+## UI Implementation Gates
 
-Gate 1: MCP available
+Gate 1: Context understood
 
-- `codex mcp list` must show `figma` enabled.
-- Active Codex tools must include Figma tools such as `use_figma`, `create_new_file`, `get_metadata`, `get_screenshot`, or `generate_figma_design`.
+- Identify the affected data contract and reuse the existing source of truth.
+- Confirm unrelated behavior, route names, and state shape remain stable.
 
-Gate 2: Figma file created
+Gate 2: Responsive implementation
 
-- Create or select one Figma file for `NutriLens Mobile App Redesign`.
-- Record the file URL or file key in `docs/nutrilens-figma-redesign-brief.md`.
+- Design for 390x844 first and ensure the layout adapts to 375, 430, 768, and centered desktop web.
+- Reuse `frontend/constants/theme.ts` and shared UI components.
 
-Gate 3: Figma screens created
+Gate 3: Rendered validation
 
-- Create frames for 390x844 and ensure responsive rules can adapt to 375, 430, 768, and centered desktop web.
-- Required screen frames:
-  - `01 Dashboard`
-  - `02 Scanner`
-  - `03 Recommend`
-  - `04 History`
-  - `05 Profile`
+- Start the Expo web app and inspect the changed state at representative mobile and desktop widths.
+- Capture local screenshots when visual behavior changes and check for clipping, overlap, unreadable contrast, and unstable layout.
 
-Gate 4: Code implementation
+Gate 4: Code verification
 
-- Replace current UI implementation only after screenshots/design context exist.
-- Keep route names and data flow stable.
+- Run typecheck, lint, and the web export before considering the UI change complete.

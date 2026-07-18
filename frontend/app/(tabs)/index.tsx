@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +13,8 @@ import DataPill from '@/components/ui/data-pill';
 import PrimaryButton from '@/components/ui/primary-button';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
-import { fetchRecords } from '@/lib/api';
+import { fetchMedicalMetadata, fetchRecords, type MedicalConditionRule } from '@/lib/api';
+import { buildNutrientSensitivityMap, type TrackedNutrientKey } from '@/lib/nutrient-sensitivity';
 import { useResponsive } from '@/hooks/useResponsive';
 
 function getGreeting(): string {
@@ -38,9 +39,23 @@ export default function DashboardScreen() {
   const { dailyNutrition, todayMeals, healthAlerts, apiBaseUrl, accessToken, replaceDashboardFromRecords, user } = useStore();
   const [syncing, setSyncing] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [conditionRules, setConditionRules] = useState<MedicalConditionRule[]>([]);
   const { calories, protein, carbs, fat, sodium, fiber } = dailyNutrition;
   const remaining = Math.max(0, Math.round(calories.target - calories.current));
   const sodiumRisk = sodium.current >= sodium.target ? '超標' : sodium.current >= sodium.target * 0.8 ? '接近上限' : '正常';
+  const nutrientSensitivities = useMemo(
+    () => buildNutrientSensitivityMap(user.healthConditions, conditionRules),
+    [conditionRules, user.healthConditions]
+  );
+  const sensitiveConditions = useMemo(
+    () => Array.from(new Set(Object.values(nutrientSensitivities).flat())),
+    [nutrientSensitivities]
+  );
+
+  const getAttentionLabel = (nutrient: TrackedNutrientKey) => {
+    const conditions = nutrientSensitivities[nutrient];
+    return conditions.length ? `${conditions.join('、')}需留意` : undefined;
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +78,22 @@ export default function DashboardScreen() {
       cancelled = true;
     };
   }, [accessToken, apiBaseUrl, replaceDashboardFromRecords, user.userId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchMedicalMetadata(apiBaseUrl)
+      .then((metadata) => {
+        if (!cancelled) setConditionRules(metadata.disease_rules.conditions || []);
+      })
+      .catch(() => {
+        if (!cancelled) setConditionRules([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl]);
 
   const alertContent = healthAlerts.length > 0 ? (
     <View style={styles.alertStack}>
@@ -108,12 +139,21 @@ export default function DashboardScreen() {
 
   const nutritionContent = (
     <SectionBlock title="營養素進度" subtitle="依每日目標檢查下一餐需要補足或控制的項目。">
+      {sensitiveConditions.length ? (
+        <View style={styles.sensitivityNotice}>
+          <Ionicons name="alert-circle-outline" size={18} color={Palette.status.warning} />
+          <View style={styles.sensitivityCopy}>
+            <Text style={styles.sensitivityTitle}>病症敏感營養素已標示</Text>
+            <Text style={styles.sensitivityText}>{sensitiveConditions.join('、')}相關提醒；每日目標值維持原設定。</Text>
+          </View>
+        </View>
+      ) : null}
       <View style={styles.nutrientStack}>
-        <NutrientBar label={protein.label} current={protein.current} target={protein.target} unit={protein.unit} color={protein.color} />
-        <NutrientBar label={carbs.label} current={carbs.current} target={carbs.target} unit={carbs.unit} color={carbs.color} />
-        <NutrientBar label={fat.label} current={fat.current} target={fat.target} unit={fat.unit} color={fat.color} />
-        <NutrientBar label={sodium.label} current={sodium.current} target={sodium.target} unit={sodium.unit} color={sodium.current >= sodium.target * 0.8 ? Palette.status.warning : sodium.color} />
-        <NutrientBar label={fiber.label} current={fiber.current} target={fiber.target} unit={fiber.unit} color={fiber.color} />
+        <NutrientBar label={protein.label} current={protein.current} target={protein.target} unit={protein.unit} color={protein.color} attentionLabel={getAttentionLabel('protein')} />
+        <NutrientBar label={carbs.label} current={carbs.current} target={carbs.target} unit={carbs.unit} color={carbs.color} attentionLabel={getAttentionLabel('carbs')} />
+        <NutrientBar label={fat.label} current={fat.current} target={fat.target} unit={fat.unit} color={fat.color} attentionLabel={getAttentionLabel('fat')} />
+        <NutrientBar label={sodium.label} current={sodium.current} target={sodium.target} unit={sodium.unit} color={sodium.current >= sodium.target * 0.8 ? Palette.status.warning : sodium.color} attentionLabel={getAttentionLabel('sodium')} />
+        <NutrientBar label={fiber.label} current={fiber.current} target={fiber.target} unit={fiber.unit} color={fiber.color} attentionLabel={getAttentionLabel('fiber')} />
       </View>
     </SectionBlock>
   );
@@ -223,6 +263,10 @@ const styles = StyleSheet.create({
   desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xl },
   desktopMain: { flex: 1.45, minWidth: 0 },
   desktopAside: { flex: 1, minWidth: 0 },
+  sensitivityNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, backgroundColor: Palette.accent.orangeDim, padding: Spacing.md, marginBottom: Spacing.lg, borderLeftWidth: 3, borderLeftColor: Palette.status.warning },
+  sensitivityCopy: { flex: 1, gap: 2 },
+  sensitivityTitle: { ...Typography.caption, color: Palette.text.primary, fontWeight: '700' },
+  sensitivityText: { ...Typography.small, color: Palette.text.secondary },
   nutrientStack: { gap: Spacing.lg },
   mealsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.lg },
   sectionTitle: { ...Typography.h3, color: Palette.text.primary },

@@ -15,6 +15,7 @@
 
 - Simplified the recommendation page so meal and nearby restaurant sections remain visible in one responsive flow.
 - Updated the frontend version, CI release branch, Render Blueprint branch, and deployment documentation to `v0.0.4`.
+- Replaced the stale backend CI file list with a full `compileall` syntax check so new and renamed Python modules are covered automatically.
 - Updated frontend contribution guidance to use the implemented Expo design system as the baseline for incremental UI work.
 
 ### Validation

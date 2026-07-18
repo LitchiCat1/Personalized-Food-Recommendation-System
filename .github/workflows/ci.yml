@@ -24,22 +24,7 @@ jobs:
           python-version: "3.12"
 
       - name: Check Python syntax
-        run: |
-          python -m py_compile \
-            backend/app.py \
-            backend/repositories/storage.py \
-            backend/services/auth_service.py \
-            backend/services/disease_rule_service.py \
-            backend/services/env_service.py \
-            backend/services/food_service.py \
-            backend/services/history_service.py \
-            backend/services/nutrition_label_service.py \
-            backend/services/nutrition_progress_service.py \
-            backend/services/predict_service.py \
-            backend/services/profile_service.py \
-            backend/services/recommend_service.py \
-            backend/services/healthy_food_service.py \
-            backend/services/restaurant_ai_service.py
+        run: python -m compileall -q backend
 
   frontend:
     name: Frontend typecheck

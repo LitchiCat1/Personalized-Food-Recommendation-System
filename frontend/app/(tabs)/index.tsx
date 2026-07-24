@@ -187,9 +187,18 @@ export default function DashboardScreen() {
           </View>
           <CalorieRing current={Math.round(calories.current)} target={calories.target} />
         </View>
-        <Link href="/scanner" asChild>
-          <PrimaryButton label="掃描下一餐" icon={<Ionicons name="scan-outline" size={18} color={Palette.text.inverse} />} />
-        </Link>
+        <View style={styles.actionRow}>
+          <Link href="/scanner" asChild style={{ flex: 1 }}>
+            <PrimaryButton label="掃描下一餐" icon={<Ionicons name="scan-outline" size={18} color={Palette.text.inverse} />} />
+          </Link>
+          <Link href={"/menu-query" as any} asChild style={{ flex: 1 }}>
+            <PrimaryButton
+              label="查詢餐廳菜單"
+              tone="blue"
+              icon={<Ionicons name="search-outline" size={18} color={Palette.text.inverse} />}
+            />
+          </Link>
+        </View>
       </View>
 
       {isDesktop ? (
@@ -284,4 +293,9 @@ const styles = StyleSheet.create({
   },
   emptyMealsTitle: { ...Typography.bodyBold, color: Palette.text.primary },
   emptyMealsText: { ...Typography.caption, color: Palette.text.tertiary, textAlign: 'center' },
+  actionRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    width: '100%',
+  },
 });

@@ -29,6 +29,16 @@ export default function RootLayout() {
       <AuthGate>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="menu-query"
+            options={{
+              title: '餐廳菜單查詢',
+              headerShown: true,
+              headerStyle: { backgroundColor: Palette.bg.card },
+              headerTintColor: Palette.text.primary,
+              headerShadowVisible: false,
+            }}
+          />
         </Stack>
         <StatusBar style="dark" />
       </AuthGate>

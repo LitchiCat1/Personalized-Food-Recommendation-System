@@ -159,6 +159,7 @@ export type HealthyFoodRestaurant = {
   nutrition_available?: boolean;
   recommended_items: HealthyFoodRecommendation[];
   filtered_items?: { restaurant_id?: string; restaurant_name: string; item_name: string; reasons: string[] }[];
+  items?: any[];
 };
 
 export type HealthyFoodResponse = {
@@ -380,7 +381,7 @@ export async function fetchHealthyFoodRecommendations(
   params: { budget: number; lat: number; lng: number; radiusKm?: number; category?: string },
   auth?: ApiAuth
 ): Promise<HealthyFoodResponse> {
-  if (!auth?.accessToken) {
+  if (!auth?.accessToken && !isLocalApiBaseUrl(apiBaseUrl)) {
     throw new Error('登入 session 尚未就緒，請重新整理頁面或重新登入後再定位推薦');
   }
 
@@ -391,8 +392,9 @@ export async function fetchHealthyFoodRecommendations(
     radius_km: String(params.radiusKm || 5),
     category: params.category || 'all',
   });
-  const path = `/map-food-recommend/${encodeURIComponent(userId)}?${query.toString()}`;
+  const path = `/healthy-food-recommend/${encodeURIComponent(userId)}?${query.toString()}`;
   const requestInit = { headers: buildHeaders(auth) };
+
 
   try {
     return await fetchJsonWithNetworkMessage<HealthyFoodResponse>(`${apiBaseUrl}${path}`, requestInit);
@@ -416,9 +418,10 @@ export async function fetchRestaurantAiSummary(
   params: { restaurant: HealthyFoodRestaurant; budget: number; category: string },
   auth?: ApiAuth
 ): Promise<RestaurantAiSummaryResponse> {
-  if (!auth?.accessToken) {
+  if (!auth?.accessToken && !isLocalApiBaseUrl(apiBaseUrl)) {
     throw new Error('登入 session 尚未就緒，請重新整理頁面或重新登入後再產生 AI 摘要');
   }
+
   const resp = await fetch(`${apiBaseUrl}/map-food-recommend/${encodeURIComponent(userId)}/restaurant-summary`, {
     method: 'POST',
     headers: buildHeaders(auth, 'application/json'),
@@ -426,3 +429,61 @@ export async function fetchRestaurantAiSummary(
   });
   return parseJson<RestaurantAiSummaryResponse>(resp);
 }
+
+export async function scrapeAndEnrichRestaurant(
+  apiBaseUrl: string,
+  params: { restaurant_name: string; address?: string; lat?: number; lng?: number; menu_url?: string; menu_text?: string },
+  auth?: ApiAuth
+): Promise<{ message: string; restaurant: any; total_catalog_restaurants: number }> {
+  const resp = await fetch(`${apiBaseUrl}/restaurant/scrape-and-enrich`, {
+    method: 'POST',
+    headers: buildHeaders(auth, 'application/json'),
+    body: JSON.stringify(params),
+  });
+  return parseJson<{ message: string; restaurant: any; total_catalog_restaurants: number }>(resp);
+}
+
+export async function searchRestaurants(
+  apiBaseUrl: string,
+  q: string,
+  auth?: ApiAuth
+): Promise<{ restaurants: HealthyFoodRestaurant[] }> {
+  const resp = await fetch(`${apiBaseUrl}/restaurant/search?q=${encodeURIComponent(q)}`, {
+    headers: buildHeaders(auth),
+  });
+  return parseJson<{ restaurants: HealthyFoodRestaurant[] }>(resp);
+}
+
+export async function addDietaryRecord(
+  apiBaseUrl: string,
+  payload: {
+    user_id: string;
+    meal_type: string;
+    foods: Array<{
+      name: string;
+      calories: number;
+      protein: number;
+      carbs: number;
+      fat: number;
+      sodium: number;
+      fiber?: number;
+      source: string;
+    }>;
+    total_calories: number;
+    total_protein: number;
+    total_carbs: number;
+    total_fat: number;
+    total_sodium: number;
+    total_fiber?: number;
+    source: string;
+  },
+  auth?: ApiAuth
+): Promise<{ message: string; record: any }> {
+  const resp = await fetch(`${apiBaseUrl}/record`, {
+    method: 'POST',
+    headers: buildHeaders(auth, 'application/json'),
+    body: JSON.stringify(payload),
+  });
+  return parseJson<{ message: string; record: any }>(resp);
+}
+

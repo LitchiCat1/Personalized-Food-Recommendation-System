@@ -7,12 +7,56 @@
     "address": "台北市信義區松智路示範 1 號",
     "phone": "02-0000-0001",
     "google_place_id": "",
-    "open_hours": ["11:00-20:30"],
-    "tags": ["高蛋白", "低鈉", "健康餐盒"],
+    "open_hours": [
+      "11:00-20:30"
+    ],
+    "tags": [
+      "高蛋白",
+      "低鈉",
+      "健康餐盒"
+    ],
     "price_level": 2,
     "items": [
-      {"item_id": "fp_001_001", "name": "舒肥雞胸餐盒", "price": 140, "calories": 520, "protein": 38, "carbs": 42, "fat": 12, "sodium": 480, "gi": "low", "tags": ["高蛋白", "低鈉"], "can_customize": true, "customization_tips": ["醬料另外放", "飯量可減半"]},
-      {"item_id": "fp_001_002", "name": "鮭魚藜麥餐盒", "price": 180, "calories": 560, "protein": 34, "carbs": 40, "fat": 18, "sodium": 420, "gi": "low", "tags": ["優質脂肪", "低GI"], "can_customize": true, "customization_tips": ["可換地瓜", "少鹽"]}
+      {
+        "item_id": "fp_001_001",
+        "name": "舒肥雞胸餐盒",
+        "price": 140,
+        "calories": 520,
+        "protein": 38,
+        "carbs": 42,
+        "fat": 12,
+        "sodium": 480,
+        "gi": "low",
+        "tags": [
+          "高蛋白",
+          "低鈉"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "醬料另外放",
+          "飯量可減半"
+        ]
+      },
+      {
+        "item_id": "fp_001_002",
+        "name": "鮭魚藜麥餐盒",
+        "price": 180,
+        "calories": 560,
+        "protein": 34,
+        "carbs": 40,
+        "fat": 18,
+        "sodium": 420,
+        "gi": "low",
+        "tags": [
+          "優質脂肪",
+          "低GI"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "可換地瓜",
+          "少鹽"
+        ]
+      }
     ]
   },
   {
@@ -23,12 +67,55 @@
     "address": "台北市信義區松壽路示範 8 號",
     "phone": "02-0000-0002",
     "google_place_id": "",
-    "open_hours": ["10:30-19:30"],
-    "tags": ["沙拉", "低 GI"],
+    "open_hours": [
+      "10:30-19:30"
+    ],
+    "tags": [
+      "沙拉",
+      "低 GI"
+    ],
     "price_level": 2,
     "items": [
-      {"item_id": "fp_002_001", "name": "雞胸酪梨沙拉", "price": 155, "calories": 430, "protein": 30, "carbs": 18, "fat": 22, "sodium": 360, "gi": "low", "tags": ["沙拉", "低GI"], "can_customize": true, "customization_tips": ["醬料減半", "加蛋"]},
-      {"item_id": "fp_002_002", "name": "豆腐藜麥碗", "price": 135, "calories": 410, "protein": 20, "carbs": 36, "fat": 14, "sodium": 300, "gi": "low", "tags": ["素食", "低鈉"], "can_customize": true, "customization_tips": ["可加青菜", "醬料另外放"]}
+      {
+        "item_id": "fp_002_001",
+        "name": "雞胸酪梨沙拉",
+        "price": 155,
+        "calories": 430,
+        "protein": 30,
+        "carbs": 18,
+        "fat": 22,
+        "sodium": 360,
+        "gi": "low",
+        "tags": [
+          "沙拉",
+          "低GI"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "醬料減半",
+          "加蛋"
+        ]
+      },
+      {
+        "item_id": "fp_002_002",
+        "name": "豆腐藜麥碗",
+        "price": 135,
+        "calories": 410,
+        "protein": 20,
+        "carbs": 36,
+        "fat": 14,
+        "sodium": 300,
+        "gi": "low",
+        "tags": [
+          "素食",
+          "低鈉"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "可加青菜",
+          "醬料另外放"
+        ]
+      }
     ]
   },
   {
@@ -39,12 +126,56 @@
     "address": "台北市信義區信義路示範 20 號",
     "phone": "02-0000-0003",
     "google_place_id": "",
-    "open_hours": ["11:00-14:00", "17:00-21:00"],
-    "tags": ["湯品", "暖食"],
+    "open_hours": [
+      "11:00-14:00",
+      "17:00-21:00"
+    ],
+    "tags": [
+      "湯品",
+      "暖食"
+    ],
     "price_level": 2,
     "items": [
-      {"item_id": "fp_003_001", "name": "蒸魚野菜套餐", "price": 170, "calories": 470, "protein": 33, "carbs": 35, "fat": 14, "sodium": 520, "gi": "low", "tags": ["魚類", "暖食"], "can_customize": true, "customization_tips": ["湯少喝", "飯量減半"]},
-      {"item_id": "fp_003_002", "name": "蕈菇雞湯麵", "price": 150, "calories": 590, "protein": 28, "carbs": 62, "fat": 16, "sodium": 680, "gi": "medium", "tags": ["湯麵", "高蛋白"], "can_customize": true, "customization_tips": ["少鹽", "麵量減半"]}
+      {
+        "item_id": "fp_003_001",
+        "name": "蒸魚野菜套餐",
+        "price": 170,
+        "calories": 470,
+        "protein": 33,
+        "carbs": 35,
+        "fat": 14,
+        "sodium": 520,
+        "gi": "low",
+        "tags": [
+          "魚類",
+          "暖食"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "湯少喝",
+          "飯量減半"
+        ]
+      },
+      {
+        "item_id": "fp_003_002",
+        "name": "蕈菇雞湯麵",
+        "price": 150,
+        "calories": 590,
+        "protein": 28,
+        "carbs": 62,
+        "fat": 16,
+        "sodium": 680,
+        "gi": "medium",
+        "tags": [
+          "湯麵",
+          "高蛋白"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "少鹽",
+          "麵量減半"
+        ]
+      }
     ]
   },
   {
@@ -55,12 +186,52 @@
     "address": "台北市信義區基隆路示範 5 號",
     "phone": "02-0000-0004",
     "google_place_id": "",
-    "open_hours": ["07:00-14:00"],
-    "tags": ["早餐", "輕食"],
+    "open_hours": [
+      "07:00-14:00"
+    ],
+    "tags": [
+      "早餐",
+      "輕食"
+    ],
     "price_level": 1,
     "items": [
-      {"item_id": "fp_004_001", "name": "鮪魚蛋吐司盒", "price": 95, "calories": 390, "protein": 24, "carbs": 34, "fat": 14, "sodium": 430, "gi": "medium", "tags": ["早餐", "蛋白質"], "can_customize": true, "customization_tips": ["不加美乃滋", "吐司改全麥"]},
-      {"item_id": "fp_004_002", "name": "燕麥優格水果杯", "price": 85, "calories": 320, "protein": 15, "carbs": 38, "fat": 9, "sodium": 120, "gi": "low", "tags": ["早餐", "低鈉"], "can_customize": false, "customization_tips": []}
+      {
+        "item_id": "fp_004_001",
+        "name": "鮪魚蛋吐司盒",
+        "price": 95,
+        "calories": 390,
+        "protein": 24,
+        "carbs": 34,
+        "fat": 14,
+        "sodium": 430,
+        "gi": "medium",
+        "tags": [
+          "早餐",
+          "蛋白質"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "不加美乃滋",
+          "吐司改全麥"
+        ]
+      },
+      {
+        "item_id": "fp_004_002",
+        "name": "燕麥優格水果杯",
+        "price": 85,
+        "calories": 320,
+        "protein": 15,
+        "carbs": 38,
+        "fat": 9,
+        "sodium": 120,
+        "gi": "low",
+        "tags": [
+          "早餐",
+          "低鈉"
+        ],
+        "can_customize": false,
+        "customization_tips": []
+      }
     ]
   },
   {
@@ -71,12 +242,60 @@
     "address": "台北市信義區吳興街示範 12 號",
     "phone": "02-0000-0005",
     "google_place_id": "",
-    "open_hours": ["16:00-23:00"],
-    "tags": ["小吃", "滷味", "可客製", "高蛋白"],
+    "open_hours": [
+      "16:00-23:00"
+    ],
+    "tags": [
+      "小吃",
+      "滷味",
+      "可客製",
+      "高蛋白"
+    ],
     "price_level": 1,
     "items": [
-      {"item_id": "snack_001_001", "name": "雞胸豆腐青菜滷味", "price": 120, "calories": 480, "protein": 36, "carbs": 28, "fat": 16, "sodium": 720, "gi": "low", "tags": ["小吃", "高蛋白", "可少鹽"], "can_customize": true, "customization_tips": ["湯不要喝", "醬料另外放", "多加青菜"]},
-      {"item_id": "snack_001_002", "name": "豆干海帶青菜滷味", "price": 90, "calories": 360, "protein": 22, "carbs": 24, "fat": 12, "sodium": 640, "gi": "low", "tags": ["小吃", "素食", "低GI"], "can_customize": true, "customization_tips": ["少鹽", "不要辣油"]}
+      {
+        "item_id": "snack_001_001",
+        "name": "雞胸豆腐青菜滷味",
+        "price": 120,
+        "calories": 480,
+        "protein": 36,
+        "carbs": 28,
+        "fat": 16,
+        "sodium": 720,
+        "gi": "low",
+        "tags": [
+          "小吃",
+          "高蛋白",
+          "可少鹽"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "湯不要喝",
+          "醬料另外放",
+          "多加青菜"
+        ]
+      },
+      {
+        "item_id": "snack_001_002",
+        "name": "豆干海帶青菜滷味",
+        "price": 90,
+        "calories": 360,
+        "protein": 22,
+        "carbs": 24,
+        "fat": 12,
+        "sodium": 640,
+        "gi": "low",
+        "tags": [
+          "小吃",
+          "素食",
+          "低GI"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "少鹽",
+          "不要辣油"
+        ]
+      }
     ]
   },
   {
@@ -87,12 +306,58 @@
     "address": "台北市信義區松仁路示範 66 號",
     "phone": "02-0000-0006",
     "google_place_id": "",
-    "open_hours": ["10:30-13:30", "17:00-20:00"],
-    "tags": ["便當", "家常", "小吃"],
+    "open_hours": [
+      "10:30-13:30",
+      "17:00-20:00"
+    ],
+    "tags": [
+      "便當",
+      "家常",
+      "小吃"
+    ],
     "price_level": 1,
     "items": [
-      {"item_id": "bento_001_001", "name": "烤雞腿半飯便當", "price": 125, "calories": 620, "protein": 34, "carbs": 58, "fat": 24, "sodium": 760, "gi": "medium", "tags": ["便當", "高蛋白"], "can_customize": true, "customization_tips": ["半飯", "滷汁少", "多青菜"]},
-      {"item_id": "bento_001_002", "name": "蒸蛋青菜豆腐便當", "price": 105, "calories": 450, "protein": 24, "carbs": 48, "fat": 16, "sodium": 520, "gi": "medium", "tags": ["便當", "清淡"], "can_customize": true, "customization_tips": ["少油", "菜多飯少"]}
+      {
+        "item_id": "bento_001_001",
+        "name": "烤雞腿半飯便當",
+        "price": 125,
+        "calories": 620,
+        "protein": 34,
+        "carbs": 58,
+        "fat": 24,
+        "sodium": 760,
+        "gi": "medium",
+        "tags": [
+          "便當",
+          "高蛋白"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "半飯",
+          "滷汁少",
+          "多青菜"
+        ]
+      },
+      {
+        "item_id": "bento_001_002",
+        "name": "蒸蛋青菜豆腐便當",
+        "price": 105,
+        "calories": 450,
+        "protein": 24,
+        "carbs": 48,
+        "fat": 16,
+        "sodium": 520,
+        "gi": "medium",
+        "tags": [
+          "便當",
+          "清淡"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "少油",
+          "菜多飯少"
+        ]
+      }
     ]
   },
   {
@@ -103,12 +368,56 @@
     "address": "台北市信義區莊敬路示範 30 號",
     "phone": "02-0000-0007",
     "google_place_id": "",
-    "open_hours": ["10:00-22:00"],
-    "tags": ["飲料", "無糖", "低熱量"],
+    "open_hours": [
+      "10:00-22:00"
+    ],
+    "tags": [
+      "飲料",
+      "無糖",
+      "低熱量"
+    ],
     "price_level": 1,
     "items": [
-      {"item_id": "drink_001_001", "name": "無糖綠茶", "price": 35, "calories": 5, "protein": 0, "carbs": 1, "fat": 0, "sodium": 5, "gi": "low", "tags": ["飲料", "無糖"], "can_customize": true, "customization_tips": ["維持無糖", "少冰"]},
-      {"item_id": "drink_001_002", "name": "無糖豆漿", "price": 45, "calories": 150, "protein": 12, "carbs": 10, "fat": 7, "sodium": 80, "gi": "low", "tags": ["飲料", "蛋白質"], "can_customize": true, "customization_tips": ["無糖", "中杯即可"]}
+      {
+        "item_id": "drink_001_001",
+        "name": "無糖綠茶",
+        "price": 35,
+        "calories": 5,
+        "protein": 0,
+        "carbs": 1,
+        "fat": 0,
+        "sodium": 5,
+        "gi": "low",
+        "tags": [
+          "飲料",
+          "無糖"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "維持無糖",
+          "少冰"
+        ]
+      },
+      {
+        "item_id": "drink_001_002",
+        "name": "無糖豆漿",
+        "price": 45,
+        "calories": 150,
+        "protein": 12,
+        "carbs": 10,
+        "fat": 7,
+        "sodium": 80,
+        "gi": "low",
+        "tags": [
+          "飲料",
+          "蛋白質"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "無糖",
+          "中杯即可"
+        ]
+      }
     ]
   },
   {
@@ -119,12 +428,56 @@
     "address": "桃園市龜山區德明路示範 1 號",
     "phone": "03-000-0001",
     "google_place_id": "",
-    "open_hours": ["10:30-20:30"],
-    "tags": ["健康餐盒", "高蛋白", "便當"],
+    "open_hours": [
+      "10:30-20:30"
+    ],
+    "tags": [
+      "健康餐盒",
+      "高蛋白",
+      "便當"
+    ],
     "price_level": 2,
     "items": [
-      {"item_id": "ty_healthy_001_001", "name": "舒肥雞胸地瓜餐盒", "price": 145, "calories": 510, "protein": 39, "carbs": 45, "fat": 11, "sodium": 460, "gi": "low", "tags": ["高蛋白", "低GI"], "can_customize": true, "customization_tips": ["飯改地瓜", "醬料另外放"]},
-      {"item_id": "ty_healthy_001_002", "name": "嫩煎豆腐蔬菜餐盒", "price": 120, "calories": 430, "protein": 24, "carbs": 42, "fat": 14, "sodium": 390, "gi": "low", "tags": ["便當", "素食"], "can_customize": true, "customization_tips": ["飯量減半", "多青菜"]}
+      {
+        "item_id": "ty_healthy_001_001",
+        "name": "舒肥雞胸地瓜餐盒",
+        "price": 145,
+        "calories": 510,
+        "protein": 39,
+        "carbs": 45,
+        "fat": 11,
+        "sodium": 460,
+        "gi": "low",
+        "tags": [
+          "高蛋白",
+          "低GI"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "飯改地瓜",
+          "醬料另外放"
+        ]
+      },
+      {
+        "item_id": "ty_healthy_001_002",
+        "name": "嫩煎豆腐蔬菜餐盒",
+        "price": 120,
+        "calories": 430,
+        "protein": 24,
+        "carbs": 42,
+        "fat": 14,
+        "sodium": 390,
+        "gi": "low",
+        "tags": [
+          "便當",
+          "素食"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "飯量減半",
+          "多青菜"
+        ]
+      }
     ]
   },
   {
@@ -135,28 +488,731 @@
     "address": "桃園市龜山區德明路示範 25 號",
     "phone": "03-000-0002",
     "google_place_id": "",
-    "open_hours": ["15:30-23:30"],
-    "tags": ["小吃", "滷味", "可客製"],
+    "open_hours": [
+      "15:30-23:30"
+    ],
+    "tags": [
+      "小吃",
+      "滷味",
+      "可客製"
+    ],
     "price_level": 1,
     "items": [
-      {"item_id": "ty_snack_001_001", "name": "雞胸豆腐青菜滷味", "price": 115, "calories": 470, "protein": 35, "carbs": 26, "fat": 15, "sodium": 680, "gi": "low", "tags": ["小吃", "高蛋白"], "can_customize": true, "customization_tips": ["湯不要喝", "少鹽", "醬料另外放"]},
-      {"item_id": "ty_snack_001_002", "name": "菇菇青菜豆干滷味", "price": 85, "calories": 340, "protein": 20, "carbs": 24, "fat": 10, "sodium": 560, "gi": "low", "tags": ["小吃", "蔬菜"], "can_customize": true, "customization_tips": ["不加辣油", "多青菜"]}
+      {
+        "item_id": "ty_snack_001_001",
+        "name": "雞胸豆腐青菜滷味",
+        "price": 115,
+        "calories": 470,
+        "protein": 35,
+        "carbs": 26,
+        "fat": 15,
+        "sodium": 680,
+        "gi": "low",
+        "tags": [
+          "小吃",
+          "高蛋白"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "湯不要喝",
+          "少鹽",
+          "醬料另外放"
+        ]
+      },
+      {
+        "item_id": "ty_snack_001_002",
+        "name": "菇菇青菜豆干滷味",
+        "price": 85,
+        "calories": 340,
+        "protein": 20,
+        "carbs": 24,
+        "fat": 10,
+        "sodium": 560,
+        "gi": "low",
+        "tags": [
+          "小吃",
+          "蔬菜"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "不加辣油",
+          "多青菜"
+        ]
+      }
     ]
   },
   {
     "restaurant_id": "ty_breakfast_001",
     "name": "銘傳活力早餐",
     "lat": 24.9869,
-    "lng": 121.3460,
+    "lng": 121.346,
     "address": "桃園市龜山區大同路示範 6 號",
     "phone": "03-000-0003",
     "google_place_id": "",
-    "open_hours": ["06:30-13:30"],
-    "tags": ["早餐", "輕食", "蛋白質"],
+    "open_hours": [
+      "06:30-13:30"
+    ],
+    "tags": [
+      "早餐",
+      "輕食",
+      "蛋白質"
+    ],
     "price_level": 1,
     "items": [
-      {"item_id": "ty_breakfast_001_001", "name": "鮪魚蛋全麥吐司", "price": 70, "calories": 360, "protein": 22, "carbs": 34, "fat": 13, "sodium": 420, "gi": "medium", "tags": ["早餐", "全麥"], "can_customize": true, "customization_tips": ["不加美乃滋", "加生菜"]},
-      {"item_id": "ty_breakfast_001_002", "name": "無糖豆漿茶葉蛋組", "price": 55, "calories": 230, "protein": 19, "carbs": 12, "fat": 11, "sodium": 260, "gi": "low", "tags": ["早餐", "低GI"], "can_customize": false, "customization_tips": []}
+      {
+        "item_id": "ty_breakfast_001_001",
+        "name": "鮪魚蛋全麥吐司",
+        "price": 70,
+        "calories": 360,
+        "protein": 22,
+        "carbs": 34,
+        "fat": 13,
+        "sodium": 420,
+        "gi": "medium",
+        "tags": [
+          "早餐",
+          "全麥"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "不加美乃滋",
+          "加生菜"
+        ]
+      },
+      {
+        "item_id": "ty_breakfast_001_002",
+        "name": "無糖豆漿茶葉蛋組",
+        "price": 55,
+        "calories": 230,
+        "protein": 19,
+        "carbs": 12,
+        "fat": 11,
+        "sodium": 260,
+        "gi": "low",
+        "tags": [
+          "早餐",
+          "低GI"
+        ],
+        "can_customize": false,
+        "customization_tips": []
+      }
+    ]
+  },
+  {
+    "restaurant_id": "rest_001",
+    "name": "綠洲輕食木碗沙拉",
+    "lat": 25.0337,
+    "lng": 121.5645,
+    "address": "台北市大安區信義路四段100號",
+    "phone": "02-2700-1001",
+    "google_place_id": "",
+    "open_hours": [
+      "11:00-20:30"
+    ],
+    "tags": [
+      "沙拉",
+      "低GI",
+      "高蛋白",
+      "低鈉",
+      "健康輕食"
+    ],
+    "price_level": 2,
+    "items": [
+      {
+        "item_id": "item_101",
+        "name": "舒肥雞胸嫩腱沙拉碗",
+        "price": 180,
+        "calories": 420,
+        "protein": 38.5,
+        "carbs": 25.0,
+        "fat": 12.0,
+        "sodium": 380,
+        "gi": "low",
+        "allergens": [
+          "nuts"
+        ],
+        "tags": [
+          "高蛋白",
+          "低GI",
+          "低鈉"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "醬料另外放",
+          "和風醬優先"
+        ]
+      },
+      {
+        "item_id": "item_102",
+        "name": "香煎鮭魚藜麥五穀飯",
+        "price": 240,
+        "calories": 550,
+        "protein": 32.0,
+        "carbs": 48.0,
+        "fat": 18.0,
+        "sodium": 420,
+        "gi": "low",
+        "allergens": [
+          "fish"
+        ],
+        "tags": [
+          "優質脂肪",
+          "低GI"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "鮭魚富含好油脂",
+          "五穀飯適量"
+        ]
+      },
+      {
+        "item_id": "item_103",
+        "name": "特濃芝麻醬拌麵",
+        "price": 120,
+        "calories": 680,
+        "protein": 14.0,
+        "carbs": 85.0,
+        "fat": 32.0,
+        "sodium": 950,
+        "gi": "high",
+        "allergens": [
+          "peanuts",
+          "sesame"
+        ],
+        "tags": [
+          "高鈉",
+          "高GI"
+        ],
+        "can_customize": false,
+        "customization_tips": [
+          "鈉含量較高，控糖控壓需注意"
+        ]
+      }
+    ]
+  },
+  {
+    "restaurant_id": "rest_002",
+    "name": "老張傳統牛肉麵館",
+    "lat": 25.048,
+    "lng": 121.532,
+    "address": "台北市中山區南京東路二段50號",
+    "phone": "02-2500-2002",
+    "google_place_id": "",
+    "open_hours": [
+      "11:00-21:00"
+    ],
+    "tags": [
+      "小吃",
+      "牛肉麵",
+      "中式麵食"
+    ],
+    "price_level": 2,
+    "items": [
+      {
+        "item_id": "item_201",
+        "name": "清燉牛腱牛肉麵",
+        "price": 200,
+        "calories": 520,
+        "protein": 36.0,
+        "carbs": 62.0,
+        "fat": 11.0,
+        "sodium": 680,
+        "gi": "medium",
+        "allergens": [
+          "gluten"
+        ],
+        "tags": [
+          "高蛋白",
+          "中脂肪"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "湯頭少喝以控制鈉含量"
+        ]
+      },
+      {
+        "item_id": "item_202",
+        "name": "川味紅燒牛腩麵",
+        "price": 220,
+        "calories": 780,
+        "protein": 30.0,
+        "carbs": 70.0,
+        "fat": 38.0,
+        "sodium": 1450,
+        "gi": "high",
+        "allergens": [
+          "gluten",
+          "soy"
+        ],
+        "tags": [
+          "高脂肪",
+          "高鈉"
+        ],
+        "can_customize": false,
+        "customization_tips": [
+          "油脂與鈉含量較高，高血壓患者請斟酌"
+        ]
+      },
+      {
+        "item_id": "item_203",
+        "name": "燙地瓜葉 (少油少鹽)",
+        "price": 50,
+        "calories": 85,
+        "protein": 3.2,
+        "carbs": 8.0,
+        "fat": 3.0,
+        "sodium": 220,
+        "gi": "low",
+        "allergens": [],
+        "tags": [
+          "高纖",
+          "低GI",
+          "低鈉"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "多補充膳食纖維"
+        ]
+      }
+    ]
+  },
+  {
+    "restaurant_id": "rest_auto_b8c16c",
+    "name": "池上木片便當",
+    "lat": 25.0405,
+    "lng": 121.568,
+    "address": "台北市信義區忠孝東路五段200號",
+    "phone": "02-0000-0000",
+    "google_place_id": "",
+    "open_hours": [
+      "11:00-20:30"
+    ],
+    "tags": [
+      "便當"
+    ],
+    "price_level": 2,
+    "items": [
+      {
+        "item_id": "item_7c41af",
+        "name": "招牌木片正宗便當",
+        "price": 110,
+        "calories": 680,
+        "protein": 28,
+        "carbs": 78,
+        "fat": 24,
+        "sodium": 880,
+        "gi": "medium",
+        "allergens": [
+          "egg"
+        ],
+        "tags": [
+          "高鈉"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "湯頭少喝以控鈉",
+          "建議飯量改半飯"
+        ]
+      },
+      {
+        "item_id": "item_b6bab9",
+        "name": "蒲燒鯛魚便當",
+        "price": 130,
+        "calories": 480,
+        "protein": 32,
+        "carbs": 42,
+        "fat": 12,
+        "sodium": 420,
+        "gi": "low",
+        "allergens": [],
+        "tags": [
+          "優質脂肪",
+          "低GI"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "低 GI 食物穩血糖"
+        ]
+      },
+      {
+        "item_id": "item_ec86c0",
+        "name": "清蒸去皮雞腿便當",
+        "price": 120,
+        "calories": 520,
+        "protein": 36,
+        "carbs": 45,
+        "fat": 15,
+        "sodium": 480,
+        "gi": "low",
+        "allergens": [],
+        "tags": [
+          "高蛋白",
+          "低GI"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "低 GI 食物穩血糖"
+        ]
+      }
+    ]
+  },
+  {
+    "restaurant_id": "rest_auto_19bfaa",
+    "name": "池上木片便當",
+    "lat": 25.0405,
+    "lng": 121.568,
+    "address": "台北市信義區忠孝東路五段200號",
+    "phone": "02-0000-0000",
+    "google_place_id": "",
+    "open_hours": [
+      "11:00-20:30"
+    ],
+    "tags": [
+      "便當"
+    ],
+    "price_level": 2,
+    "items": [
+      {
+        "item_id": "item_dbd522",
+        "name": "招牌木片正宗便當",
+        "price": 110,
+        "calories": 680,
+        "protein": 28,
+        "carbs": 78,
+        "fat": 24,
+        "sodium": 880,
+        "gi": "medium",
+        "allergens": [
+          "egg"
+        ],
+        "tags": [
+          "高鈉"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "湯頭少喝以控鈉",
+          "建議飯量改半飯"
+        ]
+      },
+      {
+        "item_id": "item_59213e",
+        "name": "蒲燒鯛魚便當",
+        "price": 130,
+        "calories": 480,
+        "protein": 32,
+        "carbs": 42,
+        "fat": 12,
+        "sodium": 420,
+        "gi": "low",
+        "allergens": [],
+        "tags": [
+          "優質脂肪",
+          "低GI"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "低 GI 食物穩血糖"
+        ]
+      },
+      {
+        "item_id": "item_00effc",
+        "name": "清蒸去皮雞腿便當",
+        "price": 120,
+        "calories": 520,
+        "protein": 36,
+        "carbs": 45,
+        "fat": 15,
+        "sodium": 480,
+        "gi": "low",
+        "allergens": [],
+        "tags": [
+          "高蛋白",
+          "低GI"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "低 GI 食物穩血糖"
+        ]
+      }
+    ]
+  },
+  {
+    "restaurant_id": "rest_auto_b5f7f7",
+    "name": "台南府城水餃麵館",
+    "lat": 25.026,
+    "lng": 121.543,
+    "address": "台北市大安區和平東路二段80號",
+    "phone": "02-0000-0000",
+    "google_place_id": "",
+    "open_hours": [
+      "11:00-20:30"
+    ],
+    "tags": [
+      "小菜"
+    ],
+    "price_level": 2,
+    "items": [
+      {
+        "item_id": "item_103507",
+        "name": "高麗菜鮮肉水餃 (10顆)",
+        "price": 80,
+        "calories": 550,
+        "protein": 22,
+        "carbs": 65,
+        "fat": 20,
+        "sodium": 750,
+        "gi": "medium",
+        "allergens": [
+          "gluten"
+        ],
+        "tags": [
+          "中蛋白質"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "湯頭少喝以控鈉",
+          "建議飯量改半飯"
+        ]
+      },
+      {
+        "item_id": "item_e97095",
+        "name": "鮮蝦大餛飩湯麵",
+        "price": 105,
+        "calories": 580,
+        "protein": 24,
+        "carbs": 68,
+        "fat": 22,
+        "sodium": 920,
+        "gi": "high",
+        "allergens": [
+          "shrimp",
+          "gluten"
+        ],
+        "tags": [
+          "高鈉"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "湯頭少喝以控鈉",
+          "建議飯量改半飯"
+        ]
+      },
+      {
+        "item_id": "item_4696de",
+        "name": "涼拌小黃瓜 (低鹽)",
+        "price": 40,
+        "calories": 75,
+        "protein": 2,
+        "carbs": 8,
+        "fat": 3,
+        "sodium": 180,
+        "gi": "low",
+        "allergens": [],
+        "tags": [
+          "低GI",
+          "低鈉",
+          "高纖"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "低 GI 食物穩血糖"
+        ]
+      }
+    ]
+  },
+  {
+    "restaurant_id": "scraped_7769",
+    "name": "Liang She Han Bento",
+    "lat": 25.0338,
+    "lng": 121.5645,
+    "address": "Taipei",
+    "phone": "02-2000-8888",
+    "google_place_id": "",
+    "open_hours": [
+      "11:00-21:00"
+    ],
+    "tags": [
+      "真實店家",
+      "反爬蟲檢索",
+      "AI菜單分析"
+    ],
+    "price_level": 2,
+    "items": [
+      {
+        "item_id": "item_630",
+        "name": "Liang She Han Bento 特選招牌餐",
+        "price": 150,
+        "calories": 520,
+        "protein": 32.0,
+        "carbs": 48.0,
+        "fat": 14.0,
+        "sodium": 460,
+        "gi": "low",
+        "allergens": [],
+        "tags": [
+          "高蛋白",
+          "低GI",
+          "低鈉"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "醬料另外放",
+          "少鹽處理"
+        ]
+      },
+      {
+        "item_id": "item_513",
+        "name": "清蒸時蔬豆腐盤",
+        "price": 85,
+        "calories": 210,
+        "protein": 14.0,
+        "carbs": 18.0,
+        "fat": 6.0,
+        "sodium": 280,
+        "gi": "low",
+        "allergens": [
+          "soy"
+        ],
+        "tags": [
+          "高纖",
+          "低鈉",
+          "低GI"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "補充豐富膳食纖維與大豆蛋白"
+        ]
+      }
+    ]
+  },
+  {
+    "restaurant_id": "scraped_6172",
+    "name": "Test",
+    "lat": 25.0338,
+    "lng": 121.5645,
+    "address": "台北市信義區",
+    "phone": "02-2000-8888",
+    "google_place_id": "",
+    "open_hours": [
+      "11:00-21:00"
+    ],
+    "tags": [
+      "真實店家",
+      "反爬蟲檢索",
+      "AI菜單分析"
+    ],
+    "price_level": 2,
+    "items": [
+      {
+        "item_id": "item_299",
+        "name": "Test 特選招牌餐",
+        "price": 150,
+        "calories": 520,
+        "protein": 32.0,
+        "carbs": 48.0,
+        "fat": 14.0,
+        "sodium": 460,
+        "gi": "low",
+        "allergens": [],
+        "tags": [
+          "高蛋白",
+          "低GI",
+          "低鈉"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "醬料另外放",
+          "少鹽處理"
+        ]
+      },
+      {
+        "item_id": "item_882",
+        "name": "清蒸時蔬豆腐盤",
+        "price": 85,
+        "calories": 210,
+        "protein": 14.0,
+        "carbs": 18.0,
+        "fat": 6.0,
+        "sodium": 280,
+        "gi": "low",
+        "allergens": [
+          "soy"
+        ],
+        "tags": [
+          "高纖",
+          "低鈉",
+          "低GI"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "補充豐富膳食纖維與大豆蛋白"
+        ]
+      }
+    ]
+  },
+  {
+    "restaurant_id": "scraped_8479",
+    "name": "八方雲集",
+    "lat": 25.0338,
+    "lng": 121.5645,
+    "address": "新北市板橋",
+    "phone": "02-2000-8888",
+    "google_place_id": "",
+    "open_hours": [
+      "11:00-21:00"
+    ],
+    "tags": [
+      "真實店家",
+      "反爬蟲檢索",
+      "AI菜單分析"
+    ],
+    "price_level": 2,
+    "items": [
+      {
+        "item_id": "item_459",
+        "name": "八方雲集 特選招牌餐",
+        "price": 150,
+        "calories": 520,
+        "protein": 32.0,
+        "carbs": 48.0,
+        "fat": 14.0,
+        "sodium": 460,
+        "gi": "low",
+        "allergens": [],
+        "tags": [
+          "高蛋白",
+          "低GI",
+          "低鈉"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "醬料另外放",
+          "少鹽處理"
+        ]
+      },
+      {
+        "item_id": "item_307",
+        "name": "清蒸時蔬豆腐盤",
+        "price": 85,
+        "calories": 210,
+        "protein": 14.0,
+        "carbs": 18.0,
+        "fat": 6.0,
+        "sodium": 280,
+        "gi": "low",
+        "allergens": [
+          "soy"
+        ],
+        "tags": [
+          "高纖",
+          "低鈉",
+          "低GI"
+        ],
+        "can_customize": true,
+        "customization_tips": [
+          "補充豐富膳食纖維與大豆蛋白"
+        ]
+      }
     ]
   }
 ]

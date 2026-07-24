@@ -169,6 +169,7 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                 "match_score": best_score,
                 "recommended_items": restaurant_recommended_items[:4],
                 "filtered_items": restaurant_filtered_items[:4],
+                "items": restaurant.get("items", []),
             })
 
     recommendations.sort(key=lambda item: item["match_score"], reverse=True)
@@ -201,6 +202,19 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
     remaining = build_daily_nutrition_progress(storage, user_id, user, now)["remaining"]
 
     restaurants = fetch_google_places_restaurants(lat, lng, radius_km, category, budget, limit=12)
+    
+    # 融合本地已建立的菜單庫
+    try:
+        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        catalog = load_restaurant_catalog(BASE_DIR)
+        for r in restaurants:
+            local_match = next((x for x in catalog if x["name"] == r["name"]), None)
+            if local_match:
+                r["items"] = local_match.get("items", [])
+                r["nutrition_available"] = True
+    except Exception as e:
+        print(f"[!] Google Places matching local catalog failed: {e}")
+
     recommendations = [item for restaurant in restaurants for item in restaurant.get("recommended_items", [])]
     recommendations.sort(key=lambda item: item["match_score"], reverse=True)
     return {

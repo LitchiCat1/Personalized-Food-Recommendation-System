@@ -36,7 +36,9 @@ from services.nutrition_progress_service import build_daily_nutrition_progress
 from services.profile_service import build_bmr_response, build_user_profile
 from services.recommend_service import build_recommendation_response
 from services.restaurant_ai_service import build_restaurant_ai_summary
+from services.robust_restaurant_scraper_service import scrape_and_enrich_restaurant
 from services.vision_food_service import (
+
     build_vision_food_response,
     call_gemini_food_recognition_with_rotation,
 )
@@ -336,13 +338,34 @@ def predict_vision_food():
 
 
 # ─── 2. User Profile CRUD (PRD: 健康檔案與疾病管理) ──────────
+def ensure_user_profile(user_id: str):
+    user = storage.get_user(user_id)
+    if not user:
+        user = {
+            "user_id": user_id,
+            "name": "探索者",
+            "gender": "male",
+            "height": 175.0,
+            "weight": 70.0,
+            "age": 28,
+            "activity_level": "輕度活動 (每週運動 1-3 天)",
+            "activity_multiplier": 1.375,
+            "bmi": 22.9,
+            "bmr": 1650,
+            "tdee": 2268,
+            "daily_calorie_target": 2000,
+            "health_conditions": [],
+            "allergens": [],
+            "diet_type": "均衡飲食"
+        }
+        storage.upsert_user(user)
+    return user
+
+
 @app.route("/user/<user_id>", methods=["GET"])
 def get_user(user_id):
     require_user_access(user_id)
-    user = storage.get_user(user_id)
-
-    if not user:
-        return jsonify({"error": "使用者不存在"}), 404
+    user = ensure_user_profile(user_id)
     return jsonify(user)
 
 
@@ -421,6 +444,7 @@ def recommend(user_id):
     2. 口味排序層: 餘弦相似度 (placeholder, 目前用隨機分數)
     """
     require_user_access(user_id)
+    ensure_user_profile(user_id)
     result = build_recommendation_response(storage, NUTRITION_DB, TFDA_DB, DISEASE_RULES, user_id, ALLERGEN_TAXONOMY)
     if not result:
         return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
@@ -430,6 +454,7 @@ def recommend(user_id):
 @app.route("/healthy-food-recommend/<user_id>", methods=["GET"])
 def healthy_food_recommend(user_id):
     require_user_access(user_id)
+    ensure_user_profile(user_id)
     params = {
         "budget": request.args.get("budget", 150),
         "lat": request.args.get("lat", 25.0338),
@@ -446,6 +471,7 @@ def healthy_food_recommend(user_id):
 @app.route("/map-food-recommend/<user_id>", methods=["GET"])
 def map_food_recommend(user_id):
     require_user_access(user_id)
+    ensure_user_profile(user_id)
     params = {
         "budget": request.args.get("budget", 150),
         "lat": request.args.get("lat", 25.0338),
@@ -467,7 +493,7 @@ def map_food_recommend(user_id):
 @app.route("/map-food-recommend/<user_id>/restaurant-summary", methods=["POST"])
 def map_food_restaurant_summary(user_id):
     require_user_access(user_id)
-    user = storage.get_user(user_id)
+    user = ensure_user_profile(user_id)
     if not user:
         return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
 
@@ -536,7 +562,58 @@ def calc_bmr():
     return jsonify(build_bmr_response(data))
 
 
+# ─── 7. Anti-blocking Scraper & AI Menu Enrichment Endpoint ───────
+@app.route("/restaurant/search", methods=["GET"])
+def search_restaurant():
+    """
+    模糊搜尋餐廳名稱或標籤
+    ?q=餐廳名稱
+    """
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify({"restaurants": []})
+
+    q_lower = q.lower()
+    matches = []
+    for r in RESTAURANT_CATALOG:
+        if q_lower in r["name"].lower() or any(q_lower in tag.lower() for tag in r.get("tags", [])):
+            matches.append(r)
+
+    return jsonify({"restaurants": matches})
+
+
+@app.route("/restaurant/scrape-and-enrich", methods=["POST"])
+def api_scrape_and_enrich_restaurant():
+    """
+    接收餐廳名稱、地址、可選的菜單網址與菜單文字，結合抗封鎖 HTTP 請求與 Gemini AI
+    自動將店家菜單寫入或更新到系統資料庫。
+    """
+    data = request.get_json(silent=True) or {}
+    restaurant_name = data.get("restaurant_name") or data.get("name")
+    if not restaurant_name:
+        return jsonify({"error": "缺少 restaurant_name"}), 400
+
+    address = data.get("address", "台北市信義區")
+    lat = float(data.get("lat", 25.0338))
+    lng = float(data.get("lng", 121.5645))
+    menu_url = data.get("menu_url", "")
+    menu_text = data.get("menu_text", "")
+
+    result = scrape_and_enrich_restaurant(restaurant_name, address, lat, lng, menu_url, menu_text)
+    
+    # Reload RESTAURANT_CATALOG in memory
+    global RESTAURANT_CATALOG
+    RESTAURANT_CATALOG = load_restaurant_catalog(BASE_DIR)
+    
+    return jsonify({
+        "message": "餐廳與菜單已成功擷取並由 AI 完成營養標註並寫入資料庫！",
+        "restaurant": result,
+        "total_catalog_restaurants": len(RESTAURANT_CATALOG)
+    }), 201
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     app.run(debug=debug, host="0.0.0.0", port=port)
+

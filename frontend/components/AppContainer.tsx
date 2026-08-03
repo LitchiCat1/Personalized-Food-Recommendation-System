@@ -8,7 +8,7 @@
  */
 
 import React, { useRef, useCallback } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet, type ScrollViewProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -19,9 +19,10 @@ interface Props {
   children: React.ReactNode;
   /** Extra bottom padding beyond safe area (default: 80 for tab bar) */
   bottomPadding?: number;
+  keyboardShouldPersistTaps?: ScrollViewProps['keyboardShouldPersistTaps'];
 }
 
-export default function AppContainer({ children, bottomPadding = 80 }: Props) {
+export default function AppContainer({ children, bottomPadding = 80, keyboardShouldPersistTaps }: Props) {
   const insets = useSafeAreaInsets();
   const { isDesktop, rs } = useResponsive();
   const scrollRef = useRef<ScrollView>(null);
@@ -48,6 +49,7 @@ export default function AppContainer({ children, bottomPadding = 80 }: Props) {
           <ScrollView
             ref={scrollRef}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps={keyboardShouldPersistTaps}
             contentContainerStyle={[
               styles.scrollContent,
               {

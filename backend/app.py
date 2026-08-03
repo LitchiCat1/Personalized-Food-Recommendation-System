@@ -400,8 +400,85 @@ def add_record():
 def get_records(user_id):
     require_user_access(user_id)
     date_str = request.args.get("date")  # YYYY-MM-DD
-    records = storage.get_records(user_id, date_str, limit=50)
+    try:
+        limit = min(max(int(request.args.get("limit", 50)), 1), 500)
+        offset = max(int(request.args.get("offset", 0)), 0)
+    except (TypeError, ValueError):
+        return jsonify({"error": "limit 與 offset 必須是有效數字"}), 400
+    records = storage.get_records(user_id, date_str, limit=limit, offset=offset)
     return jsonify({"records": records, "count": len(records)})
+
+
+EDITABLE_RECORD_NUTRIENTS = ("calories", "protein", "carbs", "fat", "sodium", "fiber")
+
+
+def normalize_record_foods(foods):
+    if not isinstance(foods, list) or not foods:
+        raise ValueError("飲食紀錄至少需要一項食物")
+
+    normalized_foods = []
+    for food in foods:
+        if not isinstance(food, dict):
+            raise ValueError("食物資料格式錯誤")
+        name = str(food.get("name") or "").strip()
+        if not name:
+            raise ValueError("食物名稱不可空白")
+
+        normalized_food = {**food, "name": name}
+        for nutrient in EDITABLE_RECORD_NUTRIENTS:
+            value = food.get(nutrient, 0)
+            if isinstance(value, bool):
+                raise ValueError(f"{nutrient} 必須是有效數字")
+            try:
+                numeric_value = float(value)
+            except (TypeError, ValueError):
+                raise ValueError(f"{nutrient} 必須是有效數字") from None
+            if not math.isfinite(numeric_value):
+                raise ValueError(f"{nutrient} 必須是有效數字")
+            if numeric_value < 0:
+                raise ValueError(f"{nutrient} 不可小於 0")
+            normalized_food[nutrient] = round(numeric_value, 2)
+        normalized_foods.append(normalized_food)
+
+    return normalized_foods
+
+
+@app.route("/records/<user_id>/<client_record_id>", methods=["PATCH"])
+def update_record(user_id, client_record_id):
+    require_user_access(user_id)
+    existing = storage.get_record_by_client_record_id(user_id, client_record_id)
+    if not existing:
+        return jsonify({"error": "找不到飲食紀錄"}), 404
+
+    data = request.get_json()
+    if not isinstance(data, dict):
+        return jsonify({"error": "缺少資料"}), 400
+    try:
+        foods = normalize_record_foods(data.get("foods"))
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    updated = {
+        **existing,
+        "foods": foods,
+        **{
+            f"total_{nutrient}": round(sum(food[nutrient] for food in foods), 2)
+            for nutrient in EDITABLE_RECORD_NUTRIENTS
+        },
+    }
+    saved = storage.update_record(updated)
+    if not saved:
+        return jsonify({"error": "找不到飲食紀錄"}), 404
+    return jsonify({"message": "飲食紀錄已更新", "record": saved})
+
+
+@app.route("/records/<user_id>/<client_record_id>", methods=["DELETE"])
+def delete_record(user_id, client_record_id):
+    require_user_access(user_id)
+    deleted = storage.delete_record(user_id, client_record_id)
+    if not deleted:
+        return jsonify({"error": "找不到飲食紀錄"}), 404
+    return jsonify({"message": "飲食紀錄已刪除", "record": deleted})
 
 
 # ─── 4. History & Trends (PRD: 飲食趨勢回顧) ─────────────────

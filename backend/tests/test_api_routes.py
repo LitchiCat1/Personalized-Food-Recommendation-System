@@ -118,6 +118,127 @@ class ApiRouteTests(unittest.TestCase):
         self.assertFalse(data["deduplicated"])
         self.assertTrue(data["record"]["client_record_id"].startswith("server_record_"))
 
+    def test_records_route_paginates_in_newest_first_order(self):
+        for index in range(1, 4):
+            self.app_module.storage.insert_record({
+                "user_id": "user-a",
+                "client_record_id": f"record-{index}",
+                "timestamp": f"2026-08-0{index}T12:00:00Z",
+                "foods": [],
+                "total_calories": index * 100,
+            })
+
+        with self.mock_auth("user-a"):
+            first_page = self.client.get("/records/user-a?limit=2&offset=0", headers=self.auth_headers())
+            second_page = self.client.get("/records/user-a?limit=2&offset=2", headers=self.auth_headers())
+
+        self.assertEqual(first_page.status_code, 200)
+        self.assertEqual([record["client_record_id"] for record in first_page.get_json()["records"]], ["record-3", "record-2"])
+        self.assertEqual([record["client_record_id"] for record in second_page.get_json()["records"]], ["record-1"])
+
+    def test_record_update_trims_names_and_recalculates_totals(self):
+        self.app_module.storage.insert_record({
+            "user_id": "user-a",
+            "client_record_id": "editable-record",
+            "timestamp": "2026-08-03T12:00:00Z",
+            "meal_type": "午餐",
+            "foods": [{"name": "原始名稱", "calories": 80}],
+            "total_calories": 80,
+            "source": "nutrition-label",
+        })
+        payload = {
+            "foods": [
+                {"name": "  豆漿  ", "calories": 120, "protein": 8.5, "carbs": 10, "fat": 4, "sodium": 95, "fiber": 2},
+                {"name": "香蕉", "calories": 90, "protein": 1, "carbs": 23, "fat": 0.3, "sodium": 1, "fiber": 2.6},
+            ],
+            "total_calories": 9999,
+        }
+
+        with self.mock_auth("user-a"):
+            response = self.client.patch(
+                "/records/user-a/editable-record",
+                json=payload,
+                headers=self.auth_headers(),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        record = response.get_json()["record"]
+        self.assertEqual(record["foods"][0]["name"], "豆漿")
+        self.assertEqual(record["total_calories"], 210)
+        self.assertEqual(record["total_protein"], 9.5)
+        self.assertEqual(record["total_fiber"], 4.6)
+        self.assertEqual(record["source"], "nutrition-label")
+
+    def test_record_update_rejects_blank_names_invalid_numbers_and_negatives(self):
+        self.app_module.storage.insert_record({
+            "user_id": "user-a",
+            "client_record_id": "invalid-record",
+            "timestamp": "2026-08-03T12:00:00Z",
+            "foods": [{"name": "原始名稱", "calories": 80}],
+        })
+        invalid_foods = (
+            [{"name": "   ", "calories": 80}],
+            [{"name": "豆漿", "calories": "not-a-number"}],
+            [{"name": "豆漿", "calories": -1}],
+        )
+
+        for foods in invalid_foods:
+            with self.subTest(foods=foods):
+                with self.mock_auth("user-a"):
+                    response = self.client.patch(
+                        "/records/user-a/invalid-record",
+                        json={"foods": foods},
+                        headers=self.auth_headers(),
+                    )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("error", response.get_json())
+
+        record = self.app_module.storage.get_record_by_client_record_id("user-a", "invalid-record")
+        self.assertEqual(record["foods"][0]["name"], "原始名稱")
+
+    def test_record_delete_removes_only_authenticated_users_record(self):
+        for user_id in ("user-a", "user-b"):
+            self.app_module.storage.insert_record({
+                "user_id": user_id,
+                "client_record_id": "shared-client-id",
+                "timestamp": "2026-08-03T12:00:00Z",
+                "foods": [{"name": user_id, "calories": 80}],
+            })
+
+        with self.mock_auth("user-a"):
+            response = self.client.delete(
+                "/records/user-a/shared-client-id",
+                headers=self.auth_headers(),
+            )
+            records_response = self.client.get("/records/user-a", headers=self.auth_headers())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(records_response.get_json()["records"], [])
+        self.assertIsNotNone(self.app_module.storage.get_record_by_client_record_id("user-b", "shared-client-id"))
+
+    def test_record_mutations_reject_cross_user_access(self):
+        self.app_module.storage.insert_record({
+            "user_id": "user-b",
+            "client_record_id": "private-record",
+            "timestamp": "2026-08-03T12:00:00Z",
+            "foods": [{"name": "私有紀錄", "calories": 80}],
+        })
+
+        with self.mock_auth("user-a"):
+            update_response = self.client.patch(
+                "/records/user-b/private-record",
+                json={"foods": [{"name": "越權修改", "calories": 1}]},
+                headers=self.auth_headers(),
+            )
+            delete_response = self.client.delete(
+                "/records/user-b/private-record",
+                headers=self.auth_headers(),
+            )
+
+        self.assertEqual(update_response.status_code, 403)
+        self.assertEqual(delete_response.status_code, 403)
+        self.assertIsNotNone(self.app_module.storage.get_record_by_client_record_id("user-b", "private-record"))
+
     def test_custom_food_route_scopes_food_to_authenticated_user(self):
         payload = {
             "user_id": "user-a",

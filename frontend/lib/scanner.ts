@@ -46,6 +46,23 @@ export type OCRDraft = {
   ocr_text?: string;
 };
 
+type OCRSuggestedCustomFood = Omit<OCRDraft, 'product_name'> & {
+  name_zh?: string;
+  product_name?: string;
+};
+
+type NutritionLabelOCRResponse = OCRDraft & {
+  error?: string;
+  suggested_custom_food?: OCRSuggestedCustomFood;
+};
+
+export const DEFAULT_OCR_FOOD_NAME = '未命名食品';
+export const FOOD_NAME_REQUIRED_MESSAGE = '請輸入食物名稱';
+
+export function normalizeFoodName(value?: string | null): string {
+  return (value || '').trim();
+}
+
 function mapApiDetections(detections: any[]): DetectedFood[] {
   return detections.map((d: any, i: number) => ({
     id: `det_${Date.now()}_${i}`,
@@ -105,15 +122,45 @@ export async function runPrediction(params: {
   };
 }
 
-export async function saveRecord(params: {
+type SaveRecordParams = {
   apiBaseUrl: string;
   userId: string;
   clientRecordId?: string;
   foods: DetectedFood[];
   source: 'camera' | 'manual' | 'nutrition-label';
   auth?: ApiAuth;
-}) {
+};
+
+const inFlightRecordRequests = new Map<string, Promise<void>>();
+
+export async function saveRecord(params: SaveRecordParams): Promise<void> {
+  const requestKey = params.clientRecordId
+    ? `${params.apiBaseUrl}:${params.userId}:${params.clientRecordId}`
+    : null;
+  const existingRequest = requestKey ? inFlightRecordRequests.get(requestKey) : undefined;
+  if (existingRequest) return existingRequest;
+
+  const request = performSaveRecord(params);
+  if (requestKey) inFlightRecordRequests.set(requestKey, request);
+
+  try {
+    await request;
+  } finally {
+    if (requestKey && inFlightRecordRequests.get(requestKey) === request) {
+      inFlightRecordRequests.delete(requestKey);
+    }
+  }
+}
+
+async function performSaveRecord(params: SaveRecordParams): Promise<void> {
   if (params.foods.length === 0) return;
+  const normalizedFoods = params.foods.map((food) => ({
+    ...food,
+    foodName: normalizeFoodName(food.foodName),
+  }));
+  if (normalizedFoods.some((food) => !food.foodName)) {
+    throw new Error(FOOD_NAME_REQUIRED_MESSAGE);
+  }
   const totalCalories = params.foods.reduce((sum, item) => sum + item.nutrition.calories, 0);
   const totalProtein = params.foods.reduce((sum, item) => sum + item.nutrition.protein, 0);
   const totalCarbs = params.foods.reduce((sum, item) => sum + item.nutrition.carbs, 0);
@@ -128,7 +175,7 @@ export async function saveRecord(params: {
       user_id: params.userId,
       client_record_id: params.clientRecordId,
       meal_type: '點心',
-      foods: params.foods.map((food) => ({
+      foods: normalizedFoods.map((food) => ({
         name: food.foodName,
         calories: food.nutrition.calories,
         protein: food.nutrition.protein,
@@ -211,11 +258,18 @@ export async function runNutritionLabelOCR(params: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ image: normalizeImageBase64(params.imageBase64) }),
   });
-  const data = await resp.json();
+  const data = await resp.json() as NutritionLabelOCRResponse;
   if (!resp.ok) {
     throw new Error(data.error || '營養標示辨識失敗');
   }
-  return data.suggested_custom_food || data;
+  const suggestedFood = data.suggested_custom_food;
+  const draft = suggestedFood || data;
+  return {
+    ...draft,
+    product_name: normalizeFoodName(
+      suggestedFood?.name_zh || suggestedFood?.product_name || data.product_name
+    ) || DEFAULT_OCR_FOOD_NAME,
+  };
 }
 
 export async function saveCustomFood(params: {
@@ -224,12 +278,16 @@ export async function saveCustomFood(params: {
   draft: OCRDraft;
   auth?: ApiAuth;
 }) {
+  const foodName = normalizeFoodName(params.draft.product_name);
+  if (!foodName) {
+    throw new Error(FOOD_NAME_REQUIRED_MESSAGE);
+  }
   const resp = await fetch(`${params.apiBaseUrl}/custom-food`, {
     method: 'POST',
     headers: buildHeaders(params.auth, 'application/json'),
     body: JSON.stringify({
       user_id: params.userId,
-      name_zh: params.draft.product_name,
+      name_zh: foodName,
       brand: params.draft.brand,
       serving_size_g: params.draft.serving_size_g,
       servings_per_container: params.draft.servings_per_container,
@@ -247,9 +305,13 @@ export async function saveCustomFood(params: {
 }
 
 export function buildOCRDetectedFood(draft: OCRDraft): DetectedFood {
+  const foodName = normalizeFoodName(draft.product_name);
+  if (!foodName) {
+    throw new Error(FOOD_NAME_REQUIRED_MESSAGE);
+  }
   return {
     id: `ocr_${Date.now()}`,
-    foodName: draft.product_name || '營養標示食品',
+    foodName,
     confidence: 100,
     source: 'nutrition-label-ocr',
     needsConfirmation: false,

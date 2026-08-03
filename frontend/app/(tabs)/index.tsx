@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import CalorieRing from '@/components/dashboard/CalorieRing';
 import NutrientBar from '@/components/dashboard/NutrientBar';
@@ -11,6 +11,7 @@ import SectionBlock from '@/components/ui/section-block';
 import MetricCard from '@/components/ui/metric-card';
 import DataPill from '@/components/ui/data-pill';
 import PrimaryButton from '@/components/ui/primary-button';
+import DietaryRecordManager from '@/components/dashboard/DietaryRecordManager';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
 import { fetchMedicalMetadata, fetchRecords, type MedicalConditionRule } from '@/lib/api';
@@ -36,10 +37,11 @@ function getLocalDateString(): string {
 
 export default function DashboardScreen() {
   const { isDesktop } = useResponsive();
-  const { dailyNutrition, todayMeals, healthAlerts, apiBaseUrl, accessToken, replaceDashboardFromRecords, user } = useStore();
+  const { dailyNutrition, todayMeals, healthAlerts, apiBaseUrl, accessToken, dietaryRecordsRevision, replaceDashboardFromRecords, user } = useStore();
   const [syncing, setSyncing] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [conditionRules, setConditionRules] = useState<MedicalConditionRule[]>([]);
+  const [recordManagerVisible, setRecordManagerVisible] = useState(false);
   const { calories, protein, carbs, fat, sodium, fiber } = dailyNutrition;
   const remaining = Math.max(0, Math.round(calories.target - calories.current));
   const sodiumRisk = sodium.current >= sodium.target ? '超標' : sodium.current >= sodium.target * 0.8 ? '接近上限' : '正常';
@@ -57,27 +59,30 @@ export default function DashboardScreen() {
     return conditions.length ? `${conditions.join('、')}需留意` : undefined;
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    setSyncing(true);
-    setSyncError(null);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      const requestRevision = dietaryRecordsRevision;
+      setSyncing(true);
+      setSyncError(null);
 
-    fetchRecords(apiBaseUrl, user.userId, getLocalDateString(), { accessToken })
-      .then((data) => {
-        if (cancelled) return;
-        replaceDashboardFromRecords(data.records || []);
-      })
-      .catch((err: Error) => {
-        if (!cancelled) setSyncError(err.message);
-      })
-      .finally(() => {
-        if (!cancelled) setSyncing(false);
-      });
+      fetchRecords(apiBaseUrl, user.userId, getLocalDateString(), { accessToken })
+        .then((data) => {
+          if (cancelled || requestRevision !== useStore.getState().dietaryRecordsRevision) return;
+          replaceDashboardFromRecords(data.records || []);
+        })
+        .catch((err: Error) => {
+          if (!cancelled) setSyncError(err.message);
+        })
+        .finally(() => {
+          if (!cancelled) setSyncing(false);
+        });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, apiBaseUrl, replaceDashboardFromRecords, user.userId]);
+      return () => {
+        cancelled = true;
+      };
+    }, [accessToken, apiBaseUrl, dietaryRecordsRevision, replaceDashboardFromRecords, user.userId])
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -187,9 +192,17 @@ export default function DashboardScreen() {
           </View>
           <CalorieRing current={Math.round(calories.current)} target={calories.target} />
         </View>
-        <Link href="/scanner" asChild>
-          <PrimaryButton label="掃描下一餐" icon={<Ionicons name="scan-outline" size={18} color={Palette.text.inverse} />} />
-        </Link>
+        <View style={styles.heroActions}>
+          <Link href="/scanner" asChild>
+            <PrimaryButton label="掃描下一餐" icon={<Ionicons name="scan-outline" size={18} color={Palette.text.inverse} />} />
+          </Link>
+          <PrimaryButton
+            tone="ghost"
+            label="修改飲食紀錄"
+            onPress={() => setRecordManagerVisible(true)}
+            icon={<Ionicons name="create-outline" size={18} color={Palette.accent.green} />}
+          />
+        </View>
       </View>
 
       {isDesktop ? (
@@ -207,6 +220,8 @@ export default function DashboardScreen() {
       ) : (
         <>{alertContent}{mealsContent}{nutritionContent}</>
       )}
+
+      <DietaryRecordManager visible={recordManagerVisible} onClose={() => setRecordManagerVisible(false)} />
     </AppContainer>
   );
 }
@@ -241,6 +256,7 @@ const styles = StyleSheet.create({
   heroCopy: { flex: 1, gap: Spacing.sm },
   heroTitle: { ...Typography.h1, color: Palette.text.primary },
   heroSubtitle: { ...Typography.caption, color: Palette.text.secondary },
+  heroActions: { gap: Spacing.sm },
   alertStack: { gap: Spacing.sm, marginBottom: Spacing.xl },
   safeBanner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Palette.accent.greenDim, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.xl },
   safeBannerText: { ...Typography.caption, color: Palette.accent.green, flex: 1 },

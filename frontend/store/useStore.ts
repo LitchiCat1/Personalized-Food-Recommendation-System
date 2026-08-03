@@ -61,6 +61,8 @@ export interface NutriLensState {
   dailyNutrition: typeof DAILY_NUTRITION;
   todayMeals: MealEntry[];
   healthAlerts: HealthAlert[];
+  dietaryRecordsRevision: number;
+  invalidateDietaryRecords: () => void;
   addMealFromScan: (detections: DetectedFood[]) => void;
   replaceDashboardFromRecords: (records: DietaryRecord[]) => void;
   resetDashboard: () => void;
@@ -168,6 +170,8 @@ export const useStore = create<NutriLensState>((set, get) => ({
   dailyNutrition: { ...DAILY_NUTRITION },
   todayMeals: [...TODAY_MEALS],
   healthAlerts: [...HEALTH_ALERTS],
+  dietaryRecordsRevision: 0,
+  invalidateDietaryRecords: () => set((state) => ({ dietaryRecordsRevision: state.dietaryRecordsRevision + 1 })),
 
   resetDashboard: () =>
     set((state) => ({

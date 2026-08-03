@@ -202,7 +202,88 @@ class StorageRepository:
                 return record
         return None
 
-    def get_records(self, user_id: str, date_str: str | None = None, limit: int = 50):
+    def update_record(self, record: dict):
+        user_id = record.get("user_id")
+        client_record_id = record.get("client_record_id")
+        if not user_id or not client_record_id:
+            return None
+
+        if self.use_postgres:
+            with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    UPDATE records
+                    SET timestamp = %s, meal_type = %s, foods = %s,
+                        total_calories = %s, total_protein = %s, total_carbs = %s,
+                        total_fat = %s, total_sodium = %s, total_fiber = %s, source = %s
+                    WHERE user_id = %s AND client_record_id = %s
+                    RETURNING user_id, client_record_id, timestamp, meal_type, foods,
+                              total_calories, total_protein, total_carbs, total_fat,
+                              total_sodium, total_fiber, source
+                    """,
+                    (
+                        record.get("timestamp"),
+                        record.get("meal_type"),
+                        Json(record.get("foods", [])),
+                        record.get("total_calories", 0),
+                        record.get("total_protein", 0),
+                        record.get("total_carbs", 0),
+                        record.get("total_fat", 0),
+                        record.get("total_sodium", 0),
+                        record.get("total_fiber", 0),
+                        record.get("source", "camera"),
+                        user_id,
+                        client_record_id,
+                    ),
+                )
+                row = cursor.fetchone()
+            return dict(row) if row else None
+
+        if self.use_mongo:
+            result = self.db.records.update_one(
+                {"user_id": user_id, "client_record_id": client_record_id},
+                {"$set": record},
+            )
+            if result.matched_count == 0:
+                return None
+            return self.get_record_by_client_record_id(user_id, client_record_id)
+
+        for index, existing in enumerate(self.mem_records):
+            if existing.get("user_id") == user_id and existing.get("client_record_id") == client_record_id:
+                self.mem_records[index] = record
+                return record
+        return None
+
+    def delete_record(self, user_id: str, client_record_id: str):
+        if self.use_postgres:
+            with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    DELETE FROM records
+                    WHERE user_id = %s AND client_record_id = %s
+                    RETURNING user_id, client_record_id, timestamp, meal_type, foods,
+                              total_calories, total_protein, total_carbs, total_fat,
+                              total_sodium, total_fiber, source
+                    """,
+                    (user_id, client_record_id),
+                )
+                row = cursor.fetchone()
+            return dict(row) if row else None
+
+        if self.use_mongo:
+            record = self.db.records.find_one_and_delete(
+                {"user_id": user_id, "client_record_id": client_record_id}
+            )
+            if record:
+                record.pop("_id", None)
+            return record
+
+        for index, record in enumerate(self.mem_records):
+            if record.get("user_id") == user_id and record.get("client_record_id") == client_record_id:
+                return self.mem_records.pop(index)
+        return None
+
+    def get_records(self, user_id: str, date_str: str | None = None, limit: int = 50, offset: int = 0):
         if self.use_postgres:
             sql = """
                 SELECT user_id, client_record_id, timestamp, meal_type, foods, total_calories, total_protein,
@@ -214,8 +295,8 @@ class StorageRepository:
             if date_str:
                 sql += " AND timestamp LIKE %s"
                 params.append(f"{date_str}%")
-            sql += " ORDER BY timestamp DESC LIMIT %s"
-            params.append(limit)
+            sql += " ORDER BY timestamp DESC LIMIT %s OFFSET %s"
+            params.extend([limit, offset])
             with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute(sql, params)
                 rows = cursor.fetchall()
@@ -225,12 +306,13 @@ class StorageRepository:
             query = {"user_id": user_id}
             if date_str:
                 query["timestamp"] = {"$regex": f"^{date_str}"}
-            return list(self.db.records.find(query, {"_id": 0}).sort("timestamp", -1).limit(limit))
+            return list(self.db.records.find(query, {"_id": 0}).sort("timestamp", -1).skip(offset).limit(limit))
 
         records = [r for r in self.mem_records if r.get("user_id") == user_id]
         if date_str:
             records = [r for r in records if str(r.get("timestamp", "")).startswith(date_str)]
-        return records[:limit]
+        records.sort(key=lambda record: str(record.get("timestamp", "")), reverse=True)
+        return records[offset:offset + limit]
 
     def get_today_records(self, user_id: str):
         return self.get_records(user_id, datetime.now(timezone.utc).strftime("%Y-%m-%d"), limit=500)

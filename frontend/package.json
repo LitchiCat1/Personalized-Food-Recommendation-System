@@ -1,13 +1,16 @@
 {
   "name": "frontend",
   "main": "expo-router/entry",
-  "version": "0.0.4",
+  "version": "0.0.6",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "node scripts/with-google-map-env.js expo start --web",
     "build:web": "node scripts/with-google-map-env.js expo export --platform web",
+    "test:trends": "node --test scripts/test-dietary-trends.mjs",
+    "test:records": "node --test scripts/test-dietary-records.mjs",
+    "test:scanner": "node --test scripts/test-scanner-records.mjs",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit"
   },

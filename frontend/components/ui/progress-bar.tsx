@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   label: { ...Typography.caption, color: Palette.text.secondary, flex: 1 },
   attentionNutrientLabel: { color: Palette.text.primary, fontWeight: '700' },
-  values: { ...Typography.caption, color: Palette.text.secondary },
+  values: { ...Typography.caption, ...Typography.number, color: Palette.text.secondary },
   attentionRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xs },
   attentionText: { ...Typography.small, color: Palette.status.warning, flex: 1 },
   track: { height: 8, borderRadius: Radius.full, overflow: 'hidden' },

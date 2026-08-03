@@ -61,7 +61,7 @@ Personalized-Food-Recommendation-System/
 
 - Render URL：`https://personalized-food-recommendation-system-nq8t.onrender.com`
 - Render service id：`srv-d7u2qhdckfvc73ei96l0`
-- 部署分支：`v0.0.4`
+- 部署分支：`v0.0.6`
 - 後端儲存：Supabase Postgres Session Pooler
 - 後端 Auth：`SUPABASE_AUTH_REQUIRED=true`
 - 權限驗證：無 token 回 `401`，正確 token 回 `200`，跨 `user_id` 回 `403`

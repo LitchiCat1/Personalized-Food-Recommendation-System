@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+import { Link, useFocusEffect } from 'expo-router';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -12,7 +12,8 @@ import MetricCard from '@/components/ui/metric-card';
 import DataPill from '@/components/ui/data-pill';
 import ProgressBar from '@/components/ui/progress-bar';
 import PrimaryButton from '@/components/ui/primary-button';
-import { fetchHistory, type HistoryDay, type HistoryResponse } from '@/lib/api';
+import { fetchAllRecords, type HistoryDay, type HistoryResponse } from '@/lib/api';
+import { buildDietaryTrend, type DietaryTrendData } from '@/lib/dietary-trends';
 
 function buildInsights(summary: HistoryResponse['summary'], daily: HistoryDay[], target: number) {
   if (daily.length === 0) {
@@ -36,35 +37,44 @@ function buildInsights(summary: HistoryResponse['summary'], daily: HistoryDay[],
 
 export default function HistoryScreen() {
   const { rs, isSmall, isDesktop } = useResponsive();
-  const { user, apiBaseUrl, accessToken } = useStore();
+  const { user, apiBaseUrl, accessToken, dietaryRecordsRevision } = useStore();
   const target = user.dailyCalorieTarget;
-  const [history, setHistory] = useState<HistoryResponse | null>(null);
+  const [trend, setTrend] = useState<DietaryTrendData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      const requestRevision = dietaryRecordsRevision;
+      void reloadKey;
+      setLoading(true);
+      setError(null);
 
-    fetchHistory(apiBaseUrl, user.userId, 7, { accessToken })
-      .then((data) => {
-        if (!cancelled) setHistory(data);
-      })
-      .catch((err: Error) => {
-        if (!cancelled) setError(err.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      fetchAllRecords(apiBaseUrl, user.userId, { accessToken })
+        .then((records) => {
+          if (!cancelled && requestRevision === useStore.getState().dietaryRecordsRevision) {
+            setTrend(buildDietaryTrend(records, { maxDays: 7, userId: user.userId }));
+          }
+        })
+        .catch((err: Error) => {
+          if (cancelled) return;
+          setTrend(null);
+          setError(err.message);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, apiBaseUrl, user.userId]);
+      return () => {
+        cancelled = true;
+      };
+    }, [accessToken, apiBaseUrl, dietaryRecordsRevision, reloadKey, user.userId])
+  );
 
-  const daily = useMemo(() => history?.daily || [], [history]);
-  const summary = useMemo(() => history?.summary || {}, [history]);
+  const daily = useMemo(() => trend?.daily || [], [trend]);
+  const summary = useMemo(() => trend?.summary || {}, [trend]);
   const maxCal = Math.max(target, ...daily.map((d) => d.calories), 1);
   const calorieGoalHitDays = daily.filter((d) => d.calories >= target * 0.85 && d.calories <= target * 1.15).length;
   const sodiumOverDays = daily.filter((d) => d.sodium > 2000).length;
@@ -74,12 +84,17 @@ export default function HistoryScreen() {
 
   return (
     <AppContainer>
-      <ScreenHeader title="飲食趨勢" subtitle="用 7 日資料檢查熱量、營養素和鈉攝取風險。" badge="7 日摘要" badgeTone="info" />
+      <ScreenHeader title="飲食趨勢" subtitle="檢查最新連續紀錄區段的熱量、營養素和鈉攝取風險。" badge={daily.length ? `${daily.length} 日摘要` : '近期摘要'} badgeTone="info" />
 
       {loading ? (
         <StateCard icon="bar-chart-outline" text="讀取歷史紀錄中..." loading />
       ) : error ? (
-        <StateCard icon="cloud-offline-outline" text={`無法載入歷史資料：${error}`} tone="warning" />
+        <StateCard
+          icon="cloud-offline-outline"
+          text={`無法載入歷史資料：${error}`}
+          tone="warning"
+          action={<PrimaryButton label="重新讀取" onPress={() => setReloadKey((key) => key + 1)} icon={<Ionicons name="refresh-outline" size={18} color={Palette.text.inverse} />} />}
+        />
       ) : daily.length === 0 ? (
         <View style={styles.stateCard}>
           <Ionicons name="bar-chart-outline" size={30} color={Palette.text.tertiary} />
@@ -91,7 +106,7 @@ export default function HistoryScreen() {
       ) : (
         <>
           <View style={styles.metricRow}>
-            <MetricCard label="本週均值" value={summary.avg_calories || 0} unit="kcal" accent={Palette.accent.green} />
+            <MetricCard label="區段均值" value={summary.avg_calories || 0} unit="kcal" accent={Palette.accent.green} />
             <MetricCard label="紀錄餐數" value={totalRecords} unit={`/${recordedDays}天`} accent={Palette.accent.blue} />
             <MetricCard label="鈉超標" value={sodiumOverDays} unit="天" accent={sodiumOverDays > 0 ? Palette.status.warning : Palette.accent.green} />
           </View>
@@ -109,7 +124,7 @@ export default function HistoryScreen() {
             </View>
           </SectionBlock>
 
-          <SectionBlock title="每日熱量追蹤" subtitle={`目標 ${target} kcal，達標 ${calorieGoalHitDays}/${daily.length} 天。`}>
+          <SectionBlock title="每日熱量追蹤" subtitle={`目標 ${target} kcal，達標 ${calorieGoalHitDays}/${daily.length} 天。`} numericSubtitle>
             <View style={styles.chartTitleRow}>
               <DataPill tone="success">目標 {target} kcal</DataPill>
               <DataPill tone={calorieGoalHitDays >= Math.ceil(daily.length / 2) ? 'success' : 'warning'}>達標 {calorieGoalHitDays} 天</DataPill>
@@ -117,15 +132,15 @@ export default function HistoryScreen() {
             <View style={styles.barsContainer}>
               {daily.map((day, index) => {
                 const barHeight = (day.calories / maxCal) * 100;
-                const isToday = index === daily.length - 1;
+                const isLatest = index === daily.length - 1;
                 const overTarget = day.calories > target * 1.15;
                 return (
                   <View key={day.date} style={styles.barColumn}>
                     <Text style={[styles.barValue, { color: overTarget ? Palette.status.warning : Palette.text.tertiary }]}>{day.calories}</Text>
                     <View style={[styles.barTrack, { height: rs(isSmall ? 108 : 132) }]}>
-                      <View style={[styles.barFill, { height: `${barHeight}%` }, overTarget && styles.barFillOver, isToday && styles.barFillToday]} />
+                      <View style={[styles.barFill, { height: `${barHeight}%` }, overTarget && styles.barFillOver, isLatest && styles.barFillToday]} />
                     </View>
-                    <Text style={[styles.barLabel, isToday && styles.barLabelToday]}>{day.date.slice(5)}</Text>
+                    <Text style={[styles.barLabel, isLatest && styles.barLabelToday]}>{day.date.slice(5)}</Text>
                   </View>
                 );
               })}
@@ -135,7 +150,7 @@ export default function HistoryScreen() {
             </View>
             <View style={isDesktop && styles.desktopAside}>
 
-          <SectionBlock title="營養素週均值" subtitle="比對週平均與建議目標，找出長期偏差。">
+          <SectionBlock title="營養素區段均值" subtitle="比對連續紀錄均值與建議目標，找出長期偏差。">
             <View style={styles.progressStack}>
               <ProgressBar label="蛋白質" current={summary.avg_protein || 0} target={130} unit="g" color={Palette.accent.blue} />
               <ProgressBar label="碳水" current={summary.avg_carbs || 0} target={250} unit="g" color={Palette.accent.orange} />
@@ -144,7 +159,7 @@ export default function HistoryScreen() {
             </View>
           </SectionBlock>
 
-          <SectionBlock title="鈉攝取風險" subtitle="以 2,000mg 作為健康管理提醒上限。">
+          <SectionBlock title="鈉攝取風險" subtitle="以 2,000mg 作為健康管理提醒上限。" numericSubtitle>
             <View style={styles.sodiumBars}>
               {daily.map((day) => {
                 const ratio = day.sodium / 2000;
@@ -169,11 +184,12 @@ export default function HistoryScreen() {
   );
 }
 
-function StateCard({ icon, text, loading, tone }: { icon: keyof typeof Ionicons.glyphMap; text: string; loading?: boolean; tone?: 'warning' }) {
+function StateCard({ icon, text, loading, tone, action }: { icon: keyof typeof Ionicons.glyphMap; text: string; loading?: boolean; tone?: 'warning'; action?: React.ReactNode }) {
   return (
     <View style={styles.stateCard}>
       {loading ? <ActivityIndicator size="large" color={Palette.accent.green} /> : <Ionicons name={icon} size={30} color={tone === 'warning' ? Palette.status.warning : Palette.text.tertiary} />}
-      <Text style={styles.emptyText}>{text}</Text>
+      <Text style={styles.emptyText} selectable>{text}</Text>
+      {action}
     </View>
   );
 }
@@ -198,7 +214,7 @@ const styles = StyleSheet.create({
   chartTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, marginBottom: Spacing.lg },
   barsContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   barColumn: { flex: 1, alignItems: 'center' },
-  barValue: { ...Typography.small, marginBottom: 4 },
+  barValue: { ...Typography.small, ...Typography.number, marginBottom: 4 },
   barTrack: {
     width: '62%',
     backgroundColor: Palette.bg.elevated,
@@ -209,12 +225,12 @@ const styles = StyleSheet.create({
   barFill: { width: '100%', backgroundColor: Palette.accent.blue, borderRadius: Radius.full, opacity: 0.68 },
   barFillOver: { backgroundColor: Palette.status.warning },
   barFillToday: { backgroundColor: Palette.accent.green, opacity: 1 },
-  barLabel: { ...Typography.small, color: Palette.text.tertiary, marginTop: 6 },
+  barLabel: { ...Typography.small, ...Typography.number, color: Palette.text.tertiary, marginTop: 6 },
   barLabelToday: { color: Palette.accent.green },
   progressStack: { gap: Spacing.lg },
   sodiumBars: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   sodiumBarCol: { flex: 1, alignItems: 'center' },
-  sodiumBarVal: { ...Typography.small, marginBottom: 4 },
+  sodiumBarVal: { ...Typography.small, ...Typography.number, marginBottom: 4 },
   sodiumBarTrack: {
     width: '55%',
     backgroundColor: Palette.bg.elevated,
@@ -224,10 +240,10 @@ const styles = StyleSheet.create({
   },
   sodiumBarFill: { width: '100%', backgroundColor: Palette.accent.pink, borderRadius: Radius.full, opacity: 0.62 },
   sodiumBarOver: { backgroundColor: Palette.status.error, opacity: 1 },
-  sodiumBarLabel: { ...Typography.small, color: Palette.text.tertiary, marginTop: 4 },
+  sodiumBarLabel: { ...Typography.small, ...Typography.number, color: Palette.text.tertiary, marginTop: 4 },
   insightStack: { gap: Spacing.md },
   insightRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md, backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, padding: Spacing.md },
   noteIndex: { width: 24, height: 24, borderRadius: 12, backgroundColor: Palette.bg.card, alignItems: 'center', justifyContent: 'center' },
   noteIndexText: { ...Typography.small, color: Palette.accent.green },
-  insightText: { ...Typography.caption, color: Palette.text.secondary, flex: 1 },
+  insightText: { ...Typography.caption, color: Palette.text.secondary, flex: 1, fontVariant: Typography.number.fontVariant },
 });

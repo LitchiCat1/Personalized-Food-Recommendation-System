@@ -25,6 +25,7 @@ export default function MetricCard({ label, value, unit, accent, tone = 'default
 const styles = StyleSheet.create({
   card: {
     flex: 1,
+    minWidth: 0,
     backgroundColor: Palette.bg.card,
     borderRadius: Radius.lg,
     borderWidth: 1,
@@ -37,7 +38,7 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.bg.mint,
   },
   label: { ...Typography.small, color: Palette.text.secondary },
-  valueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  valueRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: 4 },
   value: { ...Typography.h2, ...Typography.number },
   unit: { ...Typography.caption, ...Typography.number },
 });

@@ -39,5 +39,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: 4,
   },
-  text: { ...Typography.small },
+  text: { ...Typography.small, ...Typography.number },
 });

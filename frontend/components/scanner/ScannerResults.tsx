@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import DataPill from '@/components/ui/data-pill';
@@ -12,9 +12,13 @@ type Props = {
   results: DetectedFood[];
   onAddRecord: () => void;
   onWeightChange: (foodId: string, nextWeight: number) => void;
+  submitting?: boolean;
+  disabled?: boolean;
 };
 
-export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightChange }: Props) {
+export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightChange, submitting = false, disabled = false }: Props) {
+  const controlsDisabled = submitting || disabled;
+
   if (results.length === 0) {
     return (
       <View style={styles.placeholderCard}>
@@ -52,9 +56,11 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
             <View style={styles.portionControls}>
               <Pressable
                 onPress={() => onWeightChange(food.id, food.estimatedWeight - 10)}
+                disabled={controlsDisabled}
                 accessibilityRole="button"
                 accessibilityLabel={`${food.foodName} 減少 10 克`}
-                style={styles.portionButton}
+                accessibilityState={{ disabled: controlsDisabled }}
+                style={[styles.portionButton, controlsDisabled && styles.controlDisabled]}
               >
                 <Text style={styles.portionButtonText}>-10g</Text>
               </Pressable>
@@ -66,23 +72,28 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
                 }}
                 keyboardType="numeric"
                 selectTextOnFocus
-                style={styles.portionInput}
+                editable={!controlsDisabled}
+                style={[styles.portionInput, controlsDisabled && styles.controlDisabled]}
               />
               <Text style={styles.portionUnit}>g</Text>
               <Pressable
                 onPress={() => onWeightChange(food.id, food.estimatedWeight + 10)}
+                disabled={controlsDisabled}
                 accessibilityRole="button"
                 accessibilityLabel={`${food.foodName} 增加 10 克`}
-                style={styles.portionButton}
+                accessibilityState={{ disabled: controlsDisabled }}
+                style={[styles.portionButton, controlsDisabled && styles.controlDisabled]}
               >
                 <Text style={styles.portionButtonText}>+10g</Text>
               </Pressable>
               {food.portionAdjusted ? (
                 <Pressable
                   onPress={() => onWeightChange(food.id, food.originalEstimatedWeight || food.estimatedWeight)}
+                  disabled={controlsDisabled}
                   accessibilityRole="button"
                   accessibilityLabel={`${food.foodName} 還原估算份量`}
-                  style={styles.resetButton}
+                  accessibilityState={{ disabled: controlsDisabled }}
+                  style={[styles.resetButton, controlsDisabled && styles.controlDisabled]}
                 >
                   <Text style={styles.resetButtonText}>還原</Text>
                 </Pressable>
@@ -146,7 +157,14 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
             <Text style={[styles.totalValue, { color: Palette.text.primary }]}>{results.length} 項</Text>
           </View>
         </View>
-        <PrimaryButton label="加入今日紀錄" onPress={onAddRecord} icon={<Ionicons name="add-circle-outline" size={18} color={Palette.text.inverse} />} />
+        <PrimaryButton
+          label={submitting ? '儲存中' : '加入今日紀錄'}
+          onPress={onAddRecord}
+          disabled={controlsDisabled}
+          icon={submitting
+            ? <ActivityIndicator size="small" color={Palette.text.inverse} />
+            : <Ionicons name="add-circle-outline" size={18} color={Palette.text.inverse} />}
+        />
       </View>
     </>
   );
@@ -219,6 +237,7 @@ const styles = StyleSheet.create({
   portionUnit: { ...Typography.caption, color: Palette.text.tertiary, marginLeft: -4 },
   resetButton: { minHeight: 44, paddingHorizontal: Spacing.sm, justifyContent: 'center' },
   resetButtonText: { ...Typography.caption, color: Palette.status.warning },
+  controlDisabled: { opacity: 0.48 },
   tagsRow: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' },
   warningBanner: {
     flexDirection: 'row',

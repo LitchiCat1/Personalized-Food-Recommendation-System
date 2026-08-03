@@ -38,6 +38,7 @@ export type FoodRecordItem = {
 
 export type DietaryRecord = {
   user_id: string;
+  client_record_id?: string;
   timestamp: string;
   meal_type?: string;
   foods?: FoodRecordItem[];
@@ -53,6 +54,11 @@ export type DietaryRecord = {
 export type RecordsResponse = {
   records: DietaryRecord[];
   count: number;
+};
+
+export type RecordMutationResponse = {
+  message: string;
+  record: DietaryRecord;
 };
 
 export type RecommendationItem = {
@@ -323,12 +329,71 @@ export async function fetchHistory(apiBaseUrl: string, userId: string, days = 7,
   return parseJson<HistoryResponse>(resp);
 }
 
-export async function fetchRecords(apiBaseUrl: string, userId: string, date?: string, auth?: ApiAuth): Promise<RecordsResponse> {
-  const query = date ? `?date=${encodeURIComponent(date)}` : '';
+export type RecordsQueryOptions = {
+  limit?: number;
+  offset?: number;
+};
+
+export async function fetchRecords(
+  apiBaseUrl: string,
+  userId: string,
+  date?: string,
+  auth?: ApiAuth,
+  options?: RecordsQueryOptions
+): Promise<RecordsResponse> {
+  const queryParams = new URLSearchParams();
+  if (date) queryParams.set('date', date);
+  if (options?.limit !== undefined) queryParams.set('limit', String(options.limit));
+  if (options?.offset !== undefined) queryParams.set('offset', String(options.offset));
+  const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
   const resp = await fetch(`${apiBaseUrl}/records/${encodeURIComponent(userId)}${query}`, {
     headers: buildHeaders(auth),
   });
   return parseJson<RecordsResponse>(resp);
+}
+
+/** Fetch every record page so trend aggregation never drops a busy user's meals. */
+export async function fetchAllRecords(apiBaseUrl: string, userId: string, auth?: ApiAuth): Promise<DietaryRecord[]> {
+  const pageSize = 250;
+  const records: DietaryRecord[] = [];
+  let offset = 0;
+
+  while (true) {
+    const page = await fetchRecords(apiBaseUrl, userId, undefined, auth, { limit: pageSize, offset });
+    records.push(...(page.records || []));
+    if ((page.records || []).length < pageSize) break;
+    offset += pageSize;
+  }
+
+  return records;
+}
+
+export async function updateDietaryRecord(
+  apiBaseUrl: string,
+  userId: string,
+  clientRecordId: string,
+  foods: FoodRecordItem[],
+  auth?: ApiAuth
+): Promise<RecordMutationResponse> {
+  const resp = await fetch(`${apiBaseUrl}/records/${encodeURIComponent(userId)}/${encodeURIComponent(clientRecordId)}`, {
+    method: 'PATCH',
+    headers: buildHeaders(auth, 'application/json'),
+    body: JSON.stringify({ foods }),
+  });
+  return parseJson<RecordMutationResponse>(resp);
+}
+
+export async function deleteDietaryRecord(
+  apiBaseUrl: string,
+  userId: string,
+  clientRecordId: string,
+  auth?: ApiAuth
+): Promise<RecordMutationResponse> {
+  const resp = await fetch(`${apiBaseUrl}/records/${encodeURIComponent(userId)}/${encodeURIComponent(clientRecordId)}`, {
+    method: 'DELETE',
+    headers: buildHeaders(auth),
+  });
+  return parseJson<RecordMutationResponse>(resp);
 }
 
 export async function fetchRecommendations(apiBaseUrl: string, userId: string, auth?: ApiAuth): Promise<RecommendationResponse> {

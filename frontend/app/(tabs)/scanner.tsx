@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert, ActivityIndicator, Keyboard, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,12 +16,15 @@ import DataPill from '@/components/ui/data-pill';
 import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
+import FeedbackBanner from '@/components/ui/feedback-banner';
 import ScannerCameraView from '@/components/scanner/ScannerCameraView';
 import ScannerManualTools from '@/components/scanner/ScannerManualTools';
 import ScannerResults from '@/components/scanner/ScannerResults';
 import {
   buildOCRDetectedFood,
+  FOOD_NAME_REQUIRED_MESSAGE,
   manualSearchFood,
+  normalizeFoodName,
   runNutritionLabelOCR,
   runPrediction,
   saveCustomFood,
@@ -36,11 +39,23 @@ import {
   markPendingRecordSyncFailed,
   MAX_RECORD_SYNC_ATTEMPTS,
   removePendingRecordSync,
+  removePendingRecordSyncByClientRecordId,
   type PendingRecordSync,
   type RecordSource,
 } from '@/lib/recordSyncQueue';
 
 type ScanMode = 'camera' | 'gallery' | 'label' | 'manual';
+
+type RecordFeedback = {
+  tone: 'success' | 'error';
+  title: string;
+  message: string;
+};
+
+type ActiveRecordSubmission = {
+  key: string;
+  source: RecordSource;
+};
 
 const SCAN_MODE_OPTIONS = [
   { value: 'camera', label: '拍照' },
@@ -51,18 +66,60 @@ const SCAN_MODE_OPTIONS = [
 
 function OCRDraftCard({
   draft,
+  foodNameError,
+  onFoodNameChange,
+  onFoodNameBlur,
   onSaveCustomFood,
   onQuickAdd,
+  submitting,
+  actionsDisabled,
 }: {
   draft: OCRDraft;
+  foodNameError: string | null;
+  onFoodNameChange: (value: string) => void;
+  onFoodNameBlur: () => void;
   onSaveCustomFood: () => void;
   onQuickAdd: () => void;
+  submitting: boolean;
+  actionsDisabled: boolean;
 }) {
   return (
     <SectionBlock title="營養標示辨識結果" subtitle="可直接加入今日紀錄，或儲存成自訂食品供下次搜尋。">
-      <View style={styles.ocrHeader}>
-        <Text style={styles.ocrProductName}>{draft.product_name || '未命名食品'}</Text>
-        {draft.brand ? <DataPill tone="info">{draft.brand}</DataPill> : null}
+      {draft.brand ? (
+        <View style={styles.ocrBrandRow}>
+          <DataPill tone="info">{draft.brand}</DataPill>
+        </View>
+      ) : null}
+      <View style={styles.ocrNameField}>
+        <Text style={styles.ocrNameLabel}>食物名稱</Text>
+        <TextInput
+          value={draft.product_name || ''}
+          onChangeText={onFoodNameChange}
+          onBlur={onFoodNameBlur}
+          onSubmitEditing={Keyboard.dismiss}
+          placeholder="輸入食物名稱"
+          placeholderTextColor={Palette.text.muted}
+          selectionColor={Palette.accent.green}
+          autoCorrect={false}
+          autoCapitalize="none"
+          autoComplete="off"
+          returnKeyType="done"
+          maxLength={80}
+          editable={!actionsDisabled}
+          accessibilityLabel="食物名稱"
+          accessibilityHint={foodNameError || undefined}
+          style={[
+            styles.ocrNameInput,
+            foodNameError && styles.ocrNameInputError,
+            actionsDisabled && styles.controlDisabled,
+          ]}
+        />
+        {foodNameError ? (
+          <View style={styles.ocrNameErrorRow}>
+            <Ionicons name="alert-circle-outline" size={15} color={Palette.status.error} />
+            <Text style={styles.ocrNameErrorText} selectable>{foodNameError}</Text>
+          </View>
+        ) : null}
       </View>
       {draft.serving_size_g ? <Text style={styles.ocrMetaText}>每份 {draft.serving_size_g} g</Text> : null}
       <View style={styles.nutritionGrid}>
@@ -84,8 +141,15 @@ function OCRDraftCard({
         ))}
       </View>
       <View style={styles.ocrActions}>
-        <SecondaryButton label="儲存成自訂食品" onPress={onSaveCustomFood} icon={<Ionicons name="bookmark-outline" size={15} color={Palette.accent.green} />} />
-        <PrimaryButton label="直接加入今日紀錄" onPress={onQuickAdd} icon={<Ionicons name="add-circle-outline" size={18} color={Palette.text.inverse} />} />
+        <SecondaryButton label="儲存成自訂食品" onPress={onSaveCustomFood} disabled={actionsDisabled} icon={<Ionicons name="bookmark-outline" size={15} color={Palette.accent.green} />} />
+        <PrimaryButton
+          label={submitting ? '儲存中' : '直接加入今日紀錄'}
+          onPress={onQuickAdd}
+          disabled={actionsDisabled}
+          icon={submitting
+            ? <ActivityIndicator size="small" color={Palette.text.inverse} />
+            : <Ionicons name="add-circle-outline" size={18} color={Palette.text.inverse} />}
+        />
       </View>
     </SectionBlock>
   );
@@ -94,9 +158,13 @@ function OCRDraftCard({
 function ManualResultsList({
   foods,
   onAddFood,
+  submittingFoodId,
+  actionsDisabled,
 }: {
   foods: DetectedFood[];
   onAddFood: (food: DetectedFood) => void;
+  submittingFoodId: string | null;
+  actionsDisabled: boolean;
 }) {
   if (foods.length === 0) return null;
 
@@ -110,7 +178,14 @@ function ManualResultsList({
                 <Text style={styles.manualFoodName}>{food.foodName}</Text>
                 <Text style={styles.manualFoodHint}>每 100g · TFDA/自訂食品資料</Text>
               </View>
-              <SecondaryButton label="加入" onPress={() => onAddFood(food)} />
+              <SecondaryButton
+                label={submittingFoodId === food.id ? '儲存中' : '加入'}
+                onPress={() => onAddFood(food)}
+                disabled={actionsDisabled}
+                icon={submittingFoodId === food.id
+                  ? <ActivityIndicator size="small" color={Palette.accent.green} />
+                  : undefined}
+              />
             </View>
             <View style={styles.macroRow}>
               <Text style={styles.macro}>熱量 {food.nutrition.calories} kcal</Text>
@@ -139,6 +214,7 @@ export default function ScannerScreen() {
     isCameraActive,
     setCameraActive,
     user,
+    invalidateDietaryRecords,
   } = useStore();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
@@ -148,18 +224,31 @@ export default function ScannerScreen() {
   const [rejectedDetections, setRejectedDetections] = useState<RejectedDetection[]>([]);
   const [ocrQuerying, setOcrQuerying] = useState(false);
   const [ocrDraft, setOcrDraft] = useState<OCRDraft | null>(null);
+  const [ocrNameError, setOcrNameError] = useState<string | null>(null);
   const [scanMode, setScanMode] = useState<ScanMode>('camera');
   const [syncingRecord, setSyncingRecord] = useState(false);
+  const [activeRecordSubmission, setActiveRecordSubmission] = useState<ActiveRecordSubmission | null>(null);
+  const [recordFeedback, setRecordFeedback] = useState<RecordFeedback | null>(null);
   const [pendingRecordQueue, setPendingRecordQueue] = useState<PendingRecordSync[]>([]);
   const [isCameraReady, setCameraReady] = useState(false);
   const [isCapturing, setCapturing] = useState(false);
   const captureInFlightRef = useRef(false);
+  const recordSubmitInFlightRef = useRef(false);
+  const recordSyncInFlightRef = useRef(false);
+  const recordClientIdsRef = useRef(new Map<string, string>());
+  const ocrSubmissionKeyRef = useRef(buildSubmissionKey('nutrition-label'));
 
   const results = scanResult.detections;
   const totalCal = results.reduce((sum, f) => sum + f.nutrition.calories, 0);
   const totalSodium = results.reduce((sum, f) => sum + f.nutrition.sodium, 0);
   const userPendingRecords = pendingRecordQueue.filter((item) => item.userId === user.userId);
   const firstPendingRecord = userPendingRecords[0];
+  const recordActionsDisabled = Boolean(activeRecordSubmission) || syncingRecord;
+  const cameraRecordSubmitting = activeRecordSubmission?.source === 'camera';
+  const ocrRecordSubmitting = activeRecordSubmission?.source === 'nutrition-label';
+  const submittingManualFoodId = activeRecordSubmission?.source === 'manual'
+    ? activeRecordSubmission.key.slice('manual:'.length)
+    : null;
 
   const handleCamera = async () => {
     try {
@@ -289,7 +378,9 @@ export default function ScannerScreen() {
     setOcrQuerying(true);
     try {
       const draft = await runNutritionLabelOCR({ apiBaseUrl, imageBase64: asset.base64 });
+      ocrSubmissionKeyRef.current = buildSubmissionKey('nutrition-label');
       setOcrDraft(draft);
+      setOcrNameError(null);
       Alert.alert('營養標示已辨識', '你可以直接儲存成自訂食品，之後就不必重複輸入。');
     } catch (error: any) {
       Alert.alert('營養標示辨識失敗', error?.message || '請確認後端已設定 Gemini API key');
@@ -319,37 +410,106 @@ export default function ScannerScreen() {
     }
   };
 
-  const persistRecord = async (foods: DetectedFood[], source: RecordSource, clientRecordId = buildClientRecordId()) => {
-    setSyncingRecord(true);
+  const submitRecord = async ({
+    foods,
+    source,
+    submissionKey,
+    successTitle,
+    successMessage,
+    onSuccess,
+  }: {
+    foods: DetectedFood[];
+    source: RecordSource;
+    submissionKey: string;
+    successTitle: string;
+    successMessage: string;
+    onSuccess: () => void;
+  }) => {
+    if (
+      foods.length === 0
+      || recordSubmitInFlightRef.current
+      || recordSyncInFlightRef.current
+    ) {
+      return false;
+    }
+
+    recordSubmitInFlightRef.current = true;
+    setActiveRecordSubmission({ key: submissionKey, source });
+    setRecordFeedback(null);
+    Keyboard.dismiss();
+
+    const clientRecordId = getOrCreateClientRecordId(recordClientIdsRef.current, submissionKey);
+    let recordSaved = false;
+
     try {
       await saveRecord({ apiBaseUrl, userId: user.userId, clientRecordId, foods, source, auth: { accessToken } });
+      recordSaved = true;
+      invalidateDietaryRecords();
+
+      try {
+        const nextQueue = await removePendingRecordSyncByClientRecordId(user.userId, clientRecordId);
+        setPendingRecordQueue(nextQueue);
+      } catch {
+        // The backend write already succeeded. A stale local queue item is harmless
+        // because client_record_id keeps later synchronization idempotent.
+      }
+
+      addMealFromScan(foods);
+      onSuccess();
+      recordClientIdsRef.current.delete(submissionKey);
+      setRecordFeedback({ tone: 'success', title: successTitle, message: successMessage });
       return true;
     } catch (error: any) {
-      const nextQueue = await enqueuePendingRecordSync({
-        userId: user.userId,
-        clientRecordId,
-        foods,
-        source,
-        error: error?.message || '後端暫時無法儲存這筆紀錄',
+      if (recordSaved) {
+        setRecordFeedback({
+          tone: 'error',
+          title: '紀錄已儲存，畫面更新失敗',
+          message: '請重新整理畫面確認最新紀錄，請勿再次送出。',
+        });
+        return false;
+      }
+
+      const errorMessage = getRecordSubmitErrorMessage(error);
+      try {
+        const nextQueue = await enqueuePendingRecordSync({
+          userId: user.userId,
+          clientRecordId,
+          foods,
+          source,
+          error: errorMessage,
+        });
+        setPendingRecordQueue(nextQueue);
+      } catch {
+        // The visible result remains available for an explicit retry even if
+        // local persistence is unavailable.
+      }
+
+      setRecordFeedback({
+        tone: 'error',
+        title: '飲食紀錄新增失敗',
+        message: `${errorMessage}。內容已保留，請再按一次加入重試。`,
       });
-      setPendingRecordQueue(nextQueue);
       return false;
     } finally {
-      setSyncingRecord(false);
+      recordSubmitInFlightRef.current = false;
+      setActiveRecordSubmission(null);
     }
   };
 
   const syncPendingRecords = useCallback(async (queue: PendingRecordSync[], options?: { manual?: boolean }) => {
+    if (recordSubmitInFlightRef.current || recordSyncInFlightRef.current) return 0;
     const userQueue = queue.filter((item) => item.userId === user.userId);
     const retryableQueue = options?.manual ? userQueue : userQueue.filter(canRetryPendingRecordSync);
     if (retryableQueue.length === 0) return 0;
 
+    recordSyncInFlightRef.current = true;
     setSyncingRecord(true);
     let syncedCount = 0;
     try {
       for (const item of retryableQueue) {
         try {
           await saveRecord({ apiBaseUrl, userId: item.userId, clientRecordId: item.clientRecordId, foods: item.foods, source: item.source, auth: { accessToken } });
+          invalidateDietaryRecords();
           const nextQueue = await removePendingRecordSync(item.id);
           setPendingRecordQueue(nextQueue);
           syncedCount += 1;
@@ -360,17 +520,43 @@ export default function ScannerScreen() {
         }
       }
     } finally {
+      recordSyncInFlightRef.current = false;
       setSyncingRecord(false);
     }
 
     return syncedCount;
-  }, [accessToken, apiBaseUrl, user.userId]);
+  }, [accessToken, apiBaseUrl, invalidateDietaryRecords, user.userId]);
 
   const retryPendingRecordSync = async () => {
-    const syncedCount = await syncPendingRecords(pendingRecordQueue, { manual: true });
+    if (recordSubmitInFlightRef.current || recordSyncInFlightRef.current) return;
+    setRecordFeedback(null);
+    try {
+      const syncedCount = await syncPendingRecords(pendingRecordQueue, { manual: true });
 
-    if (syncedCount > 0) {
-      Alert.alert('同步完成', `${syncedCount} 筆待同步餐點已寫入後端紀錄。`);
+      if (syncedCount > 0) {
+        setRecordFeedback({
+          tone: 'success',
+          title: '待同步紀錄已儲存',
+          message: `${syncedCount} 筆餐點已寫入後端紀錄。`,
+        });
+        return;
+      }
+
+      const latestQueue = await loadPendingRecordSyncQueue();
+      const latestPendingRecord = latestQueue.find((item) => item.userId === user.userId);
+      if (latestPendingRecord) {
+        setRecordFeedback({
+          tone: 'error',
+          title: '同步仍未完成',
+          message: `${latestPendingRecord.error} 請稍後再試。`,
+        });
+      }
+    } catch (error) {
+      setRecordFeedback({
+        tone: 'error',
+        title: '同步仍未完成',
+        message: `${getRecordSubmitErrorMessage(error)} 請稍後再試。`,
+      });
     }
   };
 
@@ -380,7 +566,7 @@ export default function ScannerScreen() {
       loadPendingRecordSyncQueue().then((queue) => {
         if (!active) return;
         setPendingRecordQueue(queue);
-        void syncPendingRecords(queue);
+        void syncPendingRecords(queue).catch(() => undefined);
       });
       return () => {
         active = false;
@@ -389,42 +575,87 @@ export default function ScannerScreen() {
     }, [setCameraActive, syncPendingRecords])
   );
 
-  const handleAddRecord = () => {
+  const handleAddRecord = async () => {
     if (results.length === 0) return;
-    addMealFromScan(results);
-    persistRecord(results, 'camera').then((ok) => {
-      if (!ok) Alert.alert('已加入本機畫面', '後端同步失敗，請稍後在辨識頁重試。');
+    const submissionKey = `camera:${scanResult.timestamp || results.map((food) => food.id).join(',')}`;
+    await submitRecord({
+      foods: results,
+      source: 'camera',
+      submissionKey,
+      successTitle: '飲食紀錄已新增',
+      successMessage: `${results.length} 項食物已加入今日紀錄。`,
+      onSuccess: clearScan,
     });
-    clearScan();
-    Alert.alert('已加入', `${results.length} 項食物已加入今日紀錄`);
   };
 
-  const handleAddManualFood = (food: DetectedFood) => {
-    addMealFromScan([food]);
-    persistRecord([food], 'manual').then((ok) => {
-      if (!ok) Alert.alert('已加入本機畫面', '後端同步失敗，請稍後在辨識頁重試。');
+  const handleAddManualFood = async (food: DetectedFood) => {
+    await submitRecord({
+      foods: [food],
+      source: 'manual',
+      submissionKey: `manual:${food.id}`,
+      successTitle: '飲食紀錄已新增',
+      successMessage: `${food.foodName} 已以每 100g 份量加入今日紀錄。`,
+      onSuccess: () => setManualResults((current) => current.filter((item) => item.id !== food.id)),
     });
-    Alert.alert('已加入今日紀錄', `${food.foodName} 已以每 100g 份量加入今日紀錄`);
   };
 
   const handleSaveCustomFood = async () => {
-    if (!ocrDraft) return;
+    const draft = getValidatedOCRDraft();
+    if (!draft) return;
     try {
-      const data = await saveCustomFood({ apiBaseUrl, userId: user.userId, draft: ocrDraft, auth: { accessToken } });
-      Alert.alert('自訂食品已儲存', `${data.food?.name_zh || ocrDraft.product_name} 之後可直接搜尋使用`);
-    } catch {
-      Alert.alert('儲存失敗', '請稍後再試');
+      const data = await saveCustomFood({ apiBaseUrl, userId: user.userId, draft, auth: { accessToken } });
+      Alert.alert('自訂食品已儲存', `${data.food?.name_zh || draft.product_name} 之後可直接搜尋使用`);
+    } catch (error: any) {
+      Alert.alert('儲存失敗', error?.message || '請稍後再試');
     }
   };
 
-  const handleQuickAddOCRFood = () => {
-    if (!ocrDraft) return;
-    const food = buildOCRDetectedFood(ocrDraft);
-    addMealFromScan([food]);
-    persistRecord([food], 'nutrition-label').then((ok) => {
-      if (!ok) Alert.alert('已加入本機畫面', '後端同步失敗，請稍後在辨識頁重試。');
+  const handleQuickAddOCRFood = async () => {
+    const draft = getValidatedOCRDraft();
+    if (!draft) return;
+    const food = buildOCRDetectedFood(draft);
+    await submitRecord({
+      foods: [food],
+      source: 'nutrition-label',
+      submissionKey: ocrSubmissionKeyRef.current,
+      successTitle: '飲食紀錄已新增',
+      successMessage: `${food.foodName} 已依包裝營養標示加入紀錄。`,
+      onSuccess: () => {
+        setOcrDraft(null);
+        setOcrNameError(null);
+      },
     });
-    Alert.alert('已加入今日紀錄', `${food.foodName} 已依包裝營養標示加入紀錄`);
+  };
+
+  const handleOCRFoodNameChange = (value: string) => {
+    setOcrDraft((current) => current ? { ...current, product_name: value } : current);
+    if (ocrNameError && normalizeFoodName(value)) {
+      setOcrNameError(null);
+    }
+  };
+
+  const handleOCRFoodNameBlur = () => {
+    if (!ocrDraft) return;
+    const foodName = normalizeFoodName(ocrDraft.product_name);
+    if (!foodName) {
+      setOcrNameError(FOOD_NAME_REQUIRED_MESSAGE);
+      return;
+    }
+    setOcrDraft({ ...ocrDraft, product_name: foodName });
+    setOcrNameError(null);
+  };
+
+  const getValidatedOCRDraft = (): OCRDraft | null => {
+    if (!ocrDraft) return null;
+    const foodName = normalizeFoodName(ocrDraft.product_name);
+    if (!foodName) {
+      setOcrNameError(FOOD_NAME_REQUIRED_MESSAGE);
+      return null;
+    }
+    const normalizedDraft = { ...ocrDraft, product_name: foodName };
+    setOcrDraft(normalizedDraft);
+    setOcrNameError(null);
+    return normalizedDraft;
   };
 
   if (isCameraActive) {
@@ -488,9 +719,33 @@ export default function ScannerScreen() {
         <Text style={styles.sectionTitle}>辨識結果</Text>
         {results.length > 0 ? <DataPill tone="success">{results.length} 項</DataPill> : null}
       </View>
-      <ScannerResults rs={rs} wp={wp} results={results} onAddRecord={handleAddRecord} onWeightChange={updateScanFoodWeight} />
-      {ocrDraft ? <OCRDraftCard draft={ocrDraft} onSaveCustomFood={handleSaveCustomFood} onQuickAdd={handleQuickAddOCRFood} /> : null}
-      <ManualResultsList foods={manualResults} onAddFood={handleAddManualFood} />
+      <ScannerResults
+        rs={rs}
+        wp={wp}
+        results={results}
+        onAddRecord={handleAddRecord}
+        onWeightChange={updateScanFoodWeight}
+        submitting={cameraRecordSubmitting}
+        disabled={recordActionsDisabled}
+      />
+      {ocrDraft ? (
+        <OCRDraftCard
+          draft={ocrDraft}
+          foodNameError={ocrNameError}
+          onFoodNameChange={handleOCRFoodNameChange}
+          onFoodNameBlur={handleOCRFoodNameBlur}
+          onSaveCustomFood={handleSaveCustomFood}
+          onQuickAdd={handleQuickAddOCRFood}
+          submitting={ocrRecordSubmitting}
+          actionsDisabled={recordActionsDisabled}
+        />
+      ) : null}
+      <ManualResultsList
+        foods={manualResults}
+        onAddFood={handleAddManualFood}
+        submittingFoodId={submittingManualFoodId}
+        actionsDisabled={recordActionsDisabled}
+      />
     </View>
   );
 
@@ -510,13 +765,22 @@ export default function ScannerScreen() {
   );
 
   return (
-    <AppContainer>
+    <AppContainer keyboardShouldPersistTaps="handled">
       <ScreenHeader
         title="AI 食物辨識"
         subtitle="拍照、上傳相簿或掃描營養標示，系統會套用健康條件和過敏原做安全檢查。"
         badge="Gemini + TFDA"
         badgeTone="info"
       />
+
+      {recordFeedback ? (
+        <FeedbackBanner
+          tone={recordFeedback.tone}
+          title={recordFeedback.title}
+          message={recordFeedback.message}
+          onDismiss={() => setRecordFeedback(null)}
+        />
+      ) : null}
 
       {(syncingRecord || firstPendingRecord) ? (
         <View style={[styles.syncStatusCard, firstPendingRecord && styles.syncStatusWarning]}>
@@ -536,7 +800,12 @@ export default function ScannerScreen() {
             ) : null}
           </View>
           {firstPendingRecord && !syncingRecord ? (
-            <Pressable onPress={retryPendingRecordSync} style={styles.retryButton}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="重試同步飲食紀錄"
+              onPress={retryPendingRecordSync}
+              style={styles.retryButton}
+            >
               <Text style={styles.retryButtonText}>重試</Text>
             </Pressable>
           ) : null}
@@ -559,6 +828,27 @@ function buildClientRecordId(): string {
   return `record_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function buildSubmissionKey(source: RecordSource): string {
+  return `${source}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getOrCreateClientRecordId(recordIds: Map<string, string>, submissionKey: string): string {
+  const existingId = recordIds.get(submissionKey);
+  if (existingId) return existingId;
+
+  const clientRecordId = buildClientRecordId();
+  recordIds.set(submissionKey, clientRecordId);
+  return clientRecordId;
+}
+
+function getRecordSubmitErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message.trim() : '';
+  if (/failed to fetch|network request failed|fetch failed|networkerror/i.test(message)) {
+    return '目前無法連線到伺服器';
+  }
+  return (message || '目前無法儲存這筆飲食紀錄').replace(/[。.!?]+$/u, '');
+}
+
 const styles = StyleSheet.create({
   syncStatusCard: {
     flexDirection: 'row',
@@ -577,12 +867,13 @@ const styles = StyleSheet.create({
   syncStatusTitle: { ...Typography.caption, color: Palette.text.primary },
   syncStatusMessage: { ...Typography.small, color: Palette.text.tertiary },
   retryButton: {
+    minHeight: 44,
     backgroundColor: Palette.bg.card,
     borderRadius: Radius.full,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
+    justifyContent: 'center',
   },
   retryButtonText: { ...Typography.caption, color: Palette.status.warning },
   scanHero: {
@@ -617,8 +908,26 @@ const styles = StyleSheet.create({
   conditionText: { ...Typography.small, color: Palette.text.tertiary },
   resultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.lg },
   sectionTitle: { ...Typography.h3, color: Palette.text.primary },
-  ocrHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, marginBottom: Spacing.xs },
-  ocrProductName: { ...Typography.bodyBold, color: Palette.text.primary, flex: 1 },
+  ocrBrandRow: { flexDirection: 'row', marginBottom: Spacing.md },
+  ocrNameField: { minWidth: 0, gap: Spacing.xs, marginBottom: Spacing.md },
+  ocrNameLabel: { ...Typography.caption, color: Palette.text.secondary },
+  ocrNameInput: {
+    width: '100%',
+    minWidth: 0,
+    minHeight: 48,
+    backgroundColor: Palette.bg.elevated,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Palette.border.medium,
+    color: Palette.text.primary,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    ...Typography.body,
+  },
+  ocrNameInputError: { borderColor: Palette.status.error, backgroundColor: Palette.accent.pinkDim },
+  ocrNameErrorRow: { minHeight: 20, flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  ocrNameErrorText: { ...Typography.small, color: Palette.status.error, flex: 1 },
+  controlDisabled: { opacity: 0.56 },
   ocrMetaText: { ...Typography.caption, color: Palette.text.tertiary, marginBottom: Spacing.md },
   nutritionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   nutritionItem: { flex: 1, minWidth: '30%', backgroundColor: Palette.bg.elevated, borderRadius: Radius.md, padding: Spacing.sm },

@@ -60,18 +60,33 @@ export async function enqueuePendingRecordSync(params: {
 }): Promise<PendingRecordSync[]> {
   const queue = await loadPendingRecordSyncQueue();
   const now = new Date().toISOString();
-  const item: PendingRecordSync = {
-    id: `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    userId: params.userId,
-    clientRecordId: params.clientRecordId,
-    foods: params.foods,
-    source: params.source,
-    error: params.error,
-    attempts: 0,
-    createdAt: now,
-    updatedAt: now,
-  };
-  const nextQueue = [...queue, item];
+  const existingIndex = queue.findIndex((item) => (
+    item.userId === params.userId && item.clientRecordId === params.clientRecordId
+  ));
+  const nextQueue = [...queue];
+
+  if (existingIndex >= 0) {
+    nextQueue[existingIndex] = {
+      ...nextQueue[existingIndex],
+      foods: params.foods,
+      source: params.source,
+      error: params.error,
+      updatedAt: now,
+    };
+  } else {
+    nextQueue.push({
+      id: `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      userId: params.userId,
+      clientRecordId: params.clientRecordId,
+      foods: params.foods,
+      source: params.source,
+      error: params.error,
+      attempts: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
   await savePendingRecordSyncQueue(nextQueue);
   return nextQueue;
 }
@@ -79,6 +94,18 @@ export async function enqueuePendingRecordSync(params: {
 export async function removePendingRecordSync(id: string): Promise<PendingRecordSync[]> {
   const queue = await loadPendingRecordSyncQueue();
   const nextQueue = queue.filter((item) => item.id !== id);
+  await savePendingRecordSyncQueue(nextQueue);
+  return nextQueue;
+}
+
+export async function removePendingRecordSyncByClientRecordId(
+  userId: string,
+  clientRecordId: string
+): Promise<PendingRecordSync[]> {
+  const queue = await loadPendingRecordSyncQueue();
+  const nextQueue = queue.filter((item) => (
+    item.userId !== userId || item.clientRecordId !== clientRecordId
+  ));
   await savePendingRecordSyncQueue(nextQueue);
   return nextQueue;
 }

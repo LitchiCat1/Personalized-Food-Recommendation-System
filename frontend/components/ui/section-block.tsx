@@ -5,16 +5,17 @@ import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme
 type Props = {
   title?: string;
   subtitle?: string;
+  numericSubtitle?: boolean;
   children: React.ReactNode;
 };
 
-export default function SectionBlock({ title, subtitle, children }: Props) {
+export default function SectionBlock({ title, subtitle, numericSubtitle, children }: Props) {
   return (
     <View style={styles.card}>
       {title || subtitle ? (
         <View style={styles.header}>
           {title ? <Text style={styles.title}>{title}</Text> : null}
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+          {subtitle ? <Text style={[styles.subtitle, numericSubtitle && styles.numericSubtitle]}>{subtitle}</Text> : null}
         </View>
       ) : null}
       {children}
@@ -35,4 +36,5 @@ const styles = StyleSheet.create({
   header: { gap: Spacing.xs, marginBottom: Spacing.lg },
   title: { ...Typography.h3, color: Palette.text.primary },
   subtitle: { ...Typography.caption, color: Palette.text.secondary },
+  numericSubtitle: { fontVariant: Typography.number.fontVariant },
 });

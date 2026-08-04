@@ -362,53 +362,6 @@ def create_or_update_user():
 
 
 # ─── 3. Dietary Records (PRD: 飲食紀錄) ──────────────────────
-@app.route("/record", methods=["POST"])
-def add_record():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "缺少資料"}), 400
-    if is_auth_required():
-        data["user_id"] = require_user_access(data.get("user_id"))
-    if not data.get("client_record_id"):
-        data["client_record_id"] = f"server_record_{uuid.uuid4().hex}"
-
-    record = {
-        "user_id": data.get("user_id"),
-        "client_record_id": data.get("client_record_id"),
-        "timestamp": data.get("timestamp", datetime.now(timezone.utc).replace(tzinfo=None).isoformat()),
-        "meal_type": data.get("meal_type", "午餐"),
-        "foods": data.get("foods", []),
-        "total_calories": data.get("total_calories", 0),
-        "total_protein": data.get("total_protein", 0),
-        "total_carbs": data.get("total_carbs", 0),
-        "total_fat": data.get("total_fat", 0),
-        "total_sodium": data.get("total_sodium", 0),
-        "total_fiber": data.get("total_fiber", 0),
-        "source": data.get("source", "camera"),  # camera | manual
-    }
-
-    saved_record = storage.insert_record(record)
-
-    if saved_record.get("_deduplicated"):
-        saved_record = {key: value for key, value in saved_record.items() if key != "_deduplicated"}
-        return jsonify({"message": "飲食紀錄已存在", "record": saved_record, "deduplicated": True}), 200
-
-    return jsonify({"message": "飲食紀錄已儲存", "record": saved_record, "deduplicated": False}), 201
-
-
-@app.route("/records/<user_id>", methods=["GET"])
-def get_records(user_id):
-    require_user_access(user_id)
-    date_str = request.args.get("date")  # YYYY-MM-DD
-    try:
-        limit = min(max(int(request.args.get("limit", 50)), 1), 500)
-        offset = max(int(request.args.get("offset", 0)), 0)
-    except (TypeError, ValueError):
-        return jsonify({"error": "limit 與 offset 必須是有效數字"}), 400
-    records = storage.get_records(user_id, date_str, limit=limit, offset=offset)
-    return jsonify({"records": records, "count": len(records)})
-
-
 EDITABLE_RECORD_NUTRIENTS = ("calories", "protein", "carbs", "fat", "sodium", "fiber")
 
 
@@ -441,6 +394,78 @@ def normalize_record_foods(foods):
         normalized_foods.append(normalized_food)
 
     return normalized_foods
+
+
+def normalize_record_timestamp(value):
+    if value is None:
+        return datetime.now(timezone.utc).isoformat()
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("timestamp 必須是有效的 ISO 日期時間")
+
+    timestamp = value.strip()
+    try:
+        parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+    except ValueError:
+        raise ValueError("timestamp 必須是有效的 ISO 日期時間") from None
+
+    comparison_timezone = parsed.tzinfo or timezone.utc
+    if parsed.date() > datetime.now(timezone.utc).astimezone(comparison_timezone).date():
+        raise ValueError("紀錄日期不得晚於今天")
+    return timestamp
+
+
+@app.route("/record", methods=["POST"])
+def add_record():
+    data = request.get_json()
+    if not isinstance(data, dict):
+        return jsonify({"error": "缺少資料"}), 400
+    if not data.get("user_id"):
+        return jsonify({"error": "缺少 user_id"}), 400
+    if is_auth_required():
+        data["user_id"] = require_user_access(data.get("user_id"))
+    if not data.get("client_record_id"):
+        data["client_record_id"] = f"server_record_{uuid.uuid4().hex}"
+
+    try:
+        foods = normalize_record_foods(data.get("foods"))
+        timestamp = normalize_record_timestamp(data.get("timestamp"))
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    totals = {
+        nutrient: round(sum(food[nutrient] for food in foods), 2)
+        for nutrient in EDITABLE_RECORD_NUTRIENTS
+    }
+    record = {
+        "user_id": data["user_id"],
+        "client_record_id": data["client_record_id"],
+        "timestamp": timestamp,
+        "meal_type": data.get("meal_type", "午餐"),
+        "foods": foods,
+        **{f"total_{nutrient}": total for nutrient, total in totals.items()},
+        "source": data.get("source", "camera"),  # camera | manual | nutrition-label
+    }
+
+    saved_record = storage.insert_record(record)
+
+    if saved_record.get("_deduplicated"):
+        saved_record = {key: value for key, value in saved_record.items() if key != "_deduplicated"}
+        return jsonify({"message": "飲食紀錄已存在", "record": saved_record, "deduplicated": True}), 200
+
+    return jsonify({"message": "飲食紀錄已儲存", "record": saved_record, "deduplicated": False}), 201
+
+
+@app.route("/records/<user_id>", methods=["GET"])
+def get_records(user_id):
+    require_user_access(user_id)
+    date_str = request.args.get("date")  # YYYY-MM-DD
+    try:
+        limit = min(max(int(request.args.get("limit", 50)), 1), 500)
+        offset = max(int(request.args.get("offset", 0)), 0)
+    except (TypeError, ValueError):
+        return jsonify({"error": "limit 與 offset 必須是有效數字"}), 400
+    records = storage.get_records(user_id, date_str, limit=limit, offset=offset)
+    return jsonify({"records": records, "count": len(records)})
 
 
 @app.route("/records/<user_id>/<client_record_id>", methods=["PATCH"])

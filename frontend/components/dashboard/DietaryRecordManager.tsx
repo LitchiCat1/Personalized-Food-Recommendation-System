@@ -15,20 +15,26 @@ import { Palette, Radius, Shadows, Spacing, Typography } from '@/constants/theme
 import { useResponsive } from '@/hooks/useResponsive';
 import { useStore } from '@/store/useStore';
 import {
+  createDietaryRecord,
   deleteDietaryRecord,
   fetchAllRecords,
   updateDietaryRecord,
   type DietaryRecord,
 } from '@/lib/api';
 import {
+  buildLocalTimestampForDate,
+  calculateRecordFoodTotals,
+  createManualRecordFoodDraft,
   createRecordFoodDrafts,
   filterAndSortRecords,
   formatDateInput,
   formatRecordDateTime,
   getDefaultRecordDateRange,
   getEditableRecordFoods,
+  getLocalTodayDateKey,
   getRecordFoodNames,
   RECORD_NUTRIENT_FIELDS,
+  validateRecordDate,
   validateRecordDateRange,
   validateRecordFoodDrafts,
   type RecordDateRange,
@@ -39,6 +45,7 @@ import {
 } from '@/lib/dietary-records';
 import DataPill from '@/components/ui/data-pill';
 import FeedbackBanner from '@/components/ui/feedback-banner';
+import DatePicker from '@/components/ui/date-picker';
 import FormInput from '@/components/ui/form-input';
 import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
@@ -49,10 +56,12 @@ type Props = {
 };
 
 type ManagerFeedback = { tone: 'success' | 'error'; title: string; message?: string };
+type ManagerView = 'list' | 'create' | 'edit';
 
 export default function DietaryRecordManager({ visible, onClose }: Props) {
   const { width } = useResponsive();
   const isNarrow = width < 600;
+  const isDateRangeStacked = width < 840;
   const { user, apiBaseUrl, accessToken, invalidateDietaryRecords } = useStore();
   const defaultRange = useMemo(() => getDefaultRecordDateRange(), []);
   const [range, setRange] = useState<RecordDateRange>(defaultRange);
@@ -62,17 +71,33 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<ManagerFeedback | null>(null);
+  const [viewMode, setViewMode] = useState<ManagerView>('list');
   const [editingRecord, setEditingRecord] = useState<DietaryRecord | null>(null);
   const [drafts, setDrafts] = useState<RecordFoodDraft[]>([]);
   const [draftErrors, setDraftErrors] = useState<RecordDraftErrors>({});
   const [saving, setSaving] = useState(false);
+  const [createDate, setCreateDate] = useState(() => formatDateInput(getLocalTodayDateKey()));
+  const [createDateError, setCreateDateError] = useState<string | undefined>();
+  const [createDraft, setCreateDraft] = useState<RecordFoodDraft>(() => createManualRecordFoodDraft());
+  const [createErrors, setCreateErrors] = useState<RecordDraftErrors>({});
+  const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DietaryRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
   const wasVisibleRef = useRef(false);
   const savingRef = useRef(false);
+  const creatingRef = useRef(false);
+  const createClientRecordIdRef = useRef<string | null>(null);
   const deletingRef = useRef(false);
+
+  const resetCreateForm = useCallback(() => {
+    setCreateDate(formatDateInput(getLocalTodayDateKey()));
+    setCreateDateError(undefined);
+    setCreateDraft(createManualRecordFoodDraft());
+    setCreateErrors({});
+    createClientRecordIdRef.current = null;
+  }, []);
 
   const runQuery = useCallback(async (queryRange: RecordDateRange) => {
     const validation = validateRecordDateRange(queryRange);
@@ -113,12 +138,16 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
     }
     if (!visible) {
       requestIdRef.current += 1;
+      setViewMode('list');
       setEditingRecord(null);
+      setDrafts([]);
+      setDraftErrors({});
       setDeleteTarget(null);
       setFeedback(null);
+      resetCreateForm();
     }
     wasVisibleRef.current = visible;
-  }, [range, runQuery, visible]);
+  }, [range, resetCreateForm, runQuery, visible]);
 
   const updateRange = (key: keyof RecordDateRange, value: string) => {
     setRange((current) => ({ ...current, [key]: value }));
@@ -134,6 +163,25 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
     setDrafts(createRecordFoodDrafts(record));
     setDraftErrors({});
     setFeedback(null);
+    setViewMode('edit');
+  };
+
+  const openCreator = () => {
+    resetCreateForm();
+    createClientRecordIdRef.current = createManualRecordClientId();
+    setEditingRecord(null);
+    setFeedback(null);
+    setViewMode('create');
+  };
+
+  const returnToList = () => {
+    if (saving || creating) return;
+    setEditingRecord(null);
+    setDrafts([]);
+    setDraftErrors({});
+    resetCreateForm();
+    setFeedback(null);
+    setViewMode('list');
   };
 
   const updateDraft = (index: number, key: keyof RecordFoodDraft, value: string) => {
@@ -145,6 +193,69 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
       delete next[`foods.${index}.${key}`];
       return next;
     });
+  };
+
+  const updateCreateDraft = (key: keyof RecordFoodDraft, value: string) => {
+    setCreateDraft((current) => ({ ...current, [key]: value }));
+    setCreateErrors((current) => {
+      const next = { ...current };
+      delete next[`foods.0.${key}`];
+      return next;
+    });
+  };
+
+  const createRecord = async () => {
+    if (creatingRef.current) return;
+    const dateValidation = validateRecordDate(createDate);
+    const foodValidation = validateRecordFoodDrafts([createDraft]);
+    setCreateDateError(dateValidation.error);
+    setCreateErrors(foodValidation.errors);
+    if (!dateValidation.dateKey || !foodValidation.foods) return;
+
+    const clientRecordId = createClientRecordIdRef.current || createManualRecordClientId();
+    createClientRecordIdRef.current = clientRecordId;
+    const totals = calculateRecordFoodTotals(foodValidation.foods);
+
+    creatingRef.current = true;
+    setCreating(true);
+    setFeedback(null);
+    try {
+      await createDietaryRecord(apiBaseUrl, {
+        user_id: user.userId,
+        client_record_id: clientRecordId,
+        timestamp: buildLocalTimestampForDate(dateValidation.dateKey),
+        foods: foodValidation.foods,
+        total_calories: totals.calories,
+        total_protein: totals.protein,
+        total_carbs: totals.carbs,
+        total_fat: totals.fat,
+        total_sodium: totals.sodium,
+        total_fiber: totals.fiber,
+        source: 'manual',
+      }, { accessToken });
+      invalidateDietaryRecords();
+      const selectedRange = {
+        startDate: formatDateInput(dateValidation.dateKey),
+        endDate: formatDateInput(dateValidation.dateKey),
+      };
+      setViewMode('list');
+      resetCreateForm();
+      await runQuery(selectedRange);
+      setFeedback({
+        tone: 'success',
+        title: '飲食紀錄已新增',
+        message: '已切換至紀錄日期，首頁與飲食趨勢也會同步更新。',
+      });
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        title: '新增失敗，內容已保留',
+        message: error instanceof Error ? error.message : '請稍後重試',
+      });
+    } finally {
+      creatingRef.current = false;
+      setCreating(false);
+    }
   };
 
   const saveRecord = async () => {
@@ -173,6 +284,7 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
       });
       invalidateDietaryRecords();
       setEditingRecord(null);
+      setViewMode('list');
       setFeedback({ tone: 'success', title: '飲食紀錄已更新', message: '列表與首頁營養趨勢已同步重新計算。' });
     } catch (error) {
       setFeedback({
@@ -215,7 +327,7 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
   };
 
   const closeManager = () => {
-    if (saving || deleting) return;
+    if (saving || creating || deleting) return;
     onClose();
   };
 
@@ -228,8 +340,10 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
         >
           <Pressable accessibilityLabel="關閉修改飲食紀錄" style={styles.backdrop} onPress={closeManager} />
           <View style={[styles.managerPanel, isNarrow && styles.managerPanelNarrow]}>
-            {editingRecord ? (
-              <RecordEditorHeader onBack={() => setEditingRecord(null)} />
+            {viewMode === 'edit' ? (
+              <RecordFormHeader title="編輯飲食內容" subtitle="名稱與營養數值會寫回原紀錄。" onBack={returnToList} />
+            ) : viewMode === 'create' ? (
+              <RecordFormHeader title="新增飲食紀錄" subtitle="選擇日期並填寫一筆食物資料。" onBack={returnToList} />
             ) : (
               <ManagerHeader onClose={closeManager} />
             )}
@@ -248,7 +362,7 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
                 />
               ) : null}
 
-              {editingRecord ? (
+              {viewMode === 'edit' && editingRecord ? (
                 <RecordEditor
                   record={editingRecord}
                   drafts={drafts}
@@ -258,35 +372,42 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
                   onChange={updateDraft}
                   onSave={saveRecord}
                 />
+              ) : viewMode === 'create' ? (
+                <RecordCreator
+                  date={createDate}
+                  dateError={createDateError}
+                  draft={createDraft}
+                  errors={createErrors}
+                  creating={creating}
+                  isNarrow={isNarrow}
+                  onDateChange={(value) => {
+                    setCreateDate(value);
+                    setCreateDateError(undefined);
+                  }}
+                  onChange={updateCreateDraft}
+                  onSave={createRecord}
+                />
               ) : (
                 <>
-                  <View style={[styles.dateRow, isNarrow && styles.stackRow]}>
+                  <View style={[styles.dateRow, isDateRangeStacked && styles.stackRow]}>
                     <View style={styles.dateField}>
-                      <FormInput
+                      <DatePicker
                         label="開始日期"
                         value={range.startDate}
-                        onChangeText={(value) => updateRange('startDate', value)}
-                        placeholder="2026/08/01"
-                        keyboardType="numbers-and-punctuation"
-                        inputMode="numeric"
-                        maxLength={10}
+                        onChange={(value) => updateRange('startDate', value)}
                         error={rangeErrors.startDate}
                       />
                     </View>
-                    <Text style={[styles.rangeSeparator, isNarrow && styles.rangeSeparatorNarrow]}>～</Text>
+                    <Text style={[styles.rangeSeparator, isDateRangeStacked && styles.rangeSeparatorNarrow]}>～</Text>
                     <View style={styles.dateField}>
-                      <FormInput
+                      <DatePicker
                         label="結束日期"
                         value={range.endDate}
-                        onChangeText={(value) => updateRange('endDate', value)}
-                        placeholder="2026/08/03"
-                        keyboardType="numbers-and-punctuation"
-                        inputMode="numeric"
-                        maxLength={10}
+                        onChange={(value) => updateRange('endDate', value)}
                         error={rangeErrors.endDate}
                       />
                     </View>
-                    <View style={styles.queryButton}>
+                    <View style={[styles.queryButton, isDateRangeStacked && styles.queryButtonStacked]}>
                       <PrimaryButton
                         label={loading ? '查詢中' : '查詢'}
                         onPress={() => void runQuery(range)}
@@ -294,6 +415,17 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
                         icon={loading
                           ? <ActivityIndicator size="small" color={Palette.text.inverse} />
                           : <Ionicons name="search" size={18} color={Palette.text.inverse} />}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={[styles.listToolbar, isNarrow && styles.listToolbarNarrow]}>
+                    <View style={[styles.createButtonWrap, isNarrow && styles.createButtonWrapNarrow]}>
+                      <PrimaryButton
+                        label="新增飲食紀錄"
+                        onPress={openCreator}
+                        fullWidth={isNarrow}
+                        icon={<Ionicons name="add" size={20} color={Palette.text.inverse} />}
                       />
                     </View>
                   </View>
@@ -368,15 +500,15 @@ function ManagerHeader({ onClose }: { onClose: () => void }) {
   );
 }
 
-function RecordEditorHeader({ onBack }: { onBack: () => void }) {
+function RecordFormHeader({ title, subtitle, onBack }: { title: string; subtitle: string; onBack: () => void }) {
   return (
     <View style={styles.modalHeader}>
       <Pressable accessibilityRole="button" accessibilityLabel="返回紀錄列表" onPress={onBack} style={styles.iconButton}>
         <Ionicons name="arrow-back" size={22} color={Palette.text.secondary} />
       </Pressable>
       <View style={styles.modalTitleWrap}>
-        <Text style={styles.modalTitle}>編輯飲食內容</Text>
-        <Text style={styles.modalSubtitle}>名稱與營養數值會寫回原紀錄。</Text>
+        <Text style={styles.modalTitle}>{title}</Text>
+        <Text style={styles.modalSubtitle}>{subtitle}</Text>
       </View>
     </View>
   );
@@ -452,38 +584,16 @@ function RecordEditor({ record, drafts, errors, saving, isNarrow, onChange, onSa
         <Text style={styles.editorMetaText}>{formatRecordDateTime(record.timestamp)}</Text>
       </View>
       {drafts.map((draft, foodIndex) => (
-        <View key={foodIndex} style={styles.foodEditor}>
-          <View style={styles.foodEditorHeader}>
-            <Text style={styles.foodEditorTitle}>食物 {foodIndex + 1}</Text>
-            {draft.source ? <DataPill tone="info">{draft.source}</DataPill> : null}
-          </View>
-          <FormInput
-            label="食物名稱"
-            value={draft.name}
-            onChangeText={(value) => onChange(foodIndex, 'name', value)}
-            editable={!saving}
-            maxLength={100}
-            returnKeyType="done"
-            error={errors[`foods.${foodIndex}.name`]}
-          />
-          <View style={styles.nutrientFormGrid}>
-            {RECORD_NUTRIENT_FIELDS.map((field) => (
-              <View key={field.key} style={[styles.nutrientField, isNarrow && styles.nutrientFieldNarrow]}>
-                <FormInput
-                  label={field.label}
-                  unit={field.unit}
-                  value={draft[field.key]}
-                  onChangeText={(value) => onChange(foodIndex, field.key, value)}
-                  editable={!saving}
-                  keyboardType="decimal-pad"
-                  inputMode="decimal"
-                  maxLength={12}
-                  error={errors[`foods.${foodIndex}.${field.key}`]}
-                />
-              </View>
-            ))}
-          </View>
-        </View>
+        <RecordFoodFields
+          key={foodIndex}
+          title={`食物 ${foodIndex + 1}`}
+          draft={draft}
+          errors={errors}
+          foodIndex={foodIndex}
+          disabled={saving}
+          isNarrow={isNarrow}
+          onChange={(key, value) => onChange(foodIndex, key, value)}
+        />
       ))}
       <PrimaryButton
         label={saving ? '儲存中' : '儲存修改'}
@@ -493,6 +603,94 @@ function RecordEditor({ record, drafts, errors, saving, isNarrow, onChange, onSa
           ? <ActivityIndicator size="small" color={Palette.text.inverse} />
           : <Ionicons name="save-outline" size={18} color={Palette.text.inverse} />}
       />
+    </View>
+  );
+}
+
+function RecordCreator({ date, dateError, draft, errors, creating, isNarrow, onDateChange, onChange, onSave }: {
+  date: string;
+  dateError?: string;
+  draft: RecordFoodDraft;
+  errors: RecordDraftErrors;
+  creating: boolean;
+  isNarrow: boolean;
+  onDateChange: (value: string) => void;
+  onChange: (key: keyof RecordFoodDraft, value: string) => void;
+  onSave: () => void;
+}) {
+  return (
+    <View style={styles.editor}>
+      <DatePicker
+        label="紀錄日期"
+        value={date}
+        onChange={onDateChange}
+        maximumDate={formatDateInput(getLocalTodayDateKey())}
+        disabled={creating}
+        error={dateError}
+      />
+      <RecordFoodFields
+        title="食物內容"
+        draft={draft}
+        errors={errors}
+        foodIndex={0}
+        disabled={creating}
+        isNarrow={isNarrow}
+        onChange={onChange}
+      />
+      <PrimaryButton
+        label={creating ? '新增中' : '新增紀錄'}
+        onPress={onSave}
+        disabled={creating}
+        icon={creating
+          ? <ActivityIndicator size="small" color={Palette.text.inverse} />
+          : <Ionicons name="add-circle-outline" size={18} color={Palette.text.inverse} />}
+      />
+    </View>
+  );
+}
+
+function RecordFoodFields({ title, draft, errors, foodIndex, disabled, isNarrow, onChange }: {
+  title: string;
+  draft: RecordFoodDraft;
+  errors: RecordDraftErrors;
+  foodIndex: number;
+  disabled: boolean;
+  isNarrow: boolean;
+  onChange: (key: keyof RecordFoodDraft, value: string) => void;
+}) {
+  return (
+    <View style={styles.foodEditor}>
+      <View style={styles.foodEditorHeader}>
+        <Text style={styles.foodEditorTitle}>{title}</Text>
+        {draft.source ? <DataPill tone="info">{draft.source}</DataPill> : null}
+      </View>
+      <FormInput
+        label="食物名稱"
+        value={draft.name}
+        onChangeText={(value) => onChange('name', value)}
+        editable={!disabled}
+        maxLength={100}
+        returnKeyType="done"
+        error={errors[`foods.${foodIndex}.name`]}
+      />
+      <View style={styles.nutrientFormGrid}>
+        {RECORD_NUTRIENT_FIELDS.map((field) => (
+          <View key={field.key} style={[styles.nutrientField, isNarrow && styles.nutrientFieldNarrow]}>
+            <FormInput
+              label={field.label}
+              unit={field.unit}
+              value={draft[field.key]}
+              onChangeText={(value) => onChange(field.key, value)}
+              editable={!disabled}
+              keyboardType="decimal-pad"
+              inputMode="decimal"
+              maxLength={12}
+              error={errors[`foods.${foodIndex}.${field.key}`]}
+              style={styles.nutrientInput}
+            />
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -569,6 +767,10 @@ function formatNutrientNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
+function createManualRecordClientId(): string {
+  return `manual_record_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 const styles = StyleSheet.create({
   modalLayer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: Palette.overlay },
@@ -607,6 +809,11 @@ const styles = StyleSheet.create({
   rangeSeparator: { ...Typography.bodyBold, color: Palette.text.tertiary, height: 48, textAlignVertical: 'center', paddingTop: 12 },
   rangeSeparatorNarrow: { height: 18, paddingTop: 0, alignSelf: 'center' },
   queryButton: { minWidth: 124 },
+  queryButtonStacked: { width: '100%' },
+  listToolbar: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: Spacing.lg },
+  listToolbarNarrow: { alignItems: 'stretch' },
+  createButtonWrap: { minWidth: 210 },
+  createButtonWrapNarrow: { width: '100%' },
   resultHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.md },
   resultHeaderCopy: { flex: 1, minWidth: 0 },
   resultTitle: { ...Typography.h3, color: Palette.text.primary },
@@ -634,6 +841,7 @@ const styles = StyleSheet.create({
   nutrientFormGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
   nutrientField: { flexGrow: 1, flexBasis: 210, minWidth: 0 },
   nutrientFieldNarrow: { flexBasis: 132 },
+  nutrientInput: { ...Typography.number },
   stateCard: { minHeight: 220, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, padding: Spacing.xl },
   stateTitle: { ...Typography.bodyBold, color: Palette.text.primary, textAlign: 'center' },
   stateMessage: { ...Typography.caption, color: Palette.text.secondary, textAlign: 'center', maxWidth: 520 },

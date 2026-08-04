@@ -8,6 +8,7 @@
 - Added idempotent dietary record saves, visible success/error feedback, and a retryable local synchronization queue.
 - Added authenticated record-backed dietary trends with same-day aggregation and latest continuous seven-day selection.
 - Added a dashboard dietary record manager with inclusive date ranges, responsive record lists, editing, deletion confirmation, and error recovery.
+- Added a shared calendar date picker and manual creation of validated today or historical dietary records.
 - Added backward-compatible record pagination plus authenticated `PATCH` and `DELETE` endpoints keyed by `client_record_id`.
 - Added focused scanner, date-range, trend, record mutation, and API route tests.
 

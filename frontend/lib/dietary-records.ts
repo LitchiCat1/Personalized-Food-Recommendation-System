@@ -7,10 +7,10 @@ const DECIMAL_PATTERN = /^\d+(?:\.\d+)?$/;
 export const RECORD_NUTRIENT_FIELDS = [
   { key: 'calories', label: '熱量', unit: 'kcal' },
   { key: 'protein', label: '蛋白質', unit: 'g' },
-  { key: 'carbs', label: '碳水', unit: 'g' },
+  { key: 'carbs', label: '碳水化合物', unit: 'g' },
   { key: 'fat', label: '脂肪', unit: 'g' },
   { key: 'sodium', label: '鈉', unit: 'mg' },
-  { key: 'fiber', label: '纖維', unit: 'g' },
+  { key: 'fiber', label: '膳食纖維', unit: 'g' },
 ] as const;
 
 export type RecordNutrientKey = typeof RECORD_NUTRIENT_FIELDS[number]['key'];
@@ -23,6 +23,11 @@ export type RecordFoodDraft = Record<RecordNutrientKey, string> & {
 export type RecordDateRange = { startDate: string; endDate: string };
 export type RecordDateRangeErrors = Partial<Record<keyof RecordDateRange, string>>;
 export type RecordDraftErrors = Record<string, string>;
+
+export type RecordDateValidation = {
+  dateKey: string | null;
+  error?: string;
+};
 
 export function formatDateInput(dateKey: string): string {
   return dateKey.replace(/-/g, '/');
@@ -53,6 +58,69 @@ export function getDefaultRecordDateRange(now = new Date()): RecordDateRange {
   };
 }
 
+export function getLocalTodayDateKey(now = new Date()): string {
+  return formatLocalDateKey(now);
+}
+
+export function validateRecordDate(value: string, now = new Date()): RecordDateValidation {
+  const dateKey = parseDateInput(value);
+  if (!dateKey) return { dateKey: null, error: '請選擇有效的紀錄日期' };
+  if (dateKey > getLocalTodayDateKey(now)) {
+    return { dateKey: null, error: '紀錄日期不得晚於今天' };
+  }
+  return { dateKey };
+}
+
+export function buildLocalTimestampForDate(value: string, now = new Date()): string {
+  const dateKey = parseDateInput(value);
+  if (!dateKey) throw new Error('請選擇有效的紀錄日期');
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const localDateTime = new Date(
+    year,
+    month - 1,
+    day,
+    now.getHours(),
+    now.getMinutes(),
+    now.getSeconds(),
+    now.getMilliseconds()
+  );
+  const offsetMinutes = localDateTime.getTimezoneOffset();
+  const offsetSign = offsetMinutes <= 0 ? '+' : '-';
+  const absoluteOffset = Math.abs(offsetMinutes);
+  const offsetHours = String(Math.floor(absoluteOffset / 60)).padStart(2, '0');
+  const offsetRemainder = String(absoluteOffset % 60).padStart(2, '0');
+  const time = [
+    localDateTime.getHours(),
+    localDateTime.getMinutes(),
+    localDateTime.getSeconds(),
+  ].map((part) => String(part).padStart(2, '0')).join(':');
+  const milliseconds = String(localDateTime.getMilliseconds()).padStart(3, '0');
+  return `${dateKey}T${time}.${milliseconds}${offsetSign}${offsetHours}:${offsetRemainder}`;
+}
+
+export function createManualRecordFoodDraft(): RecordFoodDraft {
+  return {
+    name: '',
+    calories: '',
+    protein: '',
+    carbs: '',
+    fat: '',
+    sodium: '',
+    fiber: '',
+    source: 'manual',
+    warnings: [],
+  };
+}
+
+export function calculateRecordFoodTotals(foods: FoodRecordItem[]): Record<RecordNutrientKey, number> {
+  return RECORD_NUTRIENT_FIELDS.reduce((totals, field) => {
+    totals[field.key] = Math.round(
+      foods.reduce((sum, food) => sum + Number(food[field.key] || 0), 0) * 100
+    ) / 100;
+    return totals;
+  }, {} as Record<RecordNutrientKey, number>);
+}
+
 export function validateRecordDateRange(range: RecordDateRange): {
   dateKeys: { startDate: string; endDate: string } | null;
   errors: RecordDateRangeErrors;
@@ -60,8 +128,8 @@ export function validateRecordDateRange(range: RecordDateRange): {
   const startDate = parseDateInput(range.startDate);
   const endDate = parseDateInput(range.endDate);
   const errors: RecordDateRangeErrors = {};
-  if (!startDate) errors.startDate = '請輸入有效的開始日期（年/月/日）';
-  if (!endDate) errors.endDate = '請輸入有效的結束日期（年/月/日）';
+  if (!startDate) errors.startDate = '請選擇有效的開始日期';
+  if (!endDate) errors.endDate = '請選擇有效的結束日期';
   if (startDate && endDate && endDate < startDate) {
     errors.endDate = '結束日期不得早於開始日期';
   }
@@ -188,7 +256,7 @@ function getTimestampMillis(timestamp: string): number {
   return parseRecordTimestamp(timestamp)?.getTime() || 0;
 }
 
-function formatLocalDateKey(date: Date): string {
+export function formatLocalDateKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 

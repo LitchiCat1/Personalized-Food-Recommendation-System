@@ -50,6 +50,7 @@ Personalized-Food-Recommendation-System/
 - **智慧餐點推薦 MVP** — 安全過濾 + TFDA/自訂食品候選 + 歷史飲食偏好加權
 - **Google Places 店家推薦** — 預算 + 定位 + 半徑 + 店家類型搜尋，支援 Google Maps 導航與個人化 AI 店家摘要
 - **飲食趨勢分析** — 週熱量柱狀圖 + 營養素均值 + AI 洞察
+- **飲食紀錄管理** — 日曆區間查詢 + 手動新增今日或歷史紀錄 + 編輯與刪除
 - **未知食品備援** — TFDA 搜尋 + 自訂食品 + 營養標示 OCR
 - **Supabase Auth** — 前端登入/註冊、Bearer token 傳遞、後端 user_id 權限檢查
 - **Render + Supabase 部署** — 後端已在 Render 強制 Supabase Auth，資料存於 Supabase Postgres

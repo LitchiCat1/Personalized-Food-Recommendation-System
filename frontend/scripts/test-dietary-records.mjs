@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildLocalTimestampForDate,
+  calculateRecordFoodTotals,
+  createManualRecordFoodDraft,
   createRecordFoodDrafts,
   filterAndSortRecords,
+  formatDateInput,
   getDefaultRecordDateRange,
   parseDateInput,
+  validateRecordDate,
   validateRecordDateRange,
   validateRecordFoodDrafts,
 } from '../lib/dietary-records.ts';
@@ -45,6 +50,47 @@ test('builds a seven-day default range across a year boundary', () => {
   assert.deepEqual(getDefaultRecordDateRange(new Date(2026, 0, 3, 12)), {
     startDate: '2025/12/28',
     endDate: '2026/01/03',
+  });
+});
+
+test('formats date picker values and validates today, past, future and leap dates', () => {
+  const localNow = new Date(2026, 7, 4, 12, 30, 0);
+  assert.equal(formatDateInput('2026-08-04'), '2026/08/04');
+  assert.equal(validateRecordDate('2026/08/04', localNow).dateKey, '2026-08-04');
+  assert.equal(validateRecordDate('2025/12/31', localNow).dateKey, '2025-12-31');
+  assert.equal(validateRecordDate('2026/08/05', localNow).error, '紀錄日期不得晚於今天');
+  assert.equal(validateRecordDate('2024/02/29', localNow).dateKey, '2024-02-29');
+  assert.equal(validateRecordDate('2026/02/29', localNow).dateKey, null);
+});
+
+test('builds timezone-aware local timestamps without moving the selected calendar date', () => {
+  const localNow = new Date(2026, 7, 4, 23, 58, 59, 123);
+  for (const date of ['2024/02/29', '2025/12/31', '2026/01/01', '2026/07/31']) {
+    const timestamp = buildLocalTimestampForDate(date, localNow);
+    const dateKey = parseDateInput(date);
+    assert.ok(timestamp.startsWith(`${dateKey}T23:58:59.123`));
+    assert.match(timestamp, /[+-]\d{2}:\d{2}$/);
+    assert.equal(filterAndSortRecords([
+      record('user-a', dateKey, timestamp),
+    ], 'user-a', dateKey, dateKey).length, 1);
+  }
+});
+
+test('creates a blank manual draft and totals validated foods in the existing schema', () => {
+  const draft = createManualRecordFoodDraft();
+  assert.equal(draft.source, 'manual');
+  assert.equal(draft.name, '');
+  draft.name = '豆漿';
+  for (const key of ['calories', 'protein', 'carbs', 'fat', 'sodium', 'fiber']) draft[key] = '1.25';
+  const validation = validateRecordFoodDrafts([draft]);
+  assert.ok(validation.foods);
+  assert.deepEqual(calculateRecordFoodTotals(validation.foods), {
+    calories: 1.25,
+    protein: 1.25,
+    carbs: 1.25,
+    fat: 1.25,
+    sodium: 1.25,
+    fiber: 1.25,
   });
 });
 

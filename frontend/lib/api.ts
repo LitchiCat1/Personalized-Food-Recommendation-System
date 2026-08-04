@@ -61,6 +61,24 @@ export type RecordMutationResponse = {
   record: DietaryRecord;
 };
 
+export type CreateDietaryRecordPayload = {
+  user_id: string;
+  client_record_id: string;
+  timestamp: string;
+  foods: FoodRecordItem[];
+  total_calories: number;
+  total_protein: number;
+  total_carbs: number;
+  total_fat: number;
+  total_sodium: number;
+  total_fiber: number;
+  source: 'manual';
+};
+
+export type CreateDietaryRecordResponse = RecordMutationResponse & {
+  deduplicated: boolean;
+};
+
 export type RecommendationItem = {
   label: string;
   name_zh: string;
@@ -366,6 +384,19 @@ export async function fetchAllRecords(apiBaseUrl: string, userId: string, auth?:
   }
 
   return records;
+}
+
+export async function createDietaryRecord(
+  apiBaseUrl: string,
+  payload: CreateDietaryRecordPayload,
+  auth?: ApiAuth
+): Promise<CreateDietaryRecordResponse> {
+  const resp = await fetch(`${apiBaseUrl}/record`, {
+    method: 'POST',
+    headers: buildHeaders(auth, 'application/json'),
+    body: JSON.stringify(payload),
+  });
+  return parseJson<CreateDietaryRecordResponse>(resp);
 }
 
 export async function updateDietaryRecord(

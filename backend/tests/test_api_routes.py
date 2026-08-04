@@ -3,7 +3,7 @@ import importlib
 import os
 import sys
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 
@@ -117,6 +117,126 @@ class ApiRouteTests(unittest.TestCase):
         data = response.get_json()
         self.assertFalse(data["deduplicated"])
         self.assertTrue(data["record"]["client_record_id"].startswith("server_record_"))
+
+    def test_record_route_creates_today_and_historical_manual_records(self):
+        local_timezone = timezone(timedelta(hours=8))
+        local_now = datetime.now(local_timezone)
+        timestamps = (
+            local_now.replace(microsecond=123000).isoformat(),
+            (local_now - timedelta(days=45)).replace(microsecond=456000).isoformat(),
+        )
+
+        for index, timestamp in enumerate(timestamps):
+            with self.subTest(timestamp=timestamp):
+                payload = {
+                    "user_id": "user-a",
+                    "client_record_id": f"manual-date-{index}",
+                    "timestamp": timestamp,
+                    "foods": [{
+                        "name": "  手動豆漿  ",
+                        "calories": 120,
+                        "protein": 8.5,
+                        "carbs": 10,
+                        "fat": 4,
+                        "sodium": 95,
+                        "fiber": 2,
+                    }],
+                    "source": "manual",
+                }
+                with self.mock_auth("user-a"):
+                    response = self.client.post("/record", json=payload, headers=self.auth_headers())
+
+                self.assertEqual(response.status_code, 201)
+                record = response.get_json()["record"]
+                self.assertEqual(record["timestamp"], timestamp)
+                self.assertEqual(record["foods"][0]["name"], "手動豆漿")
+                self.assertEqual(record["source"], "manual")
+                self.assertEqual(record["meal_type"], "午餐")
+
+    def test_record_route_rejects_future_calendar_date(self):
+        local_timezone = timezone(timedelta(hours=8))
+        future_timestamp = (datetime.now(local_timezone) + timedelta(days=1)).isoformat()
+        payload = {
+            "user_id": "user-a",
+            "client_record_id": "future-manual-record",
+            "timestamp": future_timestamp,
+            "foods": [{"name": "未來餐點", "calories": 100}],
+            "source": "manual",
+        }
+
+        with self.mock_auth("user-a"):
+            response = self.client.post("/record", json=payload, headers=self.auth_headers())
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["error"], "紀錄日期不得晚於今天")
+        self.assertIsNone(self.app_module.storage.get_record_by_client_record_id("user-a", "future-manual-record"))
+
+    def test_record_route_rejects_invalid_food_values(self):
+        invalid_foods = (
+            [{"name": "   ", "calories": 80}],
+            [{"name": "豆漿", "calories": "not-a-number"}],
+            [{"name": "豆漿", "sodium": -1}],
+        )
+
+        for index, foods in enumerate(invalid_foods):
+            with self.subTest(foods=foods):
+                with self.mock_auth("user-a"):
+                    response = self.client.post(
+                        "/record",
+                        json={
+                            "user_id": "user-a",
+                            "client_record_id": f"invalid-create-{index}",
+                            "foods": foods,
+                            "source": "manual",
+                        },
+                        headers=self.auth_headers(),
+                    )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("error", response.get_json())
+
+    def test_record_route_recalculates_totals_instead_of_trusting_payload(self):
+        payload = {
+            "user_id": "user-a",
+            "client_record_id": "manual-recalculated-record",
+            "foods": [
+                {"name": "豆漿", "calories": 120, "protein": 8.5, "carbs": 10, "fat": 4, "sodium": 95, "fiber": 2},
+                {"name": "香蕉", "calories": 90, "protein": 1, "carbs": 23, "fat": 0.3, "sodium": 1, "fiber": 2.6},
+            ],
+            "total_calories": 9999,
+            "total_protein": 9999,
+            "total_sodium": 9999,
+            "source": "manual",
+        }
+
+        with self.mock_auth("user-a"):
+            response = self.client.post("/record", json=payload, headers=self.auth_headers())
+
+        self.assertEqual(response.status_code, 201)
+        record = response.get_json()["record"]
+        self.assertEqual(record["total_calories"], 210)
+        self.assertEqual(record["total_protein"], 9.5)
+        self.assertEqual(record["total_sodium"], 96)
+        self.assertEqual(record["total_fiber"], 4.6)
+
+    def test_record_route_keeps_existing_scanner_creation_compatible(self):
+        payload = {
+            "user_id": "user-a",
+            "client_record_id": "scanner-compatible-record",
+            "meal_type": "點心",
+            "foods": [{"name": "掃描蘋果", "calories": 80, "source": "camera"}],
+            "total_calories": 999,
+            "source": "camera",
+        }
+
+        with self.mock_auth("user-a"):
+            response = self.client.post("/record", json=payload, headers=self.auth_headers())
+
+        self.assertEqual(response.status_code, 201)
+        record = response.get_json()["record"]
+        self.assertEqual(record["meal_type"], "點心")
+        self.assertEqual(record["source"], "camera")
+        self.assertEqual(record["total_calories"], 80)
+        self.assertTrue(record["timestamp"])
 
     def test_records_route_paginates_in_newest_first_order(self):
         for index in range(1, 4):

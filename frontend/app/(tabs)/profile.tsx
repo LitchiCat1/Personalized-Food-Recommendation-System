@@ -237,7 +237,8 @@ export default function ProfileScreen() {
 
   const performSignOut = async () => {
     if (!isSupabaseAuthConfigured || !supabase) {
-      Alert.alert('Demo 模式', '目前未啟用 Supabase Auth。');
+      // Demo 模式下，直接清除虛擬 Session 即可登出
+      useStore.getState().setAuthSession(null);
       return;
     }
     const supabaseClient = supabase;
@@ -255,11 +256,6 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = () => {
-    if (!isSupabaseAuthConfigured || !supabase) {
-      Alert.alert('Demo 模式', '目前未啟用 Supabase Auth。');
-      return;
-    }
-
     if (Platform.OS === 'web') {
       const confirmed = typeof window === 'undefined' ? true : window.confirm('確定要登出嗎？');
       if (confirmed) void performSignOut();

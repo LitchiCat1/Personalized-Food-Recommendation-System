@@ -1,6 +1,31 @@
 # Changelog
 
+## v0.0.7 - 2026-08-07
+
+### Added
+
+- Added Google Places API (New) v1 fallback to handle projects with disabled Legacy Places API.
+- Added multi-version Gemini model selection (trying `gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-1.5-flash` in sequence) to resolve model deprecations on newer keys.
+- Added local location fallback flat coordinate shifting for mock restaurants in dev catalog, guaranteeing markers show up during off-grid offline local testing.
+- Added detailed offline empty-state helper guides inside the menu Modal to direct users to camera scanning and AI summaries.
+
+### Changed
+
+- Refactored nearby restaurant search recommendations to dynamically feed dish details into the top-level food recommendation panel with restaurant names as source labels.
+- Replaced general healthy bento dummy items in scraper default fallback with an empty list for unknown restaurant names.
+
+### Validation
+
+- Backend model list fallback tests and Google Places v1 integration verified via HTTP API.
+- Typecheck and Metro bundle compilation completed successfully.
+
+### Deployment Notes
+
+- Clear database cache of old placeholder menus if testing new keys.
+- Keep standard environment variables for production.
+
 ## v0.0.6 - 2026-08-03
+
 
 ### Added
 

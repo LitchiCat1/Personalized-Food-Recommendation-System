@@ -66,32 +66,109 @@ def _score_place(distance_km: float, rating, user_ratings_total, is_open: bool, 
     return max(1, min(99, distance_score + rating_score + popularity_score + open_bonus + budget_score))
 
 
+def _fetch_new_places_api(lat: float, lng: float, radius_m: float, key: str) -> list[dict]:
+    url = "https://places.googleapis.com/v1/places:searchNearby"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": key,
+        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.priceLevel,places.rating,places.userRatingCount"
+    }
+    payload = {
+        "includedTypes": ["restaurant"],
+        "maxResultCount": 12,
+        "locationRestriction": {
+            "circle": {
+                "center": {
+                    "latitude": lat,
+                    "longitude": lng
+                },
+                "radius": float(radius_m)
+            }
+        }
+    }
+    try:
+        res = requests.post(url, json=payload, headers=headers, timeout=10)
+        if res.status_code == 200:
+            data = res.json()
+            places_v1 = data.get("places", [])
+            results = []
+            for p in places_v1:
+                loc = p.get("location") or {}
+                name_obj = p.get("displayName") or {}
+                
+                price_enum = p.get("priceLevel", "")
+                price_level = 1
+                if "INEXPENSIVE" in price_enum:
+                    price_level = 1
+                elif "MODERATE" in price_enum:
+                    price_level = 2
+                elif "EXPENSIVE" in price_enum:
+                    price_level = 3
+                
+                results.append({
+                    "geometry": {
+                        "location": {
+                            "lat": loc.get("latitude"),
+                            "lng": loc.get("longitude")
+                        }
+                    },
+                    "name": name_obj.get("text", "附近餐廳"),
+                    "vicinity": p.get("formattedAddress", ""),
+                    "place_id": p.get("id"),
+                    "rating": p.get("rating"),
+                    "user_ratings_total": p.get("userRatingCount"),
+                    "price_level": price_level,
+                    "opening_hours": {"open_now": True},
+                    "types": p.get("types", [])
+                })
+            return results
+    except Exception as e:
+        print(f"[!] Places API (New) fallback failed: {e}")
+    return []
+
+
 def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, category: str, budget: int, limit: int = 12) -> list[dict]:
     key = get_google_places_api_key()
     radius_m = int(max(500, min(radius_km * 1000, 10000)))
-    response = requests.get(
-        GOOGLE_PLACES_NEARBY_URL,
-        params={
-            "key": key,
-            "location": f"{lat},{lng}",
-            "radius": radius_m,
-            "type": "restaurant",
-            "keyword": _category_keyword(category),
-            "language": "zh-TW",
-        },
-        timeout=10,
-    )
-    if response.status_code != 200:
-        raise GooglePlacesAPIError(f"Google Places API HTTP {response.status_code}")
+    
+    results = []
+    legacy_failed = False
+    
+    try:
+        response = requests.get(
+            GOOGLE_PLACES_NEARBY_URL,
+            params={
+                "key": key,
+                "location": f"{lat},{lng}",
+                "radius": radius_m,
+                "type": "restaurant",
+                "keyword": _category_keyword(category),
+                "language": "zh-TW",
+            },
+            timeout=10,
+        )
+        if response.status_code != 200:
+            legacy_failed = True
+        else:
+            payload = response.json()
+            status = payload.get("status")
+            if status not in {"OK", "ZERO_RESULTS"}:
+                legacy_failed = True
+            else:
+                results = payload.get("results", [])
+    except Exception:
+        legacy_failed = True
 
-    payload = response.json()
-    status = payload.get("status")
-    if status not in {"OK", "ZERO_RESULTS"}:
-        message = payload.get("error_message") or status or "unknown error"
-        raise GooglePlacesAPIError(f"Google Places API error: {message}")
+    # Automatic fallback to Google Places API (New) v1 if legacy API is not enabled
+    if legacy_failed:
+        print("[Google Places] Legacy API call failed or not enabled. Trying Places API (New) fallback...")
+        results = _fetch_new_places_api(lat, lng, radius_m, key)
+        if not results:
+            # If both failed, raise the exception
+            raise GooglePlacesAPIError("Google Places API (Legacy & New) both failed. Please check key permissions.")
 
     restaurants = []
-    for place in payload.get("results", []):
+    for place in results:
         geometry = place.get("geometry") or {}
         place_location = geometry.get("location") or {}
         place_lat = place_location.get("lat")

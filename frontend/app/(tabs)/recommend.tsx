@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TextInput, Pressable, Linking } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TextInput, Pressable, Linking, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
+import { router } from 'expo-router';
 import AppContainer from '@/components/AppContainer';
 import ScreenHeader from '@/components/ui/screen-header';
 import SectionBlock from '@/components/ui/section-block';
@@ -19,6 +20,7 @@ import {
   fetchRestaurantAiSummary,
   fetchRecommendations,
   saveRecommendationFeedback,
+  fetchRestaurantDetailedMenu,
   type HealthyFoodRestaurant,
   type RestaurantAiSummary,
   type RecommendationFeedbackAction,
@@ -26,6 +28,7 @@ import {
   type RecommendationItem,
   type RecommendationResponse,
 } from '@/lib/api';
+
 
 const RADIUS_OPTIONS = [
   { value: '1', label: '1 km' },
@@ -61,6 +64,10 @@ export default function RecommendScreen() {
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [locationLabel, setLocationLabel] = useState('尚未取得定位');
   const [showAllMeals, setShowAllMeals] = useState(false);
+  const [viewingMenuRest, setViewingMenuRest] = useState<HealthyFoodRestaurant | null>(null);
+  const [menuLoading, setMenuLoading] = useState(false);
+
+
 
   useEffect(() => {
     let cancelled = false;
@@ -83,7 +90,22 @@ export default function RecommendScreen() {
     };
   }, [accessToken, apiBaseUrl, user.userId]);
 
-  const recommended = data?.recommended || [];
+  const recommended: RecommendationItem[] = (healthyData?.recommended && healthyData.recommended.length > 0)
+    ? healthyData.recommended.map(item => ({
+        label: item.item_id || item.item_name,
+        name_zh: item.item_name,
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fat: item.fat,
+        sodium: item.sodium,
+        gi: item.gi,
+        source: item.restaurant_name,
+        match_score: item.match_score,
+        preference_reasons: item.reasons,
+      }))
+    : (data?.recommended || []);
+
   const sourceCounts = data?.source_counts;
   const preferenceProfile = data?.preference_profile;
   const remaining = data?.remaining_calories ?? user.dailyCalorieTarget;
@@ -94,13 +116,31 @@ export default function RecommendScreen() {
   const handleHealthyFoodSearch = async () => {
     setHealthyLoading(true);
     setHealthyError(null);
+    let lat = 25.0338;
+    let lng = 121.5645;
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (!permission.granted) throw new Error('未授權定位權限');
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      setLocationLabel(`目前定位：${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      const geoPromise = (async () => {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (permission.granted) {
+          const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          return { lat: position.coords.latitude, lng: position.coords.longitude };
+        }
+        throw new Error('未授權定位');
+      })();
+
+      const timeoutPromise = new Promise<{ lat: number; lng: number }>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 10000)
+      );
+
+
+      const coords = await Promise.race([geoPromise, timeoutPromise]).catch(() => {
+        return { lat: 25.0338, lng: 121.5645 };
+      });
+
+      lat = coords.lat;
+      lng = coords.lng;
+      setLocationLabel(`定位座標：${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+
       const result = await fetchHealthyFoodRecommendations(
         apiBaseUrl,
         user.userId,
@@ -115,6 +155,7 @@ export default function RecommendScreen() {
       setHealthyLoading(false);
     }
   };
+
 
   const handleRecommendationFeedback = async (meal: RecommendationItem, action: RecommendationFeedbackAction) => {
     const key = meal.label;
@@ -150,6 +191,44 @@ export default function RecommendScreen() {
     }
   };
 
+  const handleViewMenu = async (restaurant: HealthyFoodRestaurant) => {
+    setViewingMenuRest(restaurant);
+    // If nutrition_available is false, fetch structured menu dynamically from backend
+    if (!restaurant.nutrition_available || restaurant.data_source === 'google_places') {
+      setMenuLoading(true);
+      try {
+        const response = await fetchRestaurantDetailedMenu(
+          apiBaseUrl,
+          {
+            restaurant_id: restaurant.restaurant_id,
+            name: restaurant.name,
+            address: restaurant.address,
+            budget: Number(budget) || 150,
+            user_id: user.userId,
+            lat: restaurant.lat,
+            lng: restaurant.lng,
+          },
+          { accessToken }
+        );
+        setViewingMenuRest((prev) =>
+          prev && prev.restaurant_id === restaurant.restaurant_id
+            ? {
+                ...prev,
+                nutrition_available: true,
+                recommended_items: response.recommended_items,
+                filtered_items: response.filtered_items,
+              }
+            : prev
+        );
+      } catch (err: any) {
+        console.log('Failed to fetch detailed menu:', err);
+      } finally {
+        setMenuLoading(false);
+      }
+    }
+  };
+
+
   return (
     <AppContainer>
       <ScreenHeader
@@ -162,7 +241,18 @@ export default function RecommendScreen() {
       {loading ? (
         <StateCard icon="sparkles-outline" text="讀取推薦中..." loading />
       ) : error ? (
-        <StateCard icon="cloud-offline-outline" text={`無法載入推薦資料：${error}`} tone="warning" />
+        <View style={styles.stateCard}>
+          <Ionicons name="person-add-outline" size={40} color={Palette.status.warning} />
+          <Text style={styles.emptyText}>{error}</Text>
+          <View style={{ marginTop: Spacing.md, width: '100%', maxWidth: 280 }}>
+            <PrimaryButton
+              label="立即填寫個人檔案"
+              onPress={() => router.push('/profile')}
+              icon={<Ionicons name="arrow-forward-outline" size={17} color={Palette.text.inverse} />}
+            />
+          </View>
+        </View>
+
       ) : (
         <>
           <View style={styles.metricRow}>
@@ -272,6 +362,7 @@ export default function RecommendScreen() {
                   onSelect={() => setSelectedRestaurantId(restaurant.restaurant_id)}
                   onSummary={() => handleLoadRestaurantSummary(restaurant)}
                   onNavigate={() => handleOpenNavigation(restaurant)}
+                  onViewMenu={() => handleViewMenu(restaurant)}
                 />
               ))}
             </>
@@ -280,6 +371,88 @@ export default function RecommendScreen() {
           </View>
         </>
       )}
+
+      {/* 完整菜單詳細 Modal 彈窗 */}
+      <Modal
+        visible={viewingMenuRest !== null}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setViewingMenuRest(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{viewingMenuRest?.name}</Text>
+              <Pressable onPress={() => setViewingMenuRest(null)}>
+                <Ionicons name="close" size={24} color={Palette.text.primary} />
+              </Pressable>
+            </View>
+
+            {menuLoading ? (
+              <View style={{ justifyContent: 'center', alignItems: 'center', paddingVertical: Spacing.xl }}>
+                <ActivityIndicator size="large" color={Palette.accent.green} />
+                <Text style={[styles.emptyText, { marginTop: Spacing.md }]}>正在讀取或使用 AI 即時解析菜單...</Text>
+              </View>
+            ) : (
+              <ScrollView contentContainerStyle={styles.modalScroll}>
+                <Text style={styles.restaurantMeta}>{viewingMenuRest?.address}</Text>
+
+                <Text style={styles.modalSectionTitle}>安全餐點推薦</Text>
+                {(viewingMenuRest?.recommended_items || []).length === 0 && (viewingMenuRest?.filtered_items || []).length === 0 ? (
+                  <View style={{ padding: Spacing.lg, alignItems: 'center', backgroundColor: Palette.bg.wash, borderRadius: Radius.lg, borderWidth: 1, borderColor: Palette.border.subtle, marginVertical: Spacing.md }}>
+                    <Ionicons name="document-text-outline" size={32} color={Palette.text.tertiary} style={{ marginBottom: Spacing.xs }} />
+                    <Text style={[styles.itemName, { textAlign: 'center', marginBottom: 4 }]}>線上查無此店菜單</Text>
+                    <Text style={[styles.restaurantMeta, { textAlign: 'center' }]}>
+                      您可以點擊店卡中的「AI 摘要」預測其常規品項，或使用頁面右下角的「相機掃描」拍照記錄實體菜單！
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    {(viewingMenuRest?.recommended_items || []).length === 0 ? (
+                      <Text style={styles.emptyText}>無推薦的餐點</Text>
+                    ) : (
+                      (viewingMenuRest?.recommended_items || []).map((item) => (
+                        <View key={item.item_name} style={styles.menuItemCard}>
+                          <View style={styles.menuItemHeader}>
+                            <Text style={styles.menuItemName}>{item.item_name}</Text>
+                            <Text style={styles.menuItemPrice}>${item.price}</Text>
+                          </View>
+                          <View style={styles.nutritionRow}>
+                            <NutritionMini label="熱量" value={`${item.calories} kcal`} color={Palette.accent.green} />
+                            <NutritionMini label="蛋白質" value={`${item.protein} g`} color={Palette.accent.blue} />
+                            <NutritionMini label="鈉" value={`${item.sodium} mg`} color={Palette.accent.pink} />
+                          </View>
+                          {item.reasons && item.reasons.length > 0 ? (
+                            <Text style={styles.customizationText}>💡 推薦原因：{item.reasons.join('、')}</Text>
+                          ) : null}
+                        </View>
+                      ))
+                    )}
+
+                    <Text style={[styles.modalSectionTitle, { marginTop: Spacing.xl }]}>不符合 / 需注意餐點</Text>
+                    {(viewingMenuRest?.filtered_items || []).length === 0 ? (
+                      <Text style={styles.emptyText}>此店無需要排除的餐點</Text>
+                    ) : (
+                      (viewingMenuRest?.filtered_items || []).map((item) => (
+                        <View key={item.item_name} style={[styles.menuItemCard, { borderColor: Palette.status.warning }]}>
+                          <View style={styles.menuItemHeader}>
+                            <Text style={[styles.menuItemName, { color: Palette.status.warning }]}>{item.item_name}</Text>
+                          </View>
+                          {item.reasons && item.reasons.length > 0 ? (
+                            <Text style={styles.warningText}>⚠️ 排除原因：{item.reasons.join('、')}</Text>
+                          ) : null}
+                        </View>
+                      ))
+                    )}
+                  </>
+                )}
+
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
     </AppContainer>
   );
 }
@@ -367,6 +540,7 @@ function RestaurantCard({
   onSelect,
   onSummary,
   onNavigate,
+  onViewMenu,
 }: {
   restaurant: HealthyFoodRestaurant;
   index: number;
@@ -376,6 +550,7 @@ function RestaurantCard({
   onSelect: () => void;
   onSummary: () => void;
   onNavigate: () => void;
+  onViewMenu: () => void;
 }) {
   return (
     <View style={[styles.restaurantCard, selected && styles.restaurantCardSelected]}>
@@ -405,6 +580,7 @@ function RestaurantCard({
         </View>
       ))}
       <View style={styles.restaurantActions}>
+        <SecondaryButton label="完整菜單" onPress={onViewMenu} icon={<Ionicons name="restaurant-outline" size={14} color={Palette.accent.green} />} />
         <SecondaryButton label="地圖標示" onPress={onSelect} />
         <SecondaryButton label={summaryLoading ? '產生中' : 'AI 摘要'} onPress={onSummary} />
         <SecondaryButton label="導航" onPress={onNavigate} />
@@ -435,6 +611,7 @@ function RestaurantCard({
     </View>
   );
 }
+
 
 function NutritionMini({ label, value, color }: { label: string; value: string; color: string }) {
   return (
@@ -566,7 +743,7 @@ const styles = StyleSheet.create({
   restaurantMeta: { ...Typography.caption, color: Palette.text.secondary },
   restaurantItem: { backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, padding: Spacing.md, gap: Spacing.sm },
   itemName: { ...Typography.caption, color: Palette.text.primary, fontWeight: '700' },
-  restaurantActions: { flexDirection: 'row', gap: Spacing.sm },
+  restaurantActions: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' },
   aiSummaryBox: {
     gap: Spacing.sm,
     backgroundColor: Palette.accent.blueDim,
@@ -580,4 +757,17 @@ const styles = StyleSheet.create({
   personalizedTitle: { ...Typography.caption, color: Palette.text.primary, fontWeight: '700' },
   personalizedItem: { gap: 2 },
   personalizedFood: { ...Typography.caption, color: Palette.accent.green, fontWeight: '700' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
+  modalContent: { width: '100%', maxWidth: 500, maxHeight: '80%', backgroundColor: Palette.bg.card, borderRadius: Radius.xl, borderWidth: 1, borderColor: Palette.border.subtle, padding: Spacing.lg, ...Shadows.soft },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+  modalTitle: { ...Typography.bodyBold, color: Palette.text.primary },
+  modalScroll: { gap: Spacing.md },
+  modalSectionTitle: { ...Typography.bodyBold, color: Palette.text.primary, marginTop: Spacing.sm },
+  menuItemCard: { backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, borderWidth: 1, borderColor: Palette.border.subtle, padding: Spacing.md, gap: Spacing.sm },
+  menuItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  menuItemName: { ...Typography.caption, color: Palette.text.primary, fontWeight: '700' },
+  menuItemPrice: { ...Typography.caption, color: Palette.text.secondary },
+  customizationText: { ...Typography.small, color: Palette.accent.green, marginTop: Spacing.xs },
+  warningText: { ...Typography.small, color: Palette.status.warning, marginTop: Spacing.xs },
 });
+

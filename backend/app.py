@@ -40,9 +40,12 @@ from services.vision_food_service import (
     build_vision_food_response,
     call_gemini_food_recognition_with_rotation,
 )
+from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
+from services.medical_risk_service import evaluate_medical_risk
 
 
 load_local_env()
+
 BASE_DIR = os.path.dirname(__file__)
 
 pg_conn = None
@@ -564,6 +567,121 @@ def map_food_recommend(user_id):
     if not result:
         return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
     return jsonify(result)
+
+
+@app.route("/restaurant/menu", methods=["POST"])
+def get_restaurant_menu():
+    """
+    動態獲取餐廳詳細菜單。如果本地資料庫不存在，則調用爬蟲與 Gemini 動態分析。
+    """
+    data = request.get_json(silent=True) or {}
+    restaurant_id = data.get("restaurant_id", "")
+    name = data.get("name", "").strip()
+    address = data.get("address", "").strip()
+    
+    if not name:
+        return jsonify({"error": "缺少 restaurant name"}), 400
+
+    # 1. 搜尋本地資料庫是否已有該店
+    matched = None
+    for r in RESTAURANT_CATALOG:
+        if r.get("restaurant_id") == restaurant_id or r["name"].strip().lower() == name.lower():
+            matched = r
+            break
+
+    if not matched:
+        # 2. 本地不存在 ➔ 呼叫爬蟲與 Gemini 即時分析
+        print(f"[Scraper] 即時線上擷取並生成 {name} 的菜單")
+        enriched = enrich_restaurant_with_gemini(name, address or "台灣", "")
+        
+        # 建立新餐廳物件
+        new_id = restaurant_id or f"scraped_{uuid.uuid4().hex[:6]}"
+        matched = {
+            "restaurant_id": new_id,
+            "name": name,
+            "lat": float(data.get("lat") or 25.0338),
+            "lng": float(data.get("lng") or 121.5645),
+            "address": address or "台灣",
+            "phone": "",
+            "open_hours": ["11:00-21:00"],
+            "tags": ["動態擷取", "AI標記"],
+            "price_level": 2,
+            "items": enriched.get("items", [])
+        }
+        
+        # 寫入本地 Catalog 與檔案存檔
+        RESTAURANT_CATALOG.append(matched)
+        catalog_path = os.path.join(BASE_DIR, "data", "restaurant_catalog.json")
+        try:
+            with open(catalog_path, "w", encoding="utf-8") as f:
+                json.dump(RESTAURANT_CATALOG, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"[!] 無法寫入本地 catalog 檔案: {e}")
+
+    # 3. 對所有菜單項目進行醫學過濾與偏好評分
+    user_id = data.get("user_id", "demo_user")
+    user = storage.get_user(user_id)
+    conditions = user.get("health_conditions", []) if user else []
+    allergens = user.get("allergens", []) if user else []
+    
+    recommended_items = []
+    filtered_items = []
+    
+    for item in matched.get("items", []):
+        candidate = {
+            "label": item.get("item_id", item["name"]),
+            "name_zh": item["name"],
+            "gi": item.get("gi"),
+            "allergens": item.get("allergens", []),
+            "sodium": item.get("sodium"),
+            "carbs": item.get("carbs"),
+            "protein": item.get("protein"),
+            "fat": item.get("fat"),
+        }
+        medical_risk = evaluate_medical_risk(candidate, conditions, allergens, DISEASE_RULES, ALLERGEN_TAXONOMY)
+        reasons = [f"超出預算 {data.get('budget', 150)} 元"] if item.get("price", 0) > int(data.get("budget", 150)) else []
+        reasons.extend(medical_risk["block_reasons"])
+        
+        # 即使被過濾，也在本機開發測試時列出 recommended_item，但帶有警示標籤以供測試
+        recommended_item = {
+            "restaurant_id": matched["restaurant_id"],
+            "restaurant_name": matched["name"],
+            "restaurant_lat": matched["lat"],
+            "restaurant_lng": matched["lng"],
+            "address": matched.get("address", ""),
+            "distance_km": 0.1,
+            "tags": matched["tags"],
+            "item_id": item.get("item_id", item["name"]),
+            "item_name": item["name"],
+            "price": item.get("price", 0),
+            "calories": item.get("calories", 0),
+            "protein": item.get("protein", 0),
+            "carbs": item.get("carbs", 0),
+            "fat": item.get("fat", 0),
+            "sodium": item.get("sodium", 0),
+            "gi": item.get("gi"),
+            "match_score": 80 if reasons else 95,
+            "reasons": reasons if reasons else ["營養與安全條件相符"],
+            "medical_risk": medical_risk,
+        }
+        recommended_items.append(recommended_item)
+        
+        if reasons:
+            filtered_item = {
+                "restaurant_id": matched["restaurant_id"],
+                "restaurant_name": matched["name"],
+                "item_name": item["name"],
+                "reasons": reasons,
+                "price": item.get("price", 0)
+            }
+            filtered_items.append(filtered_item)
+
+    return jsonify({
+        "restaurant_id": matched["restaurant_id"],
+        "name": matched["name"],
+        "recommended_items": recommended_items,
+        "filtered_items": filtered_items
+    })
 
 
 @app.route("/map-food-recommend/<user_id>/restaurant-summary", methods=["POST"])

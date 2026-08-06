@@ -111,11 +111,39 @@ class StorageRepository:
         return row["doc"] if row else None
 
     def get_user(self, user_id: str):
+        user_doc = None
         if self.use_postgres:
-            return self._fetch_json_doc("users", "user_id", user_id)
-        if self.use_mongo:
-            return self.db.users.find_one({"user_id": user_id}, {"_id": 0})
-        return self.mem_users.get(user_id)
+            user_doc = self._fetch_json_doc("users", "user_id", user_id)
+        elif self.use_mongo:
+            user_doc = self.db.users.find_one({"user_id": user_id}, {"_id": 0})
+        else:
+            user_doc = self.mem_users.get(user_id)
+
+        # Developer auto-fallback: auto-create default user profile for demo_user if missing
+        if not user_doc and user_id == "demo_user":
+            user_doc = {
+                "user_id": "demo_user",
+                "name": "本機測試帳號",
+                "gender": "male",
+                "height": 170.0,
+                "weight": 70.0,
+                "age": 25,
+                "activity_level": "中等活動量",
+                "activity_multiplier": 1.55,
+                "bmi": 24.2,
+                "bmr": 1624,
+                "tdee": 2517,
+                "daily_calorie_target": 2517,
+                "health_conditions": [],
+                "allergens": [],
+                "target_weight": 65.0,
+                "diet_type": "均衡飲食",
+                "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+            }
+            self.upsert_user(user_doc)
+
+        return user_doc
+
 
     def upsert_user(self, user_doc: dict):
         if self.use_postgres:

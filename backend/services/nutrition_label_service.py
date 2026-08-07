@@ -8,8 +8,9 @@ import requests
 
 
 RETRYABLE_GEMINI_STATUS_CODES = {401, 403, 404, 429, 500, 502, 503, 504}
-DEFAULT_GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+DEFAULT_GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-flash"]
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
+
 
 
 def extract_number(value, as_int: bool = False):

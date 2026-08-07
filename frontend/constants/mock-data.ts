@@ -26,6 +26,12 @@ export type MealEntry = {
   fat: number;
   sodium: number;
   fiber: number;
+  sugar?: number;
+  saturated_fat?: number;
+  trans_fat?: number;
+  calcium?: number;
+  iron?: number;
+  is_fried?: boolean;
   // PRD: 疾病禁忌標記
   warnings?: string[];
 };
@@ -150,6 +156,12 @@ export type DetectedFood = {
     fat: number;
     sodium: number;
     fiber: number;
+    sugar?: number;
+    saturated_fat?: number;
+    trans_fat?: number;
+    calcium?: number;
+    iron?: number;
+    is_fried?: boolean;
   };
   originalNutrition?: {
     calories: number;
@@ -158,6 +170,12 @@ export type DetectedFood = {
     fat: number;
     sodium: number;
     fiber: number;
+    sugar?: number;
+    saturated_fat?: number;
+    trans_fat?: number;
+    calcium?: number;
+    iron?: number;
+    is_fried?: boolean;
   };
   portionAdjusted?: boolean;
   // PRD: 硬性排除規則 — GI 指數、過敏原

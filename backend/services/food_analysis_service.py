@@ -48,6 +48,7 @@ def check_food_safety(
     user_allergens: list,
     disease_rules: dict,
     allergen_taxonomy: dict | None = None,
+    user_profile: dict | None = None,
 ) -> list:
     if not nutrients.get("calories"):
         return []
@@ -62,11 +63,19 @@ def check_food_safety(
             "carbs": nutrients.get("carbs"),
             "protein": nutrients.get("protein"),
             "fat": nutrients.get("fat"),
+            "sugar": nutrients.get("sugar"),
+            "saturated_fat": nutrients.get("saturated_fat"),
+            "trans_fat": nutrients.get("trans_fat"),
+            "fiber": nutrients.get("fiber"),
+            "calcium": nutrients.get("calcium"),
+            "iron": nutrients.get("iron"),
+            "is_fried": nutrients.get("is_fried"),
         },
         user_conditions,
         user_allergens,
         disease_rules,
         allergen_taxonomy or {"groups": []},
         portion_g=weight_g,
+        user_profile=user_profile,
     )
     return risk_messages(risk_result)

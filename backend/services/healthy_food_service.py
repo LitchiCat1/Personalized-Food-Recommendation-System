@@ -6,6 +6,7 @@ from math import atan2, cos, radians, sin, sqrt
 from services.google_places_service import fetch_google_places_restaurants
 from services.medical_risk_service import evaluate_medical_risk
 from services.nutrition_progress_service import build_daily_nutrition_progress
+from services.disease_rule_service import load_disease_rules, load_allergen_taxonomy
 
 
 def load_restaurant_catalog(base_dir: str) -> list[dict]:
@@ -100,8 +101,15 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                 "carbs": item.get("carbs"),
                 "protein": item.get("protein"),
                 "fat": item.get("fat"),
+                "sugar": item.get("sugar"),
+                "saturated_fat": item.get("saturated_fat"),
+                "trans_fat": item.get("trans_fat"),
+                "fiber": item.get("fiber"),
+                "calcium": item.get("calcium"),
+                "iron": item.get("iron"),
+                "is_fried": item.get("is_fried"),
             }
-            medical_risk = evaluate_medical_risk(candidate, conditions, allergens, disease_rules, taxonomy)
+            medical_risk = evaluate_medical_risk(candidate, conditions, allergens, disease_rules, taxonomy, user_profile=user)
             reasons = [f"超出預算 {budget} 元"] if item["price"] > budget else []
             reasons.extend(medical_risk["block_reasons"])
 
@@ -198,8 +206,15 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                     "carbs": item.get("carbs"),
                     "protein": item.get("protein"),
                     "fat": item.get("fat"),
+                    "sugar": item.get("sugar"),
+                    "saturated_fat": item.get("saturated_fat"),
+                    "trans_fat": item.get("trans_fat"),
+                    "fiber": item.get("fiber"),
+                    "calcium": item.get("calcium"),
+                    "iron": item.get("iron"),
+                    "is_fried": item.get("is_fried"),
                 }
-                medical_risk = evaluate_medical_risk(candidate, conditions, allergens, disease_rules, taxonomy)
+                medical_risk = evaluate_medical_risk(candidate, conditions, allergens, disease_rules, taxonomy, user_profile=user)
                 reasons = [f"超出預算 {budget} 元"] if item["price"] > budget else []
                 reasons.extend(medical_risk["block_reasons"])
 
@@ -277,11 +292,20 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
     remaining = build_daily_nutrition_progress(storage, user_id, user, now)["remaining"]
 
     data_source = "google_places"
+    from services.google_places_service import GooglePlacesConfigError
     try:
         restaurants = fetch_google_places_restaurants(lat, lng, radius_km, category, budget, limit=12)
+    except GooglePlacesConfigError:
+        raise
     except Exception as e:
         print(f"[Google Places API error] {e}. Falling back to coordinate-shifted local catalog.")
-        offline_recommendations = build_healthy_food_recommendations(storage, user_id, params)
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        disease_rules = load_disease_rules(base_dir)
+        restaurant_catalog = load_restaurant_catalog(base_dir)
+        taxonomy = load_allergen_taxonomy(base_dir)
+        offline_recommendations = build_healthy_food_recommendations(
+            storage, disease_rules, restaurant_catalog, user_id, params, taxonomy
+        )
         return {
             "user_id": user_id,
             "budget": budget,

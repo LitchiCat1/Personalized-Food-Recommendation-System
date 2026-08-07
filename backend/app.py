@@ -637,8 +637,15 @@ def get_restaurant_menu():
             "carbs": item.get("carbs"),
             "protein": item.get("protein"),
             "fat": item.get("fat"),
+            "sugar": item.get("sugar"),
+            "saturated_fat": item.get("saturated_fat"),
+            "trans_fat": item.get("trans_fat"),
+            "fiber": item.get("fiber"),
+            "calcium": item.get("calcium"),
+            "iron": item.get("iron"),
+            "is_fried": item.get("is_fried"),
         }
-        medical_risk = evaluate_medical_risk(candidate, conditions, allergens, DISEASE_RULES, ALLERGEN_TAXONOMY)
+        medical_risk = evaluate_medical_risk(candidate, conditions, allergens, DISEASE_RULES, ALLERGEN_TAXONOMY, user_profile=user)
         reasons = [f"超出預算 {data.get('budget', 150)} 元"] if item.get("price", 0) > int(data.get("budget", 150)) else []
         reasons.extend(medical_risk["block_reasons"])
         

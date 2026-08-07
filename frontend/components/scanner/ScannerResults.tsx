@@ -106,6 +106,7 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
               GI {food.gi === 'high' ? '高' : food.gi === 'medium' ? '中' : '低'}
             </DataPill>
             {food.source ? <DataPill tone="info">{food.source}</DataPill> : null}
+            {food.nutrition.is_fried ? <DataPill tone="danger">油炸食物</DataPill> : null}
             {food.needsConfirmation ? <DataPill tone="warning">需人工確認</DataPill> : null}
             {food.allergens.map((a) => <DataPill key={a} tone="warning">{a}</DataPill>)}
           </View>
@@ -122,9 +123,14 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
               { label: '熱量', value: food.nutrition.calories, unit: 'kcal', color: Palette.accent.green },
               { label: '蛋白質', value: food.nutrition.protein, unit: 'g', color: Palette.accent.blue },
               { label: '碳水', value: food.nutrition.carbs, unit: 'g', color: Palette.accent.orange },
+              { label: '精緻糖', value: food.nutrition.sugar ?? 0, unit: 'g', color: Palette.accent.orange },
               { label: '脂肪', value: food.nutrition.fat, unit: 'g', color: Palette.accent.purple },
+              { label: '飽和脂肪', value: food.nutrition.saturated_fat ?? 0, unit: 'g', color: Palette.accent.purple },
+              { label: '反式脂肪', value: food.nutrition.trans_fat ?? 0, unit: 'g', color: Palette.accent.purple },
               { label: '鈉', value: food.nutrition.sodium, unit: 'mg', color: food.nutrition.sodium > 800 ? Palette.status.warning : Palette.accent.pink },
               { label: '纖維', value: food.nutrition.fiber, unit: 'g', color: Palette.accent.cyan },
+              { label: '鈣', value: food.nutrition.calcium ?? 0, unit: 'mg', color: Palette.accent.cyan },
+              { label: '鐵', value: food.nutrition.iron ?? 0, unit: 'mg', color: Palette.accent.cyan },
             ].map((item) => (
               <View key={item.label} style={[styles.nutritionItem, { minWidth: wp(26) }]}>
                 <Text style={styles.nutritionLabel}>{item.label}</Text>

@@ -164,12 +164,38 @@ class StorageRepository:
             self.mem_users[user_doc["user_id"]] = user_doc
         return user_doc
 
+    def _enrich_record_totals(self, record: dict) -> dict:
+        if not record or "foods" not in record:
+            return record
+        
+        total_sugar = 0.0
+        total_saturated_fat = 0.0
+        total_trans_fat = 0.0
+        total_calcium = 0.0
+        total_iron = 0.0
+        
+        foods = record.get("foods") or []
+        for food in foods:
+            total_sugar += float(food.get("sugar") or 0.0)
+            total_saturated_fat += float(food.get("saturated_fat") or 0.0)
+            total_trans_fat += float(food.get("trans_fat") or 0.0)
+            total_calcium += float(food.get("calcium") or 0.0)
+            total_iron += float(food.get("iron") or 0.0)
+            
+        record["total_sugar"] = round(total_sugar, 1)
+        record["total_saturated_fat"] = round(total_saturated_fat, 1)
+        record["total_trans_fat"] = round(total_trans_fat, 1)
+        record["total_calcium"] = round(total_calcium, 1)
+        record["total_iron"] = round(total_iron, 1)
+        return record
+
     def insert_record(self, record: dict):
         if not record.get("client_record_id"):
             record = {**record, "client_record_id": f"server_record_{uuid.uuid4().hex}"}
         existing = self.get_record_by_client_record_id(record.get("user_id"), record.get("client_record_id"))
         if existing:
-            return {**existing, "_deduplicated": True}
+            return {**self._enrich_record_totals(existing), "_deduplicated": True}
+
 
         if self.use_postgres:
             with self.pg_conn.cursor() as cursor:
@@ -196,12 +222,12 @@ class StorageRepository:
                         record.get("source", "camera"),
                     ),
                 )
-            return record
+            return self._enrich_record_totals(record)
         if self.use_mongo:
             self.db.records.insert_one(record)
         else:
             self.mem_records.append(record)
-        return record
+        return self._enrich_record_totals(record)
 
     def upsert_record(self, record: dict):
         return self.insert_record(record)
@@ -222,12 +248,13 @@ class StorageRepository:
                     (user_id, client_record_id),
                 )
                 row = cursor.fetchone()
-            return dict(row) if row else None
+            return self._enrich_record_totals(dict(row)) if row else None
         if self.use_mongo:
-            return self.db.records.find_one({"user_id": user_id, "client_record_id": client_record_id}, {"_id": 0})
+            res = self.db.records.find_one({"user_id": user_id, "client_record_id": client_record_id}, {"_id": 0})
+            return self._enrich_record_totals(res) if res else None
         for record in self.mem_records:
             if record.get("user_id") == user_id and record.get("client_record_id") == client_record_id:
-                return record
+                return self._enrich_record_totals(record)
         return None
 
     def update_record(self, record: dict):
@@ -265,7 +292,7 @@ class StorageRepository:
                     ),
                 )
                 row = cursor.fetchone()
-            return dict(row) if row else None
+            return self._enrich_record_totals(dict(row)) if row else None
 
         if self.use_mongo:
             result = self.db.records.update_one(
@@ -279,7 +306,7 @@ class StorageRepository:
         for index, existing in enumerate(self.mem_records):
             if existing.get("user_id") == user_id and existing.get("client_record_id") == client_record_id:
                 self.mem_records[index] = record
-                return record
+                return self._enrich_record_totals(record)
         return None
 
     def delete_record(self, user_id: str, client_record_id: str):
@@ -296,7 +323,7 @@ class StorageRepository:
                     (user_id, client_record_id),
                 )
                 row = cursor.fetchone()
-            return dict(row) if row else None
+            return self._enrich_record_totals(dict(row)) if row else None
 
         if self.use_mongo:
             record = self.db.records.find_one_and_delete(
@@ -304,11 +331,11 @@ class StorageRepository:
             )
             if record:
                 record.pop("_id", None)
-            return record
+            return self._enrich_record_totals(record) if record else None
 
         for index, record in enumerate(self.mem_records):
             if record.get("user_id") == user_id and record.get("client_record_id") == client_record_id:
-                return self.mem_records.pop(index)
+                return self._enrich_record_totals(self.mem_records.pop(index))
         return None
 
     def get_records(self, user_id: str, date_str: str | None = None, limit: int = 50, offset: int = 0):
@@ -328,19 +355,21 @@ class StorageRepository:
             with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute(sql, params)
                 rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            return [self._enrich_record_totals(dict(row)) for row in rows]
 
         if self.use_mongo:
             query = {"user_id": user_id}
             if date_str:
                 query["timestamp"] = {"$regex": f"^{date_str}"}
-            return list(self.db.records.find(query, {"_id": 0}).sort("timestamp", -1).skip(offset).limit(limit))
+            res_list = list(self.db.records.find(query, {"_id": 0}).sort("timestamp", -1).skip(offset).limit(limit))
+            return [self._enrich_record_totals(r) for r in res_list]
 
         records = [r for r in self.mem_records if r.get("user_id") == user_id]
         if date_str:
             records = [r for r in records if str(r.get("timestamp", "")).startswith(date_str)]
         records.sort(key=lambda record: str(record.get("timestamp", "")), reverse=True)
-        return records[offset:offset + limit]
+        slice_records = records[offset:offset + limit]
+        return [self._enrich_record_totals(r) for r in slice_records]
 
     def get_today_records(self, user_id: str):
         return self.get_records(user_id, datetime.now(timezone.utc).strftime("%Y-%m-%d"), limit=500)

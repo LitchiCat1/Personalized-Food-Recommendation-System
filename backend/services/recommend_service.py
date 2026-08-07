@@ -220,7 +220,7 @@ def build_recommendation_response(storage, nutrition_db: dict, tfda_db: dict, di
 
     for nutrients in candidates:
         label = nutrients["label"]
-        medical_risk = evaluate_medical_risk(nutrients, conditions, allergens, disease_rules, taxonomy)
+        medical_risk = evaluate_medical_risk(nutrients, conditions, allergens, disease_rules, taxonomy, user_profile=user)
         if not medical_risk["is_safe"]:
             filtered_out.append(
                 {

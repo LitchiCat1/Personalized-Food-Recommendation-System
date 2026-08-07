@@ -286,7 +286,7 @@ class ServiceSmokeTests(unittest.TestCase):
         progress = build_daily_nutrition_progress(
             OverTargetStorage(),
             "user-a",
-            {"daily_calorie_target": 2000},
+            {"daily_calorie_target": 2000, "height": 250, "weight": 140},
             datetime(2026, 7, 18, tzinfo=timezone.utc),
         )
 

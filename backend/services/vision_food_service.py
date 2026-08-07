@@ -89,6 +89,7 @@ def build_vision_food_response(
         )
 
     allergen_taxonomy = allergen_taxonomy or {"groups": []}
+    user = storage.get_user(user_id) if user_id else None
     detections = []
     rejected_detections = []
     total_calories = 0
@@ -140,6 +141,12 @@ def build_vision_food_response(
             "carbs": matched_food.get("carbs", 0),
             "sodium": matched_food.get("sodium", 0),
             "fiber": matched_food.get("fiber", 0),
+            "sugar": matched_food.get("sugar", 0),
+            "saturated_fat": matched_food.get("saturated_fat", 0),
+            "trans_fat": matched_food.get("trans_fat", 0),
+            "calcium": matched_food.get("calcium", 0),
+            "iron": matched_food.get("iron", 0),
+            "is_fried": matched_food.get("is_fried", False),
             "source": matched_food.get("source", "TFDA"),
             "allergens": matched_food.get("allergens", []),
             "gi": "medium",
@@ -171,6 +178,7 @@ def build_vision_food_response(
                 user_allergens,
                 disease_rules,
                 allergen_taxonomy,
+                user_profile=user,
             )
         )
 

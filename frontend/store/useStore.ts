@@ -203,6 +203,12 @@ export const useStore = create<NutriLensState>((set, get) => ({
         fat: d.nutrition.fat,
         sodium: d.nutrition.sodium,
         fiber: d.nutrition.fiber,
+        sugar: d.nutrition.sugar,
+        saturated_fat: d.nutrition.saturated_fat,
+        trans_fat: d.nutrition.trans_fat,
+        calcium: d.nutrition.calcium,
+        iron: d.nutrition.iron,
+        is_fried: d.nutrition.is_fried,
         warnings: d.warnings,
       }));
 
@@ -242,6 +248,11 @@ export const useStore = create<NutriLensState>((set, get) => ({
               fat: record.total_fat,
               sodium: record.total_sodium,
               fiber: record.total_fiber,
+              sugar: record.total_sugar,
+              saturated_fat: record.total_saturated_fat,
+              trans_fat: record.total_trans_fat,
+              calcium: record.total_calcium,
+              iron: record.total_iron,
               source: record.source,
               warnings: [],
             }];
@@ -258,6 +269,12 @@ export const useStore = create<NutriLensState>((set, get) => ({
           fat: Number(food.fat || 0),
           sodium: Number(food.sodium || 0),
           fiber: Number(food.fiber || 0),
+          sugar: food.sugar !== undefined ? Number(food.sugar) : undefined,
+          saturated_fat: food.saturated_fat !== undefined ? Number(food.saturated_fat) : undefined,
+          trans_fat: food.trans_fat !== undefined ? Number(food.trans_fat) : undefined,
+          calcium: food.calcium !== undefined ? Number(food.calcium) : undefined,
+          iron: food.iron !== undefined ? Number(food.iron) : undefined,
+          is_fried: food.is_fried,
           warnings: food.warnings || [],
         }));
       });
@@ -356,6 +373,12 @@ function scaleNutrition(nutrition: DetectedFood['nutrition'], scale: number): De
     fat: Math.round(nutrition.fat * scale * 10) / 10,
     sodium: Math.round(nutrition.sodium * scale),
     fiber: Math.round(nutrition.fiber * scale * 10) / 10,
+    sugar: nutrition.sugar !== undefined ? Math.round(nutrition.sugar * scale * 10) / 10 : undefined,
+    saturated_fat: nutrition.saturated_fat !== undefined ? Math.round(nutrition.saturated_fat * scale * 10) / 10 : undefined,
+    trans_fat: nutrition.trans_fat !== undefined ? Math.round(nutrition.trans_fat * scale * 10) / 10 : undefined,
+    calcium: nutrition.calcium !== undefined ? Math.round(nutrition.calcium * scale * 10) / 10 : undefined,
+    iron: nutrition.iron !== undefined ? Math.round(nutrition.iron * scale * 10) / 10 : undefined,
+    is_fried: nutrition.is_fried,
   };
 }
 
@@ -390,6 +413,11 @@ function sumMeals(meals: MealEntry[]) {
     fat: Math.round(meals.reduce((s, m) => s + m.fat, 0) * 10) / 10,
     sodium: Math.round(meals.reduce((s, m) => s + m.sodium, 0)),
     fiber: Math.round(meals.reduce((s, m) => s + m.fiber, 0) * 10) / 10,
+    sugar: Math.round(meals.reduce((s, m) => s + (m.sugar || 0), 0) * 10) / 10,
+    saturated_fat: Math.round(meals.reduce((s, m) => s + (m.saturated_fat || 0), 0) * 10) / 10,
+    trans_fat: Math.round(meals.reduce((s, m) => s + (m.trans_fat || 0), 0) * 10) / 10,
+    calcium: Math.round(meals.reduce((s, m) => s + (m.calcium || 0), 0) * 10) / 10,
+    iron: Math.round(meals.reduce((s, m) => s + (m.iron || 0), 0) * 10) / 10,
   };
 }
 

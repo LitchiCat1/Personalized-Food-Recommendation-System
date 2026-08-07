@@ -32,6 +32,12 @@ export type FoodRecordItem = {
   fat?: number;
   sodium?: number;
   fiber?: number;
+  sugar?: number;
+  saturated_fat?: number;
+  trans_fat?: number;
+  calcium?: number;
+  iron?: number;
+  is_fried?: boolean;
   source?: string;
   warnings?: string[];
 };
@@ -48,6 +54,11 @@ export type DietaryRecord = {
   total_fat?: number;
   total_sodium?: number;
   total_fiber?: number;
+  total_sugar?: number;
+  total_saturated_fat?: number;
+  total_trans_fat?: number;
+  total_calcium?: number;
+  total_iron?: number;
   source?: string;
 };
 

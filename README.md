@@ -8,37 +8,43 @@
 Personalized-Food-Recommendation-System/
 ├── backend/                  # Flask 後端 API
 │   ├── app.py                # 主伺服器入口與 API routes
-│   ├── services/             # 辨識、推薦、歷史、OCR、Profile 業務邏輯
-│   ├── repositories/         # PostgreSQL/MongoDB/In-memory 資料層
+│   ├── data/                 # 本地靜態與快取資料
+│   │   └── restaurant_catalog.json # 測試餐廳與快取菜單資料庫
+│   ├── services/             # 辨識、推薦、網頁爬蟲與 AI 解析邏輯
+│   │   ├── robust_restaurant_scraper_service.py # AI 菜單爬蟲與估算服務
+│   │   ├── google_places_service.py # Google Places API 串接與新版 v1 相容
+│   │   ├── healthy_food_service.py # 健康餐點與店家推薦整合服務
+│   │   └── ...
+│   ├── repositories/         # 資料庫/記憶體資料訪問層
+│   │   └── storage.py        # 使用者與飲食紀錄存取 (含自動註冊 Fallback)
 │   ├── nutrition_db.json     # 手工食物營養素資料庫
 │   ├── nutrition_db_tw.json  # TFDA 台灣食品營養資料庫
-│   ├── requirements.txt      # Python 依賴
-│   ├── test_client.py        # API 測試腳本
+│   ├── requirements.txt      # Python 依賴 (含 beautifulsoup4)
+│   └── ...
 ├── frontend/                 # Expo React Native 前端
 │   ├── app/                  # Expo Router 頁面
 │   │   ├── (tabs)/           # Tab 導覽頁面
-│   │   │   ├── _layout.tsx   # Tab bar 佈局
 │   │   │   ├── index.tsx     # 首頁 Dashboard
-│   │   │   ├── scanner.tsx   # AI 食物辨識
-│   │   │   ├── recommend.tsx # 智慧推薦
-│   │   │   ├── history.tsx   # 飲食趨勢
-│   │   │   └── profile.tsx   # 個人檔案
-│   │   └── _layout.tsx       # Root layout
-│   ├── components/           # 可複用元件
-│   │   ├── AppContainer.tsx  # 共用頁面容器 (scroll reset + web 支援)
-│   │   └── dashboard/        # Dashboard 專用元件
-│   ├── lib/                  # 共用 API 與前端型別
-│   ├── constants/            # 設計系統 + Mock 資料
-│   │   ├── theme.ts          # 色彩/字型/陰影 Token
-│   │   └── mock-data.ts      # 假資料
-│   ├── hooks/                # 自訂 Hooks
-│   │   └── useResponsive.ts  # 響應式 + 平台偵測
-│   └── store/                # 狀態管理
-│       └── useStore.ts       # Zustand 全域狀態
-└── docs/                     # 文件
+│   │   │   ├── scanner.tsx   # AI 食物與營養標示辨識
+│   │   │   ├── recommend.tsx # 智慧地圖與店家推薦 (連動餐點)
+│   │   │   ├── history.tsx   # 飲食趨勢與 AI 洞察
+│   │   │   └── profile.tsx   # 個人檔案設定
+│   │   └── _layout.tsx       # Root layout 與驗證閘道
+│   ├── components/           # 可複用 UI 元件
+│   │   ├── AuthGate.tsx      # Supabase 登入與註冊 Gate
+│   │   ├── AppContainer.tsx  # 響應式佈局容器
+│   │   ├── maps/             # 地圖整合元件
+│   │   └── ui/               # 設計系統通用按鈕、對話框與導覽
+│   ├── lib/                  # API 調用與型別定義
+│   │   ├── api.ts            # 前後端 API 串接 (含 Google Places v1)
+│   │   └── ...
+│   ├── store/                # Zustand 狀態管理
+│   │   └── useStore.ts       # 全域核心狀態
+│   └── package.json          # 前端依賴與腳本 (v0.0.7)
+└── docs/                     # 專案文件
     ├── PRD.md                # 產品需求文件
-    ├── Project_Architecture_and_Status.md # 架構、功能狀態、部署整合文件
-    └── Operations_Runbook.md # 指令、部署驗收、key 輪替、工作日誌與事故經驗
+    ├── Project_Architecture_and_Status.md # 架構與 Roadmap 稽核表
+    └── Operations_Runbook.md # 部署與維護指令手冊
 ```
 
 ## 🔑 核心功能狀態

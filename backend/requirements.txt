@@ -3,3 +3,5 @@ flask-cors
 pymongo
 requests
 psycopg2-binary
+beautifulsoup4
+

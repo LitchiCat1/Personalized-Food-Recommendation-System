@@ -276,7 +276,27 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
 
     remaining = build_daily_nutrition_progress(storage, user_id, user, now)["remaining"]
 
-    restaurants = fetch_google_places_restaurants(lat, lng, radius_km, category, budget, limit=12)
+    data_source = "google_places"
+    try:
+        restaurants = fetch_google_places_restaurants(lat, lng, radius_km, category, budget, limit=12)
+    except Exception as e:
+        print(f"[Google Places API error] {e}. Falling back to coordinate-shifted local catalog.")
+        offline_recommendations = build_healthy_food_recommendations(storage, user_id, params)
+        return {
+            "user_id": user_id,
+            "budget": budget,
+            "radius_km": radius_km,
+            "category": category or "all",
+            "location": {"lat": lat, "lng": lng},
+            "remaining": remaining,
+            "data_source": "google_places_fallback",
+            "nutrition_available": True,
+            "nutrition_note": f"Google Places API 載入失敗（可能是 Billing 未啟用或金鑰錯誤）：{e}。已自動為您切換至本地模擬店家以利演示功能。",
+            "recommended": offline_recommendations.get("recommended", []),
+            "restaurants": offline_recommendations.get("restaurants", []),
+            "filtered_out": offline_recommendations.get("filtered_out", []),
+        }
+
     recommendations = [item for restaurant in restaurants for item in restaurant.get("recommended_items", [])]
     recommendations.sort(key=lambda item: item["match_score"], reverse=True)
     return {
@@ -293,3 +313,4 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
         "restaurants": restaurants,
         "filtered_out": [],
     }
+

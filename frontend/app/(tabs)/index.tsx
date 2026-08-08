@@ -42,7 +42,7 @@ export default function DashboardScreen() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [conditionRules, setConditionRules] = useState<MedicalConditionRule[]>([]);
   const [recordManagerVisible, setRecordManagerVisible] = useState(false);
-  const { calories, protein, carbs, fat, sodium, fiber } = dailyNutrition;
+  const { calories, protein, carbs, sugar, fat, saturated_fat, trans_fat, sodium, fiber, calcium, iron } = dailyNutrition;
   const remaining = Math.max(0, Math.round(calories.target - calories.current));
   const sodiumRisk = sodium.current >= sodium.target ? '超標' : sodium.current >= sodium.target * 0.8 ? '接近上限' : '正常';
   const nutrientSensitivities = useMemo(
@@ -156,9 +156,14 @@ export default function DashboardScreen() {
       <View style={styles.nutrientStack}>
         <NutrientBar label={protein.label} current={protein.current} target={protein.target} unit={protein.unit} color={protein.color} attentionLabel={getAttentionLabel('protein')} />
         <NutrientBar label={carbs.label} current={carbs.current} target={carbs.target} unit={carbs.unit} color={carbs.color} attentionLabel={getAttentionLabel('carbs')} />
+        <NutrientBar label={sugar.label} current={sugar.current} target={sugar.target} unit={sugar.unit} color={sugar.color} attentionLabel={getAttentionLabel('sugar')} />
         <NutrientBar label={fat.label} current={fat.current} target={fat.target} unit={fat.unit} color={fat.color} attentionLabel={getAttentionLabel('fat')} />
+        <NutrientBar label={saturated_fat.label} current={saturated_fat.current} target={saturated_fat.target} unit={saturated_fat.unit} color={saturated_fat.color} attentionLabel={getAttentionLabel('saturated_fat')} />
+        <NutrientBar label={trans_fat.label} current={trans_fat.current} target={trans_fat.target} unit={trans_fat.unit} color={trans_fat.color} attentionLabel={getAttentionLabel('trans_fat')} />
         <NutrientBar label={sodium.label} current={sodium.current} target={sodium.target} unit={sodium.unit} color={sodium.current >= sodium.target * 0.8 ? Palette.status.warning : sodium.color} attentionLabel={getAttentionLabel('sodium')} />
         <NutrientBar label={fiber.label} current={fiber.current} target={fiber.target} unit={fiber.unit} color={fiber.color} attentionLabel={getAttentionLabel('fiber')} />
+        <NutrientBar label={calcium.label} current={calcium.current} target={calcium.target} unit={calcium.unit} color={calcium.color} attentionLabel={getAttentionLabel('calcium')} />
+        <NutrientBar label={iron.label} current={iron.current} target={iron.target} unit={iron.unit} color={iron.color} attentionLabel={getAttentionLabel('iron')} />
       </View>
     </SectionBlock>
   );

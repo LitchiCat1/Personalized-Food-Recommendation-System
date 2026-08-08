@@ -182,9 +182,14 @@ export const useStore = create<NutriLensState>((set, get) => ({
         calories: { ...state.dailyNutrition.calories, current: 0, target: state.user.dailyCalorieTarget },
         protein: { ...state.dailyNutrition.protein, current: 0 },
         carbs: { ...state.dailyNutrition.carbs, current: 0 },
+        sugar: { ...state.dailyNutrition.sugar, current: 0 },
         fat: { ...state.dailyNutrition.fat, current: 0 },
+        saturated_fat: { ...state.dailyNutrition.saturated_fat, current: 0 },
+        trans_fat: { ...state.dailyNutrition.trans_fat, current: 0 },
         sodium: { ...state.dailyNutrition.sodium, current: 0 },
         fiber: { ...state.dailyNutrition.fiber, current: 0 },
+        calcium: { ...state.dailyNutrition.calcium, current: 0 },
+        iron: { ...state.dailyNutrition.iron, current: 0 },
       },
       user: { ...state.user, totalMeals: 0 },
     })),
@@ -219,6 +224,11 @@ export const useStore = create<NutriLensState>((set, get) => ({
       const totalFat = Math.round(updatedMeals.reduce((s, m) => s + m.fat, 0));
       const totalSodium = Math.round(updatedMeals.reduce((s, m) => s + m.sodium, 0));
       const totalFiber = Math.round(updatedMeals.reduce((s, m) => s + m.fiber, 0));
+      const totalSugar = Math.round(updatedMeals.reduce((s, m) => s + (m.sugar || 0), 0) * 10) / 10;
+      const totalSaturatedFat = Math.round(updatedMeals.reduce((s, m) => s + (m.saturated_fat || 0), 0) * 10) / 10;
+      const totalTransFat = Math.round(updatedMeals.reduce((s, m) => s + (m.trans_fat || 0), 0) * 10) / 10;
+      const totalCalcium = Math.round(updatedMeals.reduce((s, m) => s + (m.calcium || 0), 0) * 10) / 10;
+      const totalIron = Math.round(updatedMeals.reduce((s, m) => s + (m.iron || 0), 0) * 10) / 10;
 
       return {
         todayMeals: updatedMeals,
@@ -227,9 +237,14 @@ export const useStore = create<NutriLensState>((set, get) => ({
           calories: { ...state.dailyNutrition.calories, current: totalCal },
           protein: { ...state.dailyNutrition.protein, current: totalProtein },
           carbs: { ...state.dailyNutrition.carbs, current: totalCarbs },
+          sugar: { ...state.dailyNutrition.sugar, current: totalSugar },
           fat: { ...state.dailyNutrition.fat, current: totalFat },
+          saturated_fat: { ...state.dailyNutrition.saturated_fat, current: totalSaturatedFat },
+          trans_fat: { ...state.dailyNutrition.trans_fat, current: totalTransFat },
           sodium: { ...state.dailyNutrition.sodium, current: totalSodium },
           fiber: { ...state.dailyNutrition.fiber, current: totalFiber },
+          calcium: { ...state.dailyNutrition.calcium, current: totalCalcium },
+          iron: { ...state.dailyNutrition.iron, current: totalIron },
         },
         user: { ...state.user, totalMeals: state.user.totalMeals + newMeals.length },
       };
@@ -290,9 +305,14 @@ export const useStore = create<NutriLensState>((set, get) => ({
           calories: { ...state.dailyNutrition.calories, current: totals.calories, target: state.user.dailyCalorieTarget },
           protein: { ...state.dailyNutrition.protein, current: totals.protein },
           carbs: { ...state.dailyNutrition.carbs, current: totals.carbs },
+          sugar: { ...state.dailyNutrition.sugar, current: totals.sugar },
           fat: { ...state.dailyNutrition.fat, current: totals.fat },
+          saturated_fat: { ...state.dailyNutrition.saturated_fat, current: totals.saturated_fat },
+          trans_fat: { ...state.dailyNutrition.trans_fat, current: totals.trans_fat },
           sodium: { ...state.dailyNutrition.sodium, current: totals.sodium },
           fiber: { ...state.dailyNutrition.fiber, current: totals.fiber },
+          calcium: { ...state.dailyNutrition.calcium, current: totals.calcium },
+          iron: { ...state.dailyNutrition.iron, current: totals.iron },
         },
         user: { ...state.user, totalMeals: Math.max(state.user.totalMeals, todayMeals.length) },
       };

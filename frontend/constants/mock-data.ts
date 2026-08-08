@@ -8,10 +8,15 @@ export const DAILY_NUTRITION = {
   calories: { current: 1450, target: 2100, unit: 'kcal' },
   protein: { current: 85, target: 130, unit: 'g', color: '#60A5FA', label: '蛋白質' },
   carbs: { current: 160, target: 250, unit: 'g', color: '#FB923C', label: '碳水化合物' },
+  sugar: { current: 12, target: 25, unit: 'g', color: '#F59E0B', label: '精緻糖' },
   fat: { current: 42, target: 70, unit: 'g', color: '#A78BFA', label: '脂肪' },
+  saturated_fat: { current: 8, target: 20, unit: 'g', color: '#8B5CF6', label: '飽和脂肪' },
+  trans_fat: { current: 0, target: 0, unit: 'g', color: '#EF4444', label: '反式脂肪' },
   // PRD: 鈉含量、纖維素追蹤 (高血壓/腎臟病患者需要)
   sodium: { current: 1800, target: 2000, unit: 'mg', color: '#F472B6', label: '鈉' },
   fiber: { current: 18, target: 25, unit: 'g', color: '#4ADE80', label: '膳食纖維' },
+  calcium: { current: 280, target: 1000, unit: 'mg', color: '#10B981', label: '鈣' },
+  iron: { current: 4.5, target: 15, unit: 'mg', color: '#EC4899', label: '鐵' },
 };
 
 export type MealEntry = {

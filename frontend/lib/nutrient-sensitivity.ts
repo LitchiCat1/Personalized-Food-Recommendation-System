@@ -1,12 +1,12 @@
 import type { MedicalConditionRule } from '@/lib/api';
 
-export type TrackedNutrientKey = 'protein' | 'carbs' | 'fat' | 'sodium' | 'fiber';
+export type TrackedNutrientKey = 'protein' | 'carbs' | 'sugar' | 'fat' | 'saturated_fat' | 'trans_fat' | 'sodium' | 'fiber' | 'calcium' | 'iron';
 
 export type NutrientSensitivityMap = Record<TrackedNutrientKey, string[]>;
 
 type SensitivityRule = Pick<MedicalConditionRule, 'id' | 'condition' | 'label_zh' | 'aliases' | 'risk_nutrients'>;
 
-const TRACKED_NUTRIENTS = new Set<TrackedNutrientKey>(['protein', 'carbs', 'fat', 'sodium', 'fiber']);
+const TRACKED_NUTRIENTS = new Set<TrackedNutrientKey>(['protein', 'carbs', 'sugar', 'fat', 'saturated_fat', 'trans_fat', 'sodium', 'fiber', 'calcium', 'iron']);
 
 const FALLBACK_RULES: SensitivityRule[] = [
   {
@@ -14,7 +14,10 @@ const FALLBACK_RULES: SensitivityRule[] = [
     condition: 'diabetes',
     label_zh: '糖尿病',
     aliases: ['糖尿病', '血糖管理', 'diabetes'],
-    risk_nutrients: { carbs: { label_zh: '碳水化合物' } },
+    risk_nutrients: {
+      carbs: { label_zh: '碳水化合物' },
+      sugar: { label_zh: '糖' },
+    },
   },
   {
     id: 'hypertension',
@@ -31,6 +34,7 @@ const FALLBACK_RULES: SensitivityRule[] = [
     risk_nutrients: {
       sodium: { label_zh: '鈉' },
       protein: { label_zh: '蛋白質' },
+      calcium: { label_zh: '鈣' },
     },
   },
   {
@@ -45,7 +49,11 @@ const FALLBACK_RULES: SensitivityRule[] = [
     condition: 'hyperlipidemia',
     label_zh: '高血脂',
     aliases: ['高血脂', '膽固醇', '脂質管理', 'hyperlipidemia'],
-    risk_nutrients: { fat: { label_zh: '脂肪' } },
+    risk_nutrients: {
+      fat: { label_zh: '脂肪' },
+      saturated_fat: { label_zh: '飽和脂肪' },
+      trans_fat: { label_zh: '反式脂肪' },
+    },
   },
 ];
 
@@ -71,9 +79,14 @@ export function buildNutrientSensitivityMap(
   const result: NutrientSensitivityMap = {
     protein: [],
     carbs: [],
+    sugar: [],
     fat: [],
+    saturated_fat: [],
+    trans_fat: [],
     sodium: [],
     fiber: [],
+    calcium: [],
+    iron: [],
   };
   const rules: SensitivityRule[] = [
     ...medicalRules,

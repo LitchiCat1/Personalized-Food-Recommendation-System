@@ -132,8 +132,7 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
     radius_m = int(max(500, min(radius_km * 1000, 10000)))
     
     results = []
-    legacy_failed = False
-    
+    legacy_err_msg = ""
     try:
         response = requests.get(
             GOOGLE_PLACES_NEARBY_URL,
@@ -149,23 +148,26 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
         )
         if response.status_code != 200:
             legacy_failed = True
+            legacy_err_msg = f"HTTP {response.status_code}: {response.text}"
         else:
             payload = response.json()
             status = payload.get("status")
             if status not in {"OK", "ZERO_RESULTS"}:
                 legacy_failed = True
+                legacy_err_msg = payload.get("error_message") or f"Status {status}"
             else:
                 results = payload.get("results", [])
-    except Exception:
+    except Exception as exc:
         legacy_failed = True
+        legacy_err_msg = str(exc)
 
     # Automatic fallback to Google Places API (New) v1 if legacy API is not enabled
     if legacy_failed:
-        print("[Google Places] Legacy API call failed or not enabled. Trying Places API (New) fallback...")
+        print(f"[Google Places] Legacy API call failed ({legacy_err_msg}). Trying Places API (New) fallback...")
         results = _fetch_new_places_api(lat, lng, radius_m, key)
         if not results:
-            # If both failed, raise the exception
-            raise GooglePlacesAPIError("Google Places API (Legacy & New) both failed. Please check key permissions.")
+            # If both failed, raise the exception with the actual detailed error message
+            raise GooglePlacesAPIError(legacy_err_msg or "Google Places API failed. Please check key permissions.")
 
     restaurants = []
     for place in results:

@@ -4,7 +4,7 @@ services:
     runtime: static
     repo: https://github.com/LitchiCat1/Personalized-Food-Recommendation-System
     rootDir: frontend
-    branch: v0.0.6
+    branch: v0.0.7
     buildCommand: npm ci && npm run build:web
     staticPublishPath: dist
     routes:
@@ -27,7 +27,7 @@ services:
     repo: https://github.com/LitchiCat1/Personalized-Food-Recommendation-System
     plan: free
     rootDir: backend
-    branch: v0.0.6
+    branch: v0.0.7
     buildCommand: pip install -r requirements.txt
     startCommand: python -u app.py
     envVars:

@@ -8,7 +8,7 @@ import { useStore } from '@/store/useStore';
 const NAV_ITEMS = [
   { href: '/', label: '首頁', icon: 'home-outline' },
   { href: '/scanner', label: '辨識', icon: 'scan-outline' },
-  { href: '/recommend', label: '推薦', icon: 'sparkles-outline' },
+  { href: '/recommend', label: '店家', icon: 'location-outline' },
   { href: '/history', label: '趨勢', icon: 'bar-chart-outline' },
   { href: '/profile', label: '我的', icon: 'person-outline' },
 ] as const;
@@ -23,7 +23,7 @@ export default function DesktopSidebar() {
         <Text style={styles.brand}>NutriLens</Text>
         <Text style={styles.tagline}>AI food safety radar</Text>
         <View style={styles.versionPill}>
-          <Text style={styles.versionText}>v0.0.7</Text>
+          <Text style={styles.versionText}>v0.0.7b</Text>
         </View>
       </View>
 

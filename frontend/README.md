@@ -7,7 +7,7 @@
 - `app/(tabs)/index.tsx`：首頁 Dashboard
 - `app/(tabs)/scanner.tsx`：食物辨識、TFDA 搜尋、營養標示 OCR
 - `app/(tabs)/history.tsx`：飲食歷史與趨勢
-- `app/(tabs)/recommend.tsx`：智慧推薦
+- `app/(tabs)/recommend.tsx`：附近店家搜尋與地圖
 - `app/(tabs)/profile.tsx`：個人檔案與健康條件
 - `store/useStore.ts`：全域使用者與本地 UI 狀態
 - `lib/api.ts`：前端共用 API 呼叫與回傳型別
@@ -50,9 +50,10 @@ EXPO_PUBLIC_API_BASE_URL=http://你的電腦IP:5000
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+EXPO_PUBLIC_SUPABASE_AUTH_REQUIRED=true
 ```
 
-設定後，前端會顯示 Supabase Auth 登入/註冊畫面，並在呼叫 user scoped API 時附上 `Authorization: Bearer <access_token>`。若未設定 Supabase Auth 變數，前端會維持 demo 模式。
+三項皆設定後，前端會顯示 Supabase Auth 登入/註冊畫面，並在呼叫 user scoped API 時附上 `Authorization: Bearer <access_token>`。若 `EXPO_PUBLIC_SUPABASE_AUTH_REQUIRED` 不是 `true`，前端會維持 demo 模式；正式環境應與後端 `SUPABASE_AUTH_REQUIRED` 使用相同值。
 
 ## 開發原則
 
@@ -68,13 +69,13 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 3. `recommend.tsx`
 4. `profile.tsx`
 
-## 健康餐點推薦 MVP
+## 附近店家搜尋
 
-`recommend.tsx` 現在除了基礎營養推薦外，也支援：
+`recommend.tsx` 支援：
 
 1. 使用者輸入單餐預算
 2. 手機定位
-3. 依時間、距離、預算、疾病史、剩餘營養素做附近健康餐點推薦
+3. 依距離、預算與店家類型搜尋附近店家
 
 目前此功能為 **Foodpanda-like MVP**，使用專案內建的店家/餐點候選資料做排序，尚未直接串接 Foodpanda 官方 API。
 
@@ -82,6 +83,6 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 
 1. 補 session 過期提示、重新登入導引與使用者管理 UI
 2. 讓待同步佇列支援網路恢復事件自動重送與詳情頁管理
-3. 將健康餐點推薦資料源改成可更新的外部資料表或正式 API
+3. 補強附近店家菜單資料來源與店家資訊品質
 4. 把更多資料轉換邏輯從頁面搬到 `lib/` 或 hooks
 5. 補前端 component test、e2e test 與更完整的 API mock 測試

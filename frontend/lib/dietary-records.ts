@@ -5,22 +5,23 @@ const TIMESTAMP_TIMEZONE_PATTERN = /(Z|[+-]\d{2}:?\d{2})$/i;
 const DECIMAL_PATTERN = /^\d+(?:\.\d+)?$/;
 
 export const RECORD_NUTRIENT_FIELDS = [
-  { key: 'calories', label: '熱量', unit: 'kcal' },
-  { key: 'protein', label: '蛋白質', unit: 'g' },
-  { key: 'carbs', label: '碳水化合物', unit: 'g' },
-  { key: 'sugar', label: '精緻糖', unit: 'g' },
-  { key: 'fat', label: '脂肪', unit: 'g' },
-  { key: 'saturated_fat', label: '飽和脂肪', unit: 'g' },
-  { key: 'trans_fat', label: '反式脂肪', unit: 'g' },
-  { key: 'sodium', label: '鈉', unit: 'mg' },
-  { key: 'fiber', label: '膳食纖維', unit: 'g' },
-  { key: 'calcium', label: '鈣', unit: 'mg' },
-  { key: 'iron', label: '鐵', unit: 'mg' },
+  { key: 'calories', label: '熱量', unit: 'kcal', required: true },
+  { key: 'protein', label: '蛋白質', unit: 'g', required: true },
+  { key: 'carbs', label: '總碳水化合物', unit: 'g', required: true },
+  { key: 'sugar', label: '精緻糖', unit: 'g', required: false },
+  { key: 'fat', label: '總脂肪', unit: 'g', required: true },
+  { key: 'saturated_fat', label: '飽和脂肪', unit: 'g', required: false },
+  { key: 'trans_fat', label: '反式脂肪', unit: 'g', required: false },
+  { key: 'fiber', label: '膳食纖維', unit: 'g', required: true },
+  { key: 'sodium', label: '鈉 (Sodium)', unit: 'mg', required: true },
+  { key: 'calcium', label: '鈣 (Calcium)', unit: 'mg', required: false },
+  { key: 'iron', label: '鐵 (Iron)', unit: 'mg', required: false },
 ] as const;
 
 export type RecordNutrientKey = typeof RECORD_NUTRIENT_FIELDS[number]['key'];
 export type RecordFoodDraft = Record<RecordNutrientKey, string> & {
   name: string;
+  is_fried: 'true' | 'false';
   source?: string;
   warnings?: string[];
 };
@@ -117,6 +118,7 @@ export function createManualRecordFoodDraft(): RecordFoodDraft {
     fiber: '',
     calcium: '',
     iron: '',
+    is_fried: 'false',
     source: 'manual',
     warnings: [],
   };
@@ -125,7 +127,12 @@ export function createManualRecordFoodDraft(): RecordFoodDraft {
 export function calculateRecordFoodTotals(foods: FoodRecordItem[]): Record<RecordNutrientKey, number> {
   return RECORD_NUTRIENT_FIELDS.reduce((totals, field) => {
     totals[field.key] = Math.round(
-      foods.reduce((sum, food) => sum + Number(food[field.key] || 0), 0) * 100
+      foods.reduce((sum, food) => {
+        const value = field.key === 'sugar'
+          ? food.sugar ?? food.refined_sugar
+          : food[field.key];
+        return sum + Number(value || 0);
+      }, 0) * 100
     ) / 100;
     return totals;
   }, {} as Record<RecordNutrientKey, number>);
@@ -176,7 +183,7 @@ export function getEditableRecordFoods(record: DietaryRecord): FoodRecordItem[] 
     calories: record.total_calories || 0,
     protein: record.total_protein || 0,
     carbs: record.total_carbs || 0,
-    sugar: record.total_sugar || 0,
+    sugar: record.total_sugar ?? record.total_refined_sugar ?? 0,
     fat: record.total_fat || 0,
     saturated_fat: record.total_saturated_fat || 0,
     trans_fat: record.total_trans_fat || 0,
@@ -184,6 +191,7 @@ export function getEditableRecordFoods(record: DietaryRecord): FoodRecordItem[] 
     fiber: record.total_fiber || 0,
     calcium: record.total_calcium || 0,
     iron: record.total_iron || 0,
+    is_fried: record.contains_fried_food || false,
     source: record.source,
     warnings: [],
   }];
@@ -195,7 +203,7 @@ export function createRecordFoodDrafts(record: DietaryRecord): RecordFoodDraft[]
     calories: String(toFiniteNumber(food.calories)),
     protein: String(toFiniteNumber(food.protein)),
     carbs: String(toFiniteNumber(food.carbs)),
-    sugar: String(toFiniteNumber(food.sugar)),
+    sugar: String(toFiniteNumber(food.sugar ?? food.refined_sugar)),
     fat: String(toFiniteNumber(food.fat)),
     saturated_fat: String(toFiniteNumber(food.saturated_fat)),
     trans_fat: String(toFiniteNumber(food.trans_fat)),
@@ -203,6 +211,7 @@ export function createRecordFoodDrafts(record: DietaryRecord): RecordFoodDraft[]
     fiber: String(toFiniteNumber(food.fiber)),
     calcium: String(toFiniteNumber(food.calcium)),
     iron: String(toFiniteNumber(food.iron)),
+    is_fried: food.is_fried ? 'true' : 'false',
     source: food.source,
     warnings: food.warnings,
   }));
@@ -216,11 +225,20 @@ export function validateRecordFoodDrafts(drafts: RecordFoodDraft[]): {
   const foods = drafts.map((draft, index) => {
     const name = draft.name.trim();
     if (!name) errors[`foods.${index}.name`] = '食物名稱不可空白';
-    const food: FoodRecordItem = { name, source: draft.source, warnings: draft.warnings };
+    const food: FoodRecordItem = {
+      name,
+      is_fried: draft.is_fried === 'true',
+      source: draft.source,
+      warnings: draft.warnings,
+    };
     for (const field of RECORD_NUTRIENT_FIELDS) {
       const rawValue = draft[field.key].trim();
       if (!rawValue) {
-        errors[`foods.${index}.${field.key}`] = `${field.label}為必填`;
+        if (field.required) {
+          errors[`foods.${index}.${field.key}`] = `${field.label}為必填`;
+        } else {
+          food[field.key] = 0;
+        }
         continue;
       }
       if (!DECIMAL_PATTERN.test(rawValue)) {

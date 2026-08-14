@@ -3,10 +3,11 @@ from datetime import datetime, timedelta, timezone
 import uuid
 
 from psycopg2.extras import Json, RealDictCursor
+from services.nutrient_service import NUTRITION_FIELDS, get_nutrient_value, nutrient_number
 
 
 class StorageRepository:
-    def __init__(self, db, use_mongo: bool, mem_users: dict, mem_records: list, mem_custom_foods: list, mem_recommendation_feedback: list | None = None, pg_conn=None):
+    def __init__(self, db, use_mongo: bool, mem_users: dict, mem_records: list, mem_custom_foods: list, pg_conn=None):
         self.db = db
         self.use_mongo = use_mongo
         self.pg_conn = pg_conn
@@ -14,7 +15,6 @@ class StorageRepository:
         self.mem_users = mem_users
         self.mem_records = mem_records
         self.mem_custom_foods = mem_custom_foods
-        self.mem_recommendation_feedback = mem_recommendation_feedback if mem_recommendation_feedback is not None else []
         if self.use_postgres:
             self._init_postgres_tables()
 
@@ -44,10 +44,19 @@ class StorageRepository:
                     total_fat DOUBLE PRECISION DEFAULT 0,
                     total_sodium DOUBLE PRECISION DEFAULT 0,
                     total_fiber DOUBLE PRECISION DEFAULT 0,
+                    total_sugar DOUBLE PRECISION DEFAULT 0,
+                    total_saturated_fat DOUBLE PRECISION DEFAULT 0,
+                    total_trans_fat DOUBLE PRECISION DEFAULT 0,
+                    total_calcium DOUBLE PRECISION DEFAULT 0,
+                    total_iron DOUBLE PRECISION DEFAULT 0,
                     source TEXT DEFAULT 'camera'
                 );
                 """
             )
+            for nutrient in ("sugar", "saturated_fat", "trans_fat", "calcium", "iron"):
+                cursor.execute(
+                    f"ALTER TABLE records ADD COLUMN IF NOT EXISTS total_{nutrient} DOUBLE PRECISION DEFAULT 0;"
+                )
             cursor.execute(
                 """
                 UPDATE records
@@ -84,25 +93,10 @@ class StorageRepository:
             cursor.execute("ALTER TABLE custom_foods DROP CONSTRAINT IF EXISTS custom_foods_pkey;")
             cursor.execute("ALTER TABLE custom_foods ALTER COLUMN owner_key SET NOT NULL;")
             cursor.execute("ALTER TABLE custom_foods ADD PRIMARY KEY (owner_key);")
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS recommendation_feedback (
-                    id BIGSERIAL PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    item_label TEXT NOT NULL,
-                    item_name TEXT,
-                    item_source TEXT,
-                    action TEXT NOT NULL,
-                    doc JSONB NOT NULL,
-                    created_at TIMESTAMPTZ DEFAULT NOW()
-                );
-                """
-            )
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_records_user_timestamp ON records (user_id, timestamp DESC);")
             cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_records_user_client_record ON records (user_id, client_record_id);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_custom_foods_user_id ON custom_foods (user_id);")
             cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_foods_owner_key ON custom_foods (owner_key);")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_recommendation_feedback_user_created ON recommendation_feedback (user_id, created_at DESC);")
 
     def _fetch_json_doc(self, table: str, key_field: str, key_value: str):
         with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -167,26 +161,15 @@ class StorageRepository:
     def _enrich_record_totals(self, record: dict) -> dict:
         if not record or "foods" not in record:
             return record
-        
-        total_sugar = 0.0
-        total_saturated_fat = 0.0
-        total_trans_fat = 0.0
-        total_calcium = 0.0
-        total_iron = 0.0
-        
+
         foods = record.get("foods") or []
-        for food in foods:
-            total_sugar += float(food.get("sugar") or 0.0)
-            total_saturated_fat += float(food.get("saturated_fat") or 0.0)
-            total_trans_fat += float(food.get("trans_fat") or 0.0)
-            total_calcium += float(food.get("calcium") or 0.0)
-            total_iron += float(food.get("iron") or 0.0)
-            
-        record["total_sugar"] = round(total_sugar, 1)
-        record["total_saturated_fat"] = round(total_saturated_fat, 1)
-        record["total_trans_fat"] = round(total_trans_fat, 1)
-        record["total_calcium"] = round(total_calcium, 1)
-        record["total_iron"] = round(total_iron, 1)
+        if foods:
+            for nutrient in NUTRITION_FIELDS:
+                record[f"total_{nutrient}"] = round(
+                    sum(nutrient_number(get_nutrient_value(food, nutrient)) for food in foods),
+                    2,
+                )
+        record["contains_fried_food"] = any(food.get("is_fried") is True for food in foods)
         return record
 
     def insert_record(self, record: dict):
@@ -204,8 +187,10 @@ class StorageRepository:
                     INSERT INTO records (
                         user_id, client_record_id, timestamp, meal_type, foods,
                         total_calories, total_protein, total_carbs,
-                        total_fat, total_sodium, total_fiber, source
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        total_fat, total_sodium, total_fiber, total_sugar,
+                        total_saturated_fat, total_trans_fat, total_calcium,
+                        total_iron, source
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         record.get("user_id"),
@@ -219,6 +204,11 @@ class StorageRepository:
                         record.get("total_fat", 0),
                         record.get("total_sodium", 0),
                         record.get("total_fiber", 0),
+                        record.get("total_sugar", 0),
+                        record.get("total_saturated_fat", 0),
+                        record.get("total_trans_fat", 0),
+                        record.get("total_calcium", 0),
+                        record.get("total_iron", 0),
                         record.get("source", "camera"),
                     ),
                 )
@@ -240,7 +230,9 @@ class StorageRepository:
                 cursor.execute(
                     """
                     SELECT user_id, client_record_id, timestamp, meal_type, foods, total_calories, total_protein,
-                           total_carbs, total_fat, total_sodium, total_fiber, source
+                           total_carbs, total_fat, total_sodium, total_fiber,
+                           total_sugar, total_saturated_fat, total_trans_fat,
+                           total_calcium, total_iron, source
                     FROM records
                     WHERE user_id = %s AND client_record_id = %s
                     LIMIT 1
@@ -270,11 +262,16 @@ class StorageRepository:
                     UPDATE records
                     SET timestamp = %s, meal_type = %s, foods = %s,
                         total_calories = %s, total_protein = %s, total_carbs = %s,
-                        total_fat = %s, total_sodium = %s, total_fiber = %s, source = %s
+                        total_fat = %s, total_sodium = %s, total_fiber = %s,
+                        total_sugar = %s, total_saturated_fat = %s,
+                        total_trans_fat = %s, total_calcium = %s, total_iron = %s,
+                        source = %s
                     WHERE user_id = %s AND client_record_id = %s
                     RETURNING user_id, client_record_id, timestamp, meal_type, foods,
                               total_calories, total_protein, total_carbs, total_fat,
-                              total_sodium, total_fiber, source
+                              total_sodium, total_fiber, total_sugar,
+                              total_saturated_fat, total_trans_fat, total_calcium,
+                              total_iron, source
                     """,
                     (
                         record.get("timestamp"),
@@ -286,6 +283,11 @@ class StorageRepository:
                         record.get("total_fat", 0),
                         record.get("total_sodium", 0),
                         record.get("total_fiber", 0),
+                        record.get("total_sugar", 0),
+                        record.get("total_saturated_fat", 0),
+                        record.get("total_trans_fat", 0),
+                        record.get("total_calcium", 0),
+                        record.get("total_iron", 0),
                         record.get("source", "camera"),
                         user_id,
                         client_record_id,
@@ -318,7 +320,9 @@ class StorageRepository:
                     WHERE user_id = %s AND client_record_id = %s
                     RETURNING user_id, client_record_id, timestamp, meal_type, foods,
                               total_calories, total_protein, total_carbs, total_fat,
-                              total_sodium, total_fiber, source
+                              total_sodium, total_fiber, total_sugar,
+                              total_saturated_fat, total_trans_fat, total_calcium,
+                              total_iron, source
                     """,
                     (user_id, client_record_id),
                 )
@@ -342,7 +346,9 @@ class StorageRepository:
         if self.use_postgres:
             sql = """
                 SELECT user_id, client_record_id, timestamp, meal_type, foods, total_calories, total_protein,
-                       total_carbs, total_fat, total_sodium, total_fiber, source
+                       total_carbs, total_fat, total_sodium, total_fiber,
+                       total_sugar, total_saturated_fat, total_trans_fat,
+                       total_calcium, total_iron, source
                 FROM records
                 WHERE user_id = %s
             """
@@ -379,16 +385,15 @@ class StorageRepository:
         start_date = end_date - timedelta(days=days)
 
         if self.use_postgres:
+            nutrient_sums = ",\n                           ".join(
+                f"SUM(total_{nutrient}) AS {nutrient}" for nutrient in NUTRITION_FIELDS
+            )
             with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute(
-                    """
+                    f"""
                     SELECT SUBSTRING(timestamp, 1, 10) AS date,
                            COUNT(*) AS record_count,
-                           SUM(total_calories) AS calories,
-                           SUM(total_protein) AS protein,
-                           SUM(total_carbs) AS carbs,
-                           SUM(total_fat) AS fat,
-                           SUM(total_sodium) AS sodium
+                           {nutrient_sums}
                     FROM records
                     WHERE user_id = %s
                       AND timestamp >= %s
@@ -403,11 +408,7 @@ class StorageRepository:
                 {
                     "date": row["date"],
                     "record_count": int(row["record_count"] or 0),
-                    "calories": round(row["calories"] or 0),
-                    "protein": round(row["protein"] or 0),
-                    "carbs": round(row["carbs"] or 0),
-                    "fat": round(row["fat"] or 0),
-                    "sodium": round(row["sodium"] or 0),
+                    **{nutrient: round(row[nutrient] or 0, 1) for nutrient in NUTRITION_FIELDS},
                 }
                 for row in rows
             ]
@@ -427,11 +428,10 @@ class StorageRepository:
                     "$group": {
                         "_id": {"$substr": ["$timestamp", 0, 10]},
                         "record_count": {"$sum": 1},
-                        "calories": {"$sum": "$total_calories"},
-                        "protein": {"$sum": "$total_protein"},
-                        "carbs": {"$sum": "$total_carbs"},
-                        "fat": {"$sum": "$total_fat"},
-                        "sodium": {"$sum": "$total_sodium"},
+                        **{
+                            nutrient: {"$sum": f"$total_{nutrient}"}
+                            for nutrient in NUTRITION_FIELDS
+                        },
                     }
                 },
                 {"$sort": {"_id": 1}},
@@ -441,16 +441,12 @@ class StorageRepository:
                 {
                     "date": d["_id"],
                     "record_count": d["record_count"],
-                    "calories": d["calories"],
-                    "protein": d["protein"],
-                    "carbs": d["carbs"],
-                    "fat": d["fat"],
-                    "sodium": d["sodium"],
+                    **{nutrient: d.get(nutrient, 0) for nutrient in NUTRITION_FIELDS},
                 }
                 for d in daily
             ]
 
-        agg = defaultdict(lambda: {"record_count": 0, "calories": 0, "protein": 0, "carbs": 0, "fat": 0, "sodium": 0})
+        agg = defaultdict(lambda: {"record_count": 0, **{nutrient: 0 for nutrient in NUTRITION_FIELDS}})
         for record in self.mem_records:
             if record.get("user_id") != user_id:
                 continue
@@ -458,11 +454,9 @@ class StorageRepository:
             if not day:
                 continue
             agg[day]["record_count"] += 1
-            agg[day]["calories"] += record.get("total_calories", 0)
-            agg[day]["protein"] += record.get("total_protein", 0)
-            agg[day]["carbs"] += record.get("total_carbs", 0)
-            agg[day]["fat"] += record.get("total_fat", 0)
-            agg[day]["sodium"] += record.get("total_sodium", 0)
+            record = self._enrich_record_totals(record)
+            for nutrient in NUTRITION_FIELDS:
+                agg[day][nutrient] += record.get(f"total_{nutrient}", 0)
         return [{"date": k, **v} for k, v in sorted(agg.items())]
 
     def get_custom_foods(self, user_id: str | None = None):
@@ -534,45 +528,3 @@ class StorageRepository:
             else:
                 self.mem_custom_foods.append(stored_doc)
         return stored_doc
-
-    def insert_recommendation_feedback(self, feedback_doc: dict):
-        if self.use_postgres:
-            with self.pg_conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO recommendation_feedback (user_id, item_label, item_name, item_source, action, doc, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                    """,
-                    (
-                        feedback_doc.get("user_id"),
-                        feedback_doc.get("item_label"),
-                        feedback_doc.get("item_name"),
-                        feedback_doc.get("item_source"),
-                        feedback_doc.get("action"),
-                        Json(feedback_doc),
-                    ),
-                )
-            return feedback_doc
-        if self.use_mongo:
-            self.db.recommendation_feedback.insert_one(feedback_doc)
-        else:
-            self.mem_recommendation_feedback.append(feedback_doc)
-        return feedback_doc
-
-    def get_recommendation_feedback(self, user_id: str, limit: int = 100):
-        if self.use_postgres:
-            with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute(
-                    """
-                    SELECT doc FROM recommendation_feedback
-                    WHERE user_id = %s
-                    ORDER BY created_at DESC
-                    LIMIT %s
-                    """,
-                    (user_id, limit),
-                )
-                rows = cursor.fetchall()
-            return [row["doc"] for row in rows]
-        if self.use_mongo:
-            return list(self.db.recommendation_feedback.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).limit(limit))
-        return [doc for doc in reversed(self.mem_recommendation_feedback) if doc.get("user_id") == user_id][:limit]

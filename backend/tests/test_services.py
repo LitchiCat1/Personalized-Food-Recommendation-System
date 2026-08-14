@@ -9,9 +9,8 @@ from services.food_service import search_foods
 from services.healthy_food_service import build_healthy_food_recommendations, load_restaurant_catalog
 from services.history_service import build_history_response
 from services.open_food_facts_service import build_open_food_facts_product
-from services.nutrition_progress_service import build_daily_nutrition_progress
+from services.nutrition_progress_service import build_daily_nutrition_progress, calculate_pdf_daily_targets
 from services.profile_service import build_bmr_response, build_user_profile
-from services.recommend_service import build_feedback_profile, build_preference_profile, compute_feedback_adjustment, compute_preference_score
 from services.restaurant_ai_service import build_restaurant_summary_prompt, normalize_restaurant_summary, validate_restaurant_summary_input
 from services.vision_food_service import build_vision_food_response
 from repositories.storage import StorageRepository
@@ -38,10 +37,6 @@ class FakeStorage:
     def get_records(self, user_id: str, date: str | None = None, limit: int = 500):
         return []
 
-    def get_recommendation_feedback(self, user_id: str, limit: int = 100):
-        return []
-
-
 class ServiceSmokeTests(unittest.TestCase):
     def test_bmr_response(self):
         result = build_bmr_response({"gender": "male", "weight": 72, "height": 175, "age": 28, "activity_multiplier": 1.55})
@@ -54,6 +49,30 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertEqual(result["summary"]["recorded_days"], 2)
         self.assertEqual(result["summary"]["total_records"], 3)
         self.assertEqual(result["summary"]["avg_calories"], 900)
+
+    def test_pdf_daily_targets_cover_diabetes_and_ckd_rules(self):
+        diabetes = calculate_pdf_daily_targets({
+            "height": 170,
+            "weight": 80,
+            "health_conditions": ["糖尿病"],
+        })
+        ideal_weight = 22 * (1.7 ** 2)
+        energy = ideal_weight * 25
+        self.assertAlmostEqual(diabetes["calories"], energy)
+        self.assertAlmostEqual(diabetes["protein"], ideal_weight)
+        self.assertAlmostEqual(diabetes["carbs"], energy * 0.475 / 4)
+        self.assertAlmostEqual(diabetes["sugar"], min(energy * 0.05 / 4, 25))
+        self.assertEqual(diabetes["trans_fat"], 0)
+
+        kidney = calculate_pdf_daily_targets({
+            "height": 170,
+            "weight": 65,
+            "health_conditions": ["ckd"],
+        })
+        self.assertAlmostEqual(kidney["protein"], ideal_weight * 0.6)
+        self.assertEqual(kidney["fiber"], 17.5)
+        self.assertEqual(kidney["sodium"], 1500)
+        self.assertEqual(kidney["calcium"], 800)
 
     def test_disease_rules_load(self):
         rules = load_disease_rules(os.path.dirname(os.path.dirname(__file__)))
@@ -126,13 +145,29 @@ class ServiceSmokeTests(unittest.TestCase):
 
     def test_food_search_prefers_whole_fruit_over_processed_matches(self):
         tfda_db = {
-            "apple pie": {"name_zh": "apple pie", "category": "processed", "calories": 68},
+            "apple pie": {
+                "name_zh": "油炸 apple pie",
+                "category": "processed",
+                "calories": 68,
+                "sugar": 8.5,
+                "saturated_fat": 2.1,
+                "trans_fat": 0.2,
+                "calcium": 12,
+                "iron": 0.7,
+            },
             "apple": {"name_zh": "apple", "category": "fruit", "calories": 51},
         }
 
         results = search_foods(FakeStorage(), tfda_db, "apple", 2, "demo_user", lambda food: food)
         self.assertEqual(results[0]["name_zh"], "apple")
         self.assertEqual(results[0]["category"], "fruit")
+        fried_result = next(result for result in results if result["category"] == "processed")
+        self.assertEqual(fried_result["sugar"], 8.5)
+        self.assertEqual(fried_result["saturated_fat"], 2.1)
+        self.assertEqual(fried_result["trans_fat"], 0.2)
+        self.assertEqual(fried_result["calcium"], 12)
+        self.assertEqual(fried_result["iron"], 0.7)
+        self.assertTrue(fried_result["is_fried"])
 
     def test_detection_reliability_and_portion_range(self):
         high = build_detection_reliability("apple", 0.91, False, {"source": "TFDA"})
@@ -225,34 +260,6 @@ class ServiceSmokeTests(unittest.TestCase):
         )
         self.assertEqual(user["health_conditions"], ["hypertension"])
         self.assertEqual(user["allergens"], ["egg"])
-
-    def test_preference_score(self):
-        profile = build_preference_profile([
-            {"foods": [{"name": "chicken", "calories": 220, "protein": 32, "sodium": 300, "source": "manual"}]}
-        ])
-        score, reasons = compute_preference_score(
-            {"name_zh": "chicken salad", "label": "chicken", "calories": 240, "protein": 30, "sodium": 260, "source": "manual"},
-            profile,
-        )
-        self.assertGreater(score, 0)
-        self.assertGreater(len(reasons), 0)
-
-    def test_feedback_adjustment_rewards_and_penalizes(self):
-        profile = build_feedback_profile([
-            {"item_label": "salad", "action": "accepted"},
-            {"item_label": "salad", "action": "accepted"},
-            {"item_label": "burger", "action": "disliked"},
-            {"item_label": "soup", "action": "skipped"},
-        ])
-
-        salad_score, salad_reasons = compute_feedback_adjustment({"label": "salad"}, profile)
-        burger_score, burger_reasons = compute_feedback_adjustment({"label": "burger"}, profile)
-        soup_score, soup_reasons = compute_feedback_adjustment({"label": "soup"}, profile)
-
-        self.assertGreater(salad_score, 0)
-        self.assertLess(burger_score, 0)
-        self.assertLess(soup_score, 0)
-        self.assertEqual(profile["total"], 4)
 
     def test_validate_restaurant_summary_input_smoke(self):
         with self.assertRaises(ValueError):

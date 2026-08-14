@@ -11,7 +11,7 @@
     "caution_carbs_per_meal": 45,
     "risk_nutrients": {
       "carbs": { "caution": 45, "block": 60, "unit": "g", "label_zh": "碳水化合物" },
-      "sugar": { "caution": 15, "block": 25, "unit": "g", "label_zh": "糖" }
+      "sugar": { "caution": 15, "block": 25, "unit": "g", "label_zh": "精緻糖" }
     },
     "severity_options": ["monitoring", "strict"],
     "rule_version": "2026.06.1",
@@ -100,7 +100,7 @@
     "blocked_labels": ["beer", "organ meat", "anchovy", "sardine"],
     "blocked_keywords": ["啤酒", "內臟", "沙丁魚", "小魚乾", "濃肉湯"],
     "risk_nutrients": {
-      "sugar": { "caution": 15, "block": 25, "unit": "g", "label_zh": "糖" }
+      "sugar": { "caution": 15, "block": 25, "unit": "g", "label_zh": "精緻糖" }
     },
     "severity_options": ["monitoring", "strict"],
     "rule_version": "2026.06.1",

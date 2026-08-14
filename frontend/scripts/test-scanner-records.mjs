@@ -16,7 +16,20 @@ function detectedFood(name = '原始名稱') {
     needsConfirmation: false,
     boundingBox: { x: 0, y: 0, w: 0, h: 0 },
     estimatedWeight: 100,
-    nutrition: { calories: 180, protein: 8.5, carbs: 22, fat: 6, sodium: 210, fiber: 3 },
+    nutrition: {
+      calories: 180,
+      protein: 8.5,
+      carbs: 22,
+      sugar: 4.5,
+      fat: 6,
+      saturated_fat: 1.2,
+      trans_fat: 0,
+      sodium: 210,
+      fiber: 3,
+      calcium: 80,
+      iron: 1.4,
+      is_fried: true,
+    },
     gi: 'medium',
     allergens: [],
     warnings: [],
@@ -55,6 +68,10 @@ test('saves the user final trimmed name in the existing foods schema', async () 
 
   assert.equal(requestBody.foods[0].name, '使用者最後輸入名稱');
   assert.equal(requestBody.foods[0].calories, 180);
+  assert.equal(requestBody.foods[0].sugar, 4.5);
+  assert.equal(requestBody.foods[0].calcium, 80);
+  assert.equal(requestBody.foods[0].is_fried, true);
+  assert.equal(requestBody.total_saturated_fat, 1.2);
   assert.equal(requestBody.source, 'nutrition-label');
   assert.equal(requestBody.client_record_id, 'edited-name-record');
 });

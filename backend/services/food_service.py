@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 import uuid
 
+from services.nutrient_service import get_nutrient_value, is_fried_food_name
+
 
 def search_foods(storage, tfda_db: dict, query: str, limit: int, user_id: str | None, build_custom_food_search_result):
     q = query.strip()
@@ -38,6 +40,13 @@ def search_foods(storage, tfda_db: dict, query: str, limit: int, user_id: str | 
                 "carbs": food.get("carbs", 0),
                 "sodium": food.get("sodium", 0),
                 "fiber": food.get("fiber", 0),
+                "sugar": get_nutrient_value(food, "sugar"),
+                "saturated_fat": food.get("saturated_fat") or 0,
+                "trans_fat": food.get("trans_fat") or 0,
+                "calcium": food.get("calcium") or 0,
+                "iron": food.get("iron") or 0,
+                "is_fried": food.get("is_fried") is True
+                or is_fried_food_name(food.get("name_zh", key), food.get("name_en")),
                 "unit": food.get("unit", "per 100g"),
                 "source": "TFDA",
                 "allergens": food.get("allergens", []) or [],
@@ -76,6 +85,9 @@ def build_custom_food_doc(data: dict, normalize_nutrition_payload, scale_nutriti
     user_id = (data.get("user_id") or "").strip()
     if not user_id:
         raise ValueError("缺少 user_id")
+    is_fried = data.get("is_fried", False)
+    if not isinstance(is_fried, bool):
+        raise ValueError("is_fried 必須是布林值")
 
     nutrition_per_serving = normalize_nutrition_payload(data.get("nutrition_per_serving") or {})
     nutrition_per_100g = normalize_nutrition_payload(data.get("nutrition_per_100g") or {})
@@ -102,6 +114,7 @@ def build_custom_food_doc(data: dict, normalize_nutrition_payload, scale_nutriti
         "unit": data.get("unit") or ("per 100g" if nutrition_per_100g else "per serving"),
         "nutrition_per_serving": nutrition_per_serving,
         "nutrition_per_100g": nutrition_per_100g,
+        "is_fried": is_fried or is_fried_food_name(name_zh, data.get("name_en")),
         "ocr_text": data.get("ocr_text", ""),
         "source": data.get("source", "custom-food"),
         "created_at": data.get("created_at") or now,

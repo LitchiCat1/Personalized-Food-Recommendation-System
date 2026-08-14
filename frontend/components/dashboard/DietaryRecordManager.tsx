@@ -228,9 +228,14 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
         total_calories: totals.calories,
         total_protein: totals.protein,
         total_carbs: totals.carbs,
+        total_sugar: totals.sugar,
         total_fat: totals.fat,
+        total_saturated_fat: totals.saturated_fat,
+        total_trans_fat: totals.trans_fat,
         total_sodium: totals.sodium,
         total_fiber: totals.fiber,
+        total_calcium: totals.calcium,
+        total_iron: totals.iron,
         source: 'manual',
       }, { accessToken });
       invalidateDietaryRecords();
@@ -691,6 +696,26 @@ function RecordFoodFields({ title, draft, errors, foodIndex, disabled, isNarrow,
           </View>
         ))}
       </View>
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityLabel="油炸食物"
+        accessibilityState={{ checked: draft.is_fried === 'true', disabled }}
+        disabled={disabled}
+        onPress={() => onChange('is_fried', draft.is_fried === 'true' ? 'false' : 'true')}
+        style={({ pressed }) => [
+          styles.friedToggle,
+          draft.is_fried === 'true' && styles.friedToggleChecked,
+          pressed && styles.pressed,
+          disabled && styles.disabled,
+        ]}
+      >
+        <Ionicons
+          name={draft.is_fried === 'true' ? 'checkbox' : 'square-outline'}
+          size={22}
+          color={draft.is_fried === 'true' ? Palette.status.warning : Palette.text.tertiary}
+        />
+        <Text style={styles.friedToggleText}>油炸食物</Text>
+      </Pressable>
     </View>
   );
 }
@@ -842,6 +867,9 @@ const styles = StyleSheet.create({
   nutrientField: { flexGrow: 1, flexBasis: 210, minWidth: 0 },
   nutrientFieldNarrow: { flexBasis: 132 },
   nutrientInput: { ...Typography.number },
+  friedToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, alignSelf: 'flex-start', paddingHorizontal: Spacing.md, borderWidth: 1, borderColor: Palette.border.subtle, borderRadius: Radius.lg, backgroundColor: Palette.bg.card },
+  friedToggleChecked: { borderColor: Palette.status.warning, backgroundColor: Palette.accent.orangeDim },
+  friedToggleText: { ...Typography.bodyBold, color: Palette.text.primary },
   stateCard: { minHeight: 220, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, padding: Spacing.xl },
   stateTitle: { ...Typography.bodyBold, color: Palette.text.primary, textAlign: 'center' },
   stateMessage: { ...Typography.caption, color: Palette.text.secondary, textAlign: 'center', maxWidth: 520 },

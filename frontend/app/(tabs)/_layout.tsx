@@ -124,9 +124,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="recommend"
         options={{
-          title: '推薦',
+          title: '店家',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'sparkles' : 'sparkles-outline'} size={22} color={color} />
+            <Ionicons name={focused ? 'location' : 'location-outline'} size={22} color={color} />
           ),
         }}
       />

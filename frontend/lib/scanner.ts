@@ -41,6 +41,10 @@ export type OCRDraft = {
     sodium?: number;
     fiber?: number;
     sugar?: number;
+    saturated_fat?: number;
+    trans_fat?: number;
+    calcium?: number;
+    iron?: number;
   };
   nutrition_per_100g?: Record<string, number | null>;
   ocr_text?: string;
@@ -164,9 +168,14 @@ async function performSaveRecord(params: SaveRecordParams): Promise<void> {
   const totalCalories = params.foods.reduce((sum, item) => sum + item.nutrition.calories, 0);
   const totalProtein = params.foods.reduce((sum, item) => sum + item.nutrition.protein, 0);
   const totalCarbs = params.foods.reduce((sum, item) => sum + item.nutrition.carbs, 0);
+  const totalSugar = params.foods.reduce((sum, item) => sum + (item.nutrition.sugar || 0), 0);
   const totalFat = params.foods.reduce((sum, item) => sum + item.nutrition.fat, 0);
+  const totalSaturatedFat = params.foods.reduce((sum, item) => sum + (item.nutrition.saturated_fat || 0), 0);
+  const totalTransFat = params.foods.reduce((sum, item) => sum + (item.nutrition.trans_fat || 0), 0);
   const totalSodium = params.foods.reduce((sum, item) => sum + item.nutrition.sodium, 0);
   const totalFiber = params.foods.reduce((sum, item) => sum + item.nutrition.fiber, 0);
+  const totalCalcium = params.foods.reduce((sum, item) => sum + (item.nutrition.calcium || 0), 0);
+  const totalIron = params.foods.reduce((sum, item) => sum + (item.nutrition.iron || 0), 0);
 
   const resp = await fetch(`${params.apiBaseUrl}/record`, {
     method: 'POST',
@@ -180,18 +189,29 @@ async function performSaveRecord(params: SaveRecordParams): Promise<void> {
         calories: food.nutrition.calories,
         protein: food.nutrition.protein,
         carbs: food.nutrition.carbs,
+        sugar: food.nutrition.sugar || 0,
         fat: food.nutrition.fat,
+        saturated_fat: food.nutrition.saturated_fat || 0,
+        trans_fat: food.nutrition.trans_fat || 0,
         sodium: food.nutrition.sodium,
         fiber: food.nutrition.fiber,
+        calcium: food.nutrition.calcium || 0,
+        iron: food.nutrition.iron || 0,
+        is_fried: food.nutrition.is_fried === true,
         source: food.source || params.source,
         warnings: food.warnings,
       })),
       total_calories: Math.round(totalCalories),
       total_protein: Math.round(totalProtein * 10) / 10,
       total_carbs: Math.round(totalCarbs * 10) / 10,
+      total_sugar: Math.round(totalSugar * 10) / 10,
       total_fat: Math.round(totalFat * 10) / 10,
+      total_saturated_fat: Math.round(totalSaturatedFat * 10) / 10,
+      total_trans_fat: Math.round(totalTransFat * 10) / 10,
       total_sodium: Math.round(totalSodium),
       total_fiber: Math.round(totalFiber * 10) / 10,
+      total_calcium: Math.round(totalCalcium),
+      total_iron: Math.round(totalIron * 10) / 10,
       source: params.source,
     }),
   });
@@ -239,9 +259,15 @@ export async function manualSearchFood(params: {
       calories: food.calories || 0,
       protein: food.protein || 0,
       carbs: food.carbs || 0,
+      sugar: food.sugar || food.refined_sugar || 0,
       fat: food.fat || 0,
+      saturated_fat: food.saturated_fat || 0,
+      trans_fat: food.trans_fat || 0,
       sodium: food.sodium || 0,
       fiber: food.fiber || 0,
+      calcium: food.calcium || 0,
+      iron: food.iron || 0,
+      is_fried: food.is_fried === true,
     },
     gi: 'medium',
     allergens: [],
@@ -328,9 +354,14 @@ export function buildOCRDetectedFood(draft: OCRDraft): DetectedFood {
       calories: Number(draft.nutrition_per_serving?.calories || 0),
       protein: Number(draft.nutrition_per_serving?.protein || 0),
       carbs: Number(draft.nutrition_per_serving?.carbs || 0),
+      sugar: Number(draft.nutrition_per_serving?.sugar || 0),
       fat: Number(draft.nutrition_per_serving?.fat || 0),
+      saturated_fat: Number(draft.nutrition_per_serving?.saturated_fat || 0),
+      trans_fat: Number(draft.nutrition_per_serving?.trans_fat || 0),
       sodium: Number(draft.nutrition_per_serving?.sodium || 0),
       fiber: Number(draft.nutrition_per_serving?.fiber || 0),
+      calcium: Number(draft.nutrition_per_serving?.calcium || 0),
+      iron: Number(draft.nutrition_per_serving?.iron || 0),
     },
     gi: 'medium',
     allergens: [],

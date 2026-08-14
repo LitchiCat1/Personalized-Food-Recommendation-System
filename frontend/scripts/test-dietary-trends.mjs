@@ -11,8 +11,14 @@ function record(date, nutrients = {}, overrides = {}) {
     total_calories: 100,
     total_protein: 10,
     total_carbs: 20,
+    total_sugar: 3,
     total_fat: 5,
+    total_saturated_fat: 1,
+    total_trans_fat: 0,
     total_sodium: 200,
+    total_fiber: 2,
+    total_calcium: 100,
+    total_iron: 1.5,
     ...nutrients,
     ...overrides,
   };
@@ -42,6 +48,8 @@ test('shows one recorded day and aggregates every record on that local date', ()
   assert.equal(trend.daily[0].record_count, 2);
   assert.equal(trend.daily[0].calories, 350);
   assert.equal(trend.daily[0].protein, 22);
+  assert.equal(trend.daily[0].sugar, 6);
+  assert.equal(trend.daily[0].calcium, 200);
   assert.equal(trend.daily[0].sodium, 650);
 });
 

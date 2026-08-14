@@ -126,10 +126,15 @@ function OCRDraftCard({
         {[
           { label: '熱量', value: draft.nutrition_per_serving?.calories ?? '--', unit: 'kcal', color: Palette.accent.green },
           { label: '蛋白質', value: draft.nutrition_per_serving?.protein ?? '--', unit: 'g', color: Palette.accent.blue },
-          { label: '碳水', value: draft.nutrition_per_serving?.carbs ?? '--', unit: 'g', color: Palette.accent.orange },
-          { label: '脂肪', value: draft.nutrition_per_serving?.fat ?? '--', unit: 'g', color: Palette.accent.purple },
-          { label: '鈉', value: draft.nutrition_per_serving?.sodium ?? '--', unit: 'mg', color: Palette.accent.pink },
-          { label: '糖', value: draft.nutrition_per_serving?.sugar ?? '--', unit: 'g', color: Palette.accent.cyan },
+          { label: '總碳水化合物', value: draft.nutrition_per_serving?.carbs ?? '--', unit: 'g', color: Palette.accent.orange },
+          { label: '精緻糖', value: draft.nutrition_per_serving?.sugar ?? '--', unit: 'g', color: Palette.accent.orange },
+          { label: '總脂肪', value: draft.nutrition_per_serving?.fat ?? '--', unit: 'g', color: Palette.accent.purple },
+          { label: '飽和脂肪', value: draft.nutrition_per_serving?.saturated_fat ?? '--', unit: 'g', color: Palette.accent.purple },
+          { label: '反式脂肪', value: draft.nutrition_per_serving?.trans_fat ?? '--', unit: 'g', color: Palette.status.error },
+          { label: '膳食纖維', value: draft.nutrition_per_serving?.fiber ?? '--', unit: 'g', color: Palette.accent.cyan },
+          { label: '鈉 (Sodium)', value: draft.nutrition_per_serving?.sodium ?? '--', unit: 'mg', color: Palette.accent.pink },
+          { label: '鈣 (Calcium)', value: draft.nutrition_per_serving?.calcium ?? '--', unit: 'mg', color: Palette.accent.green },
+          { label: '鐵 (Iron)', value: draft.nutrition_per_serving?.iron ?? '--', unit: 'mg', color: Palette.accent.blue },
         ].map((item) => (
           <View key={item.label} style={styles.nutritionItem}>
             <Text style={styles.nutritionLabel}>{item.label}</Text>

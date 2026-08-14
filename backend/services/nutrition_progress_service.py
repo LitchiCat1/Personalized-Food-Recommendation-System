@@ -43,6 +43,21 @@ RECORD_TOTAL_FIELDS = {
     "iron": "total_iron",
 }
 
+CONDITION_ALIASES = {
+    "糖尿病": "diabetes",
+    "血糖管理": "diabetes",
+    "痛風": "gout",
+    "高尿酸": "gout",
+    "高血脂": "hyperlipidemia",
+    "膽固醇": "hyperlipidemia",
+    "高血壓": "hypertension",
+    "鈉控制": "hypertension",
+    "慢性腎臟病": "kidney_disease",
+    "腎臟病": "kidney_disease",
+    "腎臟照護": "kidney_disease",
+    "ckd": "kidney_disease",
+}
+
 
 def _number(value, fallback: float = 0) -> float:
     try:
@@ -57,6 +72,8 @@ def _display_number(value: float) -> int | float:
 
 
 def _progress_status(nutrient: str, consumed: float, target: float) -> str:
+    if target <= 0:
+        return "within_target" if consumed <= 0 else "over"
     if consumed > target:
         return "over" if NUTRITION_GOAL_TYPES[nutrient] == "upper_limit" else "target_met"
     if consumed >= target * 0.8:
@@ -65,9 +82,16 @@ def _progress_status(nutrient: str, consumed: float, target: float) -> str:
 
 
 def calculate_pdf_daily_targets(user: dict) -> dict:
-    height_cm = float(user.get("height") or 170.0)
-    weight_kg = float(user.get("weight") or 65.0)
-    daily_calorie_target = float(user.get("daily_calorie_target") or user.get("dailyCalorieTarget") or (weight_kg * 30))
+    height_cm = _number(user.get("height"), 170.0)
+    weight_kg = _number(user.get("weight"), 65.0)
+    if height_cm <= 0:
+        height_cm = 170.0
+    if weight_kg <= 0:
+        weight_kg = 65.0
+    daily_calorie_target = _number(
+        user.get("daily_calorie_target") or user.get("dailyCalorieTarget"),
+        weight_kg * 30,
+    )
     
     height_m = height_cm / 100.0
     W = 22.0 * (height_m ** 2)
@@ -78,7 +102,12 @@ def calculate_pdf_daily_targets(user: dict) -> dict:
     is_overweight = bmi >= 24.0
     
     # 決定不同疾病下的每日總熱量需求 E
-    conditions = user.get("health_conditions", []) or user.get("healthConditions", [])
+    raw_conditions = user.get("health_conditions", []) or user.get("healthConditions", [])
+    conditions = {
+        CONDITION_ALIASES.get(str(condition).strip().lower(), str(condition).strip().lower())
+        for condition in raw_conditions
+        if str(condition).strip()
+    }
     
     e_candidates = []
     if "diabetes" in conditions:
@@ -128,11 +157,14 @@ def calculate_pdf_daily_targets(user: dict) -> dict:
         targets["protein"] = min(protein_vals)
         
     # 2. 總碳水化合物
-    carbs_ratio = 0.50
+    carbs_ratios = []
     if "diabetes" in conditions:
-        carbs_ratio = min(carbs_ratio, 0.475)
+        carbs_ratios.append(0.475)
+    if "gout" in conditions or "hyperlipidemia" in conditions or "hypertension" in conditions:
+        carbs_ratios.append(0.50)
     if "kidney_disease" in conditions:
-        carbs_ratio = max(carbs_ratio, 0.60) # 利用低蛋白澱粉補充
+        carbs_ratios.append(0.60)  # 利用低蛋白澱粉補充
+    carbs_ratio = min(carbs_ratios) if carbs_ratios else 0.50
     targets["carbs"] = (E * carbs_ratio) / 4.0
     
     # 3. 精緻糖

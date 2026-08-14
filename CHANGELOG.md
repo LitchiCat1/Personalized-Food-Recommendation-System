@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.0.7b - 2026-08-14
+
+### Added
+
+- Added complete record, scanner, OCR, TFDA search, history, and PostgreSQL support for refined sugar, saturated fat, trans fat, calcium, iron, and fried-food status.
+- Added disease-aware daily nutrition targets and food-risk handling for diabetes, gout, hyperlipidemia, hypertension, and stage 3-5 chronic kidney disease.
+- Added backward-compatible normalization from `refined_sugar` to the canonical `sugar` field.
+
+### Changed
+
+- Updated nutrition labels to total carbohydrates, refined sugar, total fat, dietary fiber, sodium, calcium, and iron terminology.
+- Made Supabase authentication explicit through `EXPO_PUBLIC_SUPABASE_AUTH_REQUIRED`, matching the backend deployment mode.
+- Updated Render services to deploy from `v0.0.7b`.
+
+### Removed
+
+- Removed the standalone meal recommendation list, recommendation feedback controls, `/recommend/<user_id>` API, feedback APIs, recommendation service, and dedicated feedback storage initialization.
+- Kept nearby restaurant search, Google Places map, navigation, menu inspection, and restaurant summaries available on the `recommend` route.
+
+### Validation
+
+- Backend unit/API tests and frontend TypeScript checks cover the retained record, scanner, history, disease-rule, and nearby restaurant flows.
+
 ## v0.0.7 - 2026-08-07
 
 ### Added

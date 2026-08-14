@@ -1,6 +1,6 @@
 """
 NutriLens Backend — Flask API
-PRD-aligned: Gemini Vision food recognition + nutrition analysis + user management + recommendations
+PRD-aligned: Gemini Vision food recognition + nutrition analysis + user management
 """
 
 import json
@@ -33,8 +33,8 @@ from services.nutrition_label_service import (
     scale_nutrition_per_100g,
 )
 from services.nutrition_progress_service import build_daily_nutrition_progress
+from services.nutrient_service import NUTRITION_FIELDS, get_nutrient_value
 from services.profile_service import build_bmr_response, build_user_profile
-from services.recommend_service import build_recommendation_response
 from services.restaurant_ai_service import build_restaurant_ai_summary
 from services.vision_food_service import (
     build_vision_food_response,
@@ -80,8 +80,7 @@ except Exception:
 _mem_users = {}
 _mem_records = []
 _mem_custom_foods = []
-_mem_recommendation_feedback = []
-storage = StorageRepository(db, USE_MONGO, _mem_users, _mem_records, _mem_custom_foods, _mem_recommendation_feedback, pg_conn=pg_conn)
+storage = StorageRepository(db, USE_MONGO, _mem_users, _mem_records, _mem_custom_foods, pg_conn=pg_conn)
 
 app = Flask(__name__)
 CORS(app)
@@ -365,7 +364,7 @@ def create_or_update_user():
 
 
 # ─── 3. Dietary Records (PRD: 飲食紀錄) ──────────────────────
-EDITABLE_RECORD_NUTRIENTS = ("calories", "protein", "carbs", "fat", "sodium", "fiber")
+EDITABLE_RECORD_NUTRIENTS = NUTRITION_FIELDS
 
 
 def normalize_record_foods(foods):
@@ -382,7 +381,7 @@ def normalize_record_foods(foods):
 
         normalized_food = {**food, "name": name}
         for nutrient in EDITABLE_RECORD_NUTRIENTS:
-            value = food.get(nutrient, 0)
+            value = get_nutrient_value(food, nutrient)
             if isinstance(value, bool):
                 raise ValueError(f"{nutrient} 必須是有效數字")
             try:
@@ -394,6 +393,10 @@ def normalize_record_foods(foods):
             if numeric_value < 0:
                 raise ValueError(f"{nutrient} 不可小於 0")
             normalized_food[nutrient] = round(numeric_value, 2)
+        is_fried = food.get("is_fried", False)
+        if not isinstance(is_fried, bool):
+            raise ValueError("is_fried 必須是布林值")
+        normalized_food["is_fried"] = is_fried
         normalized_foods.append(normalized_food)
 
     return normalized_foods
@@ -515,21 +518,6 @@ def get_history(user_id):
     require_user_access(user_id)
     days = int(request.args.get("days", 7))
     return jsonify(build_history_response(storage, user_id, days))
-
-
-# ─── 5. Recommendations (PRD: 個人化雙軌推薦引擎) ────────────
-@app.route("/recommend/<user_id>", methods=["GET"])
-def recommend(user_id):
-    """
-    雙軌推薦:
-    1. 安全過濾層: 根據疾病禁忌排除不安全食物
-    2. 口味排序層: 餘弦相似度 (placeholder, 目前用隨機分數)
-    """
-    require_user_access(user_id)
-    result = build_recommendation_response(storage, NUTRITION_DB, TFDA_DB, DISEASE_RULES, user_id, ALLERGEN_TAXONOMY)
-    if not result:
-        return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
-    return jsonify(result)
 
 
 @app.route("/healthy-food-recommend/<user_id>", methods=["GET"])
@@ -720,40 +708,6 @@ def map_food_restaurant_summary(user_id):
         status_code = e.response.status_code if e.response is not None else "unknown"
         return jsonify({"error": f"Gemini 店家摘要失敗: HTTP {status_code}"}), 502
     return jsonify({"summary": summary}), 200
-
-
-@app.route("/recommend/<user_id>/feedback", methods=["POST"])
-def create_recommendation_feedback(user_id):
-    require_user_access(user_id)
-    data = request.get_json(silent=True) or {}
-    action = data.get("action")
-    if action not in {"accepted", "skipped", "disliked"}:
-        return jsonify({"error": "action 必須是 accepted、skipped 或 disliked"}), 400
-
-    item = data.get("item") or {}
-    item_label = item.get("label") or data.get("item_label")
-    if not item_label:
-        return jsonify({"error": "缺少 item.label"}), 400
-
-    feedback_doc = {
-        "user_id": user_id,
-        "action": action,
-        "item_label": item_label,
-        "item_name": item.get("name_zh") or item.get("item_name") or data.get("item_name"),
-        "item_source": item.get("source") or data.get("item_source"),
-        "item": item,
-        "created_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
-    }
-    saved = storage.insert_recommendation_feedback(feedback_doc)
-    return jsonify({"message": "推薦回饋已儲存", "feedback": saved}), 201
-
-
-@app.route("/recommend/<user_id>/feedback", methods=["GET"])
-def list_recommendation_feedback(user_id):
-    require_user_access(user_id)
-    limit = min(int(request.args.get("limit", 100)), 500)
-    feedback = storage.get_recommendation_feedback(user_id, limit=limit)
-    return jsonify({"feedback": feedback, "count": len(feedback)})
 
 
 # ─── 6. BMR/TDEE Calculator (PRD: 動態計算) ─────────────────

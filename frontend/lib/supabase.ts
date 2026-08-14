@@ -10,6 +10,8 @@ const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?
   || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
 export const isSupabaseAuthConfigured = Boolean(supabaseUrl && supabasePublishableKey);
+export const isSupabaseAuthRequired = isSupabaseAuthConfigured
+  && process.env.EXPO_PUBLIC_SUPABASE_AUTH_REQUIRED?.trim().toLowerCase() === 'true';
 
 const supabaseStorage = Platform.OS === 'web'
   ? {

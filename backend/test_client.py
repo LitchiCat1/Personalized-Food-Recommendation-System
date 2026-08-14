@@ -125,19 +125,6 @@ def test_history():
     print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
 
 
-def test_recommendations():
-    sep("Personalized Recommendations")
-    resp = requests.get(f"{API_URL}/recommend/user_001")
-    data = resp.json()
-    print(f"推薦 {data.get('total_candidates', 0)} 項 | 過濾 {data.get('total_filtered', 0)} 項")
-    for r in data.get("recommended", [])[:5]:
-        print(f"  [{r['match_score']}] {r['name_zh']} — {r['calories']}kcal 鈉{r['sodium']}mg GI={r['gi']}")
-    if data.get("filtered_out"):
-        print("\n被排除:")
-        for f in data["filtered_out"]:
-            print(f"  ✗ {f['name_zh']} — {', '.join(f['reasons'])}")
-
-
 def main():
     tests = [
         ("health", test_health),
@@ -147,7 +134,6 @@ def main():
         ("record", test_add_record),
         ("records", test_get_records),
         ("history", test_history),
-        ("recommend", test_recommendations),
     ]
 
     target = sys.argv[1] if len(sys.argv) > 1 else "all"

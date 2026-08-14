@@ -14,7 +14,7 @@ type Props = {
 };
 
 export default function ProgressBar({ label, current, target, unit, color, attentionLabel }: Props) {
-  const progress = Math.min(current / Math.max(target, 1), 1);
+  const progress = target <= 0 ? (current > 0 ? 1 : 0) : Math.min(current / target, 1);
   const width = useSharedValue(0);
 
   React.useEffect(() => {

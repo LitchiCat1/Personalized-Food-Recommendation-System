@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 
 import { Palette, Radius, Shadows, Spacing, Typography } from '@/constants/theme';
 import { fetchUserProfile, saveUserProfile, type UserProfileResponse } from '@/lib/api';
-import { isSupabaseAuthConfigured, supabase } from '@/lib/supabase';
+import { isSupabaseAuthRequired, supabase } from '@/lib/supabase';
 import { useStore, type UserProfile } from '@/store/useStore';
 
 
@@ -80,7 +80,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [profileReloadKey, setProfileReloadKey] = useState(0);
 
   useEffect(() => {
-    if (!isSupabaseAuthConfigured || !supabase) {
+    if (!isSupabaseAuthRequired || !supabase) {
       setAuthReady(true);
       return;
     }
@@ -209,7 +209,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     }
   };
 
-  if (!isSupabaseAuthConfigured) {
+  if (!isSupabaseAuthRequired) {
     return <>{children}</>;
   }
 

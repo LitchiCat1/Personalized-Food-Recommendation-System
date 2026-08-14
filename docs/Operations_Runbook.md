@@ -64,7 +64,7 @@ npx expo start -c
 避免一次啟動耗時模型或長時間無輸出，優先跑短檢查：
 
 ```powershell
-python -m py_compile "backend/app.py" "backend/services/auth_service.py" "backend/repositories/storage.py" "backend/services/disease_rule_service.py" "backend/services/history_service.py" "backend/services/food_analysis_service.py" "backend/services/vision_food_service.py" "backend/services/recommend_service.py" "backend/services/healthy_food_service.py"
+python -m py_compile "backend/app.py" "backend/services/auth_service.py" "backend/repositories/storage.py" "backend/services/disease_rule_service.py" "backend/services/history_service.py" "backend/services/food_analysis_service.py" "backend/services/vision_food_service.py" "backend/services/healthy_food_service.py"
 ```
 
 食物辨識目前採 Gemini Vision 初判，再由後端查 TFDA/自訂食品資料庫取得營養值；不再部署本機影像模型。

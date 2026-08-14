@@ -4,8 +4,14 @@ export type HistoryDay = {
   calories: number;
   protein: number;
   carbs: number;
+  sugar: number;
   fat: number;
+  saturated_fat: number;
+  trans_fat: number;
   sodium: number;
+  fiber: number;
+  calcium: number;
+  iron: number;
 };
 
 export type HistoryResponse = {
@@ -16,8 +22,14 @@ export type HistoryResponse = {
     avg_calories?: number;
     avg_protein?: number;
     avg_carbs?: number;
+    avg_sugar?: number;
     avg_fat?: number;
+    avg_saturated_fat?: number;
+    avg_trans_fat?: number;
     avg_sodium?: number;
+    avg_fiber?: number;
+    avg_calcium?: number;
+    avg_iron?: number;
     recorded_days?: number;
     total_records?: number;
     avg_records_per_day?: number;
@@ -33,6 +45,7 @@ export type FoodRecordItem = {
   sodium?: number;
   fiber?: number;
   sugar?: number;
+  refined_sugar?: number;
   saturated_fat?: number;
   trans_fat?: number;
   calcium?: number;
@@ -55,10 +68,12 @@ export type DietaryRecord = {
   total_sodium?: number;
   total_fiber?: number;
   total_sugar?: number;
+  total_refined_sugar?: number;
   total_saturated_fat?: number;
   total_trans_fat?: number;
   total_calcium?: number;
   total_iron?: number;
+  contains_fried_food?: boolean;
   source?: string;
 };
 
@@ -80,77 +95,19 @@ export type CreateDietaryRecordPayload = {
   total_calories: number;
   total_protein: number;
   total_carbs: number;
+  total_sugar: number;
   total_fat: number;
+  total_saturated_fat: number;
+  total_trans_fat: number;
   total_sodium: number;
   total_fiber: number;
+  total_calcium: number;
+  total_iron: number;
   source: 'manual';
 };
 
 export type CreateDietaryRecordResponse = RecordMutationResponse & {
   deduplicated: boolean;
-};
-
-export type RecommendationItem = {
-  label: string;
-  name_zh: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  sodium: number;
-  gi?: 'low' | 'medium' | 'high' | null;
-  source?: string;
-  match_score: number;
-  preference_score?: number;
-  feedback_adjustment?: number;
-  preference_reasons?: string[];
-  safety_badges?: string[];
-  reasons?: string[];
-  medical_risk?: {
-    is_safe: boolean;
-    has_caution: boolean;
-    risks: Array<Record<string, unknown>>;
-    block_reasons: string[];
-    caution_reasons: string[];
-    normalized_conditions?: string[];
-    normalized_allergens?: string[];
-  };
-};
-
-export type RecommendationResponse = {
-  user_id: string;
-  remaining_calories: number;
-  health_conditions: string[];
-  recommended: RecommendationItem[];
-  filtered_out: RecommendationItem[];
-  total_candidates: number;
-  total_filtered: number;
-  source_counts?: {
-    total: number;
-    manual_db: number;
-    tfda: number;
-    custom_foods: number;
-  };
-  preference_profile?: {
-    record_count: number;
-    food_count: number;
-    feedback_count?: number;
-    feedback_counts?: Record<RecommendationFeedbackAction, number>;
-  };
-};
-
-export type RecommendationFeedbackAction = 'accepted' | 'skipped' | 'disliked';
-
-export type RecommendationFeedbackResponse = {
-  message: string;
-  feedback: {
-    user_id: string;
-    action: RecommendationFeedbackAction;
-    item_label: string;
-    item_name?: string;
-    item_source?: string;
-    created_at: string;
-  };
 };
 
 export type HealthyFoodRecommendation = {
@@ -167,8 +124,15 @@ export type HealthyFoodRecommendation = {
   calories: number;
   protein: number;
   carbs: number;
+  sugar?: number;
   fat: number;
+  saturated_fat?: number;
+  trans_fat?: number;
   sodium: number;
+  fiber?: number;
+  calcium?: number;
+  iron?: number;
+  is_fried?: boolean;
   gi?: 'low' | 'medium' | 'high' | null;
   match_score: number;
   nutrition_available?: boolean;
@@ -436,28 +400,6 @@ export async function deleteDietaryRecord(
     headers: buildHeaders(auth),
   });
   return parseJson<RecordMutationResponse>(resp);
-}
-
-export async function fetchRecommendations(apiBaseUrl: string, userId: string, auth?: ApiAuth): Promise<RecommendationResponse> {
-  const resp = await fetch(`${apiBaseUrl}/recommend/${encodeURIComponent(userId)}`, {
-    headers: buildHeaders(auth),
-  });
-  return parseJson<RecommendationResponse>(resp);
-}
-
-export async function saveRecommendationFeedback(
-  apiBaseUrl: string,
-  userId: string,
-  action: RecommendationFeedbackAction,
-  item: RecommendationItem,
-  auth?: ApiAuth
-): Promise<RecommendationFeedbackResponse> {
-  const resp = await fetch(`${apiBaseUrl}/recommend/${encodeURIComponent(userId)}/feedback`, {
-    method: 'POST',
-    headers: buildHeaders(auth, 'application/json'),
-    body: JSON.stringify({ action, item }),
-  });
-  return parseJson<RecommendationFeedbackResponse>(resp);
 }
 
 export async function fetchUserProfile(apiBaseUrl: string, userId: string, auth?: ApiAuth): Promise<UserProfileResponse> {

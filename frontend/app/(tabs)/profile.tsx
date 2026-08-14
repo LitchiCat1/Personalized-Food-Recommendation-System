@@ -329,7 +329,7 @@ export default function ProfileScreen() {
 
       {isDesktop || activeSection === 'safety' ? (
       <View style={isDesktop ? styles.desktopPane : undefined}>
-      <SectionBlock title="健康狀況管理" subtitle="影響推薦與掃描風險提示。">
+      <SectionBlock title="健康狀況管理" subtitle="影響附近店家排序與掃描風險提示。">
         <View style={styles.medicalDisclaimer}>
           <Ionicons name="medical-outline" size={16} color={Palette.status.warning} />
           <Text style={styles.medicalDisclaimerText}>{medicalMetadata?.medical_disclaimer || '疾病與營養提醒僅供健康管理參考，不可取代醫療專業建議。'}</Text>
@@ -368,7 +368,7 @@ export default function ProfileScreen() {
         </View>
       </SectionBlock>
 
-      <SectionBlock title="過敏原設定" subtitle="選取後會從掃描與推薦中自動排除。">
+      <SectionBlock title="過敏原設定" subtitle="選取後會套用於掃描風險提示與店家篩選。">
         <View style={styles.allergenChipsWrap}>
           {allergenCatalog.map((allergen) => {
             const isActive = user.allergens.includes(allergen.id) || user.allergens.includes(allergen.label_zh);

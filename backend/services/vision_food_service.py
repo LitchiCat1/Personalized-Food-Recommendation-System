@@ -5,6 +5,7 @@ import requests
 from services.food_service import search_foods
 from services.food_analysis_service import build_detection_reliability, build_portion_range, check_food_safety
 from services.nutrition_label_service import extract_json_block, extract_number, get_gemini_models
+from services.nutrient_service import is_fried_food_name
 
 
 VISION_FOOD_MIN_CONFIDENCE = float(os.environ.get("VISION_FOOD_MIN_CONFIDENCE", "0.45"))
@@ -146,7 +147,8 @@ def build_vision_food_response(
             "trans_fat": matched_food.get("trans_fat", 0),
             "calcium": matched_food.get("calcium", 0),
             "iron": matched_food.get("iron", 0),
-            "is_fried": matched_food.get("is_fried", False),
+            "is_fried": matched_food.get("is_fried") is True
+            or is_fried_food_name(matched_food.get("name_zh"), matched_food.get("name_en"), name_zh),
             "source": matched_food.get("source", "TFDA"),
             "allergens": matched_food.get("allergens", []),
             "gi": "medium",
@@ -158,9 +160,15 @@ def build_vision_food_response(
             "calories": round((nutrients.get("calories") or 0) * scale),
             "protein": round((nutrients.get("protein") or 0) * scale, 1),
             "carbs": round((nutrients.get("carbs") or 0) * scale, 1),
+            "sugar": round((nutrients.get("sugar") or 0) * scale, 1),
             "fat": round((nutrients.get("fat") or 0) * scale, 1),
+            "saturated_fat": round((nutrients.get("saturated_fat") or 0) * scale, 1),
+            "trans_fat": round((nutrients.get("trans_fat") or 0) * scale, 1),
             "sodium": round((nutrients.get("sodium") or 0) * scale),
             "fiber": round((nutrients.get("fiber") or 0) * scale, 1),
+            "calcium": round((nutrients.get("calcium") or 0) * scale),
+            "iron": round((nutrients.get("iron") or 0) * scale, 1),
+            "is_fried": nutrients.get("is_fried") is True,
         }
         total_calories += scaled_nutrition["calories"]
         total_sodium += scaled_nutrition["sodium"]

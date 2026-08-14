@@ -22,7 +22,6 @@ class ApiRouteTests(unittest.TestCase):
         self.app_module._mem_users.clear()
         self.app_module._mem_records.clear()
         self.app_module._mem_custom_foods.clear()
-        self.app_module._mem_recommendation_feedback.clear()
         self.app_module.storage.upsert_user({"user_id": "user-a", "name": "User A", "health_conditions": ["hypertension"], "allergens": ["egg"]})
 
     def auth_headers(self):
@@ -199,8 +198,36 @@ class ApiRouteTests(unittest.TestCase):
             "user_id": "user-a",
             "client_record_id": "manual-recalculated-record",
             "foods": [
-                {"name": "豆漿", "calories": 120, "protein": 8.5, "carbs": 10, "fat": 4, "sodium": 95, "fiber": 2},
-                {"name": "香蕉", "calories": 90, "protein": 1, "carbs": 23, "fat": 0.3, "sodium": 1, "fiber": 2.6},
+                {
+                    "name": "炸豆腐",
+                    "calories": 120,
+                    "protein": 8.5,
+                    "carbs": 10,
+                    "refined_sugar": 1.5,
+                    "fat": 4,
+                    "saturated_fat": 0.8,
+                    "trans_fat": 0,
+                    "sodium": 95,
+                    "fiber": 2,
+                    "calcium": 120,
+                    "iron": 1.2,
+                    "is_fried": True,
+                },
+                {
+                    "name": "香蕉",
+                    "calories": 90,
+                    "protein": 1,
+                    "carbs": 23,
+                    "sugar": 4.2,
+                    "fat": 0.3,
+                    "saturated_fat": 0.1,
+                    "trans_fat": 0,
+                    "sodium": 1,
+                    "fiber": 2.6,
+                    "calcium": 6,
+                    "iron": 0.3,
+                    "is_fried": False,
+                },
             ],
             "total_calories": 9999,
             "total_protein": 9999,
@@ -217,6 +244,13 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(record["total_protein"], 9.5)
         self.assertEqual(record["total_sodium"], 96)
         self.assertEqual(record["total_fiber"], 4.6)
+        self.assertEqual(record["total_sugar"], 5.7)
+        self.assertEqual(record["total_saturated_fat"], 0.9)
+        self.assertEqual(record["total_trans_fat"], 0)
+        self.assertEqual(record["total_calcium"], 126)
+        self.assertEqual(record["total_iron"], 1.5)
+        self.assertTrue(record["contains_fried_food"])
+        self.assertEqual(record["foods"][0]["sugar"], 1.5)
 
     def test_record_route_keeps_existing_scanner_creation_compatible(self):
         payload = {
@@ -362,8 +396,17 @@ class ApiRouteTests(unittest.TestCase):
     def test_custom_food_route_scopes_food_to_authenticated_user(self):
         payload = {
             "user_id": "user-a",
-            "name_zh": "測試豆漿",
-            "nutrition_per_100g": {"calories": 42, "protein": 3.4, "fat": 1.8, "carbs": 4.1, "sodium": 5},
+            "name_zh": "油炸測試豆漿",
+            "nutrition_per_100g": {
+                "calories": 42,
+                "protein": 3.4,
+                "fat": 1.8,
+                "carbs": 4.1,
+                "sugar": 1.2,
+                "sodium": 5,
+                "calcium": 18,
+                "iron": 0.6,
+            },
         }
 
         with self.mock_auth("user-a"):
@@ -372,6 +415,8 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         data = response.get_json()
         self.assertEqual(data["food"]["user_id"], "user-a")
+        self.assertTrue(data["food"]["is_fried"])
+        self.assertEqual(data["food"]["nutrition_per_100g"]["calcium"], 18)
         self.assertIn("owner_key", data["food"])
 
         with self.mock_auth("user-a"):
@@ -382,43 +427,11 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(list_data["count"], 1)
         self.assertEqual(list_data["foods"][0]["user_id"], "user-a")
 
-    def test_recommendation_feedback_round_trip(self):
-        payload = {
-            "action": "accepted",
-            "item": {
-                "label": "chicken_salad",
-                "name_zh": "雞肉沙拉",
-                "source": "tfda",
-            },
-        }
-
-        with self.mock_auth("user-a"):
-            create_response = self.client.post("/recommend/user-a/feedback", json=payload, headers=self.auth_headers())
-            list_response = self.client.get("/recommend/user-a/feedback", headers=self.auth_headers())
-
-        self.assertEqual(create_response.status_code, 201)
-        self.assertEqual(create_response.get_json()["feedback"]["item_label"], "chicken_salad")
-        self.assertEqual(list_response.status_code, 200)
-        self.assertEqual(list_response.get_json()["count"], 1)
-
-    def test_recommendation_feedback_rejects_invalid_action(self):
-        with self.mock_auth("user-a"):
-            response = self.client.post("/recommend/user-a/feedback", json={"action": "maybe", "item": {"label": "salad"}}, headers=self.auth_headers())
-        self.assertEqual(response.status_code, 400)
-
     def test_map_food_recommend_requires_google_places_key(self):
         with patch.dict(os.environ, {"GOOGLE_PLACES_API_KEY": "", "GOOGLE_MAPS_API_KEY": ""}, clear=False):
             with self.mock_auth("user-a"):
                 response = self.client.get("/map-food-recommend/user-a?budget=150&lat=24.9890&lng=121.3443&radius_km=3&category=all", headers=self.auth_headers())
         self.assertEqual(response.status_code, 503)
-
-    def test_recommend_route_includes_medical_risk(self):
-        with self.mock_auth("user-a"):
-            response = self.client.get("/recommend/user-a", headers=self.auth_headers())
-        self.assertEqual(response.status_code, 200)
-        data = response.get_json()
-        self.assertIn("recommended", data)
-        self.assertGreaterEqual(len(data["recommended"]), 0)
 
     def test_health_metadata_in_map_food_route(self):
         fake_restaurants = [

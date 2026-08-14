@@ -1,4 +1,5 @@
 from services.disease_rule_service import normalize_allergen_ids, normalize_condition_ids
+from services.nutrient_service import get_nutrient_value, is_fried_food_name
 
 
 NUTRIENT_FIELDS = {
@@ -17,11 +18,11 @@ NUTRIENT_FIELDS = {
 
 
 def _is_fried_food(candidate: dict) -> bool:
-    if candidate.get("is_fried") is True:
-        return True
-    name = (candidate.get("name_zh") or candidate.get("name") or candidate.get("label") or "").lower()
-    fried_keywords = ["油炸", "炸雞", "炸排骨", "炸魚", "炸豬排", "炸蝦", "薯條", "天婦羅", "雞塊", "炸物", "炸起司", "酥炸"]
-    return any(k in name for k in fried_keywords)
+    return candidate.get("is_fried") is True or is_fried_food_name(
+        candidate.get("name_zh"),
+        candidate.get("name"),
+        candidate.get("label"),
+    )
 
 
 
@@ -38,11 +39,14 @@ def normalize_text(value) -> str:
 
 def scale_nutrients(nutrients: dict, portion_g: float | None = None) -> dict:
     if not portion_g:
-        return {key: normalize_number(nutrients.get(source_key)) for key, (source_key, _unit) in NUTRIENT_FIELDS.items()}
+        return {
+            key: normalize_number(get_nutrient_value(nutrients, source_key))
+            for key, (source_key, _unit) in NUTRIENT_FIELDS.items()
+        }
 
     scale = normalize_number(portion_g) / 100.0
     return {
-        key: normalize_number(nutrients.get(source_key)) * scale
+        key: normalize_number(get_nutrient_value(nutrients, source_key)) * scale
         for key, (source_key, _unit) in NUTRIENT_FIELDS.items()
     }
 
@@ -204,9 +208,11 @@ def evaluate_medical_risk(
     daily_calorie_target = 1950.0
     
     if user_profile:
-        height_cm = float(user_profile.get("height") or 170.0)
-        weight_kg = float(user_profile.get("weight") or 65.0)
-        daily_calorie_target = float(user_profile.get("daily_calorie_target") or user_profile.get("dailyCalorieTarget") or (weight_kg * 30))
+        height_cm = normalize_number(user_profile.get("height")) or 170.0
+        weight_kg = normalize_number(user_profile.get("weight")) or 65.0
+        daily_calorie_target = normalize_number(
+            user_profile.get("daily_calorie_target") or user_profile.get("dailyCalorieTarget")
+        ) or (weight_kg * 30)
         
     height_m = height_cm / 100.0
     W = 22.0 * (height_m ** 2)

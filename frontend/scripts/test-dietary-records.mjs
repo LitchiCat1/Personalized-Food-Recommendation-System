@@ -88,10 +88,16 @@ test('creates a blank manual draft and totals validated foods in the existing sc
     calories: 1.25,
     protein: 1.25,
     carbs: 1.25,
+    sugar: 0,
     fat: 1.25,
-    sodium: 1.25,
+    saturated_fat: 0,
+    trans_fat: 0,
     fiber: 1.25,
+    sodium: 1.25,
+    calcium: 0,
+    iron: 0,
   });
+  assert.equal(validation.foods[0].is_fried, false);
 });
 
 test('filters only the authenticated user and includes both local date boundaries', () => {
@@ -135,6 +141,6 @@ test('keeps draft content while reporting blank names, missing values and negati
   assert.equal(validation.foods, null);
   assert.equal(validation.errors['foods.0.name'], '食物名稱不可空白');
   assert.equal(validation.errors['foods.0.calories'], '熱量為必填');
-  assert.equal(validation.errors['foods.0.sodium'], '鈉需為 0 或正數');
+  assert.equal(validation.errors['foods.0.sodium'], '鈉 (Sodium)需為 0 或正數');
   assert.equal(drafts[0].name, '   ');
 });

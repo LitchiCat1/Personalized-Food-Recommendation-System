@@ -122,15 +122,15 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
             {[
               { label: '熱量', value: food.nutrition.calories, unit: 'kcal', color: Palette.accent.green },
               { label: '蛋白質', value: food.nutrition.protein, unit: 'g', color: Palette.accent.blue },
-              { label: '碳水', value: food.nutrition.carbs, unit: 'g', color: Palette.accent.orange },
+              { label: '總碳水化合物', value: food.nutrition.carbs, unit: 'g', color: Palette.accent.orange },
               { label: '精緻糖', value: food.nutrition.sugar ?? 0, unit: 'g', color: Palette.accent.orange },
-              { label: '脂肪', value: food.nutrition.fat, unit: 'g', color: Palette.accent.purple },
+              { label: '總脂肪', value: food.nutrition.fat, unit: 'g', color: Palette.accent.purple },
               { label: '飽和脂肪', value: food.nutrition.saturated_fat ?? 0, unit: 'g', color: Palette.accent.purple },
               { label: '反式脂肪', value: food.nutrition.trans_fat ?? 0, unit: 'g', color: Palette.accent.purple },
-              { label: '鈉', value: food.nutrition.sodium, unit: 'mg', color: food.nutrition.sodium > 800 ? Palette.status.warning : Palette.accent.pink },
-              { label: '纖維', value: food.nutrition.fiber, unit: 'g', color: Palette.accent.cyan },
-              { label: '鈣', value: food.nutrition.calcium ?? 0, unit: 'mg', color: Palette.accent.cyan },
-              { label: '鐵', value: food.nutrition.iron ?? 0, unit: 'mg', color: Palette.accent.cyan },
+              { label: '膳食纖維', value: food.nutrition.fiber, unit: 'g', color: Palette.accent.cyan },
+              { label: '鈉 (Sodium)', value: food.nutrition.sodium, unit: 'mg', color: food.nutrition.sodium > 800 ? Palette.status.warning : Palette.accent.pink },
+              { label: '鈣 (Calcium)', value: food.nutrition.calcium ?? 0, unit: 'mg', color: Palette.accent.cyan },
+              { label: '鐵 (Iron)', value: food.nutrition.iron ?? 0, unit: 'mg', color: Palette.accent.cyan },
             ].map((item) => (
               <View key={item.label} style={[styles.nutritionItem, { minWidth: wp(26) }]}>
                 <Text style={styles.nutritionLabel}>{item.label}</Text>

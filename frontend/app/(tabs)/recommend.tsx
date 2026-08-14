@@ -1,32 +1,24 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TextInput, Pressable, Linking, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
-import { router } from 'expo-router';
 import AppContainer from '@/components/AppContainer';
 import ScreenHeader from '@/components/ui/screen-header';
 import SectionBlock from '@/components/ui/section-block';
-import MetricCard from '@/components/ui/metric-card';
 import DataPill from '@/components/ui/data-pill';
 import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
 import FoodMap from '@/components/maps/FoodMap';
-import { useResponsive } from '@/hooks/useResponsive';
 import {
   fetchHealthyFoodRecommendations,
   fetchRestaurantAiSummary,
-  fetchRecommendations,
-  saveRecommendationFeedback,
   fetchRestaurantDetailedMenu,
   type HealthyFoodRestaurant,
   type RestaurantAiSummary,
-  type RecommendationFeedbackAction,
   type HealthyFoodResponse,
-  type RecommendationItem,
-  type RecommendationResponse,
 } from '@/lib/api';
 
 
@@ -46,16 +38,10 @@ const CATEGORY_OPTIONS = [
 ];
 
 export default function RecommendScreen() {
-  const { isDesktop } = useResponsive();
   const { user, apiBaseUrl, accessToken } = useStore();
-  const [data, setData] = useState<RecommendationResponse | null>(null);
   const [healthyData, setHealthyData] = useState<HealthyFoodResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [healthyLoading, setHealthyLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [healthyError, setHealthyError] = useState<string | null>(null);
-  const [feedbackStatus, setFeedbackStatus] = useState<Record<string, RecommendationFeedbackAction>>({});
-  const [feedbackSavingKey, setFeedbackSavingKey] = useState<string | null>(null);
   const [summaryByRestaurant, setSummaryByRestaurant] = useState<Record<string, RestaurantAiSummary>>({});
   const [summaryLoadingKey, setSummaryLoadingKey] = useState<string | null>(null);
   const [budget, setBudget] = useState('150');
@@ -63,52 +49,9 @@ export default function RecommendScreen() {
   const [category, setCategory] = useState('all');
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [locationLabel, setLocationLabel] = useState('尚未取得定位');
-  const [showAllMeals, setShowAllMeals] = useState(false);
   const [viewingMenuRest, setViewingMenuRest] = useState<HealthyFoodRestaurant | null>(null);
   const [menuLoading, setMenuLoading] = useState(false);
 
-
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    fetchRecommendations(apiBaseUrl, user.userId, { accessToken })
-      .then((result) => {
-        if (!cancelled) setData(result);
-      })
-      .catch((err: Error) => {
-        if (!cancelled) setError(err.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, apiBaseUrl, user.userId]);
-
-  const recommended: RecommendationItem[] = (healthyData?.recommended && healthyData.recommended.length > 0)
-    ? healthyData.recommended.map(item => ({
-        label: item.item_id || item.item_name,
-        name_zh: item.item_name,
-        calories: item.calories,
-        protein: item.protein,
-        carbs: item.carbs,
-        fat: item.fat,
-        sodium: item.sodium,
-        gi: item.gi,
-        source: item.restaurant_name,
-        match_score: item.match_score,
-        preference_reasons: item.reasons,
-      }))
-    : (data?.recommended || []);
-
-  const sourceCounts = data?.source_counts;
-  const preferenceProfile = data?.preference_profile;
-  const remaining = data?.remaining_calories ?? user.dailyCalorieTarget;
   const mapRestaurants = healthyData?.restaurants || [];
   const mapLocation = healthyData?.location || null;
   const selectedRestaurant = mapRestaurants.find((restaurant) => restaurant.restaurant_id === selectedRestaurantId) || mapRestaurants[0] || null;
@@ -150,25 +93,12 @@ export default function RecommendScreen() {
       setHealthyData(result);
       setSelectedRestaurantId(result.restaurants?.[0]?.restaurant_id || null);
     } catch (err: any) {
-      setHealthyError(err?.message || '無法取得健康餐點推薦');
+      setHealthyError(err?.message || '無法取得附近店家');
     } finally {
       setHealthyLoading(false);
     }
   };
 
-
-  const handleRecommendationFeedback = async (meal: RecommendationItem, action: RecommendationFeedbackAction) => {
-    const key = meal.label;
-    setFeedbackSavingKey(key);
-    try {
-      await saveRecommendationFeedback(apiBaseUrl, user.userId, action, meal, { accessToken });
-      setFeedbackStatus((current) => ({ ...current, [key]: action }));
-    } catch (err: any) {
-      setError(err?.message || '推薦回饋儲存失敗');
-    } finally {
-      setFeedbackSavingKey(null);
-    }
-  };
 
   const handleOpenNavigation = async (restaurant: HealthyFoodRestaurant) => {
     try {
@@ -232,68 +162,13 @@ export default function RecommendScreen() {
   return (
     <AppContainer>
       <ScreenHeader
-        title="智慧推薦"
-        subtitle="查看符合個人條件的餐點，再用定位找附近可行店家。"
-        badge="安全過濾"
+        title="附近店家"
+        subtitle="依預算、距離與店家類型搜尋附近選擇。"
+        badge="地圖搜尋"
         badgeTone="success"
       />
 
-      {loading ? (
-        <StateCard icon="sparkles-outline" text="讀取推薦中..." loading />
-      ) : error ? (
-        <View style={styles.stateCard}>
-          <Ionicons name="person-add-outline" size={40} color={Palette.status.warning} />
-          <Text style={styles.emptyText}>{error}</Text>
-          <View style={{ marginTop: Spacing.md, width: '100%', maxWidth: 280 }}>
-            <PrimaryButton
-              label="立即填寫個人檔案"
-              onPress={() => router.push('/profile')}
-              icon={<Ionicons name="arrow-forward-outline" size={17} color={Palette.text.inverse} />}
-            />
-          </View>
-        </View>
-
-      ) : (
-        <>
-          <View style={styles.metricRow}>
-            <MetricCard label="剩餘熱量" value={remaining} unit="kcal" accent={Palette.accent.green} />
-            <MetricCard label="可推薦" value={recommended.length} unit="項" accent={Palette.accent.blue} />
-          </View>
-
-          <View style={isDesktop ? styles.desktopColumns : styles.recommendSections}>
-
-          <View style={isDesktop ? styles.desktopPane : undefined}>
-
-          <SectionBlock title="餐點推薦" subtitle="依熱量契合、疾病禁忌、過敏原和近期偏好排序。">
-            <View style={styles.sourceSummary}>
-              {sourceCounts ? <DataPill tone="info">TFDA {sourceCounts.tfda} · 自訂 {sourceCounts.custom_foods} · 基礎 {sourceCounts.manual_db}</DataPill> : null}
-              {preferenceProfile && preferenceProfile.food_count > 0 ? <DataPill tone="success">參考 {preferenceProfile.record_count} 筆紀錄</DataPill> : null}
-              <DataPill tone={user.healthConditions.length ? 'warning' : 'success'}>{user.healthConditions.length ? user.healthConditions.join('、') : '未設定疾病'}</DataPill>
-            </View>
-
-            <View style={styles.recommendList}>
-              {recommended.length === 0 ? (
-                <Text style={styles.emptyText}>目前找不到符合條件的推薦，請先調整個人條件或新增更多食品資料。</Text>
-              ) : (
-                (showAllMeals ? recommended : recommended.slice(0, 3)).map((meal, index) => (
-                  <RecommendationCard
-                    key={`${meal.label}_${index}`}
-                    meal={meal}
-                    feedbackStatus={feedbackStatus[meal.label]}
-                    saving={feedbackSavingKey === meal.label}
-                    onFeedback={(action) => handleRecommendationFeedback(meal, action)}
-                  />
-                ))
-              )}
-              {recommended.length > 3 ? (
-                <SecondaryButton label={showAllMeals ? '收合推薦' : `查看其餘 ${recommended.length - 3} 項`} onPress={() => setShowAllMeals((value) => !value)} icon={<Ionicons name={showAllMeals ? 'chevron-up' : 'chevron-down'} size={16} color={Palette.accent.green} />} />
-              ) : null}
-            </View>
-          </SectionBlock>
-          </View>
-
-          <View style={isDesktop ? styles.desktopPane : undefined}>
-          <SectionBlock title="附近店家推薦" subtitle="Google Places 只提供真實店家位置；實際餐點營養仍建議用掃描確認。">
+      <SectionBlock title="附近店家搜尋" subtitle="Google Places 只提供真實店家位置；實際餐點營養仍建議用掃描確認。">
             <View style={styles.budgetRow}>
               <TextInput
                 value={budget}
@@ -343,7 +218,7 @@ export default function RecommendScreen() {
                   <View style={styles.selectedMapInfo}>
                     <View style={styles.mapTitleRow}>
                       <Text style={styles.restaurantName}>{selectedRestaurant.name}</Text>
-                      <DataPill tone="info">推薦 {selectedRestaurant.match_score}</DataPill>
+                      <DataPill tone="info">評分 {selectedRestaurant.match_score}</DataPill>
                     </View>
                     <Text style={styles.restaurantMeta}>{selectedRestaurant.address || '尚無地址'} · {selectedRestaurant.distance_km} km</Text>
                     <SecondaryButton label="開啟 Google Maps 導航" onPress={() => handleOpenNavigation(selectedRestaurant)} icon={<Ionicons name="navigate-outline" size={15} color={Palette.accent.green} />} />
@@ -367,10 +242,6 @@ export default function RecommendScreen() {
               ))}
             </>
           ) : null}
-          </View>
-          </View>
-        </>
-      )}
 
       {/* 完整菜單詳細 Modal 彈窗 */}
       <Modal
@@ -397,7 +268,7 @@ export default function RecommendScreen() {
               <ScrollView contentContainerStyle={styles.modalScroll}>
                 <Text style={styles.restaurantMeta}>{viewingMenuRest?.address}</Text>
 
-                <Text style={styles.modalSectionTitle}>安全餐點推薦</Text>
+                <Text style={styles.modalSectionTitle}>餐點安全分析</Text>
                 {(viewingMenuRest?.recommended_items || []).length === 0 && (viewingMenuRest?.filtered_items || []).length === 0 ? (
                   <View style={{ padding: Spacing.lg, alignItems: 'center', backgroundColor: Palette.bg.wash, borderRadius: Radius.lg, borderWidth: 1, borderColor: Palette.border.subtle, marginVertical: Spacing.md }}>
                     <Ionicons name="document-text-outline" size={32} color={Palette.text.tertiary} style={{ marginBottom: Spacing.xs }} />
@@ -409,7 +280,7 @@ export default function RecommendScreen() {
                 ) : (
                   <>
                     {(viewingMenuRest?.recommended_items || []).length === 0 ? (
-                      <Text style={styles.emptyText}>無推薦的餐點</Text>
+                      <Text style={styles.emptyText}>沒有符合條件的餐點</Text>
                     ) : (
                       (viewingMenuRest?.recommended_items || []).map((item) => (
                         <View key={item.item_name} style={styles.menuItemCard}>
@@ -423,7 +294,7 @@ export default function RecommendScreen() {
                             <NutritionMini label="鈉" value={`${item.sodium} mg`} color={Palette.accent.pink} />
                           </View>
                           {item.reasons && item.reasons.length > 0 ? (
-                            <Text style={styles.customizationText}>💡 推薦原因：{item.reasons.join('、')}</Text>
+                            <Text style={styles.customizationText}>判定依據：{item.reasons.join('、')}</Text>
                           ) : null}
                         </View>
                       ))
@@ -454,80 +325,6 @@ export default function RecommendScreen() {
       </Modal>
 
     </AppContainer>
-  );
-}
-
-function StateCard({ icon, text, loading, tone }: { icon: keyof typeof Ionicons.glyphMap; text: string; loading?: boolean; tone?: 'warning' }) {
-  return (
-    <View style={styles.stateCard}>
-      {loading ? <ActivityIndicator size="large" color={Palette.accent.green} /> : <Ionicons name={icon} size={30} color={tone === 'warning' ? Palette.status.warning : Palette.text.tertiary} />}
-      <Text style={styles.emptyText}>{text}</Text>
-    </View>
-  );
-}
-
-function RecommendationCard({
-  meal,
-  feedbackStatus,
-  saving,
-  onFeedback,
-}: {
-  meal: RecommendationItem;
-  feedbackStatus?: RecommendationFeedbackAction;
-  saving: boolean;
-  onFeedback: (action: RecommendationFeedbackAction) => void;
-}) {
-  return (
-    <View style={styles.mealCard}>
-      <View style={styles.mealTop}>
-        <View style={styles.mealInfo}>
-          <Text style={styles.mealName}>{meal.name_zh}</Text>
-          <View style={styles.pillRow}>
-            <DataPill tone="success">{meal.source === 'TFDA' ? 'TFDA 官方資料' : meal.source === 'manual-db' ? '基礎資料庫' : '自訂食品'}</DataPill>
-            {meal.gi ? <DataPill tone={meal.gi === 'high' ? 'danger' : meal.gi === 'medium' ? 'warning' : 'success'}>GI {meal.gi === 'low' ? '低' : meal.gi === 'medium' ? '中' : '高'}</DataPill> : null}
-          </View>
-        </View>
-        <View style={styles.scoreBox}>
-          <Text style={styles.scoreValue}>{meal.match_score}</Text>
-          <Text style={styles.scoreLabel}>契合</Text>
-        </View>
-      </View>
-      <View style={styles.reasonBox}>
-        {(meal.preference_reasons || []).length > 0 ? (
-          (meal.preference_reasons || []).map((reason) => <Text key={reason} style={styles.reasonText}>因為 {reason}</Text>)
-        ) : (
-          <Text style={styles.reasonText}>已通過健康條件與過敏原安全篩選。</Text>
-        )}
-      </View>
-      <View style={styles.nutritionRow}>
-        <NutritionMini label="熱量" value={`${meal.calories} kcal`} color={Palette.accent.green} />
-        <NutritionMini label="蛋白質" value={`${meal.protein} g`} color={Palette.accent.blue} />
-        <NutritionMini label="鈉" value={`${meal.sodium} mg`} color={meal.sodium > 800 ? Palette.status.warning : Palette.accent.pink} />
-      </View>
-      <View style={styles.feedbackRow}>
-        {[
-          { action: 'accepted' as const, label: '採納', icon: 'checkmark-circle-outline' as const },
-          { action: 'skipped' as const, label: '略過', icon: 'play-skip-forward-outline' as const },
-          { action: 'disliked' as const, label: '不喜歡', icon: 'thumbs-down-outline' as const },
-        ].map((item) => {
-          const active = feedbackStatus === item.action;
-          return (
-            <Pressable
-              key={item.action}
-              disabled={saving}
-              accessibilityRole="button"
-              accessibilityLabel={`推薦回饋：${item.label}`}
-              accessibilityState={{ selected: active, disabled: saving }}
-              onPress={() => onFeedback(item.action)}
-              style={[styles.feedbackButton, active && styles.feedbackButtonActive]}
-            >
-              {saving && item.action === 'accepted' ? <ActivityIndicator size="small" color={Palette.accent.green} /> : <Ionicons name={item.icon} size={13} color={active ? Palette.accent.green : Palette.text.tertiary} />}
-              <Text style={[styles.feedbackButtonText, active && styles.feedbackButtonTextActive]}>{item.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
   );
 }
 
@@ -594,7 +391,7 @@ function RestaurantCard({
             <View style={styles.personalizedRecommendations}>
               <View style={styles.personalizedTitleRow}>
                 <Ionicons name="sparkles-outline" size={16} color={Palette.accent.green} />
-                <Text style={styles.personalizedTitle}>依疾病與今日進度推薦</Text>
+                <Text style={styles.personalizedTitle}>疾病與今日進度提醒</Text>
               </View>
               {(summary.recommended_foods || []).map((item, itemIndex) => (
                 <View key={`${item.name}_${itemIndex}`} style={styles.personalizedItem}>
@@ -623,61 +420,14 @@ function NutritionMini({ label, value, color }: { label: string; value: string; 
 }
 
 const styles = StyleSheet.create({
-  metricRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl },
-  recommendSections: { gap: Spacing.xl },
-  desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xl },
-  desktopPane: { flex: 1, minWidth: 0 },
-  stateCard: {
-    backgroundColor: Palette.bg.card,
-    borderRadius: Radius.xl,
-    marginBottom: Spacing.xl,
-    borderWidth: 1,
-    borderColor: Palette.border.subtle,
-    alignItems: 'center',
-    gap: Spacing.md,
-    padding: Spacing['3xl'],
-    ...Shadows.card,
-  },
   emptyText: { ...Typography.body, color: Palette.text.tertiary, textAlign: 'center' },
-  sourceSummary: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.lg },
-  recommendList: { gap: Spacing.md, marginTop: Spacing.lg },
-  mealCard: {
-    backgroundColor: Palette.bg.wash,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    borderColor: Palette.border.subtle,
-    padding: Spacing.lg,
-    gap: Spacing.md,
-  },
   mealTop: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
   mealInfo: { flex: 1, gap: Spacing.sm },
-  mealName: { ...Typography.bodyBold, color: Palette.text.primary },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  scoreBox: { alignItems: 'center', minWidth: 48 },
-  scoreValue: { ...Typography.h2, ...Typography.number, color: Palette.accent.green },
-  scoreLabel: { ...Typography.small, color: Palette.text.tertiary },
-  reasonBox: { backgroundColor: Palette.bg.mint, borderRadius: Radius.lg, padding: Spacing.md, gap: 2 },
-  reasonText: { ...Typography.caption, color: Palette.text.secondary },
   nutritionRow: { flexDirection: 'row', gap: Spacing.sm },
   nutritionMini: { flex: 1, backgroundColor: Palette.bg.card, borderRadius: Radius.lg, padding: Spacing.sm },
   nutritionMiniLabel: { ...Typography.small, color: Palette.text.tertiary },
   nutritionMiniValue: { ...Typography.caption, ...Typography.number },
-  feedbackRow: { flexDirection: 'row', gap: Spacing.sm },
-  feedbackButton: {
-    flex: 1,
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Palette.border.subtle,
-    backgroundColor: Palette.bg.card,
-  },
-  feedbackButtonActive: { borderColor: 'rgba(31,157,114,0.26)', backgroundColor: Palette.accent.greenDim },
-  feedbackButtonText: { ...Typography.small, color: Palette.text.tertiary },
-  feedbackButtonTextActive: { color: Palette.accent.green },
   budgetRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center', marginBottom: Spacing.md },
   budgetInput: {
     flex: 1,

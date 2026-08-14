@@ -6,6 +6,8 @@ import re
 
 import requests
 
+from services.nutrient_service import get_nutrient_value
+
 
 RETRYABLE_GEMINI_STATUS_CODES = {401, 403, 404, 429, 500, 502, 503, 504}
 DEFAULT_GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-flash"]
@@ -39,9 +41,11 @@ def normalize_nutrition_payload(nutrition: dict) -> dict:
         "carbs": round_nutrient(nutrition.get("carbs"), 1),
         "sodium": round_nutrient(nutrition.get("sodium"), 0),
         "fiber": round_nutrient(nutrition.get("fiber"), 1),
-        "sugar": round_nutrient(nutrition.get("sugar"), 1),
+        "sugar": round_nutrient(get_nutrient_value(nutrition, "sugar", None), 1),
         "saturated_fat": round_nutrient(nutrition.get("saturated_fat"), 1),
         "trans_fat": round_nutrient(nutrition.get("trans_fat"), 1),
+        "calcium": round_nutrient(nutrition.get("calcium"), 0),
+        "iron": round_nutrient(nutrition.get("iron"), 1),
     }
 
 
@@ -68,6 +72,12 @@ def build_custom_food_search_result(food_doc: dict) -> dict:
         "carbs": base_nutrition.get("carbs", 0),
         "sodium": base_nutrition.get("sodium", 0),
         "fiber": base_nutrition.get("fiber", 0),
+        "sugar": base_nutrition.get("sugar", base_nutrition.get("refined_sugar", 0)),
+        "saturated_fat": base_nutrition.get("saturated_fat", 0),
+        "trans_fat": base_nutrition.get("trans_fat", 0),
+        "calcium": base_nutrition.get("calcium", 0),
+        "iron": base_nutrition.get("iron", 0),
+        "is_fried": food_doc.get("is_fried", False),
         "unit": food_doc.get("unit", "per serving"),
         "source": food_doc.get("source", "custom-food"),
         "serving_size_g": food_doc.get("serving_size_g"),
@@ -212,7 +222,7 @@ def call_gemini_nutrition_ocr(image_b64: str, mime_type: str, api_key: str, gemi
         '"servings_per_container":null,'
         '"nutrition_per_serving":{"calories":null,"protein":null,"fat":null,'
         '"saturated_fat":null,"trans_fat":null,"carbs":null,"sugar":null,'
-        '"sodium":null,"fiber":null},'
+        '"sodium":null,"fiber":null,"calcium":null,"iron":null},'
         '"ocr_text":"","confidence_note":""}'
     )
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
@@ -247,6 +257,8 @@ def normalize_ocr_result(parsed: dict) -> dict:
             "sugar": extract_number((parsed.get("nutrition_per_serving") or {}).get("sugar")),
             "saturated_fat": extract_number((parsed.get("nutrition_per_serving") or {}).get("saturated_fat")),
             "trans_fat": extract_number((parsed.get("nutrition_per_serving") or {}).get("trans_fat")),
+            "calcium": extract_number((parsed.get("nutrition_per_serving") or {}).get("calcium")),
+            "iron": extract_number((parsed.get("nutrition_per_serving") or {}).get("iron")),
         }
     )
     nutrition_per_100g = scale_nutrition_per_100g(nutrition_per_serving, serving_size_g)

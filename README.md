@@ -1,6 +1,6 @@
 # 個人化飲食推薦與影像辨識 App
 
-> 健康飲食管理工具，結合 Gemini Vision 食物辨識、資料庫營養對應、個人化營養分析與智慧餐點推薦。
+> 健康飲食管理工具，結合 Gemini Vision 食物辨識、資料庫營養對應、個人化營養分析與附近店家搜尋。
 
 ## 📁 專案結構
 
@@ -26,7 +26,7 @@ Personalized-Food-Recommendation-System/
 │   │   ├── (tabs)/           # Tab 導覽頁面
 │   │   │   ├── index.tsx     # 首頁 Dashboard
 │   │   │   ├── scanner.tsx   # AI 食物與營養標示辨識
-│   │   │   ├── recommend.tsx # 智慧地圖與店家推薦 (連動餐點)
+│   │   │   ├── recommend.tsx # 附近店家搜尋與地圖
 │   │   │   ├── history.tsx   # 飲食趨勢與 AI 洞察
 │   │   │   └── profile.tsx   # 個人檔案設定
 │   │   └── _layout.tsx       # Root layout 與驗證閘道
@@ -53,7 +53,6 @@ Personalized-Food-Recommendation-System/
 - **份量校正** — 掃描結果可人工調整重量並即時重算營養素
 - **個人化營養追蹤** — BMR/TDEE 計算、三大營養素 + 鈉/纖維進度
 - **安全過濾引擎** — 5 種疾病禁忌規則 + 過敏原比對
-- **智慧餐點推薦 MVP** — 安全過濾 + TFDA/自訂食品候選 + 歷史飲食偏好加權
 - **Google Places 店家推薦** — 預算 + 定位 + 半徑 + 店家類型搜尋，支援 Google Maps 導航與個人化 AI 店家摘要
 - **飲食趨勢分析** — 週熱量柱狀圖 + 營養素均值 + AI 洞察
 - **飲食紀錄管理** — 日曆區間查詢 + 手動新增今日或歷史紀錄 + 編輯與刪除

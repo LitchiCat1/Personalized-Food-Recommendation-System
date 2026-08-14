@@ -263,7 +263,7 @@ export const useStore = create<NutriLensState>((set, get) => ({
               fat: record.total_fat,
               sodium: record.total_sodium,
               fiber: record.total_fiber,
-              sugar: record.total_sugar,
+              sugar: record.total_sugar ?? record.total_refined_sugar,
               saturated_fat: record.total_saturated_fat,
               trans_fat: record.total_trans_fat,
               calcium: record.total_calcium,
@@ -284,7 +284,9 @@ export const useStore = create<NutriLensState>((set, get) => ({
           fat: Number(food.fat || 0),
           sodium: Number(food.sodium || 0),
           fiber: Number(food.fiber || 0),
-          sugar: food.sugar !== undefined ? Number(food.sugar) : undefined,
+          sugar: food.sugar !== undefined || food.refined_sugar !== undefined
+            ? Number(food.sugar ?? food.refined_sugar)
+            : undefined,
           saturated_fat: food.saturated_fat !== undefined ? Number(food.saturated_fat) : undefined,
           trans_fat: food.trans_fat !== undefined ? Number(food.trans_fat) : undefined,
           calcium: food.calcium !== undefined ? Number(food.calcium) : undefined,

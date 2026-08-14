@@ -4,7 +4,7 @@ services:
     runtime: static
     repo: https://github.com/LitchiCat1/Personalized-Food-Recommendation-System
     rootDir: frontend
-    branch: v0.0.7a
+    branch: v0.0.7b
     buildCommand: npm ci && npm run build:web
     staticPublishPath: dist
     routes:
@@ -18,6 +18,8 @@ services:
         sync: false
       - key: EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
         sync: false
+      - key: EXPO_PUBLIC_SUPABASE_AUTH_REQUIRED
+        value: "false"
       - key: GOOGLE_PLACES_API_KEY
         sync: false
 
@@ -27,7 +29,7 @@ services:
     repo: https://github.com/LitchiCat1/Personalized-Food-Recommendation-System
     plan: free
     rootDir: backend
-    branch: v0.0.7a
+    branch: v0.0.7b
     buildCommand: pip install -r requirements.txt
     startCommand: python -u app.py
     envVars:

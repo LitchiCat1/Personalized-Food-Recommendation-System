@@ -16,7 +16,7 @@ const FALLBACK_RULES: SensitivityRule[] = [
     aliases: ['糖尿病', '血糖管理', 'diabetes'],
     risk_nutrients: {
       carbs: { label_zh: '碳水化合物' },
-      sugar: { label_zh: '糖' },
+      sugar: { label_zh: '精緻糖' },
     },
   },
   {
@@ -42,7 +42,7 @@ const FALLBACK_RULES: SensitivityRule[] = [
     condition: 'gout',
     label_zh: '痛風',
     aliases: ['痛風', '高尿酸', '尿酸管理', 'gout'],
-    risk_nutrients: { sugar: { label_zh: '糖' } },
+    risk_nutrients: { sugar: { label_zh: '精緻糖' } },
   },
   {
     id: 'hyperlipidemia',
@@ -99,9 +99,10 @@ export function buildNutrientSensitivityMap(
 
     const conditionLabel = getConditionLabel(rule);
     Object.keys(rule.risk_nutrients).forEach((nutrient) => {
-      if (!TRACKED_NUTRIENTS.has(nutrient as TrackedNutrientKey)) return;
+      const normalizedNutrient = nutrient === 'refined_sugar' ? 'sugar' : nutrient;
+      if (!TRACKED_NUTRIENTS.has(normalizedNutrient as TrackedNutrientKey)) return;
 
-      const nutrientKey = nutrient as TrackedNutrientKey;
+      const nutrientKey = normalizedNutrient as TrackedNutrientKey;
       if (!result[nutrientKey].includes(conditionLabel)) {
         result[nutrientKey].push(conditionLabel);
       }

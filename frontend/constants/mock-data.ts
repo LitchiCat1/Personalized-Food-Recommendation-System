@@ -7,16 +7,16 @@
 export const DAILY_NUTRITION = {
   calories: { current: 1450, target: 2100, unit: 'kcal' },
   protein: { current: 85, target: 130, unit: 'g', color: '#60A5FA', label: '蛋白質' },
-  carbs: { current: 160, target: 250, unit: 'g', color: '#FB923C', label: '碳水化合物' },
+  carbs: { current: 160, target: 250, unit: 'g', color: '#FB923C', label: '總碳水化合物' },
   sugar: { current: 12, target: 25, unit: 'g', color: '#F59E0B', label: '精緻糖' },
-  fat: { current: 42, target: 70, unit: 'g', color: '#A78BFA', label: '脂肪' },
+  fat: { current: 42, target: 70, unit: 'g', color: '#A78BFA', label: '總脂肪' },
   saturated_fat: { current: 8, target: 20, unit: 'g', color: '#8B5CF6', label: '飽和脂肪' },
   trans_fat: { current: 0, target: 0, unit: 'g', color: '#EF4444', label: '反式脂肪' },
   // PRD: 鈉含量、纖維素追蹤 (高血壓/腎臟病患者需要)
-  sodium: { current: 1800, target: 2000, unit: 'mg', color: '#F472B6', label: '鈉' },
+  sodium: { current: 1800, target: 2000, unit: 'mg', color: '#F472B6', label: '鈉 (Sodium)' },
   fiber: { current: 18, target: 25, unit: 'g', color: '#4ADE80', label: '膳食纖維' },
-  calcium: { current: 280, target: 1000, unit: 'mg', color: '#10B981', label: '鈣' },
-  iron: { current: 4.5, target: 15, unit: 'mg', color: '#EC4899', label: '鐵' },
+  calcium: { current: 280, target: 1000, unit: 'mg', color: '#10B981', label: '鈣 (Calcium)' },
+  iron: { current: 4.5, target: 15, unit: 'mg', color: '#EC4899', label: '鐵 (Iron)' },
 };
 
 export type MealEntry = {
@@ -281,88 +281,6 @@ export const DIET_GOALS = [
   { id: '4', icon: '🍽️', label: '用餐頻率', value: '每日 4 餐', color: '#A78BFA' },
   { id: '5', icon: '💧', label: '每日飲水', value: '2,000 ml', color: '#22D3EE' },
   { id: '6', icon: '⏰', label: '斷食計畫', value: '16:8 間歇性', color: '#F472B6' },
-];
-
-// ─── Recommendation (NEW — PRD 雙軌推薦引擎) ────────────────
-export type RecommendedMeal = {
-  id: string;
-  name: string;
-  emoji: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  sodium: number;
-  matchScore: number; // 0-100 口味相似度
-  safetyBadges: string[]; // e.g., ['低鈉', '低 GI']
-  distance?: string; // 地圖 API 距離 placeholder
-  restaurant?: string;
-};
-
-export const RECOMMENDED_MEALS: RecommendedMeal[] = [
-  {
-    id: '1',
-    name: '地中海鮭魚沙拉',
-    emoji: '🥗',
-    calories: 380,
-    protein: 32,
-    carbs: 18,
-    fat: 22,
-    sodium: 420,
-    matchScore: 94,
-    safetyBadges: ['低鈉', '低 GI', '高蛋白'],
-    distance: '350m',
-    restaurant: '綠食堂',
-  },
-  {
-    id: '2',
-    name: '日式味噌烤雞定食',
-    emoji: '🍗',
-    calories: 520,
-    protein: 38,
-    carbs: 45,
-    fat: 16,
-    sodium: 680,
-    matchScore: 87,
-    safetyBadges: ['高蛋白', '中 GI'],
-    distance: '500m',
-    restaurant: '和風亭',
-  },
-  {
-    id: '3',
-    name: '藜麥酪梨碗',
-    emoji: '🥑',
-    calories: 420,
-    protein: 15,
-    carbs: 48,
-    fat: 20,
-    sodium: 280,
-    matchScore: 82,
-    safetyBadges: ['低鈉', '高纖', '低 GI'],
-    distance: '800m',
-    restaurant: '穀活力',
-  },
-  {
-    id: '4',
-    name: '清蒸鱸魚套餐',
-    emoji: '🐟',
-    calories: 340,
-    protein: 35,
-    carbs: 28,
-    fat: 8,
-    sodium: 350,
-    matchScore: 78,
-    safetyBadges: ['低脂', '低鈉', '高蛋白'],
-    distance: '1.2km',
-    restaurant: '鮮食記',
-  },
-];
-
-// PRD: 「安全過濾層」排除的不安全食物
-export const FILTERED_UNSAFE_MEALS = [
-  { name: '麻辣燙', reason: '高鈉 (3,200mg)、不適合高血壓患者', icon: '🌶️' },
-  { name: '炸雞排', reason: '高飽和脂肪、高鈉', icon: '🍗' },
-  { name: '珍珠奶茶', reason: '高糖、高 GI', icon: '🧋' },
 ];
 
 // ─── History / Trends (NEW — PRD 飲食趨勢回顧) ──────────────

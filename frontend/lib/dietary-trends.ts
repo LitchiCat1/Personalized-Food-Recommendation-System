@@ -71,8 +71,14 @@ export function buildDietaryTrend(records: DietaryRecord[], options: DietaryTren
       calories: current.calories + nutrients.calories,
       protein: current.protein + nutrients.protein,
       carbs: current.carbs + nutrients.carbs,
+      sugar: current.sugar + nutrients.sugar,
       fat: current.fat + nutrients.fat,
+      saturated_fat: current.saturated_fat + nutrients.saturated_fat,
+      trans_fat: current.trans_fat + nutrients.trans_fat,
       sodium: current.sodium + nutrients.sodium,
+      fiber: current.fiber + nutrients.fiber,
+      calcium: current.calcium + nutrients.calcium,
+      iron: current.iron + nutrients.iron,
     });
   }
 
@@ -89,18 +95,41 @@ function getRecordNutrients(record: DietaryRecord) {
     calories: getRecordNutrient(record.total_calories, foods, 'calories'),
     protein: getRecordNutrient(record.total_protein, foods, 'protein'),
     carbs: getRecordNutrient(record.total_carbs, foods, 'carbs'),
+    sugar: getRecordNutrient(record.total_sugar ?? record.total_refined_sugar, foods, 'sugar'),
     fat: getRecordNutrient(record.total_fat, foods, 'fat'),
+    saturated_fat: getRecordNutrient(record.total_saturated_fat, foods, 'saturated_fat'),
+    trans_fat: getRecordNutrient(record.total_trans_fat, foods, 'trans_fat'),
     sodium: getRecordNutrient(record.total_sodium, foods, 'sodium'),
+    fiber: getRecordNutrient(record.total_fiber, foods, 'fiber'),
+    calcium: getRecordNutrient(record.total_calcium, foods, 'calcium'),
+    iron: getRecordNutrient(record.total_iron, foods, 'iron'),
   };
 }
 
 function getRecordNutrient(recordValue: number | undefined, foods: FoodRecordItem[], key: keyof FoodRecordItem): number {
   if (recordValue !== undefined && Number.isFinite(Number(recordValue))) return Number(recordValue);
-  return foods.reduce((sum, food) => sum + toNumber(food[key]), 0);
+  return foods.reduce((sum, food) => {
+    const value = key === 'sugar' ? food.sugar ?? food.refined_sugar : food[key];
+    return sum + toNumber(value);
+  }, 0);
 }
 
 function createEmptyDay(date: string): DailyTotals {
-  return { date, record_count: 0, calories: 0, protein: 0, carbs: 0, fat: 0, sodium: 0 };
+  return {
+    date,
+    record_count: 0,
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    sugar: 0,
+    fat: 0,
+    saturated_fat: 0,
+    trans_fat: 0,
+    fiber: 0,
+    sodium: 0,
+    calcium: 0,
+    iron: 0,
+  };
 }
 
 function roundDay(day: DailyTotals): HistoryDay {
@@ -110,8 +139,14 @@ function roundDay(day: DailyTotals): HistoryDay {
     calories: Math.round(day.calories),
     protein: Math.round(day.protein),
     carbs: Math.round(day.carbs),
+    sugar: roundOne(day.sugar),
     fat: Math.round(day.fat),
+    saturated_fat: roundOne(day.saturated_fat),
+    trans_fat: roundOne(day.trans_fat),
+    fiber: roundOne(day.fiber),
     sodium: Math.round(day.sodium),
+    calcium: Math.round(day.calcium),
+    iron: roundOne(day.iron),
   };
 }
 
@@ -122,8 +157,14 @@ function buildSummary(daily: HistoryDay[]): HistoryResponse['summary'] {
     avg_calories: Math.round(daily.reduce((sum, day) => sum + day.calories, 0) / daily.length),
     avg_protein: Math.round(daily.reduce((sum, day) => sum + day.protein, 0) / daily.length),
     avg_carbs: Math.round(daily.reduce((sum, day) => sum + day.carbs, 0) / daily.length),
+    avg_sugar: roundOne(daily.reduce((sum, day) => sum + day.sugar, 0) / daily.length),
     avg_fat: Math.round(daily.reduce((sum, day) => sum + day.fat, 0) / daily.length),
+    avg_saturated_fat: roundOne(daily.reduce((sum, day) => sum + day.saturated_fat, 0) / daily.length),
+    avg_trans_fat: roundOne(daily.reduce((sum, day) => sum + day.trans_fat, 0) / daily.length),
     avg_sodium: Math.round(daily.reduce((sum, day) => sum + day.sodium, 0) / daily.length),
+    avg_fiber: roundOne(daily.reduce((sum, day) => sum + day.fiber, 0) / daily.length),
+    avg_calcium: Math.round(daily.reduce((sum, day) => sum + day.calcium, 0) / daily.length),
+    avg_iron: roundOne(daily.reduce((sum, day) => sum + day.iron, 0) / daily.length),
     recorded_days: daily.length,
     total_records: totalRecords,
     avg_records_per_day: Math.round((totalRecords / daily.length) * 10) / 10,
@@ -148,4 +189,8 @@ function formatDateKey(year: number, month: number, day: number): string {
 function toNumber(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function roundOne(value: number): number {
+  return Math.round(value * 10) / 10;
 }

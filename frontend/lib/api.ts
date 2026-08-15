@@ -429,9 +429,7 @@ export async function fetchHealthyFoodRecommendations(
   params: { budget: number; lat: number; lng: number; radiusKm?: number; category?: string },
   auth?: ApiAuth
 ): Promise<HealthyFoodResponse> {
-  if (!auth?.accessToken && !isLocalApiBaseUrl(apiBaseUrl)) {
-    throw new Error('登入 session 尚未就緒，請重新整理頁面或重新登入後再定位推薦');
-  }
+
 
   const query = new URLSearchParams({
     budget: String(params.budget),
@@ -465,9 +463,7 @@ export async function fetchRestaurantAiSummary(
   params: { restaurant: HealthyFoodRestaurant; budget: number; category: string },
   auth?: ApiAuth
 ): Promise<RestaurantAiSummaryResponse> {
-  if (!auth?.accessToken && !isLocalApiBaseUrl(apiBaseUrl)) {
-    throw new Error('登入 session 尚未就緒，請重新整理頁面或重新登入後再產生 AI 摘要');
-  }
+
   const resp = await fetch(`${apiBaseUrl}/map-food-recommend/${encodeURIComponent(userId)}/restaurant-summary`, {
     method: 'POST',
     headers: buildHeaders(auth, 'application/json'),

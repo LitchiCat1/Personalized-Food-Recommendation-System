@@ -11,6 +11,7 @@
     "test:trends": "node --test scripts/test-dietary-trends.mjs",
     "test:records": "node --test scripts/test-dietary-records.mjs",
     "test:scanner": "node --test scripts/test-scanner-records.mjs",
+    "test:config": "node --test scripts/test-build-env.mjs",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit"
   },

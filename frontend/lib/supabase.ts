@@ -8,10 +8,23 @@ import { Platform } from 'react-native';
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim();
 const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim()
   || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim();
+const supabaseAuthFlag = process.env.EXPO_PUBLIC_SUPABASE_AUTH_REQUIRED?.trim().toLowerCase();
 
-export const isSupabaseAuthConfigured = Boolean(supabaseUrl && supabasePublishableKey);
-export const isSupabaseAuthRequired = isSupabaseAuthConfigured
-  && process.env.EXPO_PUBLIC_SUPABASE_AUTH_REQUIRED?.trim().toLowerCase() === 'true';
+function isValidHttpUrl(value?: string) {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+export const isSupabaseAuthConfigured = Boolean(isValidHttpUrl(supabaseUrl) && supabasePublishableKey);
+export const isSupabaseAuthRequired = supabaseAuthFlag === 'true';
+export const supabaseConfigurationError = isSupabaseAuthRequired && !isSupabaseAuthConfigured
+  ? '部署缺少有效的 EXPO_PUBLIC_SUPABASE_URL 或 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY，已停止載入示範帳號。'
+  : null;
 
 const supabaseStorage = Platform.OS === 'web'
   ? {

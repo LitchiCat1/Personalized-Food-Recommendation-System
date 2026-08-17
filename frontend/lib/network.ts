@@ -22,9 +22,20 @@ function inferHostFromRuntime(): string | null {
   return extractHost(manifestDebuggerHost) || extractHost(manifest2DebuggerHost) || extractHost(expoConfigHostUri);
 }
 
+export function normalizeApiBaseUrl(value: string): string {
+  const normalized = value.trim().replace(/\/+$/, '');
+  if (/^https?:\/\//i.test(normalized)) return normalized;
+  const host = normalized.split('/')[0];
+  const local = /^(localhost|127\.0\.0\.1|10\.0\.2\.2)(:\d+)?$/i.test(host)
+    || /^192\.168\./.test(host)
+    || /^10\./.test(host)
+    || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
+  return `${local ? 'http' : 'https'}://${normalized}`;
+}
+
 export function resolveApiBaseUrl(): string {
   const explicitUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
-  if (explicitUrl) return explicitUrl;
+  if (explicitUrl) return normalizeApiBaseUrl(explicitUrl);
 
   const explicitHost = process.env.EXPO_PUBLIC_API_HOST?.trim();
   if (explicitHost) return `http://${explicitHost}:5000`;

@@ -14,7 +14,7 @@ import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from repositories.storage import StorageRepository
-from services.auth_service import AuthError, is_auth_required, verify_supabase_user
+from services.auth_service import AuthError, is_auth_required, is_supabase_auth_configured, verify_supabase_user
 from services.disease_rule_service import build_disease_rules_response, build_medical_metadata_response, load_allergen_taxonomy, load_disease_rules
 from services.env_service import load_local_env
 from services.history_service import build_history_response
@@ -169,6 +169,8 @@ def health():
         "disease_rule_review_status": build_disease_rules_response(DISEASE_RULES)["review_status_counts"],
         "restaurants": len(RESTAURANT_CATALOG),
         "places_enabled": bool(os.environ.get("GOOGLE_PLACES_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY")),
+        "auth_required": is_auth_required(),
+        "supabase_auth_configured": is_supabase_auth_configured(),
         "custom_foods": len(storage.get_custom_foods()),
     })
 

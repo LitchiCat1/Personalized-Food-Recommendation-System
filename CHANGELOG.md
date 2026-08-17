@@ -13,6 +13,12 @@
 - Google Places restaurants no longer invoke the Gemini/template-generated detailed-menu flow; local catalog restaurants retain their existing menu analysis.
 - Updated Render services and the desktop sidebar version label to `v0.0.7c`.
 
+### Fixed
+
+- Fixed Blueprint deployments sending API requests to the original project's backend instead of the backend created in the same deployment.
+- Made Render deployments require Supabase Auth by default and fail closed with a configuration error instead of silently loading the `demo_user` / 王小明 profile.
+- Render now prompts for Supabase and Google Places settings once on the backend, then exposes the required public build values to the frontend through Blueprint service references.
+
 ### Validation
 
 - Added focused Google Places link tests covering successful website discovery and non-blocking detail lookup failure.

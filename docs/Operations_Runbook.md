@@ -140,15 +140,14 @@ GEMINI_API_KEYS=key1,key2,key3
 4. 儲存環境變數並重新部署後端。
 5. 測試 `POST /ocr/nutrition-label` 或至少確認後端啟動無 env 錯誤。
 
-## 5. Render + Supabase 部署狀態
+## 5. Render + Supabase 部署設定
 
-- Backend Render URL：`https://personalized-food-recommendation-system-nq8t.onrender.com`
+- Backend Render URL：由 Blueprint 建立 `personalized-food-recommendation-backend` 後由 Render 指派，每次部署各自不同
 - Frontend Render Static Site：由 Blueprint 建立 `personalized-food-recommendation-frontend`，部署後使用 Render 指派網址
-- Render service id：`srv-d7u2qhdckfvc73ei96l0`
-- 部署分支：`v0.0.6`
+- Render service id：以部署者自己的 Render Dashboard 顯示為準
+- 部署分支：`v0.0.7c`
 - 後端儲存：Supabase Postgres Session Pooler
 - 後端 Auth：`SUPABASE_AUTH_REQUIRED=true`
-- 最新已驗證強制 Auth deploy：`dep-d7u8pb67r5hc73bfus20`
 
 Backend Render URL 是後端 API，不是前端網頁。瀏覽器打開根路徑 `/` 只會看到 API 狀態 JSON；正式操作畫面請使用 frontend static site 網址。
 
@@ -166,16 +165,10 @@ GOOGLE_PLACES_API_KEY=your-google-maps-and-places-key
 
 `DATABASE_URL` value 必須直接以 `postgresql://` 開頭，不要包含 `DATABASE_URL=` 前綴。
 
-Frontend Static Site 需要設定：
-
-```env
-EXPO_PUBLIC_API_BASE_URL=https://personalized-food-recommendation-system-nq8t.onrender.com
-EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
-GOOGLE_PLACES_API_KEY=your-google-maps-and-places-key
-```
+Blueprint 首次建立時，`DATABASE_URL`、`GEMINI_API_KEYS`、`SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY` 與 `GOOGLE_PLACES_API_KEY` 都只需在 Backend Web Service 輸入一次。Frontend 會透過 Blueprint service reference 取得可公開的 build-time 值，不需要重複輸入。Frontend API 位址也會自動引用同次部署建立的 backend 公開 hostname，不可再固定填入原專案網址。
 
 `render.yaml` 已設定 frontend build：`npm ci && npm run build:web`，publish path：`dist`，並加上 SPA rewrite `/* -> /index.html`。
+Blueprint 會把 `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY` 與 `GOOGLE_PLACES_API_KEY` 引用到 Frontend Static Site，並把前後端 Auth flag 固定為 `true`。若缺少 Supabase URL 或 publishable key，正式 Render 前端會顯示設定錯誤並停止載入 demo profile。
 
 ## 6. 部署後驗收流程
 

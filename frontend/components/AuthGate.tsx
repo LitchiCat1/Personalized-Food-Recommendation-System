@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 
 import { Palette, Radius, Shadows, Spacing, Typography } from '@/constants/theme';
 import { fetchUserProfile, saveUserProfile, type UserProfileResponse } from '@/lib/api';
-import { isSupabaseAuthRequired, supabase } from '@/lib/supabase';
+import { isSupabaseAuthRequired, supabase, supabaseConfigurationError } from '@/lib/supabase';
 import { useStore, type UserProfile } from '@/store/useStore';
 
 
@@ -80,17 +80,30 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [profileReloadKey, setProfileReloadKey] = useState(0);
 
   useEffect(() => {
-    if (!isSupabaseAuthRequired || !supabase) {
+    if (!isSupabaseAuthRequired) {
+      setAuthReady(true);
+      return;
+    }
+    if (!supabase) {
+      applySession(null);
       setAuthReady(true);
       return;
     }
 
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      applySession(data.session);
-      setAuthReady(true);
-    });
+    supabase.auth.getSession()
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) setMessage(error.message || '無法確認 Supabase 登入狀態');
+        applySession(error ? null : data.session);
+        setAuthReady(true);
+      })
+      .catch((error: Error) => {
+        if (!active) return;
+        applySession(null);
+        setMessage(error.message || '無法連線至 Supabase Auth');
+        setAuthReady(true);
+      });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       applySession(session);
@@ -211,6 +224,19 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (!isSupabaseAuthRequired) {
     return <>{children}</>;
+  }
+
+  if (supabaseConfigurationError || !supabase) {
+    return (
+      <View style={styles.screen}>
+        <View style={styles.card}>
+          <Text style={styles.kicker}>部署設定錯誤</Text>
+          <Text style={styles.title}>Supabase 尚未連接</Text>
+          <Text style={styles.subtitle}>{supabaseConfigurationError || 'Supabase client 初始化失敗。'}</Text>
+          <Text style={styles.message}>請在 Render Blueprint 建立時填入 Supabase URL 與 publishable key，然後重新部署前端與後端。</Text>
+        </View>
+      </View>
+    );
   }
 
   if (!authReady) {

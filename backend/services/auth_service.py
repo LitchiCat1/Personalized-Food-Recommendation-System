@@ -13,7 +13,16 @@ class AuthError(Exception):
 
 
 def is_auth_required() -> bool:
-    return os.environ.get("SUPABASE_AUTH_REQUIRED", "").strip().lower() in TRUTHY_VALUES
+    configured_value = os.environ.get("SUPABASE_AUTH_REQUIRED")
+    if configured_value is not None:
+        return configured_value.strip().lower() in TRUTHY_VALUES
+    return os.environ.get("RENDER", "").strip().lower() in TRUTHY_VALUES
+
+
+def is_supabase_auth_configured() -> bool:
+    supabase_url = (os.environ.get("SUPABASE_URL") or "").strip()
+    publishable_key = os.environ.get("SUPABASE_PUBLISHABLE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+    return bool(supabase_url and publishable_key)
 
 
 def extract_bearer_token(auth_header: str | None) -> str:

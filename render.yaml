@@ -13,15 +13,27 @@ services:
         destination: /index.html
     envVars:
       - key: EXPO_PUBLIC_API_BASE_URL
-        value: https://personalized-food-recommendation-system-nq8t.onrender.com
+        fromService:
+          type: web
+          name: personalized-food-recommendation-backend
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
       - key: EXPO_PUBLIC_SUPABASE_URL
-        sync: false
+        fromService:
+          type: web
+          name: personalized-food-recommendation-backend
+          envVarKey: SUPABASE_URL
       - key: EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-        sync: false
+        fromService:
+          type: web
+          name: personalized-food-recommendation-backend
+          envVarKey: SUPABASE_PUBLISHABLE_KEY
       - key: EXPO_PUBLIC_SUPABASE_AUTH_REQUIRED
-        value: "false"
+        value: "true"
       - key: GOOGLE_PLACES_API_KEY
-        sync: false
+        fromService:
+          type: web
+          name: personalized-food-recommendation-backend
+          envVarKey: GOOGLE_PLACES_API_KEY
 
   - type: web
     name: personalized-food-recommendation-backend
@@ -40,7 +52,7 @@ services:
       - key: FLASK_DEBUG
         value: "false"
       - key: SUPABASE_AUTH_REQUIRED
-        value: "false"
+        value: "true"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_PUBLISHABLE_KEY

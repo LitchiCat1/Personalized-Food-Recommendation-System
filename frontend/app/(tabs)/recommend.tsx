@@ -108,6 +108,25 @@ export default function RecommendScreen() {
     }
   };
 
+  const handleOpenRestaurantWebsite = async (restaurant: HealthyFoodRestaurant) => {
+    if (!restaurant.menu_link) return;
+    try {
+      await Linking.openURL(restaurant.menu_link.url);
+    } catch (err: any) {
+      setHealthyError(err?.message || '無法開啟店家網站');
+    }
+  };
+
+  const handleOpenRestaurantInfo = async (restaurant: HealthyFoodRestaurant) => {
+    const mapsUrl = restaurant.google_maps_url
+      || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurant.name)}&query_place_id=${encodeURIComponent(restaurant.google_place_id || '')}`;
+    try {
+      await Linking.openURL(mapsUrl);
+    } catch (err: any) {
+      setHealthyError(err?.message || '無法開啟 Google Maps 店家資訊');
+    }
+  };
+
   const handleLoadRestaurantSummary = async (restaurant: HealthyFoodRestaurant) => {
     setHealthyError(null);
     setSummaryLoadingKey(restaurant.restaurant_id);
@@ -123,8 +142,8 @@ export default function RecommendScreen() {
 
   const handleViewMenu = async (restaurant: HealthyFoodRestaurant) => {
     setViewingMenuRest(restaurant);
-    // If nutrition_available is false, fetch structured menu dynamically from backend
-    if (!restaurant.nutrition_available || restaurant.data_source === 'google_places') {
+    // Local catalog entries can still load their structured nutrition analysis.
+    if (!restaurant.nutrition_available) {
       setMenuLoading(true);
       try {
         const response = await fetchRestaurantDetailedMenu(
@@ -238,6 +257,8 @@ export default function RecommendScreen() {
                   onSummary={() => handleLoadRestaurantSummary(restaurant)}
                   onNavigate={() => handleOpenNavigation(restaurant)}
                   onViewMenu={() => handleViewMenu(restaurant)}
+                  onOpenRestaurantWebsite={() => handleOpenRestaurantWebsite(restaurant)}
+                  onOpenRestaurantInfo={() => handleOpenRestaurantInfo(restaurant)}
                 />
               ))}
             </>
@@ -338,6 +359,8 @@ function RestaurantCard({
   onSummary,
   onNavigate,
   onViewMenu,
+  onOpenRestaurantWebsite,
+  onOpenRestaurantInfo,
 }: {
   restaurant: HealthyFoodRestaurant;
   index: number;
@@ -348,6 +371,8 @@ function RestaurantCard({
   onSummary: () => void;
   onNavigate: () => void;
   onViewMenu: () => void;
+  onOpenRestaurantWebsite: () => void;
+  onOpenRestaurantInfo: () => void;
 }) {
   return (
     <View style={[styles.restaurantCard, selected && styles.restaurantCardSelected]}>
@@ -377,7 +402,15 @@ function RestaurantCard({
         </View>
       ))}
       <View style={styles.restaurantActions}>
-        <SecondaryButton label="完整菜單" onPress={onViewMenu} icon={<Ionicons name="restaurant-outline" size={14} color={Palette.accent.green} />} />
+        {restaurant.data_source === 'google_places' ? (
+          restaurant.menu_link ? (
+            <SecondaryButton label="店家網站／菜單" onPress={onOpenRestaurantWebsite} icon={<Ionicons name="open-outline" size={14} color={Palette.accent.green} />} />
+          ) : (
+            <SecondaryButton label="店家資訊" onPress={onOpenRestaurantInfo} icon={<Ionicons name="images-outline" size={14} color={Palette.accent.green} />} />
+          )
+        ) : (
+          <SecondaryButton label="完整菜單" onPress={onViewMenu} icon={<Ionicons name="restaurant-outline" size={14} color={Palette.accent.green} />} />
+        )}
         <SecondaryButton label="地圖標示" onPress={onSelect} />
         <SecondaryButton label={summaryLoading ? '產生中' : 'AI 摘要'} onPress={onSummary} />
         <SecondaryButton label="導航" onPress={onNavigate} />

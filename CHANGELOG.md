@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.0.7c - 2026-08-17
+
+### Added
+
+- Added Google Places official website and Google Maps links to nearby restaurant results.
+- Added a conditional external "店家網站／菜單" entry when Google Places provides an official restaurant website.
+- Added a Google Maps store-information entry for traditional shops without a public website, so users can inspect the store's current photos and details without invented menu data.
+
+### Changed
+
+- Google Places restaurants no longer invoke the Gemini/template-generated detailed-menu flow; local catalog restaurants retain their existing menu analysis.
+- Updated Render services and the desktop sidebar version label to `v0.0.7c`.
+
+### Validation
+
+- Added focused Google Places link tests covering successful website discovery and non-blocking detail lookup failure.
+
 ## v0.0.7b - 2026-08-14
 
 ### Added

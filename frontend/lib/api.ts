@@ -139,6 +139,11 @@ export type HealthyFoodRecommendation = {
   reasons: string[];
 };
 
+export type RestaurantMenuLink = {
+  url: string;
+  source: 'google_places_website';
+};
+
 export type HealthyFoodRestaurant = {
   restaurant_id: string;
   name: string;
@@ -147,6 +152,9 @@ export type HealthyFoodRestaurant = {
   address?: string;
   phone?: string;
   google_place_id?: string;
+  official_website_url?: string;
+  google_maps_url?: string;
+  menu_link?: RestaurantMenuLink;
   distance_km: number;
   tags: string[];
   price_level?: number | null;

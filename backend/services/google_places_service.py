@@ -1,11 +1,14 @@
 import os
+from concurrent.futures import ThreadPoolExecutor
 from math import isfinite
 from math import cos, radians, sin, sqrt, atan2
+from urllib.parse import urlparse
 
 import requests
 
 
 GOOGLE_PLACES_NEARBY_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+GOOGLE_PLACES_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
 
 PLACE_CATEGORY_KEYWORDS = {
     "all": "餐廳 美食 小吃",
@@ -56,6 +59,58 @@ def _price_estimate(price_level) -> int | None:
     return {0: 80, 1: 120, 2: 220, 3: 420, 4: 700}.get(level)
 
 
+def _public_http_url(value) -> str | None:
+    if not isinstance(value, str):
+        return None
+    url = value.strip()
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return None
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return url
+
+
+def _build_place_links(website_url, google_maps_url) -> dict:
+    website = _public_http_url(website_url)
+    maps_url = _public_http_url(google_maps_url)
+    links = {}
+    if website:
+        links["official_website_url"] = website
+        links["menu_link"] = {
+            "url": website,
+            "source": "google_places_website",
+        }
+    if maps_url:
+        links["google_maps_url"] = maps_url
+    return links
+
+
+def _fetch_legacy_place_links(place_id: str, key: str) -> dict:
+    """Get optional public links without allowing a details failure to break discovery."""
+    try:
+        response = requests.get(
+            GOOGLE_PLACES_DETAILS_URL,
+            params={
+                "key": key,
+                "place_id": place_id,
+                "fields": "website,url",
+                "language": "zh-TW",
+            },
+            timeout=4,
+        )
+        if response.status_code != 200:
+            return {}
+        payload = response.json()
+        if payload.get("status") != "OK":
+            return {}
+        result = payload.get("result") or {}
+        return _build_place_links(result.get("website"), result.get("url"))
+    except (requests.RequestException, ValueError, TypeError):
+        return {}
+
+
 def _score_place(distance_km: float, rating, user_ratings_total, is_open: bool, budget: int, price_level) -> int:
     distance_score = max(0, 42 - int(distance_km * 8))
     rating_score = int(float(rating or 0) * 8)
@@ -71,7 +126,7 @@ def _fetch_new_places_api(lat: float, lng: float, radius_m: float, key: str) -> 
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": key,
-        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.priceLevel,places.rating,places.userRatingCount"
+        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.priceLevel,places.rating,places.userRatingCount,places.websiteUri,places.googleMapsUri"
     }
     payload = {
         "includedTypes": ["restaurant"],
@@ -119,7 +174,10 @@ def _fetch_new_places_api(lat: float, lng: float, radius_m: float, key: str) -> 
                     "user_ratings_total": p.get("userRatingCount"),
                     "price_level": price_level,
                     "opening_hours": {"open_now": True},
-                    "types": p.get("types", [])
+                    "types": p.get("types", []),
+                    "website": p.get("websiteUri"),
+                    "url": p.get("googleMapsUri"),
+                    "_new_places_api": True,
                 })
             return results
     except Exception as e:
@@ -132,6 +190,7 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
     radius_m = int(max(500, min(radius_km * 1000, 10000)))
     
     results = []
+    legacy_failed = False
     legacy_err_msg = ""
     try:
         response = requests.get(
@@ -169,7 +228,7 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
             # If both failed, raise the exception with the actual detailed error message
             raise GooglePlacesAPIError(legacy_err_msg or "Google Places API failed. Please check key permissions.")
 
-    restaurants = []
+    candidates = []
     for place in results:
         geometry = place.get("geometry") or {}
         place_location = geometry.get("location") or {}
@@ -187,7 +246,7 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
         user_ratings_total = place.get("user_ratings_total")
         price_level = place.get("price_level")
         score = _score_place(distance_km, rating, user_ratings_total, is_open, budget, price_level)
-        place_id = place.get("place_id") or place.get("name") or str(len(restaurants))
+        place_id = place.get("place_id") or place.get("name") or str(len(candidates))
         name = place.get("name") or "附近餐廳"
 
         recommended_item = {
@@ -215,7 +274,7 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
             ],
         }
 
-        restaurants.append({
+        restaurant = {
             "restaurant_id": f"google_{place_id}",
             "name": name,
             "lat": float(place_lat),
@@ -234,7 +293,32 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
             "nutrition_available": False,
             "recommended_items": [recommended_item],
             "filtered_items": [],
-        })
+        }
+        candidates.append((restaurant, place))
 
-    restaurants.sort(key=lambda item: (-item["match_score"], item["distance_km"]))
-    return restaurants[:limit]
+    candidates.sort(key=lambda item: (-item[0]["match_score"], item[0]["distance_km"]))
+    selected_candidates = candidates[:limit]
+
+    # Places API (New) already returns the requested links. Legacy Nearby Search
+    # requires a Place Details request, so fetch only the selected nearby venues.
+    legacy_candidates = [
+        (restaurant, place_id)
+        for restaurant, place in selected_candidates
+        if not place.get("_new_places_api")
+        for place_id in [restaurant.get("google_place_id")]
+        if place_id
+    ]
+    if legacy_candidates:
+        with ThreadPoolExecutor(max_workers=min(4, len(legacy_candidates))) as executor:
+            futures = {
+                restaurant["restaurant_id"]: executor.submit(_fetch_legacy_place_links, place_id, key)
+                for restaurant, place_id in legacy_candidates
+            }
+            for restaurant, _ in legacy_candidates:
+                restaurant.update(futures[restaurant["restaurant_id"]].result())
+
+    for restaurant, place in selected_candidates:
+        if place.get("_new_places_api"):
+            restaurant.update(_build_place_links(place.get("website"), place.get("url")))
+
+    return [restaurant for restaurant, _ in selected_candidates]

@@ -99,3 +99,9 @@ Personalized-Food-Recommendation-System/
 | Backend | Flask + PostgreSQL/Supabase + MongoDB fallback |
 | AI Model | Gemini Vision API + TFDA/custom food DB lookup |
 | Camera | expo-camera + expo-image-picker |
+
+## 📝 最近更新紀錄 (v0.0.7d)
+
+- **「+ 加入今日紀錄」一鍵寫入**：在店家卡片推薦餐點、AI 摘要建議品項、以及完整菜單彈窗旁均新增按鈕，點擊可直接將詳細營養成分寫入當日飲食紀錄並同步動態累加儀表板進度條。
+- **全店家通用「完整菜單」解析**：支援所有店家（包含 Google Places 店家）點擊「完整菜單」，由後端結合 Gemini AI 即時解析並回傳 3~5 項醫學安全推薦品項。
+- **個人化 3~5 項精準推薦**：自動依據使用者疾病條件（慢性腎臟病、糖尿病、高血壓、痛風、高血脂）、過敏原、每日剩餘營養目標與預算進行評分排序，精準推薦 Top 3~5 項最佳餐點。

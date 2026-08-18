@@ -1166,5 +1166,118 @@
         ]
       }
     ]
+  },
+  {
+    "restaurant_id": "google_ChIJVzGOMoapQjQRCTSQyHHbtcU",
+    "name": "Xiang Duck Banqiao Xianmin Boulevard",
+    "lat": 25.012066599999997,
+    "lng": 121.46165459999999,
+    "address": "No. 1號, Section 2, Xianmin Blvd, Xinmin Village, Banqiao District, New Taipei City, Taiwan 220",
+    "phone": "",
+    "open_hours": [
+      "11:00-21:00"
+    ],
+    "tags": [
+      "動態擷取",
+      "AI標記"
+    ],
+    "price_level": 2,
+    "items": []
+  },
+  {
+    "restaurant_id": "google_ChIJdZHsBAAdaDQRPEznusRzY9A",
+    "name": "ㄅㄧˋㄇㄢˋ吃部",
+    "lat": 25.0038785,
+    "lng": 121.4445911,
+    "address": "復興里大觀路二段20巷15號",
+    "phone": "",
+    "open_hours": [
+      "11:00-21:00"
+    ],
+    "tags": [
+      "動態擷取",
+      "AI標記"
+    ],
+    "price_level": 2,
+    "items": []
+  },
+  {
+    "restaurant_id": "google_ChIJI6u9BLwDaDQRk21ERyO6l3A",
+    "name": "川味小吃",
+    "lat": 25.0055135,
+    "lng": 121.4536288,
+    "address": "湳興里南雅東路29巷9號",
+    "phone": "",
+    "open_hours": [
+      "11:00-21:00"
+    ],
+    "tags": [
+      "動態擷取",
+      "AI標記"
+    ],
+    "price_level": 2,
+    "items": [
+      {
+        "item_id": "f_1",
+        "name": "紅燒牛肉麵 (大份)",
+        "price": 180,
+        "calories": 850,
+        "protein": 48.0,
+        "carbs": 95.0,
+        "fat": 30.0,
+        "sodium": 2100,
+        "gi": "medium",
+        "tags": [
+          "高高鈉",
+          "高蛋白"
+        ]
+      },
+      {
+        "item_id": "f_2",
+        "name": "清燉腱子肉麵",
+        "price": 170,
+        "calories": 620,
+        "protein": 45.0,
+        "carbs": 88.0,
+        "fat": 10.0,
+        "sodium": 1450,
+        "gi": "medium",
+        "tags": [
+          "高蛋白",
+          "低脂"
+        ]
+      },
+      {
+        "item_id": "f_3",
+        "name": "涼拌小黃瓜",
+        "price": 40,
+        "calories": 65,
+        "protein": 1.5,
+        "carbs": 6.0,
+        "fat": 4.0,
+        "sodium": 290,
+        "gi": "low",
+        "tags": [
+          "低鈉",
+          "低GI",
+          "高纖"
+        ]
+      },
+      {
+        "item_id": "f_4",
+        "name": "皮蛋豆腐",
+        "price": 50,
+        "calories": 220,
+        "protein": 16.0,
+        "carbs": 8.0,
+        "fat": 14.0,
+        "sodium": 420,
+        "gi": "low",
+        "tags": [
+          "高蛋白",
+          "低GI"
+        ]
+      }
+    ]
   }
 ]

@@ -608,11 +608,13 @@ def get_restaurant_menu():
         except Exception as e:
             print(f"[!] 無法寫入本地 catalog 檔案: {e}")
 
-    # 3. 對所有菜單項目進行醫學過濾與偏好評分
+    # 3. 對所有菜單項目進行醫學過濾與個人化偏好契合度評分
     user_id = data.get("user_id", "demo_user")
     user = storage.get_user(user_id)
     conditions = user.get("health_conditions", []) if user else []
     allergens = user.get("allergens", []) if user else []
+    budget = int(data.get("budget", 150))
+    target_calories = (user.get("daily_calorie_target", 2100) / 3) if user else 650
     
     recommended_items = []
     filtered_items = []
@@ -636,47 +638,79 @@ def get_restaurant_menu():
             "is_fried": item.get("is_fried"),
         }
         medical_risk = evaluate_medical_risk(candidate, conditions, allergens, DISEASE_RULES, ALLERGEN_TAXONOMY, user_profile=user)
-        reasons = [f"超出預算 {data.get('budget', 150)} 元"] if item.get("price", 0) > int(data.get("budget", 150)) else []
-        reasons.extend(medical_risk["block_reasons"])
+        is_over_budget = item.get("price", 0) > budget
+        is_blocked = medical_risk.get("action") == "BLOCK" or is_over_budget
         
-        # 即使被過濾，也在本機開發測試時列出 recommended_item，但帶有警示標籤以供測試
-        recommended_item = {
-            "restaurant_id": matched["restaurant_id"],
-            "restaurant_name": matched["name"],
-            "restaurant_lat": matched["lat"],
-            "restaurant_lng": matched["lng"],
-            "address": matched.get("address", ""),
-            "distance_km": 0.1,
-            "tags": matched["tags"],
-            "item_id": item.get("item_id", item["name"]),
-            "item_name": item["name"],
-            "price": item.get("price", 0),
-            "calories": item.get("calories", 0),
-            "protein": item.get("protein", 0),
-            "carbs": item.get("carbs", 0),
-            "fat": item.get("fat", 0),
-            "sodium": item.get("sodium", 0),
-            "gi": item.get("gi"),
-            "match_score": 80 if reasons else 95,
-            "reasons": reasons if reasons else ["營養與安全條件相符"],
-            "medical_risk": medical_risk,
-        }
-        recommended_items.append(recommended_item)
+        block_reasons = []
+        if is_over_budget:
+            block_reasons.append(f"超出預算 {budget} 元")
+        block_reasons.extend(medical_risk.get("block_reasons", []))
         
-        if reasons:
-            filtered_item = {
+        if is_blocked:
+            filtered_items.append({
                 "restaurant_id": matched["restaurant_id"],
                 "restaurant_name": matched["name"],
                 "item_name": item["name"],
+                "reasons": block_reasons,
+                "price": item.get("price", 0),
+                "medical_risk": medical_risk,
+            })
+        else:
+            # 計算個人化契合度分數
+            base_score = 92 if medical_risk.get("action") == "ALLOW" else 78
+            item_cal = float(item.get("calories", 0) or 0)
+            cal_diff = abs(target_calories - item_cal)
+            cal_score = max(0, 10 - int(cal_diff / 40))
+            
+            prot = float(item.get("protein", 0) or 0)
+            prot_bonus = 5 if prot >= 18 else 0
+            
+            sod = float(item.get("sodium", 0) or 0)
+            sod_bonus = 3 if sod <= 600 else -5 if sod >= 1000 else 0
+            
+            match_score = min(99, max(1, base_score + cal_score + prot_bonus + sod_bonus))
+            
+            reasons = []
+            if medical_risk.get("caution_reasons"):
+                reasons.extend(medical_risk["caution_reasons"])
+            else:
+                reasons.append(f"符合單餐預算 {budget} 元")
+                reasons.append(f"熱量契合個人單餐目標 ({int(target_calories)} kcal)")
+            if prot >= 18:
+                reasons.append("高蛋白質補給")
+            if sod <= 600:
+                reasons.append("低鈉好選擇")
+                
+            recommended_items.append({
+                "restaurant_id": matched["restaurant_id"],
+                "restaurant_name": matched["name"],
+                "restaurant_lat": matched["lat"],
+                "restaurant_lng": matched["lng"],
+                "address": matched.get("address", ""),
+                "distance_km": 0.1,
+                "tags": matched["tags"],
+                "item_id": item.get("item_id", item["name"]),
+                "item_name": item["name"],
+                "price": item.get("price", 0),
+                "calories": item.get("calories", 0),
+                "protein": item.get("protein", 0),
+                "carbs": item.get("carbs", 0),
+                "fat": item.get("fat", 0),
+                "sodium": item.get("sodium", 0),
+                "gi": item.get("gi"),
+                "match_score": match_score,
                 "reasons": reasons,
-                "price": item.get("price", 0)
-            }
-            filtered_items.append(filtered_item)
+                "medical_risk": medical_risk,
+            })
+
+    # 按契合度高低排序，精準截取前 3~5 項推薦品項
+    recommended_items.sort(key=lambda x: x["match_score"], reverse=True)
+    top_recommended = recommended_items[:5]
 
     return jsonify({
         "restaurant_id": matched["restaurant_id"],
         "name": matched["name"],
-        "recommended_items": recommended_items,
+        "recommended_items": top_recommended,
         "filtered_items": filtered_items
     })
 

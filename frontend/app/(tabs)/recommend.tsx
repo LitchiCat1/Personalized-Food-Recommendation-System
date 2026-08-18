@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TextInput, Pressable, Linking, Modal, ScrollView } from 'react-native';
+import { Alert, View, Text, StyleSheet, ActivityIndicator, TextInput, Pressable, Linking, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
+import type { DetectedFood } from '@/constants/mock-data';
 import AppContainer from '@/components/AppContainer';
 import ScreenHeader from '@/components/ui/screen-header';
 import SectionBlock from '@/components/ui/section-block';
@@ -12,6 +13,7 @@ import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
 import FoodMap from '@/components/maps/FoodMap';
+import { saveRecord } from '@/lib/scanner';
 import {
   fetchHealthyFoodRecommendations,
   fetchRestaurantAiSummary,
@@ -38,23 +40,100 @@ const CATEGORY_OPTIONS = [
 ];
 
 export default function RecommendScreen() {
-  const { user, apiBaseUrl, accessToken } = useStore();
-  const [healthyData, setHealthyData] = useState<HealthyFoodResponse | null>(null);
-  const [healthyLoading, setHealthyLoading] = useState(false);
-  const [healthyError, setHealthyError] = useState<string | null>(null);
-  const [summaryByRestaurant, setSummaryByRestaurant] = useState<Record<string, RestaurantAiSummary>>({});
-  const [summaryLoadingKey, setSummaryLoadingKey] = useState<string | null>(null);
+  const user = useStore((state) => state.user);
+  const apiBaseUrl = useStore((state) => state.apiBaseUrl);
+  const accessToken = useStore((state) => state.accessToken);
+  const addMealFromScan = useStore((state) => state.addMealFromScan);
+  const invalidateDietaryRecords = useStore((state) => state.invalidateDietaryRecords);
+
   const [budget, setBudget] = useState('150');
   const [radiusKm, setRadiusKm] = useState(3);
   const [category, setCategory] = useState('all');
+  const [healthyLoading, setHealthyLoading] = useState(false);
+  const [healthyError, setHealthyError] = useState<string | null>(null);
+  const [healthyData, setHealthyData] = useState<HealthyFoodResponse | null>(null);
+  const [summaryByRestaurant, setSummaryByRestaurant] = useState<Record<string, RestaurantAiSummary>>({});
+  const [summaryLoadingKey, setSummaryLoadingKey] = useState<string | null>(null);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [locationLabel, setLocationLabel] = useState('尚未取得定位');
   const [viewingMenuRest, setViewingMenuRest] = useState<HealthyFoodRestaurant | null>(null);
   const [menuLoading, setMenuLoading] = useState(false);
+  const [addingFoodName, setAddingFoodName] = useState<string | null>(null);
 
   const mapRestaurants = healthyData?.restaurants || [];
   const mapLocation = healthyData?.location || null;
   const selectedRestaurant = mapRestaurants.find((restaurant) => restaurant.restaurant_id === selectedRestaurantId) || mapRestaurants[0] || null;
+
+  const handleQuickAddRecord = async (item: {
+    item_name?: string;
+    name?: string;
+    calories?: number;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+    sodium?: number;
+    sugar?: number;
+    saturated_fat?: number;
+    trans_fat?: number;
+    fiber?: number;
+    calcium?: number;
+    iron?: number;
+    price?: number;
+  }) => {
+    const foodName = item.item_name || item.name || '推薦餐點';
+    const clientRecordId = `rec_${Date.now()}`;
+    setAddingFoodName(foodName);
+    try {
+      const foodItem = {
+        name: foodName,
+        calories: Number(item.calories || 350),
+        protein: Number(item.protein || 15),
+        carbs: Number(item.carbs || 45),
+        fat: Number(item.fat || 10),
+        sodium: Number(item.sodium || 500),
+        sugar: Number(item.sugar || 0),
+        saturated_fat: Number(item.saturated_fat || 0),
+        trans_fat: Number(item.trans_fat || 0),
+        fiber: Number(item.fiber || 3),
+        calcium: Number(item.calcium || 0),
+        iron: Number(item.iron || 0),
+        source: 'manual',
+      };
+
+      const detectedFoodItem: DetectedFood = {
+        id: clientRecordId,
+        foodName,
+        confidence: 100,
+        source: 'manual',
+        needsConfirmation: false,
+        boundingBox: { x: 0, y: 0, w: 0, h: 0 },
+        estimatedWeight: 200,
+        portionRange: { minG: 200, maxG: 200, uncertaintyPercent: 0 },
+        portionEstimationMethod: 'nutrition_label_serving_size',
+        reliability: { level: 'high', score: 0.9, reasons: ['來自 AI 個人化推薦'] },
+        nutrition: foodItem,
+        gi: 'medium',
+        allergens: [],
+        warnings: [],
+      };
+
+      await saveRecord({
+        apiBaseUrl,
+        userId: user.userId,
+        clientRecordId,
+        foods: [detectedFoodItem],
+        source: 'manual',
+        auth: { accessToken },
+      });
+      invalidateDietaryRecords();
+      addMealFromScan([detectedFoodItem]);
+      Alert.alert('已新增紀錄', `已成功將「${foodName} (${foodItem.calories} kcal)」加入今日飲食紀錄！`);
+    } catch (err: any) {
+      Alert.alert('新增紀錄失敗', err?.message || '請稍後再試');
+    } finally {
+      setAddingFoodName(null);
+    }
+  };
 
   const handleHealthyFoodSearch = async () => {
     setHealthyLoading(true);
@@ -75,7 +154,6 @@ export default function RecommendScreen() {
         setTimeout(() => reject(new Error('timeout')), 10000)
       );
 
-
       const coords = await Promise.race([geoPromise, timeoutPromise]).catch(() => {
         return { lat: 25.0338, lng: 121.5645 };
       });
@@ -93,48 +171,27 @@ export default function RecommendScreen() {
       setHealthyData(result);
       setSelectedRestaurantId(result.restaurants?.[0]?.restaurant_id || null);
     } catch (err: any) {
-      setHealthyError(err?.message || '無法取得附近店家');
+      setHealthyError(err?.message || '無法取得健康餐點推薦');
     } finally {
       setHealthyLoading(false);
     }
   };
 
-
-  const handleOpenNavigation = async (restaurant: HealthyFoodRestaurant) => {
-    try {
-      await Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${restaurant.lat},${restaurant.lng}&travelmode=walking`);
-    } catch (err: any) {
-      setHealthyError(err?.message || '無法開啟 Google Maps 導航');
-    }
-  };
-
-  const handleOpenRestaurantWebsite = async (restaurant: HealthyFoodRestaurant) => {
-    if (!restaurant.menu_link) return;
-    try {
-      await Linking.openURL(restaurant.menu_link.url);
-    } catch (err: any) {
-      setHealthyError(err?.message || '無法開啟店家網站');
-    }
-  };
-
-  const handleOpenRestaurantInfo = async (restaurant: HealthyFoodRestaurant) => {
-    const mapsUrl = restaurant.google_maps_url
-      || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurant.name)}&query_place_id=${encodeURIComponent(restaurant.google_place_id || '')}`;
-    try {
-      await Linking.openURL(mapsUrl);
-    } catch (err: any) {
-      setHealthyError(err?.message || '無法開啟 Google Maps 店家資訊');
-    }
-  };
-
   const handleLoadRestaurantSummary = async (restaurant: HealthyFoodRestaurant) => {
-    setHealthyError(null);
     setSummaryLoadingKey(restaurant.restaurant_id);
     try {
-      const response = await fetchRestaurantAiSummary(apiBaseUrl, user.userId, { restaurant, budget: Number(budget) || 150, category }, { accessToken });
-      setSummaryByRestaurant((current) => ({ ...current, [restaurant.restaurant_id]: response.summary }));
+      const result = await fetchRestaurantAiSummary(
+        apiBaseUrl,
+        user.userId,
+        { restaurant, budget: Number(budget) || 150, category },
+        { accessToken }
+      );
+      setSummaryByRestaurant((current: Record<string, RestaurantAiSummary>) => ({
+        ...current,
+        [restaurant.restaurant_id]: result.summary,
+      }));
     } catch (err: any) {
-      setHealthyError(err?.message || 'AI 店家摘要產生失敗');
+      alert(err?.message || '無法取得 AI 摘要');
     } finally {
       setSummaryLoadingKey(null);
     }
@@ -142,8 +199,7 @@ export default function RecommendScreen() {
 
   const handleViewMenu = async (restaurant: HealthyFoodRestaurant) => {
     setViewingMenuRest(restaurant);
-    // Local catalog entries can still load their structured nutrition analysis.
-    if (!restaurant.nutrition_available) {
+    if ((restaurant.recommended_items || []).length === 0 || !restaurant.nutrition_available) {
       setMenuLoading(true);
       try {
         const response = await fetchRestaurantDetailedMenu(
@@ -159,17 +215,10 @@ export default function RecommendScreen() {
           },
           { accessToken }
         );
-        setViewingMenuRest((prev) =>
-          prev && prev.restaurant_id === restaurant.restaurant_id
-            ? {
-                ...prev,
-                nutrition_available: true,
-                recommended_items: response.recommended_items,
-                filtered_items: response.filtered_items,
-              }
-            : prev
+        setViewingMenuRest((prev: HealthyFoodRestaurant | null) =>
+          prev ? { ...prev, recommended_items: response.recommended_items, filtered_items: response.filtered_items } : null
         );
-      } catch (err: any) {
+      } catch (err) {
         console.log('Failed to fetch detailed menu:', err);
       } finally {
         setMenuLoading(false);
@@ -177,17 +226,34 @@ export default function RecommendScreen() {
     }
   };
 
+  const handleOpenNavigation = (restaurant: HealthyFoodRestaurant) => {
+    const query = encodeURIComponent(`${restaurant.name} ${restaurant.address}`);
+    const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
+    Linking.openURL(url);
+  };
+
+  const handleOpenRestaurantWebsite = (restaurant: HealthyFoodRestaurant) => {
+    if (restaurant.menu_link) {
+      Linking.openURL(restaurant.menu_link.url);
+    }
+  };
+
+  const handleOpenRestaurantInfo = (restaurant: HealthyFoodRestaurant) => {
+    const query = encodeURIComponent(`${restaurant.name} ${restaurant.address}`);
+    const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
+    Linking.openURL(url);
+  };
 
   return (
     <AppContainer>
       <ScreenHeader
-        title="附近店家"
-        subtitle="依預算、距離與店家類型搜尋附近選擇。"
+        title="智慧推薦"
+        subtitle="查看符合個人條件的餐點，再用定位找附近可行店家。"
         badge="地圖搜尋"
         badgeTone="success"
       />
 
-      <SectionBlock title="附近店家搜尋" subtitle="Google Places 只提供真實店家位置；實際餐點營養仍建議用掃描確認。">
+      <SectionBlock title="附近店家推薦" subtitle="Google Places 只提供真實店家位置；實際餐點營養仍建議用掃描確認。">
             <View style={styles.budgetRow}>
               <TextInput
                 value={budget}
@@ -237,7 +303,7 @@ export default function RecommendScreen() {
                   <View style={styles.selectedMapInfo}>
                     <View style={styles.mapTitleRow}>
                       <Text style={styles.restaurantName}>{selectedRestaurant.name}</Text>
-                      <DataPill tone="info">評分 {selectedRestaurant.match_score}</DataPill>
+                      <DataPill tone="info">推薦 {selectedRestaurant.match_score}</DataPill>
                     </View>
                     <Text style={styles.restaurantMeta}>{selectedRestaurant.address || '尚無地址'} · {selectedRestaurant.distance_km} km</Text>
                     <SecondaryButton label="開啟 Google Maps 導航" onPress={() => handleOpenNavigation(selectedRestaurant)} icon={<Ionicons name="navigate-outline" size={15} color={Palette.accent.green} />} />
@@ -250,6 +316,7 @@ export default function RecommendScreen() {
                   key={restaurant.restaurant_id}
                   restaurant={restaurant}
                   index={index}
+                  addingFoodName={addingFoodName}
                   selected={selectedRestaurantId === restaurant.restaurant_id}
                   summary={summaryByRestaurant[restaurant.restaurant_id]}
                   summaryLoading={summaryLoadingKey === restaurant.restaurant_id}
@@ -259,12 +326,12 @@ export default function RecommendScreen() {
                   onViewMenu={() => handleViewMenu(restaurant)}
                   onOpenRestaurantWebsite={() => handleOpenRestaurantWebsite(restaurant)}
                   onOpenRestaurantInfo={() => handleOpenRestaurantInfo(restaurant)}
+                  onQuickAddRecord={handleQuickAddRecord}
                 />
               ))}
             </>
           ) : null}
 
-      {/* 完整菜單詳細 Modal 彈窗 */}
       <Modal
         visible={viewingMenuRest !== null}
         transparent={true}
@@ -317,6 +384,14 @@ export default function RecommendScreen() {
                           {item.reasons && item.reasons.length > 0 ? (
                             <Text style={styles.customizationText}>判定依據：{item.reasons.join('、')}</Text>
                           ) : null}
+                          <View style={{ marginTop: Spacing.xs, alignItems: 'flex-end' }}>
+                            <SecondaryButton
+                              disabled={addingFoodName === item.item_name}
+                              label={addingFoodName === item.item_name ? '新增中...' : '+ 加入今日紀錄'}
+                              onPress={() => handleQuickAddRecord(item)}
+                              icon={<Ionicons name="add-circle-outline" size={14} color={Palette.accent.green} />}
+                            />
+                          </View>
                         </View>
                       ))
                     )}
@@ -355,24 +430,28 @@ function RestaurantCard({
   selected,
   summary,
   summaryLoading,
+  addingFoodName,
   onSelect,
   onSummary,
   onNavigate,
   onViewMenu,
   onOpenRestaurantWebsite,
   onOpenRestaurantInfo,
+  onQuickAddRecord,
 }: {
   restaurant: HealthyFoodRestaurant;
   index: number;
   selected: boolean;
   summary?: RestaurantAiSummary;
   summaryLoading: boolean;
+  addingFoodName: string | null;
   onSelect: () => void;
   onSummary: () => void;
   onNavigate: () => void;
   onViewMenu: () => void;
   onOpenRestaurantWebsite: () => void;
   onOpenRestaurantInfo: () => void;
+  onQuickAddRecord: (item: any) => void;
 }) {
   return (
     <View style={[styles.restaurantCard, selected && styles.restaurantCardSelected]}>
@@ -387,9 +466,17 @@ function RestaurantCard({
       <View style={styles.pillRow}>
         {restaurant.tags.slice(0, 4).map((tag) => <DataPill key={tag} tone="success">{tag}</DataPill>)}
       </View>
-      {restaurant.recommended_items.slice(0, 2).map((item) => (
+      {restaurant.recommended_items.slice(0, 5).map((item) => (
         <View key={`${restaurant.restaurant_id}_${item.item_id || item.item_name}`} style={styles.restaurantItem}>
-          <Text style={styles.itemName}>{item.item_name}</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={styles.itemName}>{item.item_name}</Text>
+            <SecondaryButton
+              disabled={addingFoodName === item.item_name}
+              label={addingFoodName === item.item_name ? '新增中' : '+ 加入今日紀錄'}
+              onPress={() => onQuickAddRecord(item)}
+              icon={<Ionicons name="add-circle-outline" size={13} color={Palette.accent.green} />}
+            />
+          </View>
           {item.nutrition_available ? (
             <View style={styles.nutritionRow}>
               <NutritionMini label="熱量" value={`${item.calories} kcal`} color={Palette.accent.green} />
@@ -402,15 +489,10 @@ function RestaurantCard({
         </View>
       ))}
       <View style={styles.restaurantActions}>
-        {restaurant.data_source === 'google_places' ? (
-          restaurant.menu_link ? (
-            <SecondaryButton label="店家網站／菜單" onPress={onOpenRestaurantWebsite} icon={<Ionicons name="open-outline" size={14} color={Palette.accent.green} />} />
-          ) : (
-            <SecondaryButton label="店家資訊" onPress={onOpenRestaurantInfo} icon={<Ionicons name="images-outline" size={14} color={Palette.accent.green} />} />
-          )
-        ) : (
-          <SecondaryButton label="完整菜單" onPress={onViewMenu} icon={<Ionicons name="restaurant-outline" size={14} color={Palette.accent.green} />} />
-        )}
+        <SecondaryButton label="完整菜單" onPress={onViewMenu} icon={<Ionicons name="restaurant-outline" size={14} color={Palette.accent.green} />} />
+        {restaurant.menu_link ? (
+          <SecondaryButton label="店家網站" onPress={onOpenRestaurantWebsite} icon={<Ionicons name="open-outline" size={14} color={Palette.accent.green} />} />
+        ) : null}
         <SecondaryButton label="地圖標示" onPress={onSelect} />
         <SecondaryButton label={summaryLoading ? '產生中' : 'AI 摘要'} onPress={onSummary} />
         <SecondaryButton label="導航" onPress={onNavigate} />
@@ -427,9 +509,17 @@ function RestaurantCard({
                 <Text style={styles.personalizedTitle}>疾病與今日進度提醒</Text>
               </View>
               {(summary.recommended_foods || []).map((item, itemIndex) => (
-                <View key={`${item.name}_${itemIndex}`} style={styles.personalizedItem}>
-                  <Text style={styles.personalizedFood}>{item.name}</Text>
-                  <Text style={styles.restaurantMeta}>{item.reason}</Text>
+                <View key={`${item.name}_${itemIndex}`} style={[styles.personalizedItem, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                  <View style={{ flex: 1, paddingRight: Spacing.sm }}>
+                    <Text style={styles.personalizedFood}>{item.name}</Text>
+                    <Text style={styles.restaurantMeta}>{item.reason}</Text>
+                  </View>
+                  <SecondaryButton
+                    disabled={addingFoodName === item.name}
+                    label={addingFoodName === item.name ? '新增中' : '+ 加入今日紀錄'}
+                    onPress={() => onQuickAddRecord({ name: item.name, calories: 400, protein: 18, carbs: 45, fat: 12, sodium: 550 })}
+                    icon={<Ionicons name="add-circle-outline" size={13} color={Palette.accent.green} />}
+                  />
                 </View>
               ))}
             </View>

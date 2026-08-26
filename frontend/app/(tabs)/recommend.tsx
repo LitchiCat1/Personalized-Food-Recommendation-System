@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Alert, View, Text, StyleSheet, ActivityIndicator, TextInput, Pressable, Linking, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
 import type { DetectedFood } from '@/constants/mock-data';
@@ -59,6 +60,46 @@ export default function RecommendScreen() {
   const [viewingMenuRest, setViewingMenuRest] = useState<HealthyFoodRestaurant | null>(null);
   const [menuLoading, setMenuLoading] = useState(false);
   const [addingFoodName, setAddingFoodName] = useState<string | null>(null);
+  const [uploadingMenu, setUploadingMenu] = useState(false);
+
+  const handleUploadMenuPhoto = async (restaurant: HealthyFoodRestaurant) => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      base64: true,
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets?.[0]?.base64) return;
+    const base64 = result.assets[0].base64;
+
+    setMenuLoading(true);
+    setUploadingMenu(true);
+    try {
+      const response = await fetchRestaurantDetailedMenu(
+        apiBaseUrl,
+        {
+          restaurant_id: restaurant.restaurant_id,
+          name: restaurant.name,
+          address: restaurant.address,
+          budget: Number(budget) || 150,
+          user_id: user.userId,
+          lat: restaurant.lat,
+          lng: restaurant.lng,
+          menu_image: base64,
+        },
+        { accessToken }
+      );
+      setViewingMenuRest((prev) =>
+        prev ? { ...prev, recommended_items: response.recommended_items, filtered_items: response.filtered_items } : null
+      );
+      Alert.alert('AI 辨識完成', '已成功解析實體菜單圖片並產生 3~5 項個人化推薦！');
+    } catch (err: any) {
+      Alert.alert('菜單辨識失敗', err?.message || '請選擇更清晰的菜單照片');
+    } finally {
+      setMenuLoading(false);
+      setUploadingMenu(false);
+    }
+  };
 
   const mapRestaurants = healthyData?.restaurants || [];
   const mapLocation = healthyData?.location || null;
@@ -91,12 +132,12 @@ export default function RecommendScreen() {
         carbs: Number(item.carbs || 45),
         fat: Number(item.fat || 10),
         sodium: Number(item.sodium || 500),
-        sugar: Number(item.sugar || 0),
-        saturated_fat: Number(item.saturated_fat || 0),
-        trans_fat: Number(item.trans_fat || 0),
-        fiber: Number(item.fiber || 3),
-        calcium: Number(item.calcium || 0),
-        iron: Number(item.iron || 0),
+        sugar: Number(item.sugar ?? 0),
+        saturated_fat: Number(item.saturated_fat ?? 0),
+        trans_fat: Number(item.trans_fat ?? 0),
+        fiber: Number(item.fiber ?? (foodName.includes('青菜') || foodName.includes('沙拉') || foodName.includes('蔬菜') ? 3.5 : 1.0)),
+        calcium: Number(item.calcium ?? 0),
+        iron: Number(item.iron ?? 0),
         source: 'manual',
       };
 
@@ -341,10 +382,22 @@ export default function RecommendScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{viewingMenuRest?.name}</Text>
+              <View style={{ flex: 1, paddingRight: Spacing.sm }}>
+                <Text style={styles.modalTitle}>{viewingMenuRest?.name}</Text>
+                <Text style={styles.restaurantMeta}>{viewingMenuRest?.address}</Text>
+              </View>
               <Pressable onPress={() => setViewingMenuRest(null)}>
                 <Ionicons name="close" size={24} color={Palette.text.primary} />
               </Pressable>
+            </View>
+
+            <View style={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm, alignItems: 'flex-start' }}>
+              <SecondaryButton
+                disabled={uploadingMenu}
+                icon={<Ionicons name="camera-outline" size={14} color={Palette.accent.green} />}
+                label={uploadingMenu ? "正在用 AI 辨識菜單..." : "📷 上傳 / 更新實體菜單照片"}
+                onPress={() => viewingMenuRest && handleUploadMenuPhoto(viewingMenuRest)}
+              />
             </View>
 
             {menuLoading ? (
@@ -354,65 +407,80 @@ export default function RecommendScreen() {
               </View>
             ) : (
               <ScrollView contentContainerStyle={styles.modalScroll}>
-                <Text style={styles.restaurantMeta}>{viewingMenuRest?.address}</Text>
-
                 <Text style={styles.modalSectionTitle}>餐點安全分析</Text>
-                {(viewingMenuRest?.recommended_items || []).length === 0 && (viewingMenuRest?.filtered_items || []).length === 0 ? (
-                  <View style={{ padding: Spacing.lg, alignItems: 'center', backgroundColor: Palette.bg.wash, borderRadius: Radius.lg, borderWidth: 1, borderColor: Palette.border.subtle, marginVertical: Spacing.md }}>
-                    <Ionicons name="document-text-outline" size={32} color={Palette.text.tertiary} style={{ marginBottom: Spacing.xs }} />
-                    <Text style={[styles.itemName, { textAlign: 'center', marginBottom: 4 }]}>線上查無此店菜單</Text>
-                    <Text style={[styles.restaurantMeta, { textAlign: 'center' }]}>
-                      您可以點擊店卡中的「AI 摘要」預測其常規品項，或使用頁面右下角的「相機掃描」拍照記錄實體菜單！
-                    </Text>
-                  </View>
-                ) : (
-                  <>
-                    {(viewingMenuRest?.recommended_items || []).length === 0 ? (
-                      <Text style={styles.emptyText}>沒有符合條件的餐點</Text>
-                    ) : (
-                      (viewingMenuRest?.recommended_items || []).map((item) => (
-                        <View key={item.item_name} style={styles.menuItemCard}>
-                          <View style={styles.menuItemHeader}>
-                            <Text style={styles.menuItemName}>{item.item_name}</Text>
-                            <Text style={styles.menuItemPrice}>${item.price}</Text>
-                          </View>
-                          <View style={styles.nutritionRow}>
-                            <NutritionMini label="熱量" value={`${item.calories} kcal`} color={Palette.accent.green} />
-                            <NutritionMini label="蛋白質" value={`${item.protein} g`} color={Palette.accent.blue} />
-                            <NutritionMini label="鈉" value={`${item.sodium} mg`} color={Palette.accent.pink} />
-                          </View>
-                          {item.reasons && item.reasons.length > 0 ? (
-                            <Text style={styles.customizationText}>判定依據：{item.reasons.join('、')}</Text>
-                          ) : null}
-                          <View style={{ marginTop: Spacing.xs, alignItems: 'flex-end' }}>
-                            <SecondaryButton
-                              disabled={addingFoodName === item.item_name}
-                              label={addingFoodName === item.item_name ? '新增中...' : '+ 加入今日紀錄'}
-                              onPress={() => handleQuickAddRecord(item)}
-                              icon={<Ionicons name="add-circle-outline" size={14} color={Palette.accent.green} />}
-                            />
-                          </View>
-                        </View>
-                      ))
-                    )}
+                {(() => {
+                  const validRecItems = (viewingMenuRest?.recommended_items || []).filter(
+                    (item) => item.nutrition_available !== false && !item.item_name.includes('到店後選擇')
+                  );
+                  const validFilteredItems = viewingMenuRest?.filtered_items || [];
 
-                    <Text style={[styles.modalSectionTitle, { marginTop: Spacing.xl }]}>不符合 / 需注意餐點</Text>
-                    {(viewingMenuRest?.filtered_items || []).length === 0 ? (
-                      <Text style={styles.emptyText}>此店無需要排除的餐點</Text>
-                    ) : (
-                      (viewingMenuRest?.filtered_items || []).map((item) => (
-                        <View key={item.item_name} style={[styles.menuItemCard, { borderColor: Palette.status.warning }]}>
-                          <View style={styles.menuItemHeader}>
-                            <Text style={[styles.menuItemName, { color: Palette.status.warning }]}>{item.item_name}</Text>
+                  if (validRecItems.length === 0 && validFilteredItems.length === 0) {
+                    return (
+                      <View style={{ padding: Spacing.lg, alignItems: 'center', backgroundColor: Palette.bg.wash, borderRadius: Radius.lg, borderWidth: 1, borderColor: Palette.border.subtle, marginVertical: Spacing.md, gap: Spacing.sm }}>
+                        <Ionicons name="document-text-outline" size={32} color={Palette.text.tertiary} />
+                        <Text style={[styles.itemName, { textAlign: 'center', marginBottom: 2 }]}>線上查無此店菜單</Text>
+                        <Text style={[styles.restaurantMeta, { textAlign: 'center', marginBottom: Spacing.xs }]}>
+                          此為 Google Places 真實店家。請直接點擊下方按鈕上傳該店的「實體菜單照片」，Gemini Vision AI 將自動辨識菜單並給予 3~5 項個人化推薦！
+                        </Text>
+                        <SecondaryButton
+                          disabled={uploadingMenu}
+                          icon={<Ionicons name="camera-outline" size={16} color={Palette.accent.green} />}
+                          label={uploadingMenu ? "正在用 AI 辨識菜單..." : "📷 拍照 / 📁 上傳實體菜單"}
+                          onPress={() => viewingMenuRest && handleUploadMenuPhoto(viewingMenuRest)}
+                        />
+                      </View>
+                    );
+                  }
+
+                  return (
+                    <>
+                      {validRecItems.length === 0 ? (
+                        <Text style={styles.emptyText}>沒有符合條件的餐點</Text>
+                      ) : (
+                        validRecItems.map((item) => (
+                          <View key={item.item_name} style={styles.menuItemCard}>
+                            <View style={styles.menuItemHeader}>
+                              <Text style={styles.menuItemName}>{item.item_name}</Text>
+                              <Text style={styles.menuItemPrice}>${item.price}</Text>
+                            </View>
+                            <View style={styles.nutritionRow}>
+                              <NutritionMini label="熱量" value={`${item.calories} kcal`} color={Palette.accent.green} />
+                              <NutritionMini label="蛋白質" value={`${item.protein} g`} color={Palette.accent.blue} />
+                              <NutritionMini label="鈉" value={`${item.sodium} mg`} color={Palette.accent.pink} />
+                            </View>
+                            {item.reasons && item.reasons.length > 0 ? (
+                              <Text style={styles.customizationText}>判定依據：{item.reasons.join('、')}</Text>
+                            ) : null}
+                            <View style={{ marginTop: Spacing.xs, alignItems: 'flex-end' }}>
+                              <SecondaryButton
+                                disabled={addingFoodName === item.item_name}
+                                label={addingFoodName === item.item_name ? '新增中...' : '+ 加入今日紀錄'}
+                                onPress={() => handleQuickAddRecord(item)}
+                                icon={<Ionicons name="add-circle-outline" size={14} color={Palette.accent.green} />}
+                              />
+                            </View>
                           </View>
-                          {item.reasons && item.reasons.length > 0 ? (
-                            <Text style={styles.warningText}>⚠️ 排除原因：{item.reasons.join('、')}</Text>
-                          ) : null}
-                        </View>
-                      ))
-                    )}
-                  </>
-                )}
+                        ))
+                      )}
+
+                      <Text style={[styles.modalSectionTitle, { marginTop: Spacing.xl }]}>不符合 / 需注意餐點</Text>
+                      {validFilteredItems.length === 0 ? (
+                        <Text style={styles.emptyText}>此店無需要排除的餐點</Text>
+                      ) : (
+                        validFilteredItems.map((item) => (
+                          <View key={item.item_name} style={styles.menuItemCard}>
+                            <View style={styles.menuItemHeader}>
+                              <Text style={styles.menuItemName}>{item.item_name}</Text>
+                            </View>
+                            {item.reasons && item.reasons.length > 0 ? (
+                              <Text style={styles.warningText}>⚠️ 排除原因：{item.reasons.join('、')}</Text>
+                            ) : null}
+                          </View>
+                        ))
+                      )}
+                    </>
+                  );
+                })()}
 
               </ScrollView>
             )}
@@ -470,12 +538,14 @@ function RestaurantCard({
         <View key={`${restaurant.restaurant_id}_${item.item_id || item.item_name}`} style={styles.restaurantItem}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Text style={styles.itemName}>{item.item_name}</Text>
-            <SecondaryButton
-              disabled={addingFoodName === item.item_name}
-              label={addingFoodName === item.item_name ? '新增中' : '+ 加入今日紀錄'}
-              onPress={() => onQuickAddRecord(item)}
-              icon={<Ionicons name="add-circle-outline" size={13} color={Palette.accent.green} />}
-            />
+            {item.nutrition_available !== false && !item.item_name.includes('到店後選擇') ? (
+              <SecondaryButton
+                disabled={addingFoodName === item.item_name}
+                label={addingFoodName === item.item_name ? '新增中' : '+ 加入今日紀錄'}
+                onPress={() => onQuickAddRecord(item)}
+                icon={<Ionicons name="add-circle-outline" size={13} color={Palette.accent.green} />}
+              />
+            ) : null}
           </View>
           {item.nutrition_available ? (
             <View style={styles.nutritionRow}>
@@ -517,7 +587,7 @@ function RestaurantCard({
                   <SecondaryButton
                     disabled={addingFoodName === item.name}
                     label={addingFoodName === item.name ? '新增中' : '+ 加入今日紀錄'}
-                    onPress={() => onQuickAddRecord({ name: item.name, calories: 400, protein: 18, carbs: 45, fat: 12, sodium: 550 })}
+                    onPress={() => onQuickAddRecord(item)}
                     icon={<Ionicons name="add-circle-outline" size={13} color={Palette.accent.green} />}
                   />
                 </View>

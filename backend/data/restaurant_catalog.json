@@ -21,10 +21,10 @@
         "item_id": "fp_001_001",
         "name": "舒肥雞胸餐盒",
         "price": 140,
-        "calories": 520,
-        "protein": 38,
-        "carbs": 42,
-        "fat": 12,
+        "calories": 428,
+        "protein": 38.0,
+        "carbs": 42.0,
+        "fat": 12.0,
         "sodium": 480,
         "gi": "low",
         "tags": [
@@ -35,16 +35,23 @@
         "customization_tips": [
           "醬料另外放",
           "飯量可減半"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "fp_001_002",
         "name": "鮭魚藜麥餐盒",
         "price": 180,
-        "calories": 560,
-        "protein": 34,
-        "carbs": 40,
-        "fat": 18,
+        "calories": 458,
+        "protein": 34.0,
+        "carbs": 40.0,
+        "fat": 18.0,
         "sodium": 420,
         "gi": "low",
         "tags": [
@@ -55,7 +62,14 @@
         "customization_tips": [
           "可換地瓜",
           "少鹽"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       }
     ]
   },
@@ -81,9 +95,9 @@
         "name": "雞胸酪梨沙拉",
         "price": 155,
         "calories": 430,
-        "protein": 30,
-        "carbs": 18,
-        "fat": 22,
+        "protein": 30.0,
+        "carbs": 18.0,
+        "fat": 22.0,
         "sodium": 360,
         "gi": "low",
         "tags": [
@@ -94,16 +108,23 @@
         "customization_tips": [
           "醬料減半",
           "加蛋"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 3.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "fp_002_002",
         "name": "豆腐藜麥碗",
         "price": 135,
         "calories": 410,
-        "protein": 20,
-        "carbs": 36,
-        "fat": 14,
+        "protein": 20.0,
+        "carbs": 36.0,
+        "fat": 14.0,
         "sodium": 300,
         "gi": "low",
         "tags": [
@@ -114,7 +135,14 @@
         "customization_tips": [
           "可加青菜",
           "醬料另外放"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 1.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       }
     ]
   },
@@ -141,9 +169,9 @@
         "name": "蒸魚野菜套餐",
         "price": 170,
         "calories": 470,
-        "protein": 33,
-        "carbs": 35,
-        "fat": 14,
+        "protein": 33.0,
+        "carbs": 35.0,
+        "fat": 14.0,
         "sodium": 520,
         "gi": "low",
         "tags": [
@@ -154,16 +182,23 @@
         "customization_tips": [
           "湯少喝",
           "飯量減半"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "fp_003_002",
         "name": "蕈菇雞湯麵",
         "price": 150,
-        "calories": 590,
-        "protein": 28,
-        "carbs": 62,
-        "fat": 16,
+        "calories": 504,
+        "protein": 28.0,
+        "carbs": 62.0,
+        "fat": 16.0,
         "sodium": 680,
         "gi": "medium",
         "tags": [
@@ -174,7 +209,14 @@
         "customization_tips": [
           "少鹽",
           "麵量減半"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 3.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       }
     ]
   },
@@ -200,9 +242,9 @@
         "name": "鮪魚蛋吐司盒",
         "price": 95,
         "calories": 390,
-        "protein": 24,
-        "carbs": 34,
-        "fat": 14,
+        "protein": 24.0,
+        "carbs": 34.0,
+        "fat": 14.0,
         "sodium": 430,
         "gi": "medium",
         "tags": [
@@ -213,16 +255,23 @@
         "customization_tips": [
           "不加美乃滋",
           "吐司改全麥"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 2.0,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "fp_004_002",
         "name": "燕麥優格水果杯",
         "price": 85,
         "calories": 320,
-        "protein": 15,
-        "carbs": 38,
-        "fat": 9,
+        "protein": 15.0,
+        "carbs": 38.0,
+        "fat": 9.0,
         "sodium": 120,
         "gi": "low",
         "tags": [
@@ -230,7 +279,14 @@
           "低鈉"
         ],
         "can_customize": false,
-        "customization_tips": []
+        "customization_tips": [],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 2.0,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       }
     ]
   },
@@ -258,9 +314,9 @@
         "name": "雞胸豆腐青菜滷味",
         "price": 120,
         "calories": 480,
-        "protein": 36,
-        "carbs": 28,
-        "fat": 16,
+        "protein": 36.0,
+        "carbs": 28.0,
+        "fat": 16.0,
         "sodium": 720,
         "gi": "low",
         "tags": [
@@ -273,16 +329,23 @@
           "湯不要喝",
           "醬料另外放",
           "多加青菜"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 3.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "snack_001_002",
         "name": "豆干海帶青菜滷味",
         "price": 90,
         "calories": 360,
-        "protein": 22,
-        "carbs": 24,
-        "fat": 12,
+        "protein": 22.0,
+        "carbs": 24.0,
+        "fat": 12.0,
         "sodium": 640,
         "gi": "low",
         "tags": [
@@ -294,7 +357,14 @@
         "customization_tips": [
           "少鹽",
           "不要辣油"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 3.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       }
     ]
   },
@@ -322,9 +392,9 @@
         "name": "烤雞腿半飯便當",
         "price": 125,
         "calories": 620,
-        "protein": 34,
-        "carbs": 58,
-        "fat": 24,
+        "protein": 34.0,
+        "carbs": 58.0,
+        "fat": 24.0,
         "sodium": 760,
         "gi": "medium",
         "tags": [
@@ -336,16 +406,23 @@
           "半飯",
           "滷汁少",
           "多青菜"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 2.0,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "bento_001_002",
         "name": "蒸蛋青菜豆腐便當",
         "price": 105,
         "calories": 450,
-        "protein": 24,
-        "carbs": 48,
-        "fat": 16,
+        "protein": 24.0,
+        "carbs": 48.0,
+        "fat": 16.0,
         "sodium": 520,
         "gi": "medium",
         "tags": [
@@ -356,7 +433,14 @@
         "customization_tips": [
           "少油",
           "菜多飯少"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 3.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       }
     ]
   },
@@ -383,9 +467,9 @@
         "name": "無糖綠茶",
         "price": 35,
         "calories": 5,
-        "protein": 0,
-        "carbs": 1,
-        "fat": 0,
+        "protein": 0.0,
+        "carbs": 1.0,
+        "fat": 0.0,
         "sodium": 5,
         "gi": "low",
         "tags": [
@@ -396,16 +480,23 @@
         "customization_tips": [
           "維持無糖",
           "少冰"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "drink_001_002",
         "name": "無糖豆漿",
         "price": 45,
         "calories": 150,
-        "protein": 12,
-        "carbs": 10,
-        "fat": 7,
+        "protein": 12.0,
+        "carbs": 10.0,
+        "fat": 7.0,
         "sodium": 80,
         "gi": "low",
         "tags": [
@@ -416,7 +507,14 @@
         "customization_tips": [
           "無糖",
           "中杯即可"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 1.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       }
     ]
   },
@@ -443,9 +541,9 @@
         "name": "舒肥雞胸地瓜餐盒",
         "price": 145,
         "calories": 510,
-        "protein": 39,
-        "carbs": 45,
-        "fat": 11,
+        "protein": 39.0,
+        "carbs": 45.0,
+        "fat": 11.0,
         "sodium": 460,
         "gi": "low",
         "tags": [
@@ -456,16 +554,23 @@
         "customization_tips": [
           "飯改地瓜",
           "醬料另外放"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "ty_healthy_001_002",
         "name": "嫩煎豆腐蔬菜餐盒",
         "price": 120,
         "calories": 430,
-        "protein": 24,
-        "carbs": 42,
-        "fat": 14,
+        "protein": 24.0,
+        "carbs": 42.0,
+        "fat": 14.0,
         "sodium": 390,
         "gi": "low",
         "tags": [
@@ -476,7 +581,14 @@
         "customization_tips": [
           "飯量減半",
           "多青菜"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 3.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       }
     ]
   },
@@ -502,10 +614,10 @@
         "item_id": "ty_snack_001_001",
         "name": "雞胸豆腐青菜滷味",
         "price": 115,
-        "calories": 470,
-        "protein": 35,
-        "carbs": 26,
-        "fat": 15,
+        "calories": 379,
+        "protein": 35.0,
+        "carbs": 26.0,
+        "fat": 15.0,
         "sodium": 680,
         "gi": "low",
         "tags": [
@@ -517,16 +629,23 @@
           "湯不要喝",
           "少鹽",
           "醬料另外放"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 3.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "ty_snack_001_002",
         "name": "菇菇青菜豆干滷味",
         "price": 85,
         "calories": 340,
-        "protein": 20,
-        "carbs": 24,
-        "fat": 10,
+        "protein": 20.0,
+        "carbs": 24.0,
+        "fat": 10.0,
         "sodium": 560,
         "gi": "low",
         "tags": [
@@ -537,7 +656,14 @@
         "customization_tips": [
           "不加辣油",
           "多青菜"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 3.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       }
     ]
   },
@@ -564,9 +690,9 @@
         "name": "鮪魚蛋全麥吐司",
         "price": 70,
         "calories": 360,
-        "protein": 22,
-        "carbs": 34,
-        "fat": 13,
+        "protein": 22.0,
+        "carbs": 34.0,
+        "fat": 13.0,
         "sodium": 420,
         "gi": "medium",
         "tags": [
@@ -577,16 +703,23 @@
         "customization_tips": [
           "不加美乃滋",
           "加生菜"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 2.0,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "ty_breakfast_001_002",
         "name": "無糖豆漿茶葉蛋組",
         "price": 55,
         "calories": 230,
-        "protein": 19,
-        "carbs": 12,
-        "fat": 11,
+        "protein": 19.0,
+        "carbs": 12.0,
+        "fat": 11.0,
         "sodium": 260,
         "gi": "low",
         "tags": [
@@ -594,7 +727,14 @@
           "低GI"
         ],
         "can_customize": false,
-        "customization_tips": []
+        "customization_tips": [],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 1.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       }
     ]
   },
@@ -639,7 +779,14 @@
         "customization_tips": [
           "醬料減量 (減少脂肪與鈉)",
           "去酸黃瓜"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "m_002",
@@ -663,7 +810,14 @@
         "can_customize": true,
         "customization_tips": [
           "醬料減量 (減少脂肪與鈉)"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "m_003",
@@ -688,7 +842,14 @@
         "customization_tips": [
           "醬料另外放 (減少糖分與鈉)",
           "盡量減少沾醬"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "m_004",
@@ -710,7 +871,14 @@
         "customization_tips": [
           "少鹽",
           "盡早食用減少吸油"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "m_005",
@@ -735,7 +903,14 @@
         "can_customize": true,
         "customization_tips": [
           "醬料減量 (減少脂肪與鈉)"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "m_006",
@@ -762,7 +937,14 @@
         "customization_tips": [
           "去起司 (減少脂肪與鈉)",
           "可選擇單點豬肉滿福堡減少蛋與起司熱量"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       }
     ]
   },
@@ -786,7 +968,7 @@
         "item_id": "f_def_1",
         "name": "My Home Steak 特選舒肥雞胸便當",
         "price": 140,
-        "calories": 520,
+        "calories": 422,
         "protein": 38.0,
         "carbs": 45.0,
         "fat": 10.0,
@@ -795,13 +977,20 @@
         "tags": [
           "高蛋白",
           "低GI"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "f_def_2",
         "name": "My Home Steak 優質鮭魚排便當",
         "price": 170,
-        "calories": 590,
+        "calories": 478,
         "protein": 34.0,
         "carbs": 45.0,
         "fat": 18.0,
@@ -810,7 +999,14 @@
         "tags": [
           "優質脂肪",
           "低GI"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "f_def_3",
@@ -826,7 +1022,14 @@
           "高纖",
           "低GI",
           "低鈉"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 1.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "f_def_4",
@@ -841,7 +1044,14 @@
         "tags": [
           "高蛋白",
           "低鈉"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 1.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       }
     ]
   },
@@ -885,7 +1095,14 @@
           "減少勾芡量",
           "蒜泥/烏醋/辣醬另給",
           "不加豬大腸"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 2.0,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "m_002",
@@ -912,7 +1129,14 @@
           "減少勾芡量",
           "蒜泥/烏醋/辣醬另給",
           "不加豬大腸"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 2.0,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "m_003",
@@ -938,7 +1162,14 @@
         "customization_tips": [
           "醬汁另外放",
           "多加泡菜"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 1.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": true
       },
       {
         "item_id": "m_004",
@@ -958,7 +1189,14 @@
           "低GI"
         ],
         "can_customize": false,
-        "customization_tips": []
+        "customization_tips": [],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "m_005",
@@ -980,7 +1218,14 @@
         "can_customize": true,
         "customization_tips": [
           "減少醬汁用量"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       }
     ]
   },
@@ -1004,7 +1249,7 @@
         "item_id": "m_001",
         "name": "經典貳樓總匯大早餐",
         "price": 380,
-        "calories": 850,
+        "calories": 987,
         "protein": 38.0,
         "carbs": 85.0,
         "fat": 55.0,
@@ -1027,7 +1272,14 @@
           "醬料另外放",
           "麵包種類可更換",
           "蛋品烹調方式可選擇"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "m_002",
@@ -1053,13 +1305,20 @@
           "醬料另外放",
           "麵包種類可更換",
           "去皮雞腿排"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "m_003",
         "name": "青醬雞肉義大利麵",
         "price": 320,
-        "calories": 720,
+        "calories": 840,
         "protein": 40.0,
         "carbs": 80.0,
         "fat": 40.0,
@@ -1079,13 +1338,20 @@
           "醬料可減量",
           "增加蔬菜量",
           "可調整麵條軟硬度"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 2.0,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "m_004",
         "name": "美式花生醬牛肉堡",
         "price": 350,
-        "calories": 1050,
+        "calories": 1230,
         "protein": 55.0,
         "carbs": 95.0,
         "fat": 70.0,
@@ -1109,7 +1375,14 @@
           "醬料另外放",
           "可更換配餐(沙拉/薯條)",
           "花生醬可減量"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "m_005",
@@ -1135,7 +1408,14 @@
           "醬料另外放",
           "可更換醬料",
           "增加蔬菜量"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 3.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "m_006",
@@ -1163,7 +1443,14 @@
           "楓糖漿另外附",
           "可加點水果",
           "培根可更換其他肉品(若有)"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       }
     ]
   },
@@ -1230,7 +1517,14 @@
         "tags": [
           "高高鈉",
           "高蛋白"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 2.0,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "f_2",
@@ -1245,7 +1539,14 @@
         "tags": [
           "高蛋白",
           "低脂"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 2.0,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "f_3",
@@ -1261,7 +1562,14 @@
           "低鈉",
           "低GI",
           "高纖"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 0.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       },
       {
         "item_id": "f_4",
@@ -1276,8 +1584,66 @@
         "tags": [
           "高蛋白",
           "低GI"
-        ]
+        ],
+        "sugar": 0.0,
+        "saturated_fat": 0.0,
+        "trans_fat": 0.0,
+        "fiber": 1.5,
+        "calcium": 0,
+        "iron": 0.0,
+        "is_fried": false
       }
     ]
+  },
+  {
+    "restaurant_id": "google_ChIJV_RfoperQjQRit9_MVtVUps",
+    "name": "不二煮藝",
+    "lat": 25.0368323,
+    "lng": 121.5500021,
+    "address": "敦安里仁愛路四段112巷9弄5號1樓",
+    "phone": "",
+    "open_hours": [
+      "11:00-21:00"
+    ],
+    "tags": [
+      "動態擷取",
+      "AI標記"
+    ],
+    "price_level": 2,
+    "items": []
+  },
+  {
+    "restaurant_id": "google_ChIJox9CITsDaDQRzXhQRmYj05k",
+    "name": "蚵仔之家",
+    "lat": 25.0080942,
+    "lng": 121.4532408,
+    "address": "湳興里南雅東路79號",
+    "phone": "",
+    "open_hours": [
+      "11:00-21:00"
+    ],
+    "tags": [
+      "動態擷取",
+      "AI標記"
+    ],
+    "price_level": 2,
+    "items": []
+  },
+  {
+    "restaurant_id": "google_ChIJ3xv7FKYCaDQR-4VdGKD5MrA",
+    "name": "慢慢來 快一點｜板橋早午餐推薦｜人氣早餐｜府中必吃早點｜河粉蛋餅",
+    "lat": 25.0046049,
+    "lng": 121.4582914,
+    "address": "華福里華興街33號",
+    "phone": "",
+    "open_hours": [
+      "11:00-21:00"
+    ],
+    "tags": [
+      "動態擷取",
+      "AI標記"
+    ],
+    "price_level": 2,
+    "items": []
   }
 ]

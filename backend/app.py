@@ -40,7 +40,7 @@ from services.vision_food_service import (
     build_vision_food_response,
     call_gemini_food_recognition_with_rotation,
 )
-from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
+from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini, parse_menu_image_with_gemini
 from services.medical_risk_service import evaluate_medical_risk
 
 
@@ -568,6 +568,7 @@ def get_restaurant_menu():
     restaurant_id = data.get("restaurant_id", "")
     name = data.get("name", "").strip()
     address = data.get("address", "").strip()
+    menu_image = data.get("menu_image", "").strip()
     
     if not name:
         return jsonify({"error": "缺少 restaurant name"}), 400
@@ -579,7 +580,27 @@ def get_restaurant_menu():
             matched = r
             break
 
-    if not matched:
+    if menu_image:
+        print(f"[Scraper] 使用 Gemini Vision AI 辨識 {name} 的實體菜單圖片")
+        enriched = parse_menu_image_with_gemini(menu_image, name)
+        if matched:
+            matched["items"] = enriched.get("items", [])
+        else:
+            new_id = restaurant_id or f"scraped_{uuid.uuid4().hex[:6]}"
+            matched = {
+                "restaurant_id": new_id,
+                "name": name,
+                "lat": float(data.get("lat") or 25.0338),
+                "lng": float(data.get("lng") or 121.5645),
+                "address": address or "台灣",
+                "phone": "",
+                "open_hours": ["11:00-21:00"],
+                "tags": ["實體菜單辨識", "AI標記"],
+                "price_level": 2,
+                "items": enriched.get("items", [])
+            }
+            RESTAURANT_CATALOG.append(matched)
+    elif not matched:
         # 2. 本地不存在 ➔ 呼叫爬蟲與 Gemini 即時分析
         print(f"[Scraper] 即時線上擷取並生成 {name} 的菜單")
         enriched = enrich_restaurant_with_gemini(name, address or "台灣", "")

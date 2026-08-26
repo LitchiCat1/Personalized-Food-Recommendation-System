@@ -139,16 +139,76 @@ def generate_fallback_menu(restaurant_name: str) -> list[dict]:
 
 
 
+def validate_and_balance_nutrition(item: dict) -> dict:
+    """
+    Validates and balances nutrient numbers so that:
+    Calories roughly equals (Protein*4 + Carbs*4 + Fat*9).
+    Also ensures sugar <= carbs, saturated_fat <= fat, etc.
+    """
+    calories = float(item.get("calories", 0) or 0)
+    protein = float(item.get("protein", 0) or 0)
+    carbs = float(item.get("carbs", 0) or 0)
+    fat = float(item.get("fat", 0) or 0)
+    
+    # Check physical calorie consistency (1g P=4, 1g C=4, 1g F=9)
+    calculated_calories = protein * 4.0 + carbs * 4.0 + fat * 9.0
+    if calories > 0 and abs(calculated_calories - calories) > 80:
+        if fat * 9.0 > calories:
+            fat = max(0.0, round((calories - protein * 4.0 - carbs * 4.0) / 9.0, 1))
+        else:
+            calories = round(calculated_calories)
+    elif calories <= 0 and calculated_calories > 0:
+        calories = round(calculated_calories)
+            
+    sugar = float(item.get("sugar", 0) or 0)
+    if sugar > carbs and carbs > 0:
+        sugar = round(carbs * 0.4, 1)
+        
+    saturated_fat = float(item.get("saturated_fat", 0) or 0)
+    if saturated_fat > fat and fat > 0:
+        saturated_fat = round(fat * 0.35, 1)
+        
+    trans_fat = float(item.get("trans_fat", 0) or 0)
+    if trans_fat > fat:
+        trans_fat = 0.0
+        
+    fiber = float(item.get("fiber", 0) or 0)
+    if fiber == 0:
+        name = item.get("name", "")
+        if any(k in name for k in ["蔬菜", "青菜", "沙拉", "菇", "海帶"]):
+            fiber = 3.5
+        elif any(k in name for k in ["飯", "麵", "吐司", "漢堡", "燕麥", "水果"]):
+            fiber = 2.0
+        elif any(k in name for k in ["豆漿", "豆腐", "豆乾"]):
+            fiber = 1.5
+        else:
+            fiber = 0.5
+
+    item["calories"] = round(calories)
+    item["protein"] = round(protein, 1)
+    item["carbs"] = round(carbs, 1)
+    item["fat"] = round(fat, 1)
+    item["sugar"] = round(sugar, 1)
+    item["saturated_fat"] = round(saturated_fat, 1)
+    item["trans_fat"] = round(trans_fat, 1)
+    item["fiber"] = round(fiber, 1)
+    item["sodium"] = round(float(item.get("sodium", 0) or 0))
+    item["calcium"] = round(float(item.get("calcium", 0) or 0))
+    item["iron"] = round(float(item.get("iron", 0) or 0), 1)
+    item["is_fried"] = item.get("is_fried", False) or any(k in item.get("name", "") for k in ["炸", "脆", "酥"])
+    return item
+
+
 def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_text: str = "") -> dict:
     keys = get_gemini_api_keys()
     if not keys:
         print("[!] No Gemini API key found for scraper - using realistic templates")
-        return {"items": generate_fallback_menu(restaurant_name)}
+        fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
+        return {"items": fallback_items}
     
-    gemini_key = keys[0]
     prompt = f"""
     你是一位台灣經驗豐富的臨床膳食評估師與營養師。
-    請根據這家台灣餐廳的名稱與描述，產生該餐廳最經典常見的 4~6 道餐點，並為每道餐點估算熱量、蛋白質、碳水化合物、脂肪、鈉含量、GI值與過敏原：
+    請根據這家台灣餐廳的名稱與描述，產生該餐廳最經典常見的 4~6 道餐點，並為每道餐點精準估算 11 項營養指標（需符合 1g蛋白質=4kcal, 1g碳水=4kcal, 1g脂肪=9kcal 熱量平衡公式）：
 
     餐廳名稱：{restaurant_name}
     餐廳地址：{address}
@@ -165,35 +225,126 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
           "protein": 32.0,
           "carbs": 45.0,
           "fat": 14.0,
+          "sugar": 2.0,
+          "saturated_fat": 3.5,
+          "trans_fat": 0.0,
+          "fiber": 3.0,
           "sodium": 420,
+          "calcium": 60,
+          "iron": 1.8,
+          "is_fried": false,
           "gi": "low",
           "allergens": [],
-          "tags": ["高蛋白", "低GI"],
-          "can_customize": true,
-          "customization_tips": ["醬料另外放"]
+          "tags": ["高蛋白", "低GI"]
         }}
       ]
     }}
     """
-    candidate_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
-    for model_name in candidate_models:
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"response_mime_type": "application/json"}
-            }
-            res = requests.post(url, json=payload, timeout=20)
-            if res.status_code == 200:
-                parsed_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
-                items = extract_json_block(parsed_text).get("items", [])
-                if items:
-                    print(f"[Scraper] Successfully generated menu using model: {model_name}")
-                    return {"items": items}
-            else:
-                print(f"[!] Model {model_name} returned status code {res.status_code}, trying next model...")
-        except Exception as e:
-            print(f"[!] Gemini Model {model_name} error: {e}")
+    candidate_models = ["gemini-2.5-flash", "gemini-2.5-pro"]
+    for gemini_key in keys:
+        for model_name in candidate_models:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
+                payload = {
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"response_mime_type": "application/json"}
+                }
+                res = requests.post(url, json=payload, timeout=20)
+                if res.status_code == 200:
+                    parsed_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    items = extract_json_block(parsed_text).get("items", [])
+                    if items:
+                        print(f"[Scraper] Successfully generated menu using key {gemini_key[:8]}... model: {model_name}")
+                        balanced_items = [validate_and_balance_nutrition(item) for item in items]
+                        return {"items": balanced_items}
+                else:
+                    print(f"[!] Key {gemini_key[:8]}... model {model_name} status {res.status_code}, trying next key/model...")
+            except Exception as e:
+                print(f"[!] Gemini Model {model_name} error: {e}")
     
-    return {"items": generate_fallback_menu(restaurant_name)}
+    fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
+    return {"items": fallback_items}
+
+
+def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐廳") -> dict:
+    """Uses Gemini Vision API to OCR and parse a menu photo Base64 into structured items with nutrition estimates."""
+    if not image_base64:
+        return {"items": []}
+    
+    if "base64," in image_base64:
+        image_base64 = image_base64.split("base64,")[1]
+    image_base64 = image_base64.strip()
+    
+    keys = get_gemini_api_keys()
+    if not keys:
+        print("[!] No Gemini API key found for menu image parsing")
+        fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
+        return {"items": fallback_items}
+    
+    prompt = f"""
+    你是一位台灣經驗豐富的臨床膳食評估師與營養師。
+    請識別這張「{restaurant_name}」實體菜單照片中的餐點名稱與價格，並為每道餐點精準估算 11 項營養指標（需符合 1g蛋白質=4kcal, 1g碳水=4kcal, 1g脂肪=9kcal 熱量物理算式）：
+
+    請輸出合法 JSON 格式（不要包含任何 markdown codeblock 或文字說明）：
+    {{
+      "items": [
+        {{
+          "item_id": "m_001",
+          "name": "餐點名稱",
+          "price": 120,
+          "calories": 480,
+          "protein": 32.0,
+          "carbs": 45.0,
+          "fat": 14.0,
+          "sugar": 2.0,
+          "saturated_fat": 3.5,
+          "trans_fat": 0.0,
+          "fiber": 3.0,
+          "sodium": 420,
+          "calcium": 60,
+          "iron": 1.8,
+          "is_fried": false,
+          "gi": "low",
+          "allergens": [],
+          "tags": ["高蛋白", "低GI"]
+        }}
+      ]
+    }}
+    """
+    candidate_models = ["gemini-2.5-flash", "gemini-2.5-pro"]
+    for gemini_key in keys:
+        for model_name in candidate_models:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
+                payload = {
+                    "contents": [
+                        {
+                            "parts": [
+                                {"text": prompt},
+                                {
+                                    "inlineData": {
+                                        "mimeType": "image/jpeg",
+                                        "data": image_base64
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    "generationConfig": {"response_mime_type": "application/json"}
+                }
+                res = requests.post(url, json=payload, timeout=25)
+                if res.status_code == 200:
+                    parsed_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    items = extract_json_block(parsed_text).get("items", [])
+                    if items:
+                        print(f"[Scraper] Successfully parsed menu photo using key {gemini_key[:8]}... model: {model_name}")
+                        balanced_items = [validate_and_balance_nutrition(item) for item in items]
+                        return {"items": balanced_items}
+                else:
+                    print(f"[!] Key {gemini_key[:8]}... Vision model {model_name} status {res.status_code}, trying next key/model...")
+            except Exception as e:
+                print(f"[!] Gemini Vision error with model {model_name}: {e}")
+    
+    fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
+    return {"items": fallback_items}
 

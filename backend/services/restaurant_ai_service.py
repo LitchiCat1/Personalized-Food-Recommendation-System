@@ -68,15 +68,58 @@ def normalize_restaurant_summary(parsed: dict, budget: int) -> dict:
     likely_foods = [str(item).strip() for item in (parsed.get("likely_foods") or []) if str(item).strip()]
     health_tips = [str(item).strip() for item in (parsed.get("health_tips") or []) if str(item).strip()]
     recommended_foods = []
+    
+    from services.robust_restaurant_scraper_service import validate_and_balance_nutrition
+
     for item in parsed.get("recommended_foods") or []:
         if isinstance(item, dict):
             name = str(item.get("name") or "").strip()
             reason = str(item.get("reason") or "").strip()
+            calories = float(item.get("calories", 0) or 0)
+            protein = float(item.get("protein", 0) or 0)
+            carbs = float(item.get("carbs", 0) or 0)
+            fat = float(item.get("fat", 0) or 0)
+            sodium = float(item.get("sodium", 0) or 0)
         else:
             name = str(item or "").strip()
             reason = ""
+            calories = protein = carbs = fat = sodium = 0
+            
         if name:
-            recommended_foods.append({"name": name[:50], "reason": reason[:160]})
+            # If nutrients were not provided by LLM, estimate realistic values based on food name keywords
+            if calories <= 0:
+                if any(k in name for k in ["蔬菜", "沙拉", "青菜"]):
+                    calories, protein, carbs, fat, sodium = 120, 3, 10, 8, 300
+                elif any(k in name for k in ["湯", "貢丸"]):
+                    calories, protein, carbs, fat, sodium = 180, 8, 12, 10, 500
+                elif any(k in name for k in ["豆漿", "牛奶", "拿鐵"]):
+                    calories, protein, carbs, fat, sodium = 160, 10, 18, 5, 120
+                elif any(k in name for k in ["吐司", "三明治", "麵包"]):
+                    calories, protein, carbs, fat, sodium = 320, 14, 42, 11, 480
+                elif any(k in name for k in ["麵", "飯", "便當"]):
+                    calories, protein, carbs, fat, sodium = 550, 24, 75, 16, 750
+                elif any(k in name for k in ["蛋", "豆腐"]):
+                    calories, protein, carbs, fat, sodium = 90, 7, 2, 6, 180
+                else:
+                    calories, protein, carbs, fat, sodium = 300, 15, 38, 9, 450
+
+            item_obj = {
+                "name": name[:50],
+                "reason": reason[:160],
+                "calories": calories,
+                "protein": protein,
+                "carbs": carbs,
+                "fat": fat,
+                "sodium": sodium,
+                "sugar": float(item.get("sugar", 0) or 0) if isinstance(item, dict) else 0,
+                "saturated_fat": float(item.get("saturated_fat", 0) or 0) if isinstance(item, dict) else 0,
+                "trans_fat": float(item.get("trans_fat", 0) or 0) if isinstance(item, dict) else 0,
+                "fiber": float(item.get("fiber", 0) or 0) if isinstance(item, dict) else 0,
+                "calcium": float(item.get("calcium", 0) or 0) if isinstance(item, dict) else 0,
+                "iron": float(item.get("iron", 0) or 0) if isinstance(item, dict) else 0,
+            }
+            item_obj = validate_and_balance_nutrition(item_obj)
+            recommended_foods.append(item_obj)
 
     if max_price and max_price <= budget:
         budget_fit = "適合"

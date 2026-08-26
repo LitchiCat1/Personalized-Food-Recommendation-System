@@ -486,7 +486,7 @@ export async function fetchRestaurantAiSummary(
 
 export async function fetchRestaurantDetailedMenu(
   apiBaseUrl: string,
-  params: { restaurant_id: string; name: string; address?: string; budget?: number; user_id?: string; lat?: number; lng?: number },
+  params: { restaurant_id: string; name: string; address?: string; budget?: number; user_id?: string; lat?: number; lng?: number; menu_image?: string },
   auth?: ApiAuth
 ): Promise<{ restaurant_id: string; name: string; recommended_items: HealthyFoodRecommendation[]; filtered_items: any[] }> {
   const resp = await fetch(`${apiBaseUrl}/restaurant/menu`, {

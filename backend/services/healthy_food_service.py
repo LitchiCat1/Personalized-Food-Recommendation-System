@@ -113,18 +113,18 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
             reasons = [f"超出預算 {budget} 元"] if item["price"] > budget else []
             reasons.extend(medical_risk["block_reasons"])
 
-            # Temporarily disabled restrictions for local development testing
-            if False and reasons:
+            if reasons:
                 filtered_item = {
                     "restaurant_id": restaurant["restaurant_id"],
                     "restaurant_name": restaurant["name"],
                     "item_name": item["name"],
                     "reasons": reasons,
+                    "price": item.get("price", 0),
+                    "medical_risk": medical_risk,
                 }
                 filtered_out.append(filtered_item)
                 restaurant_filtered_items.append(filtered_item)
                 continue
-
 
             budget_score = max(0, 30 - abs(budget - item["price"]))
             distance_score = max(0, 25 - int(distance_km * 6))
@@ -218,6 +218,19 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                 reasons = [f"超出預算 {budget} 元"] if item["price"] > budget else []
                 reasons.extend(medical_risk["block_reasons"])
 
+                if reasons:
+                    filtered_item = {
+                        "restaurant_id": restaurant["restaurant_id"],
+                        "restaurant_name": restaurant["name"],
+                        "item_name": item["name"],
+                        "reasons": reasons,
+                        "price": item.get("price", 0),
+                        "medical_risk": medical_risk,
+                    }
+                    filtered_out.append(filtered_item)
+                    restaurant_filtered_items.append(filtered_item)
+                    continue
+
                 recommended_item = {
                     "restaurant_id": restaurant["restaurant_id"],
                     "restaurant_name": restaurant["name"],
@@ -235,8 +248,8 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                     "fat": item["fat"],
                     "sodium": item["sodium"],
                     "gi": item.get("gi"),
-                    "match_score": 80 if reasons else 95,
-                    "reasons": reasons if reasons else ["營養與安全條件相符"],
+                    "match_score": 95,
+                    "reasons": ["營養與安全條件相符"],
                     "medical_risk": medical_risk,
                 }
                 recommendations.append(recommended_item)

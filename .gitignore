@@ -1,0 +1,39 @@
+# Python
+**/.venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Supabase CLI
+supabase/.temp/
+
+# IDE
+.vscode/
+.idea/
+
+# Codex internal
+.agents/
+.opencode/
+tmp/
+task_plan.md
+findings.md
+progress.md
+skills-lock.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env*.local
+
+# TFDA
+backend/tfda_data/20_5.json

@@ -1,0 +1,146 @@
+{
+  "diabetes": {
+    "id": "diabetes",
+    "label_zh": "糖尿病 / 血糖管理",
+    "aliases": ["糖尿病", "血糖管理", "diabetes"],
+    "category": "metabolic",
+    "description": "優先提醒高 GI、單餐碳水過高與含糖飲品，協助穩定餐後血糖。",
+    "screening_focus": ["glycemic_load", "carbohydrate", "added_sugar"],
+    "blocked_gi": ["high"],
+    "max_carbs_per_meal": 60,
+    "caution_carbs_per_meal": 45,
+    "risk_nutrients": {
+      "carbs": { "caution": 45, "block": 60, "unit": "g", "label_zh": "碳水化合物" },
+      "sugar": { "caution": 15, "block": 25, "unit": "g", "label_zh": "糖" }
+    },
+    "severity_options": ["monitoring", "strict"],
+    "rule_version": "2026.06.1",
+    "review_status": "guideline_screening",
+    "last_reviewed": "2026-06-18",
+    "reviewed_by": "project-team",
+    "evidence_level": "public-health-guideline-derived",
+    "references": [
+      {
+        "title": "CDC - Diabetes Meal Planning",
+        "url": "https://www.cdc.gov/diabetes/healthy-eating/index.html"
+      },
+      {
+        "title": "Health Promotion Administration, Taiwan",
+        "url": "https://www.hpa.gov.tw/"
+      }
+    ],
+    "medical_disclaimer": "血糖管理需要依個人用藥、檢驗值與營養師建議調整，本系統僅提供餐點篩選提醒。"
+  },
+  "hypertension": {
+    "id": "hypertension",
+    "label_zh": "高血壓 / 鈉控制",
+    "aliases": ["高血壓", "鈉控制", "hypertension"],
+    "category": "cardiovascular",
+    "description": "優先提醒單餐鈉含量與加工高鈉食物，降低整日鈉攝取超標風險。",
+    "screening_focus": ["sodium", "processed_food"],
+    "max_sodium_per_meal": 600,
+    "caution_sodium_per_meal": 450,
+    "risk_nutrients": {
+      "sodium": { "caution": 450, "block": 600, "unit": "mg", "label_zh": "鈉" }
+    },
+    "severity_options": ["monitoring", "strict"],
+    "rule_version": "2026.06.1",
+    "review_status": "guideline_screening",
+    "last_reviewed": "2026-06-18",
+    "reviewed_by": "project-team",
+    "evidence_level": "public-health-guideline-derived",
+    "references": [
+      {
+        "title": "American Heart Association - How much sodium should I eat per day?",
+        "url": "https://www.heart.org/en/healthy-living/healthy-eating/eat-smart/sodium/how-much-sodium-should-i-eat-per-day"
+      },
+      {
+        "title": "Health Promotion Administration, Taiwan",
+        "url": "https://www.hpa.gov.tw/"
+      }
+    ],
+    "medical_disclaimer": "鈉攝取目標需依血壓、腎功能與醫囑調整，本系統僅提供健康管理提醒。"
+  },
+  "kidney_disease": {
+    "id": "kidney_disease",
+    "label_zh": "慢性腎臟病 / 腎臟照護",
+    "aliases": ["慢性腎臟病", "腎臟病", "腎臟照護", "kidney", "ckd"],
+    "category": "renal",
+    "description": "提醒鈉、蛋白質與高磷高鉀食物風險；實際限制需依 CKD 分期與抽血數值設定。",
+    "screening_focus": ["sodium", "protein", "phosphorus", "potassium"],
+    "max_sodium_per_meal": 600,
+    "caution_sodium_per_meal": 450,
+    "max_protein_per_meal": 40,
+    "caution_protein_per_meal": 30,
+    "risk_nutrients": {
+      "sodium": { "caution": 450, "block": 600, "unit": "mg", "label_zh": "鈉" },
+      "protein": { "caution": 30, "block": 40, "unit": "g", "label_zh": "蛋白質" }
+    },
+    "severity_options": ["stage_unknown", "strict"],
+    "rule_version": "2026.06.1",
+    "review_status": "requires_clinical_personalization",
+    "last_reviewed": "2026-06-18",
+    "reviewed_by": "project-team",
+    "evidence_level": "screening-rule-only",
+    "references": [
+      {
+        "title": "National Kidney Foundation - Nutrition and Kidney Disease",
+        "url": "https://www.kidney.org/kidney-topics/nutrition-and-kidney-disease-stages-1-5-not-dialysis"
+      }
+    ],
+    "medical_disclaimer": "腎臟病飲食需依分期、鉀磷血液數值與醫囑調整，本系統不提供個人化治療建議。"
+  },
+  "gout": {
+    "id": "gout",
+    "label_zh": "痛風 / 尿酸管理",
+    "aliases": ["痛風", "高尿酸", "尿酸管理", "gout"],
+    "category": "metabolic",
+    "description": "提醒高普林食物、酒精與含糖飲品；目前以食物標籤與品項名稱做篩選。",
+    "screening_focus": ["purine", "alcohol", "sugar"],
+    "blocked_labels": ["beer", "organ meat", "anchovy", "sardine"],
+    "blocked_keywords": ["啤酒", "內臟", "沙丁魚", "小魚乾", "濃肉湯"],
+    "risk_nutrients": {
+      "sugar": { "caution": 15, "block": 25, "unit": "g", "label_zh": "糖" }
+    },
+    "severity_options": ["monitoring", "strict"],
+    "rule_version": "2026.06.1",
+    "review_status": "screening_rule",
+    "last_reviewed": "2026-06-18",
+    "reviewed_by": "project-team",
+    "evidence_level": "screening-rule-only",
+    "references": [
+      {
+        "title": "Health Promotion Administration, Taiwan",
+        "url": "https://www.hpa.gov.tw/"
+      }
+    ],
+    "medical_disclaimer": "痛風與尿酸控制需搭配藥物、檢驗值與醫療建議，本系統僅提示可能高風險食物。"
+  },
+  "hyperlipidemia": {
+    "id": "hyperlipidemia",
+    "label_zh": "高血脂 / 脂質管理",
+    "aliases": ["高血脂", "膽固醇", "脂質管理", "hyperlipidemia"],
+    "category": "cardiovascular",
+    "description": "提醒單餐脂肪過高與油炸加工食物，作為心血管飲食管理輔助。",
+    "screening_focus": ["fat", "saturated_fat", "fried_food"],
+    "max_fat_per_meal": 25,
+    "caution_fat_per_meal": 18,
+    "blocked_keywords": ["油炸", "炸雞", "薯條", "奶油"],
+    "risk_nutrients": {
+      "fat": { "caution": 18, "block": 25, "unit": "g", "label_zh": "脂肪" }
+    },
+    "severity_options": ["monitoring", "strict"],
+    "rule_version": "2026.06.1",
+    "review_status": "guideline_screening",
+    "last_reviewed": "2026-06-18",
+    "reviewed_by": "project-team",
+    "evidence_level": "public-health-guideline-derived",
+    "references": [
+      {
+        "title": "Health Promotion Administration, Taiwan",
+        "url": "https://www.hpa.gov.tw/"
+      }
+    ],
+    "medical_disclaimer": "血脂管理需依血液檢查與醫療建議調整，本系統僅提供餐點風險提醒。"
+  }
+}

@@ -5,18 +5,19 @@
 
 // ─── Dashboard ──────────────────────────────────────────────
 export const DAILY_NUTRITION = {
-  calories: { current: 1450, target: 2100, unit: 'kcal' },
-  protein: { current: 85, target: 130, unit: 'g', color: '#60A5FA', label: '蛋白質' },
-  carbs: { current: 160, target: 250, unit: 'g', color: '#FB923C', label: '總碳水化合物' },
-  sugar: { current: 12, target: 25, unit: 'g', color: '#F59E0B', label: '精緻糖' },
-  fat: { current: 42, target: 70, unit: 'g', color: '#A78BFA', label: '總脂肪' },
-  saturated_fat: { current: 8, target: 20, unit: 'g', color: '#8B5CF6', label: '飽和脂肪' },
+  // All current values start at 0; backend sync will populate them
+  calories: { current: 0, target: 2100, unit: 'kcal' },
+  protein: { current: 0, target: 130, unit: 'g', color: '#60A5FA', label: '蛋白質' },
+  carbs: { current: 0, target: 250, unit: 'g', color: '#FB923C', label: '總碳水化合物' },
+  sugar: { current: 0, target: 25, unit: 'g', color: '#F59E0B', label: '精緻糖' },
+  fat: { current: 0, target: 70, unit: 'g', color: '#A78BFA', label: '總脂肪' },
+  saturated_fat: { current: 0, target: 20, unit: 'g', color: '#8B5CF6', label: '飽和脂肪' },
   trans_fat: { current: 0, target: 0, unit: 'g', color: '#EF4444', label: '反式脂肪' },
   // PRD: 鈉含量、纖維素追蹤 (高血壓/腎臟病患者需要)
-  sodium: { current: 1800, target: 2000, unit: 'mg', color: '#F472B6', label: '鈉 (Sodium)' },
-  fiber: { current: 18, target: 25, unit: 'g', color: '#4ADE80', label: '膳食纖維' },
-  calcium: { current: 280, target: 1000, unit: 'mg', color: '#10B981', label: '鈣 (Calcium)' },
-  iron: { current: 4.5, target: 15, unit: 'mg', color: '#EC4899', label: '鐵 (Iron)' },
+  sodium: { current: 0, target: 2000, unit: 'mg', color: '#F472B6', label: '鈉 (Sodium)' },
+  fiber: { current: 0, target: 25, unit: 'g', color: '#4ADE80', label: '膳食纖維' },
+  calcium: { current: 0, target: 1000, unit: 'mg', color: '#10B981', label: '鈣 (Calcium)' },
+  iron: { current: 0, target: 15, unit: 'mg', color: '#EC4899', label: '鐵 (Iron)' },
 };
 
 export type MealEntry = {
@@ -41,61 +42,8 @@ export type MealEntry = {
   warnings?: string[];
 };
 
-export const TODAY_MEALS: MealEntry[] = [
-  {
-    id: '1',
-    name: '燕麥優格碗',
-    calories: 380,
-    time: '08:15',
-    mealType: '早餐',
-    emoji: '🥣',
-    protein: 15,
-    carbs: 52,
-    fat: 12,
-    sodium: 180,
-    fiber: 6,
-  },
-  {
-    id: '2',
-    name: '雞胸肉沙拉',
-    calories: 420,
-    time: '12:30',
-    mealType: '午餐',
-    emoji: '🥗',
-    protein: 38,
-    carbs: 28,
-    fat: 14,
-    sodium: 520,
-    fiber: 5,
-  },
-  {
-    id: '3',
-    name: '香蕉蛋白奶昔',
-    calories: 280,
-    time: '15:00',
-    mealType: '點心',
-    emoji: '🥤',
-    protein: 22,
-    carbs: 35,
-    fat: 6,
-    sodium: 120,
-    fiber: 3,
-  },
-  {
-    id: '4',
-    name: '鮭魚飯糰套餐',
-    calories: 520,
-    time: '18:45',
-    mealType: '晚餐',
-    emoji: '🍱',
-    protein: 32,
-    carbs: 58,
-    fat: 16,
-    sodium: 980,
-    fiber: 4,
-    warnings: ['高鈉'],
-  },
-];
+// Start with empty meals — backend sync fills this on focus
+export const TODAY_MEALS: MealEntry[] = [];
 
 // PRD: 預警機制 — 超量攝取/禁忌食物即時警示
 export type HealthAlert = {
@@ -106,22 +54,8 @@ export type HealthAlert = {
   icon: string;
 };
 
-export const HEALTH_ALERTS: HealthAlert[] = [
-  {
-    id: '1',
-    type: 'warning',
-    title: '鈉含量接近上限',
-    message: '今日鈉攝取已達 1,800mg（上限 2,000mg），建議晚餐選擇低鈉餐點。',
-    icon: '⚠️',
-  },
-  {
-    id: '2',
-    type: 'info',
-    title: '蛋白質攝取良好',
-    message: '已達每日目標的 65%，繼續保持均衡攝取。',
-    icon: '💪',
-  },
-];
+// Start with empty alerts — backend sync fills this on focus
+export const HEALTH_ALERTS: HealthAlert[] = [];
 
 // ─── Scanner ────────────────────────────────────────────────
 export const SCANNER_PLACEHOLDER_RESULT = {

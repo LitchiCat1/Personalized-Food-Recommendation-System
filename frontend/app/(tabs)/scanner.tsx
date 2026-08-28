@@ -44,7 +44,7 @@ import {
   type RecordSource,
 } from '@/lib/recordSyncQueue';
 
-type ScanMode = 'camera' | 'gallery' | 'label' | 'manual';
+type ScanMode = 'camera' | 'gallery' | 'label' | 'manual' | 'menu';
 
 type RecordFeedback = {
   tone: 'success' | 'error';
@@ -61,6 +61,7 @@ const SCAN_MODE_OPTIONS = [
   { value: 'camera', label: '拍照' },
   { value: 'gallery', label: '相簿' },
   { value: 'label', label: '營養標示' },
+  { value: 'menu', label: '菜單' },
   { value: 'manual', label: '手動搜尋' },
 ];
 
@@ -663,6 +664,22 @@ export default function ScannerScreen() {
     return normalizedDraft;
   };
 
+  const handleMenuPhotoUpload = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      base64: true,
+      quality: 0.8,
+    });
+
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (asset.base64) {
+      await analyzeImage(asset.base64);
+      return;
+    }
+    Alert.alert('圖片無法讀取', '請改選另一張圖片');
+  };
+
   if (isCameraActive) {
     return (
       <ScannerCameraView
@@ -690,6 +707,7 @@ export default function ScannerScreen() {
     camera: { icon: 'camera-outline' as const, title: '拍攝完整餐盤', hint: '保持光線充足並避免遮擋，拍攝後會立即送出 AI 分析。', action: '啟動相機', onPress: handleCamera },
     gallery: { icon: 'images-outline' as const, title: '從相簿選擇餐點', hint: '可使用已拍攝的餐點照片，不需要重新開啟相機。', action: '選擇餐點照片', onPress: handleGallery },
     label: { icon: 'document-text-outline' as const, title: '辨識包裝營養標示', hint: '選擇清晰的營養標示照片，可建立自訂食品或直接加入紀錄。', action: ocrQuerying ? '辨識中' : '選擇標示照片', onPress: handleLabelOCRFromGallery },
+    menu: { icon: 'receipt-outline' as const, title: '上傳菜單照片', hint: '拍攝實體菜單後上傳，AI 會自動辨識菜點食物名稱與營養資訊供决策參考。', action: '選擇菜單照片', onPress: handleMenuPhotoUpload },
     manual: { icon: 'search-outline' as const, title: '從食品資料庫搜尋', hint: '辨識結果不確定時，可直接從 TFDA 與自訂食品中補上餐點。', action: '', onPress: handleManualSearch },
   }[scanMode];
 
@@ -765,6 +783,15 @@ export default function ScannerScreen() {
       </View>
       {scanMode === 'manual' ? (
         <ScannerManualTools rs={rs} manualQuery={manualQuery} onManualQueryChange={setManualQuery} manualSearching={manualSearching} onManualSearch={handleManualSearch} ocrQuerying={ocrQuerying} onOCRSearch={handleLabelOCRFromGallery} rejectedDetections={rejectedDetections} />
+      ) : null}
+      {scanMode === 'menu' ? (
+        <View style={styles.conditionSummary}>
+          <Ionicons name="information-circle-outline" size={18} color={Palette.accent.blue} />
+          <View style={styles.conditionCopy}>
+            <Text style={styles.conditionTitle}>菜單辨識模式</Text>
+            <Text style={styles.conditionText}>上傳實體菜單照片，AI 會辨識可見食物名稱。較大字體、少遠景的清晰照片效果最佳。</Text>
+          </View>
+        </View>
       ) : null}
     </>
   );

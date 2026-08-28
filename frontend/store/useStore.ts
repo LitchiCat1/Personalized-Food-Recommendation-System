@@ -65,6 +65,7 @@ export interface NutriLensState {
   invalidateDietaryRecords: () => void;
   addMealFromScan: (detections: DetectedFood[]) => void;
   replaceDashboardFromRecords: (records: DietaryRecord[]) => void;
+  applyNutritionTargets: (targets: Partial<Record<string, number>>) => void;
   resetDashboard: () => void;
 
   // Scanner
@@ -172,6 +173,20 @@ export const useStore = create<NutriLensState>((set, get) => ({
   healthAlerts: [...HEALTH_ALERTS],
   dietaryRecordsRevision: 0,
   invalidateDietaryRecords: () => set((state) => ({ dietaryRecordsRevision: state.dietaryRecordsRevision + 1 })),
+
+  applyNutritionTargets: (targets) =>
+    set((state) => {
+      const nutrition = { ...state.dailyNutrition };
+      (Object.keys(targets) as string[]).forEach((key) => {
+        const value = targets[key];
+        if (value === undefined || value === null) return;
+        const nutrientKey = key as keyof typeof nutrition;
+        if (nutrientKey in nutrition) {
+          (nutrition as any)[nutrientKey] = { ...(nutrition as any)[nutrientKey], target: value };
+        }
+      });
+      return { dailyNutrition: nutrition };
+    }),
 
   resetDashboard: () =>
     set((state) => ({

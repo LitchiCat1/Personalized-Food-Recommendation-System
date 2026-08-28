@@ -522,6 +522,17 @@ def get_history(user_id):
     return jsonify(build_history_response(storage, user_id, days))
 
 
+@app.route("/user/<user_id>/nutrition-progress", methods=["GET"])
+def get_nutrition_progress(user_id):
+    """Return today's nutrition progress with disease-adjusted targets."""
+    require_user_access(user_id)
+    user = storage.get_user(user_id)
+    if not user:
+        return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
+    progress = build_daily_nutrition_progress(storage, user_id, user)
+    return jsonify(progress)
+
+
 @app.route("/healthy-food-recommend/<user_id>", methods=["GET"])
 def healthy_food_recommend(user_id):
     require_user_access(user_id)

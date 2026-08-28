@@ -484,6 +484,42 @@ export async function fetchRestaurantAiSummary(
   return parseJson<RestaurantAiSummaryResponse>(resp);
 }
 
+export type NutritionProgressTargets = {
+  calories: number;
+  protein: number;
+  carbs: number;
+  sugar: number;
+  fat: number;
+  saturated_fat: number;
+  trans_fat: number;
+  fiber: number;
+  sodium: number;
+  calcium: number;
+  iron: number;
+};
+
+export type NutritionProgressResponse = {
+  date: string;
+  targets: NutritionProgressTargets;
+  consumed: NutritionProgressTargets;
+  remaining: NutritionProgressTargets;
+  over_by: NutritionProgressTargets;
+  progress_percent: NutritionProgressTargets;
+  goal_type: Record<string, string>;
+  status: Record<string, string>;
+};
+
+export async function fetchNutritionProgress(
+  apiBaseUrl: string,
+  userId: string,
+  auth?: ApiAuth
+): Promise<NutritionProgressResponse> {
+  const resp = await fetch(`${apiBaseUrl}/user/${encodeURIComponent(userId)}/nutrition-progress`, {
+    headers: buildHeaders(auth),
+  });
+  return parseJson<NutritionProgressResponse>(resp);
+}
+
 export async function fetchRestaurantDetailedMenu(
   apiBaseUrl: string,
   params: { restaurant_id: string; name: string; address?: string; budget?: number; user_id?: string; lat?: number; lng?: number },

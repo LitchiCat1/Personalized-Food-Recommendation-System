@@ -14,7 +14,7 @@ import PrimaryButton from '@/components/ui/primary-button';
 import DietaryRecordManager from '@/components/dashboard/DietaryRecordManager';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
-import { fetchMedicalMetadata, fetchRecords, type MedicalConditionRule } from '@/lib/api';
+import { fetchMedicalMetadata, fetchNutritionProgress, fetchRecords, type MedicalConditionRule } from '@/lib/api';
 import { buildNutrientSensitivityMap, type TrackedNutrientKey } from '@/lib/nutrient-sensitivity';
 import { useResponsive } from '@/hooks/useResponsive';
 
@@ -37,7 +37,7 @@ function getLocalDateString(): string {
 
 export default function DashboardScreen() {
   const { isDesktop } = useResponsive();
-  const { dailyNutrition, todayMeals, healthAlerts, apiBaseUrl, accessToken, dietaryRecordsRevision, replaceDashboardFromRecords, user } = useStore();
+  const { dailyNutrition, todayMeals, healthAlerts, apiBaseUrl, accessToken, dietaryRecordsRevision, replaceDashboardFromRecords, applyNutritionTargets, user } = useStore();
   const [syncing, setSyncing] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [conditionRules, setConditionRules] = useState<MedicalConditionRule[]>([]);
@@ -66,22 +66,30 @@ export default function DashboardScreen() {
       setSyncing(true);
       setSyncError(null);
 
-      fetchRecords(apiBaseUrl, user.userId, getLocalDateString(), { accessToken })
+      // Fetch disease-adjusted targets first, then records
+      const targetsPromise = fetchNutritionProgress(apiBaseUrl, user.userId, { accessToken })
+        .then((progress) => {
+          if (!cancelled) applyNutritionTargets(progress.targets);
+        })
+        .catch(() => { /* silently degrade — static targets remain */ });
+
+      const recordsPromise = fetchRecords(apiBaseUrl, user.userId, getLocalDateString(), { accessToken })
         .then((data) => {
           if (cancelled || requestRevision !== useStore.getState().dietaryRecordsRevision) return;
           replaceDashboardFromRecords(data.records || []);
         })
         .catch((err: Error) => {
           if (!cancelled) setSyncError(err.message);
-        })
-        .finally(() => {
-          if (!cancelled) setSyncing(false);
         });
+
+      Promise.allSettled([targetsPromise, recordsPromise]).finally(() => {
+        if (!cancelled) setSyncing(false);
+      });
 
       return () => {
         cancelled = true;
       };
-    }, [accessToken, apiBaseUrl, dietaryRecordsRevision, replaceDashboardFromRecords, user.userId])
+    }, [accessToken, apiBaseUrl, applyNutritionTargets, dietaryRecordsRevision, replaceDashboardFromRecords, user.userId])
   );
 
   useEffect(() => {

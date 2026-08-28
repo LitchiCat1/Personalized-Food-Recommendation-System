@@ -1,5 +1,6 @@
-flask
-flask-cors
-pymongo
-requests
-psycopg2-binary
+flask>=3.0,<4
+flask-cors>=5.0,<6
+pymongo>=4.0,<5
+requests>=2.31,<3
+psycopg2-binary>=2.9,<3
+gunicorn>=22.0,<24

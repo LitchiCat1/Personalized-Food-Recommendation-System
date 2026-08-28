@@ -3,6 +3,7 @@ services:
     name: personalized-food-recommendation-frontend
     runtime: static
     repo: https://github.com/LitchiCat1/Personalized-Food-Recommendation-System
+    plan: free
     rootDir: frontend
     branch: v0.0.4
     buildCommand: npm ci && npm run build:web
@@ -12,6 +13,8 @@ services:
         source: /*
         destination: /index.html
     envVars:
+      - key: NODE_VERSION
+        value: "20"
       - key: EXPO_PUBLIC_API_BASE_URL
         value: https://personalized-food-recommendation-system-nq8t.onrender.com
       - key: EXPO_PUBLIC_SUPABASE_URL
@@ -19,6 +22,8 @@ services:
       - key: EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
         sync: false
       - key: GOOGLE_PLACES_API_KEY
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
         sync: false
 
   - type: web
@@ -29,7 +34,7 @@ services:
     rootDir: backend
     branch: v0.0.4
     buildCommand: pip install -r requirements.txt
-    startCommand: python -u app.py
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     envVars:
       - key: GEMINI_API_KEYS
         sync: false

@@ -44,7 +44,7 @@ import {
   type RecordSource,
 } from '@/lib/recordSyncQueue';
 
-type ScanMode = 'camera' | 'gallery' | 'label' | 'manual' | 'menu';
+type ScanMode = 'camera' | 'gallery' | 'label' | 'manual' | 'menu' | 'barcode';
 
 type RecordFeedback = {
   tone: 'success' | 'error';
@@ -62,6 +62,7 @@ const SCAN_MODE_OPTIONS = [
   { value: 'gallery', label: '相簿' },
   { value: 'label', label: '營養標示' },
   { value: 'menu', label: '菜單' },
+  { value: 'barcode', label: '條碼' },
   { value: 'manual', label: '手動搜尋' },
 ];
 
@@ -221,6 +222,8 @@ export default function ScannerScreen() {
     setCameraActive,
     user,
     invalidateDietaryRecords,
+    toggleFavorite,
+    isFavorite,
   } = useStore();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
@@ -703,11 +706,37 @@ export default function ScannerScreen() {
     );
   }
 
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [barcodeQuerying, setBarcodeQuerying] = useState(false);
+
+  const handleBarcodeLookup = async (codeToLookup?: string) => {
+    const code = (codeToLookup || barcodeInput).trim();
+    if (!code) {
+      Alert.alert('請輸入條碼', '請輸入商品包裝上的 EAN/UPC 條碼數字（例如 4710088410107）。');
+      return;
+    }
+    setBarcodeQuerying(true);
+    try {
+      const res = await fetchBarcode(apiBaseUrl, code, { accessToken });
+      if (res.found && res.detection) {
+        setScanResult([res.detection]);
+        Alert.alert('條碼查詢成功', `已找到「${res.detection.foodName}」營養資料！`);
+      } else {
+        Alert.alert('查無資料', res.error || '找不到此條碼，可改用拍攝營養標示或手動搜尋。');
+      }
+    } catch (err: any) {
+      Alert.alert('查詢失敗', err?.message || '條碼查詢服務連線失敗。');
+    } finally {
+      setBarcodeQuerying(false);
+    }
+  };
+
   const modeConfig = {
     camera: { icon: 'camera-outline' as const, title: '拍攝完整餐盤', hint: '保持光線充足並避免遮擋，拍攝後會立即送出 AI 分析。', action: '啟動相機', onPress: handleCamera },
     gallery: { icon: 'images-outline' as const, title: '從相簿選擇餐點', hint: '可使用已拍攝的餐點照片，不需要重新開啟相機。', action: '選擇餐點照片', onPress: handleGallery },
     label: { icon: 'document-text-outline' as const, title: '辨識包裝營養標示', hint: '選擇清晰的營養標示照片，可建立自訂食品或直接加入紀錄。', action: ocrQuerying ? '辨識中' : '選擇標示照片', onPress: handleLabelOCRFromGallery },
     menu: { icon: 'receipt-outline' as const, title: '上傳菜單照片', hint: '拍攝實體菜單後上傳，AI 會自動辨識菜點食物名稱與營養資訊供决策參考。', action: '選擇菜單照片', onPress: handleMenuPhotoUpload },
+    barcode: { icon: 'barcode-outline' as const, title: '國際條碼查詢 (Open Food Facts)', hint: '輸入商品包裝條碼 EAN-13/UPC，自動載入熱量與三大營養素。', action: barcodeQuerying ? '查詢中...' : '查詢條碼', onPress: () => handleBarcodeLookup() },
     manual: { icon: 'search-outline' as const, title: '從食品資料庫搜尋', hint: '辨識結果不確定時，可直接從 TFDA 與自訂食品中補上餐點。', action: '', onPress: handleManualSearch },
   }[scanMode];
 
@@ -748,6 +777,8 @@ export default function ScannerScreen() {
         results={results}
         onAddRecord={handleAddRecord}
         onWeightChange={updateScanFoodWeight}
+        onToggleFavorite={toggleFavorite}
+        isFavorite={isFavorite}
         submitting={cameraRecordSubmitting}
         disabled={recordActionsDisabled}
       />
@@ -790,6 +821,46 @@ export default function ScannerScreen() {
           <View style={styles.conditionCopy}>
             <Text style={styles.conditionTitle}>菜單辨識模式</Text>
             <Text style={styles.conditionText}>上傳實體菜單照片，AI 會辨識可見食物名稱。較大字體、少遠景的清晰照片效果最佳。</Text>
+          </View>
+        </View>
+      ) : null}
+      {scanMode === 'barcode' ? (
+        <View style={[styles.conditionSummary, { flexDirection: 'column', alignItems: 'stretch', gap: Spacing.sm }]}>
+          <Text style={styles.conditionTitle}>輸入包裝商品條碼</Text>
+          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+            <TextInput
+              value={barcodeInput}
+              onChangeText={setBarcodeInput}
+              placeholder="例如: 4710088410107"
+              keyboardType="number-pad"
+              style={{
+                flex: 1,
+                backgroundColor: Palette.bg.card,
+                borderRadius: Radius.md,
+                borderWidth: 1,
+                borderColor: Palette.border.subtle,
+                paddingHorizontal: Spacing.md,
+                paddingVertical: 8,
+                color: Palette.text.primary,
+              }}
+            />
+            <Pressable
+              onPress={() => handleBarcodeLookup()}
+              disabled={barcodeQuerying}
+              style={{
+                backgroundColor: Palette.accent.green,
+                borderRadius: Radius.md,
+                paddingHorizontal: Spacing.lg,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              {barcodeQuerying ? (
+                <ActivityIndicator size="small" color={Palette.text.inverse} />
+              ) : (
+                <Text style={{ ...Typography.bodyBold, color: Palette.text.inverse }}>查詢</Text>
+              )}
+            </Pressable>
           </View>
         </View>
       ) : null}

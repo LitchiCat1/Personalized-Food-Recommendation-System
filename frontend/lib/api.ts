@@ -520,6 +520,39 @@ export async function fetchNutritionProgress(
   return parseJson<NutritionProgressResponse>(resp);
 }
 
+export async function fetchBarcode(
+  apiBaseUrl: string,
+  barcode: string,
+  auth?: ApiAuth
+): Promise<{ found: boolean; barcode: string; detection?: any; error?: string }> {
+  const resp = await fetch(`${apiBaseUrl}/barcode/${encodeURIComponent(barcode)}`, {
+    headers: buildHeaders(auth),
+  });
+  return parseJson<{ found: boolean; barcode: string; detection?: any; error?: string }>(resp);
+}
+
+export type WeeklyReportResponse = {
+  report_available: boolean;
+  message?: string;
+  summary?: string;
+  highlights?: string[];
+  warnings?: string[];
+  suggestions?: string[];
+};
+
+export async function fetchWeeklyReport(
+  apiBaseUrl: string,
+  userId: string,
+  auth?: ApiAuth
+): Promise<WeeklyReportResponse> {
+  const resp = await fetch(`${apiBaseUrl}/weekly-report/${encodeURIComponent(userId)}`, {
+    headers: buildHeaders(auth),
+  });
+  return parseJson<WeeklyReportResponse>(resp);
+}
+
+
+
 export async function fetchRestaurantDetailedMenu(
   apiBaseUrl: string,
   params: { restaurant_id: string; name: string; address?: string; budget?: number; user_id?: string; lat?: number; lng?: number },

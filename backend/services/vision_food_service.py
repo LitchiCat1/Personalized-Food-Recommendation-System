@@ -190,6 +190,7 @@ def build_vision_food_response(
             )
         )
 
+        swap_suggestion = find_swap_suggestion(tfda_db, nutrients, name_zh)
         detections.append(
             {
                 "label": name_zh,
@@ -211,6 +212,7 @@ def build_vision_food_response(
                 "warnings": warnings,
                 "matched_food": matched_food,
                 "alternatives": food_matches[1:5],
+                "swap_suggestion": swap_suggestion,
             }
         )
 
@@ -230,6 +232,44 @@ def build_vision_food_response(
             "requires_user_confirmation": any(item.get("needs_confirmation") for item in detections),
         },
     }
+
+
+def find_swap_suggestion(tfda_db: dict, nutrients: dict, name_zh: str) -> dict | None:
+    """Return a healthier TFDA alternative for high-sodium, fried, or high-GI foods."""
+    sodium_per100 = float(nutrients.get("sodium") or 0)
+    is_fried = nutrients.get("is_fried") is True
+
+    if sodium_per100 < 600 and not is_fried:
+        return None  # no swap needed
+
+    # Determine swap category keyword from food name
+    categories = []
+    if any(kw in name_zh for kw in ["飯", "白飯", "米飯"]):
+        categories = ["糙米", "十穀米", "燕麥"]
+    elif any(kw in name_zh for kw in ["麵", "拉麵", "炒麵"]):
+        categories = ["蒟蒻麵", "蔬菜麵", "冬粉"]
+    elif any(kw in name_zh for kw in ["肉", "豬", "牛", "雞腿"]):
+        categories = ["雞胸肉", "豆腐", "魚"]
+    elif any(kw in name_zh for kw in ["炸", "油炸", "薯條"]):
+        categories = ["烤", "蒸", "水煮"]
+    else:
+        categories = ["蔬菜", "沙拉", "豆腐"]
+
+    for keyword in categories:
+        for key, food in list(tfda_db.items())[:3000]:
+            fname = food.get("name_zh", "")
+            if keyword in fname:
+                food_sodium = float(food.get("sodium") or 0)
+                food_fried = bool(food.get("is_fried"))
+                if food_sodium < sodium_per100 * 0.7 and not food_fried:
+                    return {
+                        "name": fname,
+                        "reason": f"鈉含量較低（{round(food_sodium)}mg），{'' if not is_fried else '且非油炸'}建議替換",
+                        "calories": food.get("calories"),
+                        "sodium": round(food_sodium),
+                        "protein": food.get("protein"),
+                    }
+    return None
 
 
 def find_food_matches(storage, tfda_db, search_terms: list[str], user_id: str | None, build_custom_food_search_result) -> list[dict]:

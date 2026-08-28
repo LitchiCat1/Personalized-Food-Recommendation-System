@@ -82,6 +82,15 @@ export interface NutriLensState {
   // Backend API base URL
   apiBaseUrl: string;
   setApiBaseUrl: (url: string) => void;
+
+  // Favorites (food keys for quick-add)
+  favorites: string[];
+  toggleFavorite: (foodKey: string) => void;
+  isFavorite: (foodKey: string) => boolean;
+
+  // Medications (for drug-food interaction warnings)
+  medications: string[];
+  toggleMedication: (med: string) => void;
 }
 
 // ─── BMR/TDEE computation ───────────────────────────────────
@@ -383,6 +392,25 @@ export const useStore = create<NutriLensState>((set, get) => ({
   // ── API ──
   apiBaseUrl: resolveApiBaseUrl(),
   setApiBaseUrl: (url) => set({ apiBaseUrl: url }),
+
+  // ── Favorites ──
+  favorites: [],
+  toggleFavorite: (foodKey) =>
+    set((state) => ({
+      favorites: state.favorites.includes(foodKey)
+        ? state.favorites.filter((k) => k !== foodKey)
+        : [foodKey, ...state.favorites].slice(0, 20),
+    })),
+  isFavorite: (foodKey) => get().favorites.includes(foodKey),
+
+  // ── Medications ──
+  medications: [],
+  toggleMedication: (med) =>
+    set((state) => ({
+      medications: state.medications.includes(med)
+        ? state.medications.filter((m) => m !== med)
+        : [...state.medications, med],
+    })),
 }));
 
 // ─── Helpers ────────────────────────────────────────────────

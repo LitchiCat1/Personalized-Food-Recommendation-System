@@ -12,11 +12,13 @@ type Props = {
   results: DetectedFood[];
   onAddRecord: () => void;
   onWeightChange: (foodId: string, nextWeight: number) => void;
+  onToggleFavorite?: (foodKey: string) => void;
+  isFavorite?: (foodKey: string) => boolean;
   submitting?: boolean;
   disabled?: boolean;
 };
 
-export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightChange, submitting = false, disabled = false }: Props) {
+export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightChange, onToggleFavorite, isFavorite, submitting = false, disabled = false }: Props) {
   const controlsDisabled = submitting || disabled;
 
   if (results.length === 0) {
@@ -35,7 +37,10 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
 
   return (
     <>
-      {results.map((food) => (
+      {results.map((food) => {
+        const foodKey = food.foodName;
+        const favorited = isFavorite?.(foodKey) ?? false;
+        return (
         <View key={food.id} style={styles.foodCard}>
           <View style={styles.foodTop}>
             <View style={styles.foodInfo}>
@@ -44,7 +49,16 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
                 {food.portionAdjusted ? '已校正份量' : '估算份量'} {food.estimatedWeight}g
               </Text>
             </View>
-            <DataPill tone={food.confidence >= 80 ? 'success' : 'warning'}>{food.confidence}%</DataPill>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Pressable
+                onPress={() => onToggleFavorite?.(foodKey)}
+                accessibilityLabel={favorited ? `移除 ${food.foodName} 收藏` : `收藏 ${food.foodName}`}
+                style={styles.favButton}
+              >
+                <Ionicons name={favorited ? 'star' : 'star-outline'} size={20} color={favorited ? '#FBBF24' : Palette.text.tertiary} />
+              </Pressable>
+              <DataPill tone={food.confidence >= 80 ? 'success' : 'warning'}>{food.confidence}%</DataPill>
+            </View>
           </View>
 
           <View style={styles.portionCard}>
@@ -118,6 +132,16 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
             </View>
           ) : null}
 
+          {food.swap_suggestion ? (
+            <View style={styles.swapBanner}>
+              <Ionicons name="swap-horizontal-outline" size={15} color={Palette.accent.cyan} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.swapTitle}>更健康替換：{food.swap_suggestion.name}</Text>
+                <Text style={styles.swapReason}>{food.swap_suggestion.reason}</Text>
+              </View>
+            </View>
+          ) : null}
+
           <View style={styles.nutritionGrid}>
             {[
               { label: '熱量', value: food.nutrition.calories, unit: 'kcal', color: Palette.accent.green },
@@ -142,7 +166,8 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
             ))}
           </View>
         </View>
-      ))}
+        );
+      })}
 
       <View style={styles.totalCard}>
         <View style={styles.totalHeader}>

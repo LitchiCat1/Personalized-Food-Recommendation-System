@@ -261,9 +261,18 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     return (
       <ScrollView contentContainerStyle={styles.onboardingScreen}>
         <View style={styles.card}>
-          <Text style={styles.kicker}>初次設定</Text>
-          <Text style={styles.title}>先完成基本資料</Text>
-          <Text style={styles.subtitle}>完成後才會進入 App，避免新帳號看到預設示範資料。疾病與過敏原可之後在「我的」頁調整。</Text>
+          {/* Step Progress Header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md }}>
+            <Text style={styles.kicker}>初次建置個人檔案</Text>
+            <View style={{ flexDirection: 'row', gap: 4 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: Palette.accent.green }} />
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: Palette.border.subtle }} />
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: Palette.border.subtle }} />
+            </View>
+          </View>
+
+          <Text style={styles.title}>建立專屬 NutriLens 飲食智慧庫</Text>
+          <Text style={styles.subtitle}>請設定基本數據，系統會依據你的身體指標動態計算專屬每日三大營養素與鈉上限。</Text>
 
           <Text style={styles.inputLabel}>姓名 / 暱稱</Text>
           <TextInput value={profileDraft.name} onChangeText={(value) => updateProfileDraft('name', value)} placeholder="例如：小明" placeholderTextColor={Palette.text.tertiary} style={styles.input} />
@@ -271,19 +280,19 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           <View style={styles.genderRow}>
             {(['male', 'female'] as const).map((gender) => (
               <Pressable key={gender} onPress={() => updateProfileDraft('gender', gender)} style={[styles.genderButton, profileDraft.gender === gender && styles.genderButtonActive]}>
-                <Text style={[styles.genderText, profileDraft.gender === gender && styles.genderTextActive]}>{gender === 'male' ? '男性' : '女性'}</Text>
+                <Text style={[styles.genderText, profileDraft.gender === gender && styles.genderTextActive]}>{gender === 'male' ? '👨‍💼 男性' : '👩‍💼 女性'}</Text>
               </Pressable>
             ))}
           </View>
 
           {[
-            ['height', '身高 cm'],
-            ['weight', '體重 kg'],
+            ['height', '身高 (cm)'],
+            ['weight', '體重 (kg)'],
             ['age', '年齡'],
-            ['activityMultiplier', '活動係數'],
-            ['dailyCalorieTarget', '每日目標熱量 kcal'],
-            ['targetWeight', '目標體重 kg'],
-            ['dietType', '飲食型態'],
+            ['activityMultiplier', '每日活動係數 (預設 1.375 中等)'],
+            ['dailyCalorieTarget', '每日目標熱量 (kcal)'],
+            ['targetWeight', '目標體重 (kg)'],
+            ['dietType', '飲食型態 (葷食 / 素食)'],
           ].map(([key, label]) => (
             <View key={key}>
               <Text style={styles.inputLabel}>{label}</Text>
@@ -300,12 +309,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           {profileMessage ? <Text style={styles.message}>{profileMessage}</Text> : null}
 
           <Pressable disabled={savingProfile} onPress={submitInitialProfile} style={[styles.primaryButton, savingProfile && styles.disabledButton]}>
-            {savingProfile ? <ActivityIndicator color={Palette.bg.primary} /> : <Text style={styles.primaryText}>完成並進入 App</Text>}
+            {savingProfile ? <ActivityIndicator color={Palette.bg.primary} /> : <Text style={styles.primaryText}>🚀 完成設定並解鎖 AI 飲食分析</Text>}
           </Pressable>
         </View>
       </ScrollView>
     );
   }
+
 
   if (isAuthenticated && profileStatus === 'error') {
     return (

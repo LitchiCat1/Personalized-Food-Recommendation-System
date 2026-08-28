@@ -394,6 +394,31 @@ export default function ProfileScreen() {
           })}
         </View>
       </SectionBlock>
+
+      <SectionBlock title="💊 用藥管理 (藥物×飲食交互作用警示)" subtitle="標記目前服用的慢性病或處方藥物，掃描時自動提醒潛在藥物交互作用。">
+        <View style={styles.allergenChipsWrap}>
+          {[
+            { id: 'Warfarin', label: 'Warfarin (抗凝血劑)' },
+            { id: 'Statins', label: 'Statins (降血脂藥)' },
+            { id: 'ACEi', label: 'ACEi (降血壓藥)' },
+            { id: 'Metformin', label: 'Metformin (降血糖藥)' },
+          ].map((med) => {
+            const medications = (useStore.getState().medications || []);
+            const isActive = medications.includes(med.id);
+            return (
+              <Pressable
+                key={med.id}
+                onPress={() => useStore.getState().toggleMedication(med.id)}
+                style={[styles.allergenChip, isActive && { backgroundColor: 'rgba(59, 130, 246, 0.15)', borderColor: Palette.accent.blue }]}
+              >
+                <Text style={[styles.allergenChipText, isActive && { color: Palette.accent.blue, fontWeight: '700' }]}>{med.label}</Text>
+                <Ionicons name={isActive ? 'checkmark-circle' : 'add-circle-outline'} size={15} color={isActive ? Palette.accent.blue : Palette.text.tertiary} />
+              </Pressable>
+            );
+          })}
+        </View>
+      </SectionBlock>
+
       </View>
       ) : null}
 

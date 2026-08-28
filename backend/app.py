@@ -6,6 +6,7 @@ PRD-aligned: Gemini Vision food recognition + nutrition analysis + user manageme
 import json
 import math
 import os
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -531,6 +532,118 @@ def get_nutrition_progress(user_id):
         return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
     progress = build_daily_nutrition_progress(storage, user_id, user)
     return jsonify(progress)
+
+
+@app.route("/barcode/<barcode>", methods=["GET"])
+def lookup_barcode(barcode):
+    """Lookup product details and nutrition from Open Food Facts API by barcode."""
+    try:
+        url = f"https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
+        resp = requests.get(url, headers={"User-Agent": "NutriLens - Taiwan Health Food App - Version 0.0.7"}, timeout=8)
+        if resp.status_code != 200:
+            return jsonify({"found": False, "error": "條碼查詢服務回應異常"}), 404
+        data = resp.json()
+        if data.get("status") != 1 or not data.get("product"):
+            return jsonify({"found": False, "error": f"找不到條碼 {barcode} 對應的食品資訊"}), 404
+
+        p = data["product"]
+        nutriments = p.get("nutriments", {})
+        product_name = p.get("product_name_zh") or p.get("product_name") or f"條碼食品 ({barcode})"
+        
+        cals = round(nutriments.get("energy-kcal_100g") or nutriments.get("energy-kcal") or 0)
+        protein = round(nutriments.get("proteins_100g") or nutriments.get("proteins") or 0, 1)
+        fat = round(nutriments.get("fat_100g") or nutriments.get("fat") or 0, 1)
+        carbs = round(nutriments.get("carbohydrates_100g") or nutriments.get("carbohydrates") or 0, 1)
+        sodium = round((nutriments.get("sodium_100g") or nutriments.get("sodium") or 0) * 1000)
+        sugar = round(nutriments.get("sugars_100g") or nutriments.get("sugars") or 0, 1)
+        fiber = round(nutriments.get("fiber_100g") or nutriments.get("fiber") or 0, 1)
+
+        detection = {
+            "id": f"barcode_{barcode}_{int(time.time())}",
+            "foodName": product_name,
+            "confidence": 98,
+            "estimatedWeight": 100,
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [],
+            "source": "Open Food Facts",
+            "nutrition": {
+                "calories": cals,
+                "protein": protein,
+                "fat": fat,
+                "carbs": carbs,
+                "sodium": sodium,
+                "sugar": sugar,
+                "fiber": fiber,
+                "saturated_fat": round(nutriments.get("saturated-fat_100g") or 0, 1),
+                "trans_fat": round(nutriments.get("trans-fat_100g") or 0, 1),
+                "calcium": round((nutriments.get("calcium_100g") or 0) * 1000, 1),
+                "iron": round((nutriments.get("iron_100g") or 0) * 1000, 1),
+                "is_fried": False,
+            }
+        }
+        return jsonify({"found": True, "barcode": barcode, "detection": detection})
+    except Exception as e:
+        return jsonify({"found": False, "error": str(e)}), 500
+
+
+@app.route("/weekly-report/<user_id>", methods=["GET"])
+def get_weekly_report(user_id):
+    """Generate an AI-powered 7-day dietary weekly summary report for the user."""
+    require_user_access(user_id)
+    user = storage.get_user(user_id)
+    history = build_history_response(storage, user_id, 7)
+    daily = history.get("daily", [])
+    summary = history.get("summary", {})
+
+    if not daily:
+        return jsonify({
+            "report_available": False,
+            "message": "尚未累積足夠的飲食紀錄，先新增餐點建立週趨勢。"
+        })
+
+    api_keys = get_gemini_api_keys()
+    if not api_keys:
+        # Fallback structured response without Gemini
+        avg_cals = summary.get("avg_calories", 0)
+        return jsonify({
+            "report_available": True,
+            "summary": f"過去 7 天記錄了 {summary.get('recorded_days', 0)} 天，平均每日熱量 {avg_cals} kcal。",
+            "highlights": ["維持連續飲食記錄習慣"],
+            "warnings": ["留意每日鈉與精緻糖攝取狀況"],
+            "suggestions": ["多選擇非油炸原型食物", "適當補充膳食纖維與蛋白質"]
+        })
+
+    prompt = (
+        f"你是台灣專業臨床營養師與飲食分析 AI。請根據以下使用者資料與近 7 天飲食數據，撰寫一份簡潔有力的週報：\n"
+        f"使用者疾病：{user.get('health_conditions', [])}\n"
+        f"記錄天數：{summary.get('recorded_days', 0)} 天，總餐數：{summary.get('total_records', 0)}\n"
+        f"平均熱量：{summary.get('avg_calories')} kcal/日\n"
+        f"平均鈉：{summary.get('avg_sodium')} mg/日\n"
+        f"平均蛋白質：{summary.get('avg_protein')} g/日\n"
+        f"平均膳食纖維：{summary.get('avg_fiber')} g/日\n"
+        f"請只回傳合法 JSON（不要包含 markdown）：\n"
+        f'{{"summary":"200字內的總結說明","highlights":["亮點1","亮點2"],"warnings":["提醒1"],"suggestions":["建議1","建議2"]}}'
+    )
+
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_keys[0]}"
+        resp = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=15)
+        if resp.status_code == 200:
+            text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+            parsed = extract_json_block(text)
+            return jsonify({"report_available": True, **parsed})
+    except Exception as e:
+        print(f"[WARN] Weekly AI report generation failed: {e}")
+
+    # Fallback response
+    return jsonify({
+        "report_available": True,
+        "summary": f"近 7 天平均熱量 {summary.get('avg_calories', 0)} kcal，記錄天數 {summary.get('recorded_days', 0)} 天。",
+        "highlights": ["持續紀錄餐點營養"],
+        "warnings": ["檢查外食加工品鈉含量"],
+        "suggestions": ["增加每餐蔬菜份量", "補足每日水分與膳食纖維"]
+    })
 
 
 @app.route("/healthy-food-recommend/<user_id>", methods=["GET"])

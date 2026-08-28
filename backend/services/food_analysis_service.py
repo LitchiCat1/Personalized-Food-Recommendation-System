@@ -78,4 +78,27 @@ def check_food_safety(
         portion_g=weight_g,
         user_profile=user_profile,
     )
-    return risk_messages(risk_result)
+    warnings = risk_messages(risk_result)
+
+    # Check drug-food interactions
+    user_meds = (user_profile or {}).get("medications", [])
+    food_name = (nutrients.get("name_zh") or nutrients.get("label") or "").lower()
+
+    if any(m in ["Warfarin", "抗凝血劑"] for m in user_meds):
+        if any(k in food_name for k in ["菠菜", "花椰菜", "芥藍", "綠茶", "羽衣甘藍"]):
+            warnings.append("💊 Warfarin 用藥提醒：本食物含高維生素K，請維持穩定攝取量，避免大幅改變影響藥效。")
+
+    if any(m in ["Statins", "降血脂藥"] for m in user_meds):
+        if any(k in food_name for k in ["柚子", "葡萄柚", "文旦"]):
+            warnings.append("💊 Statins 降血脂藥禁忌：葡萄柚/柚子會抑制藥物代謝，請避免食用。")
+
+    if any(m in ["ACEi", "降血壓藥"] for m in user_meds):
+        if any(k in food_name for k in ["香蕉", "奇異果", "低鈉鹽", "深綠蔬菜"]):
+            warnings.append("💊 降血壓藥提醒：本餐含有高鉀成分，服藥期間請避免過量高鉀飲食。")
+
+    if any(m in ["Metformin", "降血糖藥"] for m in user_meds):
+        if any(k in food_name for k in ["酒", "啤酒", "清酒", "紅酒"]):
+            warnings.append("💊 Metformin 用藥警示：服藥期間請勿飲酒，預防乳酸中毒風險。")
+
+    return warnings
+

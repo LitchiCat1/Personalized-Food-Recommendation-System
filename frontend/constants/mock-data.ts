@@ -117,6 +117,13 @@ export type DetectedFood = {
     is_fried?: boolean;
   };
   portionAdjusted?: boolean;
+  swap_suggestion?: {
+    name: string;
+    reason: string;
+    calories?: number;
+    sodium?: number;
+    protein?: number;
+  } | null;
   // PRD: 硬性排除規則 — GI 指數、過敏原
   gi: 'low' | 'medium' | 'high';
   allergens: string[];

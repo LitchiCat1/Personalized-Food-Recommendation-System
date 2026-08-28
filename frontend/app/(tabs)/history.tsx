@@ -12,7 +12,7 @@ import MetricCard from '@/components/ui/metric-card';
 import DataPill from '@/components/ui/data-pill';
 import ProgressBar from '@/components/ui/progress-bar';
 import PrimaryButton from '@/components/ui/primary-button';
-import { fetchAllRecords, type HistoryDay, type HistoryResponse } from '@/lib/api';
+import { fetchAllRecords, fetchWeeklyReport, type HistoryDay, type HistoryResponse, type WeeklyReportResponse } from '@/lib/api';
 import { buildDietaryTrend, type DietaryTrendData } from '@/lib/dietary-trends';
 
 function buildInsights(summary: HistoryResponse['summary'], daily: HistoryDay[], target: number) {
@@ -42,7 +42,8 @@ export default function HistoryScreen() {
   const [trend, setTrend] = useState<DietaryTrendData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+  const [report, setReport] = useState<WeeklyReportResponse | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -65,6 +66,16 @@ export default function HistoryScreen() {
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
+        });
+
+      setReportLoading(true);
+      fetchWeeklyReport(apiBaseUrl, user.userId, { accessToken })
+        .then((data) => {
+          if (!cancelled) setReport(data);
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (!cancelled) setReportLoading(false);
         });
 
       return () => {
@@ -110,6 +121,35 @@ export default function HistoryScreen() {
             <MetricCard label="紀錄餐數" value={totalRecords} unit={`/${recordedDays}天`} accent={Palette.accent.blue} />
             <MetricCard label="鈉超標" value={sodiumOverDays} unit="天" accent={sodiumOverDays > 0 ? Palette.status.warning : Palette.accent.green} />
           </View>
+
+          {/* AI Weekly Report Section */}
+          <SectionBlock title="🤖 AI 週報摘要" subtitle="由 Gemini 根據你過去 7 天紀錄進行個人化分析">
+            {reportLoading ? (
+              <ActivityIndicator size="small" color={Palette.accent.green} />
+            ) : report?.report_available ? (
+              <View style={styles.weeklyReportCard}>
+                <Text style={styles.weeklySummaryText}>{report.summary}</Text>
+                {report.highlights?.length ? (
+                  <View style={styles.reportGroup}>
+                    <Text style={[styles.reportGroupTitle, { color: '#22C55E' }]}>✨ 飲食亮點</Text>
+                    {report.highlights.map((h, i) => (
+                      <Text key={i} style={styles.reportItemText}>• {h}</Text>
+                    ))}
+                  </View>
+                ) : null}
+                {report.suggestions?.length ? (
+                  <View style={styles.reportGroup}>
+                    <Text style={[styles.reportGroupTitle, { color: Palette.accent.blue }]}>💡 專業改善建議</Text>
+                    {report.suggestions.map((s, i) => (
+                      <Text key={i} style={styles.reportItemText}>• {s}</Text>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            ) : (
+              <Text style={styles.emptyText}>{report?.message || '繼續記錄餐點以解鎖每週 AI 報告。'}</Text>
+            )}
+          </SectionBlock>
 
           <View style={[isDesktop && styles.desktopColumns]}>
             <View style={isDesktop && styles.desktopMain}>
@@ -252,4 +292,16 @@ const styles = StyleSheet.create({
   noteIndex: { width: 24, height: 24, borderRadius: 12, backgroundColor: Palette.bg.card, alignItems: 'center', justifyContent: 'center' },
   noteIndexText: { ...Typography.small, color: Palette.accent.green },
   insightText: { ...Typography.caption, color: Palette.text.secondary, flex: 1, fontVariant: Typography.number.fontVariant },
+  weeklyReportCard: {
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(74, 222, 128, 0.25)',
+    gap: Spacing.md,
+  },
+  weeklySummaryText: { ...Typography.body, color: Palette.text.primary, lineHeight: 22 },
+  reportGroup: { gap: 4 },
+  reportGroupTitle: { ...Typography.caption, fontWeight: '700' },
+  reportItemText: { ...Typography.small, color: Palette.text.secondary },
 });

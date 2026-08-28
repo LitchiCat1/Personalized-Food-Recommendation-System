@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import CalorieRing from '@/components/dashboard/CalorieRing';
 import NutrientBar from '@/components/dashboard/NutrientBar';
 import MealCard from '@/components/dashboard/MealCard';
+import HealthScoreCard from '@/components/dashboard/HealthScoreCard';
 import AppContainer from '@/components/AppContainer';
 import ScreenHeader from '@/components/ui/screen-header';
 import SectionBlock from '@/components/ui/section-block';
@@ -58,6 +59,8 @@ export default function DashboardScreen() {
     const conditions = nutrientSensitivities[nutrient];
     return conditions.length ? `${conditions.join('、')}需留意` : undefined;
   };
+
+  const hasFriedFood = todayMeals.some((m) => (m as any).is_fried === true);
 
   useFocusEffect(
     useCallback(() => {
@@ -217,6 +220,21 @@ export default function DashboardScreen() {
           />
         </View>
       </View>
+
+      <HealthScoreCard
+        calories={calories}
+        protein={protein}
+        carbs={carbs}
+        sugar={sugar}
+        fat={fat}
+        saturated_fat={saturated_fat}
+        sodium={sodium}
+        fiber={fiber}
+        calcium={calcium}
+        iron={iron}
+        hasMeals={todayMeals.length > 0}
+        hasFriedFood={hasFriedFood}
+      />
 
       {isDesktop ? (
         <>

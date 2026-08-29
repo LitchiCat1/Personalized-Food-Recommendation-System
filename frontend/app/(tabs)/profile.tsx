@@ -13,6 +13,7 @@ import DataPill from '@/components/ui/data-pill';
 import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
+import FeedbackBanner from '@/components/ui/feedback-banner';
 import { fetchMedicalMetadata, fetchUserProfile, saveUserProfile } from '@/lib/api';
 import { isSupabaseAuthConfigured, supabase } from '@/lib/supabase';
 
@@ -32,6 +33,7 @@ export default function ProfileScreen() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [profileFeedback, setProfileFeedback] = useState<{ tone: 'success' | 'error'; title: string; message?: string } | null>(null);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [activeSection, setActiveSection] = useState('personal');
   const [medicalMetadata, setMedicalMetadata] = useState<MedicalMetadata | null>(null);
@@ -232,12 +234,12 @@ export default function ProfileScreen() {
 
     await syncProfile(nextUser);
     setProfileModalVisible(false);
-    Alert.alert('健康檔案已更新', '個人資料已同步到後端。');
+    setProfileFeedback({ tone: 'success', title: '健康檔案已更新', message: '個人資料已同步到後端。' });
   };
 
   const performSignOut = async () => {
     if (!isSupabaseAuthConfigured || !supabase) {
-      Alert.alert('Demo 模式', '目前未啟用 Supabase Auth。');
+      setProfileFeedback({ tone: 'error', title: 'Demo 模式', message: '目前未啟用 Supabase Auth，無法登出。' });
       return;
     }
     const supabaseClient = supabase;
@@ -248,15 +250,16 @@ export default function ProfileScreen() {
       if (signOutError) throw signOutError;
       useStore.getState().setAuthSession(null);
     } catch (err: any) {
-      Alert.alert('登出失敗', err?.message || '無法登出。');
+      setProfileFeedback({ tone: 'error', title: '登出失敗', message: err?.message || '無法登出。' });
     } finally {
       setSigningOut(false);
     }
   };
 
   const handleSignOut = () => {
+    setProfileFeedback(null);
     if (!isSupabaseAuthConfigured || !supabase) {
-      Alert.alert('Demo 模式', '目前未啟用 Supabase Auth。');
+      setProfileFeedback({ tone: 'error', title: 'Demo 模式', message: '目前未啟用 Supabase Auth，無法登出。' });
       return;
     }
 
@@ -282,6 +285,15 @@ export default function ProfileScreen() {
   return (
     <AppContainer>
       <ScreenHeader title="我的健康檔案" subtitle="管理身體資料、飲食目標、疾病條件與過敏原。" badge={isSupabaseAuthConfigured ? 'Auth 已登入' : 'Demo 模式'} badgeTone={isSupabaseAuthConfigured ? 'success' : 'warning'} />
+
+      {profileFeedback ? (
+        <FeedbackBanner
+          tone={profileFeedback.tone}
+          title={profileFeedback.title}
+          message={profileFeedback.message}
+          onDismiss={() => setProfileFeedback(null)}
+        />
+      ) : null}
 
       <View style={[styles.syncBanner, error && styles.syncWarning]}>
         {loading || saving ? <ActivityIndicator size="small" color={Palette.accent.green} /> : <Ionicons name={error ? 'cloud-offline-outline' : 'cloud-done-outline'} size={16} color={error ? Palette.status.warning : Palette.accent.green} />}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert, ActivityIndicator, Keyboard, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Keyboard, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -256,27 +256,30 @@ export default function ScannerScreen() {
     : null;
 
   const handleCamera = async () => {
+    setRecordFeedback(null);
     try {
       const isAvailable = await CameraView.isAvailableAsync();
       if (!isAvailable) {
-        Alert.alert(
-          '無法使用相機',
-          isWeb
+        setRecordFeedback({
+          tone: 'error',
+          title: '無法使用相機',
+          message: isWeb
             ? '請使用支援相機的瀏覽器，並透過 HTTPS 或 localhost 開啟 NutriLens。你仍可改用相簿上傳。'
-            : '此裝置沒有可用的相機，你仍可改用相簿上傳。'
-        );
+            : '此裝置沒有可用的相機，你仍可改用相簿上傳。',
+        });
         return;
       }
 
       if (!permission?.granted) {
         const res = await requestPermission();
         if (!res.granted) {
-          Alert.alert(
-            '需要相機權限',
-            res.canAskAgain
+          setRecordFeedback({
+            tone: 'error',
+            title: '需要相機權限',
+            message: res.canAskAgain
               ? '請允許 NutriLens 存取相機後再試一次。'
-              : '相機權限已被封鎖，請到瀏覽器或系統設定中允許 NutriLens 使用相機。'
-          );
+              : '相機權限已被封鎖，請到瀏覽器或系統設定中允許 NutriLens 使用相機。',
+          });
           return;
         }
       }
@@ -284,7 +287,7 @@ export default function ScannerScreen() {
       setCameraReady(false);
       setCameraActive(true);
     } catch (error: any) {
-      Alert.alert('相機啟動失敗', error?.message || '請重新整理後再試，或改用相簿上傳。');
+      setRecordFeedback({ tone: 'error', title: '相機啟動失敗', message: error?.message || '請重新整理後再試，或改用相簿上傳。' });
     }
   };
 
@@ -308,17 +311,18 @@ export default function ScannerScreen() {
 
   const analyzeImage = async (imageBase64: string) => {
     setScanning(true);
+    setRecordFeedback(null);
     try {
       const ok = await handlePrediction(imageBase64);
       if (!ok) {
         clearScan();
-        Alert.alert('未辨識到可記錄的食物', '請拍攝完整餐盤、保持光線充足，或改用相簿與手動搜尋。');
+        setRecordFeedback({ tone: 'error', title: '未辨識到可記錄的食物', message: '請拍攝完整餐盤、保持光線充足，或改用相簿與手動搜尋。' });
       }
       return ok;
     } catch (error: any) {
       setRejectedDetections([]);
       clearScan();
-      Alert.alert('AI 辨識暫時不可用', error?.message || '請先使用手動搜尋加入餐點。');
+      setRecordFeedback({ tone: 'error', title: 'AI 辨識暫時不可用', message: error?.message || '請先使用手動搜尋加入餐點。' });
       return false;
     } finally {
       setScanning(false);
@@ -343,7 +347,7 @@ export default function ScannerScreen() {
       await analyzeImage(imageBase64);
     } catch (error: any) {
       setScanning(false);
-      Alert.alert('拍照失敗', error?.message || '請再試一次，或改用相簿上傳。');
+      setRecordFeedback({ tone: 'error', title: '拍照失敗', message: error?.message || '請再試一次，或改用相簿上傳。' });
     } finally {
       captureInFlightRef.current = false;
       setCapturing(false);
@@ -363,7 +367,7 @@ export default function ScannerScreen() {
       await analyzeImage(asset.base64);
       return;
     }
-    Alert.alert('圖片無法讀取', '請改選另一張圖片，或直接使用相機拍攝。');
+    setRecordFeedback({ tone: 'error', title: '圖片無法讀取', message: '請改選另一張圖片，或直接使用相機拍攝。' });
   };
 
   const handleLabelOCRFromGallery = async () => {
@@ -376,7 +380,7 @@ export default function ScannerScreen() {
     if (result.canceled) return;
     const asset = result.assets[0];
     if (!asset.base64) {
-      Alert.alert('圖片無法讀取', '請改選另一張圖片');
+      setRecordFeedback({ tone: 'error', title: '圖片無法讀取', message: '請改選另一張圖片' });
       return;
     }
 
@@ -386,18 +390,19 @@ export default function ScannerScreen() {
       ocrSubmissionKeyRef.current = buildSubmissionKey('nutrition-label');
       setOcrDraft(draft);
       setOcrNameError(null);
-      Alert.alert('營養標示已辨識', '你可以直接儲存成自訂食品，之後就不必重複輸入。');
+      setRecordFeedback({ tone: 'success', title: '營養標示已辨識', message: '你可以直接儲存成自訂食品，之後就不必重複輸入。' });
     } catch (error: any) {
-      Alert.alert('營養標示辨識失敗', error?.message || '請確認後端已設定 Gemini API key');
+      setRecordFeedback({ tone: 'error', title: '營養標示辨識失敗', message: error?.message || '請確認後端已設定 Gemini API key' });
     } finally {
       setOcrQuerying(false);
     }
   };
 
   const handleManualSearch = async () => {
+    setRecordFeedback(null);
     const keyword = manualQuery.trim();
     if (!keyword) {
-      Alert.alert('請輸入關鍵字', '例如：白飯、雞胸肉、花椰菜');
+      setRecordFeedback({ tone: 'error', title: '請輸入關鍵字', message: '例如：白飯、雞胸肉、花椰菜' });
       return;
     }
 
@@ -406,10 +411,10 @@ export default function ScannerScreen() {
       const foods = await manualSearchFood({ apiBaseUrl, keyword, limit: 6, userId: user.userId, auth: { accessToken } });
       setManualResults(foods);
       if (foods.length === 0) {
-        Alert.alert('查無結果', '請試試更短的關鍵字或常見食品名稱');
+        setRecordFeedback({ tone: 'error', title: '查無結果', message: '請試試更短的關鍵字或常見食品名稱' });
       }
     } catch {
-      Alert.alert('搜尋失敗', '目前無法連線到食品資料庫');
+      setRecordFeedback({ tone: 'error', title: '搜尋失敗', message: '目前無法連線到食品資料庫' });
     } finally {
       setManualSearching(false);
     }
@@ -609,9 +614,9 @@ export default function ScannerScreen() {
     if (!draft) return;
     try {
       const data = await saveCustomFood({ apiBaseUrl, userId: user.userId, draft, auth: { accessToken } });
-      Alert.alert('自訂食品已儲存', `${data.food?.name_zh || draft.product_name} 之後可直接搜尋使用`);
+      setRecordFeedback({ tone: 'success', title: '自訂食品已儲存', message: `${data.food?.name_zh || draft.product_name} 之後可直接搜尋使用` });
     } catch (error: any) {
-      Alert.alert('儲存失敗', error?.message || '請稍後再試');
+      setRecordFeedback({ tone: 'error', title: '儲存失敗', message: error?.message || '請稍後再試' });
     }
   };
 
@@ -680,7 +685,7 @@ export default function ScannerScreen() {
         onError={(message) => {
           setCameraReady(false);
           setCameraActive(false);
-          Alert.alert('相機啟動失敗', message || '請確認權限後再試，或改用相簿上傳。');
+          setRecordFeedback({ tone: 'error', title: '相機啟動失敗', message: message || '請確認權限後再試，或改用相簿上傳。' });
         }}
       />
     );

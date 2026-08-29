@@ -61,6 +61,7 @@ export default function RecommendScreen() {
   const [menuLoading, setMenuLoading] = useState(false);
   const [addingFoodName, setAddingFoodName] = useState<string | null>(null);
   const [uploadingMenu, setUploadingMenu] = useState(false);
+  const [photoSourceTarget, setPhotoSourceTarget] = useState<HealthyFoodRestaurant | null>(null);
 
   const captureMenuPhoto = async (source: 'camera' | 'library'): Promise<string | null> => {
     if (source === 'camera') {
@@ -87,14 +88,11 @@ export default function RecommendScreen() {
   };
 
   const handleUploadMenuPhoto = (restaurant: HealthyFoodRestaurant) => {
-    Alert.alert('上傳菜單照片', '選擇來源', [
-      { text: '📷 拍照', onPress: () => runMenuPhotoUpload(restaurant, 'camera') },
-      { text: '📁 從相簿選擇', onPress: () => runMenuPhotoUpload(restaurant, 'library') },
-      { text: '取消', style: 'cancel' },
-    ]);
+    setPhotoSourceTarget(restaurant);
   };
 
   const runMenuPhotoUpload = async (restaurant: HealthyFoodRestaurant, source: 'camera' | 'library') => {
+    setPhotoSourceTarget(null);
     const base64 = await captureMenuPhoto(source);
     if (!base64) return;
 
@@ -514,7 +512,36 @@ export default function RecommendScreen() {
         </View>
       </Modal>
 
+      <PhotoSourceModal
+        visible={photoSourceTarget !== null}
+        onCancel={() => setPhotoSourceTarget(null)}
+        onSelectCamera={() => photoSourceTarget && runMenuPhotoUpload(photoSourceTarget, 'camera')}
+        onSelectLibrary={() => photoSourceTarget && runMenuPhotoUpload(photoSourceTarget, 'library')}
+      />
+
     </AppContainer>
+  );
+}
+
+function PhotoSourceModal({ visible, onCancel, onSelectCamera, onSelectLibrary }: {
+  visible: boolean;
+  onCancel: () => void;
+  onSelectCamera: () => void;
+  onSelectLibrary: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={styles.photoSourceOverlay}>
+        <Pressable accessibilityLabel="取消上傳菜單照片" style={StyleSheet.absoluteFill} onPress={onCancel} />
+        <View style={styles.photoSourceCard}>
+          <Text style={styles.modalTitle}>上傳菜單照片</Text>
+          <Text style={styles.restaurantMeta}>選擇照片來源</Text>
+          <SecondaryButton label="📷 拍照" onPress={onSelectCamera} icon={<Ionicons name="camera-outline" size={16} color={Palette.accent.green} />} />
+          <SecondaryButton label="📁 從相簿選擇" onPress={onSelectLibrary} icon={<Ionicons name="image-outline" size={16} color={Palette.accent.green} />} />
+          <SecondaryButton label="取消" onPress={onCancel} />
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -717,6 +744,8 @@ const styles = StyleSheet.create({
   personalizedItem: { gap: 2 },
   personalizedFood: { ...Typography.caption, color: Palette.accent.green, fontWeight: '700' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
+  photoSourceOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
+  photoSourceCard: { width: '100%', maxWidth: 360, backgroundColor: Palette.bg.card, borderRadius: Radius.xl, borderWidth: 1, borderColor: Palette.border.subtle, padding: Spacing.lg, gap: Spacing.sm, ...Shadows.soft },
   modalContent: { width: '100%', maxWidth: 500, maxHeight: '80%', backgroundColor: Palette.bg.card, borderRadius: Radius.xl, borderWidth: 1, borderColor: Palette.border.subtle, padding: Spacing.lg, ...Shadows.soft },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   modalTitle: { ...Typography.bodyBold, color: Palette.text.primary },

@@ -32,7 +32,7 @@ from services.nutrition_label_service import (
     normalize_ocr_result,
     scale_nutrition_per_100g,
 )
-from services.nutrition_progress_service import build_daily_nutrition_progress, calculate_pdf_daily_targets
+from services.nutrition_progress_service import build_daily_nutrition_progress, calculate_pdf_daily_targets, round_targets_for_display
 from services.nutrient_service import NUTRITION_FIELDS, get_nutrient_value
 from services.profile_service import build_bmr_response, build_user_profile
 from services.restaurant_ai_service import build_restaurant_ai_summary
@@ -477,7 +477,7 @@ def get_records(user_id):
     return jsonify({
         "records": records,
         "count": len(records),
-        "nutrition_targets": calculate_pdf_daily_targets(user),
+        "nutrition_targets": round_targets_for_display(calculate_pdf_daily_targets(user)),
     })
 
 

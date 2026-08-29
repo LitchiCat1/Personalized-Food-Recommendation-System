@@ -81,6 +81,10 @@ def _progress_status(nutrient: str, consumed: float, target: float) -> str:
     return "within_target"
 
 
+def round_targets_for_display(targets: dict) -> dict:
+    return {key: _display_number(value) for key, value in targets.items()}
+
+
 def calculate_pdf_daily_targets(user: dict) -> dict:
     height_cm = _number(user.get("height"), 170.0)
     weight_kg = _number(user.get("weight"), 65.0)

@@ -151,11 +151,11 @@ export default function RecommendScreen() {
     try {
       const foodItem = {
         name: foodName,
-        calories: Number(item.calories || 350),
-        protein: Number(item.protein || 15),
-        carbs: Number(item.carbs || 45),
-        fat: Number(item.fat || 10),
-        sodium: Number(item.sodium || 500),
+        calories: Number(item.calories ?? 350),
+        protein: Number(item.protein ?? 15),
+        carbs: Number(item.carbs ?? 45),
+        fat: Number(item.fat ?? 10),
+        sodium: Number(item.sodium ?? 500),
         sugar: Number(item.sugar ?? 0),
         saturated_fat: Number(item.saturated_fat ?? 0),
         trans_fat: Number(item.trans_fat ?? 0),

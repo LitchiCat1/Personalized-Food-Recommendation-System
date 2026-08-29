@@ -5,7 +5,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
-from services.nutrition_label_service import get_gemini_api_keys, extract_json_block
+from services.nutrition_label_service import get_gemini_api_keys, extract_json_block, decode_image_base64
 
 # Modern User-Agents to prevent anti-bot blocking
 USER_AGENTS = [
@@ -295,11 +295,13 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
     """Uses Gemini Vision API to OCR and parse a menu photo Base64 into structured items with nutrition estimates."""
     if not image_base64:
         return {"items": []}
-    
-    if "base64," in image_base64:
-        image_base64 = image_base64.split("base64,")[1]
-    image_base64 = image_base64.strip()
-    
+
+    try:
+        _img_bytes, image_base64, image_mime_type = decode_image_base64(image_base64)
+    except ValueError as e:
+        print(f"[!] Menu photo decode failed: {e}")
+        return {"items": []}
+
     keys = get_gemini_api_keys()
     if not keys:
         print("[!] No Gemini API key found for menu image parsing")
@@ -308,7 +310,13 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
     
     prompt = f"""
     你是一位台灣經驗豐富的臨床膳食評估師與營養師。
-    請識別這張「{restaurant_name}」實體菜單照片中的餐點名稱與價格，並為每道餐點精準估算 11 項營養指標（需符合 1g蛋白質=4kcal, 1g碳水=4kcal, 1g脂肪=9kcal 熱量物理算式）：
+    請識別這張「{restaurant_name}」實體菜單照片中的餐點名稱與價格。這張照片可能是密集的價目表或菜單看板，
+    上面可能有非常多品項（十幾到數十項都有可能）；請務必逐一列出照片中「每一項」看得到的餐點，不要只挑幾項
+    或只列出範例，也不要因為品項太多而省略。即使照片邊緣模糊、部分文字不清楚，仍請根據可辨識的部分盡量列出
+    合理的品項名稱與價格，不要整個放棄辨識。
+
+    為每道餐點估算 11 項營養指標即可，數值不需要非常精確，合理概略估計即可（後端會另外做物理一致性校正，
+    1g蛋白質=4kcal, 1g碳水=4kcal, 1g脂肪=9kcal，你不需要自己保證完全吻合）：
 
     請輸出合法 JSON 格式（不要包含任何 markdown codeblock 或文字說明）：
     {{
@@ -348,28 +356,33 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
                                 {"text": prompt},
                                 {
                                     "inlineData": {
-                                        "mimeType": "image/jpeg",
+                                        "mimeType": image_mime_type,
                                         "data": image_base64
                                     }
                                 }
                             ]
                         }
                     ],
-                    "generationConfig": {"response_mime_type": "application/json"}
+                    "generationConfig": {"response_mime_type": "application/json", "maxOutputTokens": 8192}
                 }
                 res = requests.post(url, json=payload, timeout=25)
                 if res.status_code == 200:
-                    parsed_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    items = extract_json_block(parsed_text).get("items", [])
+                    body = res.json()
+                    candidate = (body.get("candidates") or [{}])[0]
+                    finish_reason = candidate.get("finishReason")
+                    parts = (candidate.get("content") or {}).get("parts") or []
+                    parsed_text = parts[0].get("text", "") if parts else ""
+                    items = extract_json_block(parsed_text).get("items", []) if parsed_text else []
                     if items:
-                        print(f"[Scraper] Successfully parsed menu photo using key {gemini_key[:8]}... model: {model_name}")
+                        print(f"[Scraper] Successfully parsed menu photo using key {gemini_key[:8]}... model: {model_name}, {len(items)} items")
                         balanced_items = [validate_and_balance_nutrition(item) for item in items]
                         return {"items": balanced_items}
+                    print(f"[!] Key {gemini_key[:8]}... Vision model {model_name} returned zero items (finishReason={finish_reason}), trying next key/model...")
                 else:
                     print(f"[!] Key {gemini_key[:8]}... Vision model {model_name} status {res.status_code}, trying next key/model...")
             except Exception as e:
                 print(f"[!] Gemini Vision error with model {model_name}: {e}")
-    
+
     fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
     return {"items": fallback_items}
 

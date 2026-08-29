@@ -69,7 +69,7 @@ export default function DashboardScreen() {
       fetchRecords(apiBaseUrl, user.userId, getLocalDateString(), { accessToken })
         .then((data) => {
           if (cancelled || requestRevision !== useStore.getState().dietaryRecordsRevision) return;
-          replaceDashboardFromRecords(data.records || []);
+          replaceDashboardFromRecords(data.records || [], data.nutrition_targets);
         })
         .catch((err: Error) => {
           if (!cancelled) setSyncError(err.message);
@@ -149,7 +149,7 @@ export default function DashboardScreen() {
           <Ionicons name="alert-circle-outline" size={18} color={Palette.status.warning} />
           <View style={styles.sensitivityCopy}>
             <Text style={styles.sensitivityTitle}>病症敏感營養素已標示</Text>
-            <Text style={styles.sensitivityText}>{sensitiveConditions.join('、')}相關提醒；每日目標值維持原設定。</Text>
+            <Text style={styles.sensitivityText}>{sensitiveConditions.join('、')}相關提醒；每日目標值已依疾病調整。</Text>
           </View>
         </View>
       ) : null}

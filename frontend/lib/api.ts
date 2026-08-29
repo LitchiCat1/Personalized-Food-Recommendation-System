@@ -77,9 +77,24 @@ export type DietaryRecord = {
   source?: string;
 };
 
+export type NutritionTargets = {
+  calories: number;
+  protein: number;
+  carbs: number;
+  sugar: number;
+  fat: number;
+  saturated_fat: number;
+  trans_fat: number;
+  fiber: number;
+  sodium: number;
+  calcium: number;
+  iron: number;
+};
+
 export type RecordsResponse = {
   records: DietaryRecord[];
   count: number;
+  nutrition_targets?: NutritionTargets;
 };
 
 export type RecordMutationResponse = {

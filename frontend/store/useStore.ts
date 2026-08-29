@@ -12,7 +12,7 @@ import {
   USER_PROFILE,
 } from '@/constants/mock-data';
 import { resolveApiBaseUrl } from '@/lib/network';
-import type { DietaryRecord } from '@/lib/api';
+import type { DietaryRecord, NutritionTargets } from '@/lib/api';
 
 // ─── Types ──────────────────────────────────────────────────
 export interface UserProfile {
@@ -64,7 +64,7 @@ export interface NutriLensState {
   dietaryRecordsRevision: number;
   invalidateDietaryRecords: () => void;
   addMealFromScan: (detections: DetectedFood[]) => void;
-  replaceDashboardFromRecords: (records: DietaryRecord[]) => void;
+  replaceDashboardFromRecords: (records: DietaryRecord[], targets?: NutritionTargets) => void;
   resetDashboard: () => void;
 
   // Scanner
@@ -250,7 +250,7 @@ export const useStore = create<NutriLensState>((set, get) => ({
       };
     }),
 
-  replaceDashboardFromRecords: (records) =>
+  replaceDashboardFromRecords: (records, targets) =>
     set((state) => {
       const todayMeals = records.flatMap((record, recordIndex) => {
         const foods = record.foods && record.foods.length > 0
@@ -297,24 +297,26 @@ export const useStore = create<NutriLensState>((set, get) => ({
       });
 
       const totals = sumMeals(todayMeals);
-      const healthAlerts = buildHealthAlerts(totals, state.dailyNutrition.sodium.target, state.dailyNutrition.protein.target);
+      const sodiumTarget = targets?.sodium ?? state.dailyNutrition.sodium.target;
+      const proteinTarget = targets?.protein ?? state.dailyNutrition.protein.target;
+      const healthAlerts = buildHealthAlerts(totals, sodiumTarget, proteinTarget);
 
       return {
         todayMeals,
         healthAlerts,
         dailyNutrition: {
           ...state.dailyNutrition,
-          calories: { ...state.dailyNutrition.calories, current: totals.calories, target: state.user.dailyCalorieTarget },
-          protein: { ...state.dailyNutrition.protein, current: totals.protein },
-          carbs: { ...state.dailyNutrition.carbs, current: totals.carbs },
-          sugar: { ...state.dailyNutrition.sugar, current: totals.sugar },
-          fat: { ...state.dailyNutrition.fat, current: totals.fat },
-          saturated_fat: { ...state.dailyNutrition.saturated_fat, current: totals.saturated_fat },
-          trans_fat: { ...state.dailyNutrition.trans_fat, current: totals.trans_fat },
-          sodium: { ...state.dailyNutrition.sodium, current: totals.sodium },
-          fiber: { ...state.dailyNutrition.fiber, current: totals.fiber },
-          calcium: { ...state.dailyNutrition.calcium, current: totals.calcium },
-          iron: { ...state.dailyNutrition.iron, current: totals.iron },
+          calories: { ...state.dailyNutrition.calories, current: totals.calories, target: targets?.calories ?? state.user.dailyCalorieTarget },
+          protein: { ...state.dailyNutrition.protein, current: totals.protein, target: proteinTarget },
+          carbs: { ...state.dailyNutrition.carbs, current: totals.carbs, target: targets?.carbs ?? state.dailyNutrition.carbs.target },
+          sugar: { ...state.dailyNutrition.sugar, current: totals.sugar, target: targets?.sugar ?? state.dailyNutrition.sugar.target },
+          fat: { ...state.dailyNutrition.fat, current: totals.fat, target: targets?.fat ?? state.dailyNutrition.fat.target },
+          saturated_fat: { ...state.dailyNutrition.saturated_fat, current: totals.saturated_fat, target: targets?.saturated_fat ?? state.dailyNutrition.saturated_fat.target },
+          trans_fat: { ...state.dailyNutrition.trans_fat, current: totals.trans_fat, target: targets?.trans_fat ?? state.dailyNutrition.trans_fat.target },
+          sodium: { ...state.dailyNutrition.sodium, current: totals.sodium, target: sodiumTarget },
+          fiber: { ...state.dailyNutrition.fiber, current: totals.fiber, target: targets?.fiber ?? state.dailyNutrition.fiber.target },
+          calcium: { ...state.dailyNutrition.calcium, current: totals.calcium, target: targets?.calcium ?? state.dailyNutrition.calcium.target },
+          iron: { ...state.dailyNutrition.iron, current: totals.iron, target: targets?.iron ?? state.dailyNutrition.iron.target },
         },
         user: { ...state.user, totalMeals: Math.max(state.user.totalMeals, todayMeals.length) },
       };

@@ -62,15 +62,41 @@ export default function RecommendScreen() {
   const [addingFoodName, setAddingFoodName] = useState<string | null>(null);
   const [uploadingMenu, setUploadingMenu] = useState(false);
 
-  const handleUploadMenuPhoto = async (restaurant: HealthyFoodRestaurant) => {
+  const captureMenuPhoto = async (source: 'camera' | 'library'): Promise<string | null> => {
+    if (source === 'camera') {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('需要相機權限', '請至系統設定開啟相機權限，才能拍攝菜單照片。');
+        return null;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        base64: true,
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets?.[0]?.base64) return null;
+      return result.assets[0].base64;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       base64: true,
       quality: 0.8,
     });
+    if (result.canceled || !result.assets?.[0]?.base64) return null;
+    return result.assets[0].base64;
+  };
 
-    if (result.canceled || !result.assets?.[0]?.base64) return;
-    const base64 = result.assets[0].base64;
+  const handleUploadMenuPhoto = (restaurant: HealthyFoodRestaurant) => {
+    Alert.alert('上傳菜單照片', '選擇來源', [
+      { text: '📷 拍照', onPress: () => runMenuPhotoUpload(restaurant, 'camera') },
+      { text: '📁 從相簿選擇', onPress: () => runMenuPhotoUpload(restaurant, 'library') },
+      { text: '取消', style: 'cancel' },
+    ]);
+  };
+
+  const runMenuPhotoUpload = async (restaurant: HealthyFoodRestaurant, source: 'camera' | 'library') => {
+    const base64 = await captureMenuPhoto(source);
+    if (!base64) return;
 
     setMenuLoading(true);
     setUploadingMenu(true);
@@ -536,17 +562,7 @@ function RestaurantCard({
       </View>
       {restaurant.recommended_items.slice(0, 5).map((item) => (
         <View key={`${restaurant.restaurant_id}_${item.item_id || item.item_name}`} style={styles.restaurantItem}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={styles.itemName}>{item.item_name}</Text>
-            {item.nutrition_available !== false && !item.item_name.includes('到店後選擇') ? (
-              <SecondaryButton
-                disabled={addingFoodName === item.item_name}
-                label={addingFoodName === item.item_name ? '新增中' : '+ 加入今日紀錄'}
-                onPress={() => onQuickAddRecord(item)}
-                icon={<Ionicons name="add-circle-outline" size={13} color={Palette.accent.green} />}
-              />
-            ) : null}
-          </View>
+          <Text style={styles.itemName}>{item.item_name}</Text>
           {item.nutrition_available ? (
             <View style={styles.nutritionRow}>
               <NutritionMini label="熱量" value={`${item.calories} kcal`} color={Palette.accent.green} />

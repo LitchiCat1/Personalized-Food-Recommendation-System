@@ -172,9 +172,10 @@ def validate_and_balance_nutrition(item: dict) -> dict:
     if trans_fat > fat:
         trans_fat = 0.0
         
+    name = item.get("name", "")
+
     fiber = float(item.get("fiber", 0) or 0)
     if fiber == 0:
-        name = item.get("name", "")
         if any(k in name for k in ["蔬菜", "青菜", "沙拉", "菇", "海帶"]):
             fiber = 3.5
         elif any(k in name for k in ["飯", "麵", "吐司", "漢堡", "燕麥", "水果"]):
@@ -183,6 +184,30 @@ def validate_and_balance_nutrition(item: dict) -> dict:
             fiber = 1.5
         else:
             fiber = 0.5
+
+    # 鈣：豆製品/乳製品最高，蔬菜次之，其餘給予保守估計，避免 AI 摘要缺漏此欄位時全為 0
+    calcium = float(item.get("calcium", 0) or 0)
+    if calcium == 0:
+        if any(k in name for k in ["豆漿", "牛奶", "拿鐵", "起司", "優格", "豆腐", "豆乾"]):
+            calcium = 150.0
+        elif any(k in name for k in ["蔬菜", "青菜", "沙拉", "海帶"]):
+            calcium = 60.0
+        elif any(k in name for k in ["魚", "蝦", "蛋"]):
+            calcium = 40.0
+        else:
+            calcium = 20.0
+
+    # 鐵：紅肉/內臟/豆製品較高，蔬菜次之，其餘給予保守估計
+    iron = float(item.get("iron", 0) or 0)
+    if iron == 0:
+        if any(k in name for k in ["牛肉", "豬肉", "肝", "貢丸", "紅肉"]):
+            iron = 2.5
+        elif any(k in name for k in ["豆漿", "豆腐", "豆乾", "菇"]):
+            iron = 1.8
+        elif any(k in name for k in ["蔬菜", "青菜", "沙拉", "海帶"]):
+            iron = 1.2
+        else:
+            iron = 0.8
 
     item["calories"] = round(calories)
     item["protein"] = round(protein, 1)
@@ -193,8 +218,8 @@ def validate_and_balance_nutrition(item: dict) -> dict:
     item["trans_fat"] = round(trans_fat, 1)
     item["fiber"] = round(fiber, 1)
     item["sodium"] = round(float(item.get("sodium", 0) or 0))
-    item["calcium"] = round(float(item.get("calcium", 0) or 0))
-    item["iron"] = round(float(item.get("iron", 0) or 0), 1)
+    item["calcium"] = round(calcium)
+    item["iron"] = round(iron, 1)
     item["is_fried"] = item.get("is_fried", False) or any(k in item.get("name", "") for k in ["炸", "脆", "酥"])
     return item
 

@@ -2,7 +2,7 @@
   "expo": {
     "name": "NutriLens",
     "slug": "nutrilens",
-    "version": "0.0.6",
+    "version": "0.0.8",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "nutrilens",
@@ -29,6 +29,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "允許 NutriLens 存取相簿，以便上傳菜單或營養標示照片。",
+          "cameraPermission": "允許 NutriLens 使用相機，以便拍攝菜單或營養標示照片。"
+        }
+      ],
       [
         "expo-splash-screen",
         {

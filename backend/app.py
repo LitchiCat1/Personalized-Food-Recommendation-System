@@ -32,7 +32,7 @@ from services.nutrition_label_service import (
     normalize_ocr_result,
     scale_nutrition_per_100g,
 )
-from services.nutrition_progress_service import build_daily_nutrition_progress
+from services.nutrition_progress_service import build_daily_nutrition_progress, calculate_pdf_daily_targets
 from services.nutrient_service import NUTRITION_FIELDS, get_nutrient_value
 from services.profile_service import build_bmr_response, build_user_profile
 from services.restaurant_ai_service import build_restaurant_ai_summary
@@ -473,7 +473,12 @@ def get_records(user_id):
     except (TypeError, ValueError):
         return jsonify({"error": "limit 與 offset 必須是有效數字"}), 400
     records = storage.get_records(user_id, date_str, limit=limit, offset=offset)
-    return jsonify({"records": records, "count": len(records)})
+    user = storage.get_user(user_id) or {}
+    return jsonify({
+        "records": records,
+        "count": len(records),
+        "nutrition_targets": calculate_pdf_daily_targets(user),
+    })
 
 
 @app.route("/records/<user_id>/<client_record_id>", methods=["PATCH"])

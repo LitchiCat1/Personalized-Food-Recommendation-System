@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, View, Text, StyleSheet, ActivityIndicator, TextInput, Pressable, Linking, Modal, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TextInput, Pressable, Linking, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
@@ -13,6 +13,7 @@ import DataPill from '@/components/ui/data-pill';
 import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
+import FeedbackBanner from '@/components/ui/feedback-banner';
 import FoodMap from '@/components/maps/FoodMap';
 import { saveRecord } from '@/lib/scanner';
 import {
@@ -62,12 +63,14 @@ export default function RecommendScreen() {
   const [addingFoodName, setAddingFoodName] = useState<string | null>(null);
   const [uploadingMenu, setUploadingMenu] = useState(false);
   const [photoSourceTarget, setPhotoSourceTarget] = useState<HealthyFoodRestaurant | null>(null);
+  const [menuUploadFeedback, setMenuUploadFeedback] = useState<{ tone: 'success' | 'error'; title: string; message?: string } | null>(null);
+  const [pageFeedback, setPageFeedback] = useState<{ tone: 'success' | 'error'; title: string; message?: string } | null>(null);
 
   const captureMenuPhoto = async (source: 'camera' | 'library'): Promise<string | null> => {
     if (source === 'camera') {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('需要相機權限', '請至系統設定開啟相機權限，才能拍攝菜單照片。');
+        setMenuUploadFeedback({ tone: 'error', title: '需要相機權限', message: '請至系統設定開啟相機權限，才能拍攝菜單照片。' });
         return null;
       }
       const result = await ImagePicker.launchCameraAsync({
@@ -93,6 +96,7 @@ export default function RecommendScreen() {
 
   const runMenuPhotoUpload = async (restaurant: HealthyFoodRestaurant, source: 'camera' | 'library') => {
     setPhotoSourceTarget(null);
+    setMenuUploadFeedback(null);
     const base64 = await captureMenuPhoto(source);
     if (!base64) return;
 
@@ -116,9 +120,18 @@ export default function RecommendScreen() {
       setViewingMenuRest((prev) =>
         prev ? { ...prev, recommended_items: response.recommended_items, filtered_items: response.filtered_items } : null
       );
-      Alert.alert('AI 辨識完成', '已成功解析實體菜單圖片並產生 3~5 項個人化推薦！');
+      const itemCount = (response.recommended_items?.length || 0) + (response.filtered_items?.length || 0);
+      if (itemCount === 0) {
+        setMenuUploadFeedback({
+          tone: 'error',
+          title: '沒有辨識到餐點',
+          message: '請確認照片清晰包含菜單品項與價格，或稍後再試一次。',
+        });
+      } else {
+        setMenuUploadFeedback({ tone: 'success', title: 'AI 辨識完成', message: '已成功解析實體菜單圖片並產生個人化推薦！' });
+      }
     } catch (err: any) {
-      Alert.alert('菜單辨識失敗', err?.message || '請選擇更清晰的菜單照片');
+      setMenuUploadFeedback({ tone: 'error', title: '菜單辨識失敗', message: err?.message || '請選擇更清晰的菜單照片' });
     } finally {
       setMenuLoading(false);
       setUploadingMenu(false);
@@ -192,9 +205,9 @@ export default function RecommendScreen() {
       });
       invalidateDietaryRecords();
       addMealFromScan([detectedFoodItem]);
-      Alert.alert('已新增紀錄', `已成功將「${foodName} (${foodItem.calories} kcal)」加入今日飲食紀錄！`);
+      setPageFeedback({ tone: 'success', title: '已新增紀錄', message: `已成功將「${foodName} (${foodItem.calories} kcal)」加入今日飲食紀錄！` });
     } catch (err: any) {
-      Alert.alert('新增紀錄失敗', err?.message || '請稍後再試');
+      setPageFeedback({ tone: 'error', title: '新增紀錄失敗', message: err?.message || '請稍後再試' });
     } finally {
       setAddingFoodName(null);
     }
@@ -256,7 +269,7 @@ export default function RecommendScreen() {
         [restaurant.restaurant_id]: result.summary,
       }));
     } catch (err: any) {
-      alert(err?.message || '無法取得 AI 摘要');
+      setPageFeedback({ tone: 'error', title: '無法取得 AI 摘要', message: err?.message });
     } finally {
       setSummaryLoadingKey(null);
     }
@@ -264,6 +277,7 @@ export default function RecommendScreen() {
 
   const handleViewMenu = async (restaurant: HealthyFoodRestaurant) => {
     setViewingMenuRest(restaurant);
+    setMenuUploadFeedback(null);
     if ((restaurant.recommended_items || []).length === 0 || !restaurant.nutrition_available) {
       setMenuLoading(true);
       try {
@@ -317,6 +331,15 @@ export default function RecommendScreen() {
         badge="地圖搜尋"
         badgeTone="success"
       />
+
+      {pageFeedback ? (
+        <FeedbackBanner
+          tone={pageFeedback.tone}
+          title={pageFeedback.title}
+          message={pageFeedback.message}
+          onDismiss={() => setPageFeedback(null)}
+        />
+      ) : null}
 
       <SectionBlock title="附近店家推薦" subtitle="Google Places 只提供真實店家位置；實際餐點營養仍建議用掃描確認。">
             <View style={styles.budgetRow}>
@@ -423,6 +446,17 @@ export default function RecommendScreen() {
                 onPress={() => viewingMenuRest && handleUploadMenuPhoto(viewingMenuRest)}
               />
             </View>
+
+            {menuUploadFeedback ? (
+              <View style={{ paddingHorizontal: Spacing.lg }}>
+                <FeedbackBanner
+                  tone={menuUploadFeedback.tone}
+                  title={menuUploadFeedback.title}
+                  message={menuUploadFeedback.message}
+                  onDismiss={() => setMenuUploadFeedback(null)}
+                />
+              </View>
+            ) : null}
 
             {menuLoading ? (
               <View style={{ justifyContent: 'center', alignItems: 'center', paddingVertical: Spacing.xl }}>

@@ -1,3 +1,5 @@
+import type { DetectedFood } from '@/constants/mock-data';
+
 export type HistoryDay = {
   date: string;
   record_count?: number;
@@ -495,5 +497,24 @@ export async function fetchRestaurantDetailedMenu(
     body: JSON.stringify(params),
   });
   return parseJson<{ restaurant_id: string; name: string; recommended_items: HealthyFoodRecommendation[]; filtered_items: any[] }>(resp);
+}
+
+export type BarcodeLookupResponse = {
+  found: boolean;
+  barcode: string;
+  detection?: DetectedFood;
+  error?: string;
+};
+
+export async function fetchBarcode(
+  apiBaseUrl: string,
+  barcode: string,
+  auth?: ApiAuth,
+): Promise<BarcodeLookupResponse> {
+  const normalized = barcode.trim();
+  const resp = await fetch(`${apiBaseUrl}/barcode/${encodeURIComponent(normalized)}`, {
+    headers: buildHeaders(auth),
+  });
+  return parseJson<BarcodeLookupResponse>(resp);
 }
 

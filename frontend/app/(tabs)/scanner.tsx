@@ -20,9 +20,12 @@ import FeedbackBanner from '@/components/ui/feedback-banner';
 import ScannerCameraView from '@/components/scanner/ScannerCameraView';
 import ScannerManualTools from '@/components/scanner/ScannerManualTools';
 import ScannerResults from '@/components/scanner/ScannerResults';
+import { fetchBarcode, fetchRestaurantDetailedMenu } from '@/lib/api';
 import {
   buildOCRDetectedFood,
   FOOD_NAME_REQUIRED_MESSAGE,
+  mapBarcodeDetectionToDetectedFood,
+  mapMenuRecommendationsToDetectedFoods,
   manualSearchFood,
   normalizeFoodName,
   runNutritionLabelOCR,
@@ -44,7 +47,7 @@ import {
   type RecordSource,
 } from '@/lib/recordSyncQueue';
 
-type ScanMode = 'camera' | 'gallery' | 'label' | 'manual';
+type ScanMode = 'camera' | 'gallery' | 'label' | 'menu' | 'barcode' | 'manual';
 
 type RecordFeedback = {
   tone: 'success' | 'error';
@@ -61,6 +64,8 @@ const SCAN_MODE_OPTIONS = [
   { value: 'camera', label: '拍照' },
   { value: 'gallery', label: '相簿' },
   { value: 'label', label: '營養標示' },
+  { value: 'menu', label: '菜單' },
+  { value: 'barcode', label: '條碼' },
   { value: 'manual', label: '手動搜尋' },
 ];
 
@@ -231,6 +236,9 @@ export default function ScannerScreen() {
   const [ocrDraft, setOcrDraft] = useState<OCRDraft | null>(null);
   const [ocrNameError, setOcrNameError] = useState<string | null>(null);
   const [scanMode, setScanMode] = useState<ScanMode>('camera');
+  const [menuQuerying, setMenuQuerying] = useState(false);
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [barcodeQuerying, setBarcodeQuerying] = useState(false);
   const [syncingRecord, setSyncingRecord] = useState(false);
   const [activeRecordSubmission, setActiveRecordSubmission] = useState<ActiveRecordSubmission | null>(null);
   const [recordFeedback, setRecordFeedback] = useState<RecordFeedback | null>(null);
@@ -364,6 +372,100 @@ export default function ScannerScreen() {
       return;
     }
     Alert.alert('圖片無法讀取', '請改選另一張圖片，或直接使用相機拍攝。');
+  };
+
+  const handleMenuPhotoUpload = async () => {
+    let result: ImagePicker.ImagePickerResult;
+    try {
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        base64: true,
+        quality: 0.8,
+      });
+    } catch (error: any) {
+      setRecordFeedback({ tone: 'error', title: '無法取得菜單照片', message: error?.message || '請確認相簿權限後再試。' });
+      return;
+    }
+
+    if (result.canceled) return;
+    const imageBase64 = result.assets?.[0]?.base64;
+    if (!imageBase64) {
+      setRecordFeedback({ tone: 'error', title: '圖片無法讀取', message: '請改選一張清晰、完整的菜單圖片。' });
+      return;
+    }
+
+    setRecordFeedback(null);
+    setMenuQuerying(true);
+    setScanning(true);
+    try {
+      const response = await fetchRestaurantDetailedMenu(
+        apiBaseUrl,
+        {
+          restaurant_id: `photo_${Date.now()}`,
+          name: '上傳菜單',
+          address: '台灣',
+          budget: 150,
+          user_id: user.userId,
+          lat: 25.0338,
+          lng: 121.5645,
+          menu_image: imageBase64,
+        },
+        { accessToken },
+      );
+      const detections = mapMenuRecommendationsToDetectedFoods(response.recommended_items || []);
+      if (detections.length === 0) {
+        clearScan();
+        const filteredCount = response.filtered_items?.length || 0;
+        setRecordFeedback({
+          tone: 'error',
+          title: '菜單辨識完成，但沒有可推薦品項',
+          message: filteredCount > 0
+            ? `${filteredCount} 項品項因預算或健康條件被排除，請換一張菜單或改用手動搜尋。`
+            : '請拍攝清晰且完整的菜單照片後重試。',
+        });
+        return;
+      }
+      setRejectedDetections([]);
+      setManualResults([]);
+      setScanResult(detections);
+      setRecordFeedback({ tone: 'success', title: '菜單辨識完成', message: `已整理 ${detections.length} 項品項，請確認估算份量後再加入紀錄。` });
+    } catch (error: any) {
+      clearScan();
+      setRecordFeedback({ tone: 'error', title: '菜單辨識失敗', message: error?.message || '請選擇更清晰的菜單照片後重試。' });
+    } finally {
+      setMenuQuerying(false);
+      setScanning(false);
+    }
+  };
+
+  const handleBarcodeLookup = async (codeToLookup?: string) => {
+    const code = (codeToLookup || barcodeInput).replace(/\D/g, '');
+    if (!code) {
+      setRecordFeedback({ tone: 'error', title: '請輸入條碼', message: '請輸入包裝上的 EAN/UPC 條碼數字。' });
+      return;
+    }
+
+    setRecordFeedback(null);
+    setBarcodeQuerying(true);
+    setScanning(true);
+    try {
+      const response = await fetchBarcode(apiBaseUrl, code, { accessToken });
+      if (!response.found || !response.detection) {
+        clearScan();
+        setRecordFeedback({ tone: 'error', title: '查無條碼資料', message: response.error || '找不到此商品，可改拍營養標示或手動搜尋。' });
+        return;
+      }
+      const detection = mapBarcodeDetectionToDetectedFood(response.detection);
+      setManualResults([]);
+      setScanResult([detection]);
+      setRecordFeedback({ tone: 'success', title: '條碼查詢成功', message: `已找到「${detection.foodName}」的每 100g 營養資料。` });
+    } catch (error: any) {
+      clearScan();
+      setRecordFeedback({ tone: 'error', title: '條碼查詢失敗', message: error?.message || '條碼查詢服務暫時無法連線。' });
+    } finally {
+      setBarcodeQuerying(false);
+      setScanning(false);
+    }
   };
 
   const handleLabelOCRFromGallery = async () => {
@@ -690,6 +792,8 @@ export default function ScannerScreen() {
     camera: { icon: 'camera-outline' as const, title: '拍攝完整餐盤', hint: '保持光線充足並避免遮擋，拍攝後會立即送出 AI 分析。', action: '啟動相機', onPress: handleCamera },
     gallery: { icon: 'images-outline' as const, title: '從相簿選擇餐點', hint: '可使用已拍攝的餐點照片，不需要重新開啟相機。', action: '選擇餐點照片', onPress: handleGallery },
     label: { icon: 'document-text-outline' as const, title: '辨識包裝營養標示', hint: '選擇清晰的營養標示照片，可建立自訂食品或直接加入紀錄。', action: ocrQuerying ? '辨識中' : '選擇標示照片', onPress: handleLabelOCRFromGallery },
+    menu: { icon: 'receipt-outline' as const, title: '上傳菜單照片', hint: '拍攝實體菜單後上傳，系統會辨識菜名並套用你的預算與健康條件。', action: menuQuerying ? '辨識中' : '選擇菜單照片', onPress: handleMenuPhotoUpload },
+    barcode: { icon: 'barcode-outline' as const, title: '國際條碼查詢', hint: '輸入商品包裝條碼 EAN-13/UPC，自動載入每 100g 營養資料。', action: barcodeQuerying ? '查詢中' : '查詢條碼', onPress: () => handleBarcodeLookup() },
     manual: { icon: 'search-outline' as const, title: '從食品資料庫搜尋', hint: '辨識結果不確定時，可直接從 TFDA 與自訂食品中補上餐點。', action: '', onPress: handleManualSearch },
   }[scanMode];
 
@@ -698,7 +802,7 @@ export default function ScannerScreen() {
       <SegmentedControl options={SCAN_MODE_OPTIONS} value={scanMode} onChange={(value) => setScanMode(value as ScanMode)} />
       <View style={styles.scanHero}>
         <View style={styles.scanIcon}>
-          {scanResult.isScanning || ocrQuerying ? (
+          {scanResult.isScanning || ocrQuerying || menuQuerying || barcodeQuerying ? (
             <ActivityIndicator size="large" color={Palette.accent.green} />
           ) : results.length > 0 ? (
             <Ionicons name="checkmark-circle-outline" size={42} color={Palette.accent.green} />
@@ -709,7 +813,7 @@ export default function ScannerScreen() {
         <Text style={styles.scanTitle}>{scanResult.isScanning ? '正在分析照片' : results.length > 0 ? `已辨識 ${results.length} 項食物` : modeConfig.title}</Text>
         <Text style={styles.scanHint}>{results.length > 0 ? `合計 ${totalCal} kcal，鈉 ${totalSodium}mg。請確認份量後加入。` : modeConfig.hint}</Text>
         {scanMode !== 'manual' ? (
-          <PrimaryButton label={modeConfig.action} onPress={modeConfig.onPress} disabled={scanResult.isScanning || ocrQuerying} icon={<Ionicons name={modeConfig.icon} size={18} color={Palette.text.inverse} />} />
+          <PrimaryButton label={modeConfig.action} onPress={modeConfig.onPress} disabled={scanResult.isScanning || ocrQuerying || menuQuerying || barcodeQuerying} icon={<Ionicons name={modeConfig.icon} size={18} color={Palette.text.inverse} />} />
         ) : null}
         {results.length > 0 ? (
           <SecondaryButton label="清除辨識結果" onPress={clearScan} icon={<Ionicons name="trash-outline" size={16} color={Palette.text.secondary} />} />
@@ -765,6 +869,42 @@ export default function ScannerScreen() {
       </View>
       {scanMode === 'manual' ? (
         <ScannerManualTools rs={rs} manualQuery={manualQuery} onManualQueryChange={setManualQuery} manualSearching={manualSearching} onManualSearch={handleManualSearch} ocrQuerying={ocrQuerying} onOCRSearch={handleLabelOCRFromGallery} rejectedDetections={rejectedDetections} />
+      ) : null}
+      {scanMode === 'menu' ? (
+        <View style={styles.modeNote}>
+          <Ionicons name="information-circle-outline" size={18} color={Palette.accent.blue} />
+          <View style={styles.conditionCopy}>
+            <Text style={styles.conditionTitle}>菜單辨識模式</Text>
+            <Text style={styles.conditionText}>上傳實體菜單照片後，系統會依可辨識品項產生保守的營養估算；模糊或未辨識的品項不會硬猜。</Text>
+          </View>
+        </View>
+      ) : null}
+      {scanMode === 'barcode' ? (
+        <View style={styles.barcodeCard}>
+          <Text style={styles.conditionTitle}>輸入包裝商品條碼</Text>
+          <View style={styles.barcodeRow}>
+            <TextInput
+              value={barcodeInput}
+              onChangeText={(value) => setBarcodeInput(value.replace(/\D/g, ''))}
+              placeholder="例如：4710088410107"
+              placeholderTextColor={Palette.text.muted}
+              keyboardType="number-pad"
+              returnKeyType="search"
+              onSubmitEditing={() => handleBarcodeLookup()}
+              style={styles.barcodeInput}
+              accessibilityLabel="商品條碼"
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="查詢條碼"
+              onPress={() => handleBarcodeLookup()}
+              disabled={barcodeQuerying || scanResult.isScanning}
+              style={({ pressed }) => [styles.barcodeButton, pressed && styles.barcodeButtonPressed, (barcodeQuerying || scanResult.isScanning) && styles.controlDisabled]}
+            >
+              {barcodeQuerying ? <ActivityIndicator size="small" color={Palette.text.inverse} /> : <Text style={styles.barcodeButtonText}>查詢</Text>}
+            </Pressable>
+          </View>
+        </View>
       ) : null}
     </>
   );
@@ -908,9 +1048,16 @@ const styles = StyleSheet.create({
   scanTitle: { ...Typography.h2, color: Palette.text.primary, textAlign: 'center' },
   scanHint: { ...Typography.caption, color: Palette.text.secondary, textAlign: 'center' },
   conditionSummary: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, backgroundColor: Palette.bg.card, borderWidth: 1, borderColor: Palette.border.subtle, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.xl },
+  modeNote: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, backgroundColor: Palette.bg.card, borderWidth: 1, borderColor: Palette.border.subtle, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.xl },
   conditionCopy: { flex: 1, gap: 2 },
   conditionTitle: { ...Typography.caption, color: Palette.text.primary },
   conditionText: { ...Typography.small, color: Palette.text.tertiary },
+  barcodeCard: { backgroundColor: Palette.bg.card, borderWidth: 1, borderColor: Palette.border.subtle, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.xl, gap: Spacing.sm },
+  barcodeRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
+  barcodeInput: { flex: 1, minWidth: 0, minHeight: 48, backgroundColor: Palette.bg.elevated, borderRadius: Radius.md, borderWidth: 1, borderColor: Palette.border.subtle, color: Palette.text.primary, paddingHorizontal: Spacing.md, ...Typography.caption },
+  barcodeButton: { minHeight: 48, minWidth: 76, borderRadius: Radius.md, backgroundColor: Palette.accent.green, paddingHorizontal: Spacing.md, alignItems: 'center', justifyContent: 'center' },
+  barcodeButtonPressed: { opacity: 0.82 },
+  barcodeButtonText: { ...Typography.bodyBold, color: Palette.text.inverse },
   resultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.lg },
   sectionTitle: { ...Typography.h3, color: Palette.text.primary },
   ocrBrandRow: { flexDirection: 'row', marginBottom: Spacing.md },

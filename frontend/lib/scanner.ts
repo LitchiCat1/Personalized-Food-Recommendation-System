@@ -1,5 +1,5 @@
 import type { DetectedFood } from '@/constants/mock-data';
-import type { ApiAuth } from '@/lib/api';
+import type { ApiAuth, HealthyFoodRecommendation } from '@/lib/api';
 
 
 function buildHeaders(auth?: ApiAuth, contentType?: string): HeadersInit {
@@ -94,6 +94,91 @@ function mapApiDetections(detections: any[]): DetectedFood[] {
     allergens: d.allergens || [],
     warnings: d.warnings || [],
   }));
+}
+
+/** Convert personalized menu items into the same editable result shape as photo detections. */
+export function mapMenuRecommendationsToDetectedFoods(items: HealthyFoodRecommendation[]): DetectedFood[] {
+  return (items || [])
+    .filter((item) => Boolean(item.item_name?.trim()))
+    .map((item, index) => {
+      const foodName = item.item_name.trim();
+      const reasons = (item.reasons || []).filter(Boolean);
+      const nutrition = {
+        calories: Number(item.calories || 0),
+        protein: Number(item.protein || 0),
+        carbs: Number(item.carbs || 0),
+        sugar: Number(item.sugar || 0),
+        fat: Number(item.fat || 0),
+        saturated_fat: Number(item.saturated_fat || 0),
+        trans_fat: Number(item.trans_fat || 0),
+        sodium: Number(item.sodium || 0),
+        fiber: Number(item.fiber || 0),
+        calcium: Number(item.calcium || 0),
+        iron: Number(item.iron || 0),
+        is_fried: item.is_fried === true,
+      };
+      return {
+        id: `menu_${Date.now()}_${index}`,
+        foodName,
+        confidence: Math.min(99, Math.max(1, Number(item.match_score || 80))),
+        source: 'menu-photo',
+        needsConfirmation: true,
+        boundingBox: { x: 0, y: 0, w: 0, h: 0 },
+        estimatedWeight: 100,
+        originalEstimatedWeight: 100,
+        portionRange: { minG: 100, maxG: 100, uncertaintyPercent: 35 },
+        portionEstimationMethod: 'menu_photo_estimate',
+        reliability: {
+          level: 'low' as const,
+          score: 0.55,
+          reasons: ['菜單照片辨識與常見份量估算，請以店家標示為準'],
+        },
+        nutrition,
+        originalNutrition: nutrition,
+        gi: item.gi === 'low' || item.gi === 'high' ? item.gi : 'medium',
+        allergens: [],
+        warnings: ['菜單照片估算，非店家正式營養標示', ...reasons],
+      };
+    });
+}
+
+export function mapBarcodeDetectionToDetectedFood(detection: any): DetectedFood {
+  const nutrition = detection?.nutrition || {};
+  const weight = Number(detection?.estimated_weight_g || 100);
+  return {
+    id: String(detection?.id || `barcode_${Date.now()}`),
+    foodName: String(detection?.name_zh || detection?.foodName || '條碼食品'),
+    confidence: Math.round(Number(detection?.confidence || 0.98) * 100),
+    source: detection?.source || 'Open Food Facts',
+    needsConfirmation: false,
+    boundingBox: detection?.bounding_box || detection?.boundingBox || { x: 0, y: 0, w: 0, h: 0 },
+    estimatedWeight: weight,
+    originalEstimatedWeight: weight,
+    portionRange: { minG: weight, maxG: weight, uncertaintyPercent: 0 },
+    portionEstimationMethod: detection?.portion_estimation_method || 'barcode_nutrition_per_100g',
+    reliability: detection?.reliability || {
+      level: 'medium',
+      score: 0.9,
+      reasons: ['Open Food Facts 包裝食品資料', '營養值以每 100g 顯示'],
+    },
+    nutrition: {
+      calories: Number(nutrition.calories || 0),
+      protein: Number(nutrition.protein || 0),
+      carbs: Number(nutrition.carbs || 0),
+      sugar: Number(nutrition.sugar || 0),
+      fat: Number(nutrition.fat || 0),
+      saturated_fat: Number(nutrition.saturated_fat || 0),
+      trans_fat: Number(nutrition.trans_fat || 0),
+      sodium: Number(nutrition.sodium || 0),
+      fiber: Number(nutrition.fiber || 0),
+      calcium: Number(nutrition.calcium || 0),
+      iron: Number(nutrition.iron || 0),
+      is_fried: false,
+    },
+    gi: detection?.gi || 'medium',
+    allergens: detection?.allergens || [],
+    warnings: detection?.warnings || ['資料來自 Open Food Facts，請以包裝標示為準'],
+  };
 }
 
 export async function runPrediction(params: {

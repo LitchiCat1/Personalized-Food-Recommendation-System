@@ -15,9 +15,16 @@ def _parse_nutrients(product: dict) -> dict:
         "calories": nutriments.get("energy-kcal_100g") or nutriments.get("energy-kcal") or 0,
         "protein": nutriments.get("proteins_100g") or nutriments.get("proteins") or 0,
         "carbs": nutriments.get("carbohydrates_100g") or nutriments.get("carbohydrates") or 0,
+        "sugar": nutriments.get("sugars_100g") or nutriments.get("sugars") or 0,
         "fat": nutriments.get("fat_100g") or nutriments.get("fat") or 0,
-        "sodium": nutriments.get("sodium_100g") or nutriments.get("sodium") or 0,
+        "saturated_fat": nutriments.get("saturated-fat_100g") or nutriments.get("saturated-fat") or 0,
+        "trans_fat": nutriments.get("trans-fat_100g") or nutriments.get("trans-fat") or 0,
+        # Open Food Facts stores mineral/salt values in grams per 100g;
+        # NutriLens exposes these fields in milligrams.
+        "sodium": (nutriments.get("sodium_100g") or nutriments.get("sodium") or 0) * 1000,
         "fiber": nutriments.get("fiber_100g") or nutriments.get("fiber") or 0,
+        "calcium": (nutriments.get("calcium_100g") or nutriments.get("calcium") or 0) * 1000,
+        "iron": (nutriments.get("iron_100g") or nutriments.get("iron") or 0) * 1000,
     }
 
 
@@ -33,7 +40,7 @@ def build_open_food_facts_product(product: dict) -> dict:
     labels = _normalize_tags(product.get("labels_tags") or [])
     ingredients_text = product.get("ingredients_text") or ""
     return {
-        "product_name": product.get("product_name") or product.get("generic_name") or "",
+        "product_name": product.get("product_name_zh") or product.get("product_name") or product.get("generic_name") or "",
         "brands": product.get("brands") or "",
         "barcode": product.get("code") or "",
         "ingredients_text": ingredients_text,

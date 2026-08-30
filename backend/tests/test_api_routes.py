@@ -49,6 +49,44 @@ class ApiRouteTests(unittest.TestCase):
             response = self.client.get("/user/user-b", headers=self.auth_headers())
         self.assertEqual(response.status_code, 403)
 
+    def test_barcode_lookup_returns_normalized_detection(self):
+        product = {
+            "product_name": "測試餅乾",
+            "code": "4712345678901",
+            "allergens": ["en:milk"],
+            "nutriments": {
+                "energy-kcal_100g": 450,
+                "proteins_100g": 6,
+                "carbohydrates_100g": 65,
+                "sugars_100g": 18,
+                "fat_100g": 16,
+                "sodium_100g": 0.32,
+                "fiber_100g": 2,
+                "calcium_100g": 0.12,
+                "iron_100g": 0.003,
+            },
+        }
+        with self.mock_auth("user-a"):
+            with patch.object(self.app_module, "fetch_open_food_facts_product", return_value={
+                "product_name": "測試餅乾",
+                "nutriments": {
+                    "calories": 450, "protein": 6, "carbs": 65, "sugar": 18,
+                    "fat": 16, "sodium": 320, "fiber": 2, "calcium": 120, "iron": 3,
+                },
+                "allergens": ["en:milk"],
+            }):
+                response = self.client.get("/barcode/4712345678901", headers=self.auth_headers())
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data["found"])
+        self.assertEqual(data["detection"]["name_zh"], "測試餅乾")
+        self.assertEqual(data["detection"]["nutrition"]["sodium"], 320)
+
+    def test_barcode_lookup_rejects_invalid_code(self):
+        with self.mock_auth("user-a"):
+            response = self.client.get("/barcode/not-a-barcode", headers=self.auth_headers())
+        self.assertEqual(response.status_code, 400)
+
     def test_vision_food_accepts_raw_base64_and_browser_data_uri(self):
         image_base64 = base64.b64encode(b"\x89PNG\r\n\x1a\nmock-image").decode("ascii")
 

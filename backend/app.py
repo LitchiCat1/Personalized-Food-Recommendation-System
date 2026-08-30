@@ -42,6 +42,7 @@ from services.vision_food_service import (
 )
 from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini, parse_menu_image_with_gemini
 from services.medical_risk_service import evaluate_medical_risk
+from services.open_food_facts_service import fetch_open_food_facts_product
 
 
 load_local_env()
@@ -520,6 +521,70 @@ def get_history(user_id):
     require_user_access(user_id)
     days = int(request.args.get("days", 7))
     return jsonify(build_history_response(storage, user_id, days))
+
+
+@app.route("/barcode/<barcode>", methods=["GET"])
+def lookup_barcode(barcode):
+    """Look up packaged-food nutrition from Open Food Facts."""
+    if is_auth_required():
+        # This endpoint has no user path segment, but production still requires
+        # a valid Supabase bearer token before contacting the external service.
+        get_request_user_id()
+
+    normalized_barcode = str(barcode or "").strip()
+    if not normalized_barcode.isdigit() or not 8 <= len(normalized_barcode) <= 14:
+        return jsonify({"error": "條碼必須是 8 至 14 位數字"}), 400
+
+    try:
+        product = fetch_open_food_facts_product(normalized_barcode)
+    except requests.RequestException:
+        return jsonify({"error": "條碼資料服務暫時無法連線"}), 502
+    except (ValueError, TypeError):
+        return jsonify({"error": "條碼資料格式無效"}), 502
+
+    if not product:
+        return jsonify({
+            "found": False,
+            "barcode": normalized_barcode,
+            "error": "找不到此條碼對應的食品資訊",
+        }), 200
+
+    nutrients = product.get("nutriments") or {}
+    nutrition = {
+        "calories": round(float(nutrients.get("calories") or 0)),
+        "protein": round(float(nutrients.get("protein") or 0), 1),
+        "carbs": round(float(nutrients.get("carbs") or 0), 1),
+        "sugar": round(float(nutrients.get("sugar") or 0), 1),
+        "fat": round(float(nutrients.get("fat") or 0), 1),
+        "saturated_fat": round(float(nutrients.get("saturated_fat") or 0), 1),
+        "trans_fat": round(float(nutrients.get("trans_fat") or 0), 1),
+        "sodium": round(float(nutrients.get("sodium") or 0)),
+        "fiber": round(float(nutrients.get("fiber") or 0), 1),
+        "calcium": round(float(nutrients.get("calcium") or 0), 1),
+        "iron": round(float(nutrients.get("iron") or 0), 1),
+        "is_fried": False,
+    }
+    detection = {
+        "id": f"barcode_{normalized_barcode}",
+        "name_zh": product.get("product_name") or f"條碼食品 {normalized_barcode}",
+        "confidence": 0.98,
+        "source": "Open Food Facts",
+        "needs_confirmation": False,
+        "bounding_box": {"x": 0, "y": 0, "w": 0, "h": 0},
+        "estimated_weight_g": 100,
+        "portion_range_g": {"min_g": 100, "max_g": 100, "uncertainty_percent": 0},
+        "portion_estimation_method": "barcode_nutrition_per_100g",
+        "reliability": {
+            "level": "medium",
+            "score": 0.9,
+            "reasons": ["Open Food Facts 包裝食品資料", "營養值以每 100g 顯示"],
+        },
+        "nutrition": nutrition,
+        "gi": "medium",
+        "allergens": product.get("allergens") or [],
+        "warnings": ["資料來自 Open Food Facts，請以包裝標示為準"],
+    }
+    return jsonify({"found": True, "barcode": normalized_barcode, "detection": detection}), 200
 
 
 @app.route("/healthy-food-recommend/<user_id>", methods=["GET"])

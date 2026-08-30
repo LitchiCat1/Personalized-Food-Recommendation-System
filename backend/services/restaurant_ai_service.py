@@ -210,7 +210,10 @@ def call_gemini_restaurant_summary(
             "generationConfig": {
                 "temperature": 0.2,
                 "responseMimeType": "application/json",
-                "maxOutputTokens": 1400,
+                # Chinese explanations can consume more tokens than the
+                # compact schema suggests. Keep enough headroom so Gemini
+                # does not truncate the JSON mid-string with MAX_TOKENS.
+                "maxOutputTokens": 3000,
                 "responseSchema": {
                     "type": "OBJECT",
                     "properties": {

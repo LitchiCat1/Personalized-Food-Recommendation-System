@@ -1,5 +1,11 @@
 # Changelog
 
+## Gemini model alignment
+
+- 統一所有 Gemini 流程固定使用 Free Tier 模型 `gemini-2.5-flash`。
+- 移除 `gemini-2.5-pro`、舊版與 preview 模型候選；`GEMINI_MODELS`/`GEMINI_MODEL` 自訂值也只接受 `gemini-2.5-flash`。
+- 菜單與餐廳資料流程改用共用模型選擇器，避免不同功能使用不一致的模型。
+
 ## v0.0.7e bug fixes
 
 - 修正首頁今日健康評分圓環，改用固定尺寸 SVG 進度環避免偏移。
@@ -96,7 +102,7 @@
 ### Added
 
 - Added Google Places API (New) v1 fallback to handle projects with disabled Legacy Places API.
-- Added multi-version Gemini model selection (trying `gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-1.5-flash` in sequence) to resolve model deprecations on newer keys.
+- Added Gemini model selection with fallback candidates to resolve model deprecations on newer keys. Current deployments are pinned to `gemini-2.5-flash`.
 - Added local location fallback flat coordinate shifting for mock restaurants in dev catalog, guaranteeing markers show up during off-grid offline local testing.
 - Added detailed offline empty-state helper guides inside the menu Modal to direct users to camera scanning and AI summaries.
 

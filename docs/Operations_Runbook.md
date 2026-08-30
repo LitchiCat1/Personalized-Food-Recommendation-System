@@ -86,7 +86,7 @@ python -m py_compile "backend/app.py" "backend/services/auth_service.py" "backen
 DATABASE_URL=postgresql://...
 GEMINI_API_KEYS=key1,key2,key3
 GEMINI_API_KEY=single-key-fallback
-GEMINI_MODELS=gemini-2.5-flash,gemini-2.0-flash
+GEMINI_MODELS=gemini-2.5-flash
 DISEASE_RULES_PATH=backend/config/disease_rules.json
 RESTAURANT_CATALOG_PATH=backend/data/restaurant_catalog.json
 SUPABASE_AUTH_REQUIRED=true
@@ -116,7 +116,7 @@ GOOGLE_PLACES_API_KEY=your-google-maps-and-places-key
 
 ## 4. Gemini API Key 輪替
 
-本專案使用 Gemini API 進行食物影像辨識與營養標示 OCR。Render 部署環境建議使用 `GEMINI_API_KEYS` 放多組 key 做輪替；本機可使用單一 `GEMINI_API_KEY` 或同樣使用 `GEMINI_API_KEYS`。模型可用 `GEMINI_MODELS` 以逗號分隔設定候選順序；未設定時會依序嘗試 `gemini-2.5-flash`、`gemini-2.0-flash`、`gemini-1.5-flash`。
+本專案使用 Gemini API 進行食物影像辨識、菜單解析、營養標示 OCR 與店家摘要。Render 部署環境建議使用 `GEMINI_API_KEYS` 放多組 key 做輪替；本機可使用單一 `GEMINI_API_KEY` 或同樣使用 `GEMINI_API_KEYS`。所有流程固定使用 Google AI Studio Free Tier 的 `gemini-2.5-flash`；`GEMINI_MODELS`/`GEMINI_MODEL` 僅接受此模型 ID，其他 Pro、preview 與已淘汰模型會被忽略，避免 Free Tier key 收到 404。
 
 單一 key：
 

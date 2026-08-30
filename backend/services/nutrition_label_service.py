@@ -11,7 +11,11 @@ from services.nutrient_service import get_nutrient_value
 
 
 RETRYABLE_GEMINI_STATUS_CODES = {401, 403, 404, 429, 500, 502, 503, 504}
-DEFAULT_GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-flash"]
+# Keep every Gemini call on the single model selected for this deployment.
+# Restricting the allowlist prevents a Free Tier key from accidentally trying
+# Pro, preview, or deprecated model IDs from an environment override.
+FREE_TIER_GEMINI_MODELS = ("gemini-2.5-flash",)
+DEFAULT_GEMINI_MODELS = list(FREE_TIER_GEMINI_MODELS)
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 
 
@@ -269,12 +273,13 @@ def get_gemini_models() -> list[str]:
     raw_models = [os.environ.get("GEMINI_MODELS"), os.environ.get("GEMINI_MODEL")]
     models: list[str] = []
     seen = set()
+    allowed_models = set(FREE_TIER_GEMINI_MODELS)
     for raw in raw_models:
         if not raw:
             continue
         for model in raw.split(","):
             normalized = model.strip()
-            if normalized and normalized not in seen:
+            if normalized in allowed_models and normalized not in seen:
                 models.append(normalized)
                 seen.add(normalized)
     for model in DEFAULT_GEMINI_MODELS:

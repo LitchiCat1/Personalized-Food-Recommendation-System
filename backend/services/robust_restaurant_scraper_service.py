@@ -5,7 +5,12 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
-from services.nutrition_label_service import decode_image_base64, extract_json_block, get_gemini_api_keys
+from services.nutrition_label_service import (
+    decode_image_base64,
+    extract_json_block,
+    get_gemini_api_keys,
+    get_gemini_models,
+)
 
 # Modern User-Agents to prevent anti-bot blocking
 USER_AGENTS = [
@@ -233,7 +238,7 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
         return {"items": fallback_items}
     
     prompt = build_restaurant_enrichment_prompt(restaurant_name, address, scraped_text)
-    candidate_models = ["gemini-2.5-flash", "gemini-2.5-pro"]
+    candidate_models = get_gemini_models()
     for gemini_key in keys:
         for model_name in candidate_models:
             try:
@@ -296,7 +301,7 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
         return {"items": [], "error": "缺少 Gemini API key，無法解析菜單照片"}
     
     prompt = build_menu_image_prompt(restaurant_name)
-    candidate_models = ["gemini-2.5-flash", "gemini-2.5-pro"]
+    candidate_models = get_gemini_models()
     for gemini_key in keys:
         for model_name in candidate_models:
             try:

@@ -573,7 +573,13 @@ def get_restaurant_menu():
     restaurant_id = data.get("restaurant_id", "")
     name = data.get("name", "").strip()
     address = data.get("address", "").strip()
-    menu_image = data.get("menu_image", "").strip()
+    raw_menu_image = data.get("menu_image", "")
+    if raw_menu_image is None:
+        menu_image = ""
+    elif isinstance(raw_menu_image, str):
+        menu_image = raw_menu_image.strip()
+    else:
+        return jsonify({"error": "menu_image 必須是 Base64 圖片字串"}), 400
     
     if not name:
         return jsonify({"error": "缺少 restaurant name"}), 400
@@ -585,11 +591,21 @@ def get_restaurant_menu():
             matched = r
             break
 
+    menu_recognition = None
     if menu_image:
         print(f"[Scraper] 使用 Gemini Vision AI 辨識 {name} 的實體菜單圖片")
         enriched = parse_menu_image_with_gemini(menu_image, name)
+        menu_recognition = {
+            key: enriched[key]
+            for key in ("recognition_status", "recognition_error", "recognition_model")
+            if key in enriched
+        }
+        recognized_items = enriched.get("items", [])
         if matched:
-            matched["items"] = enriched.get("items", [])
+            # Do not destroy a previously known menu when a transient Vision
+            # failure, quota error, or unreadable photo returns zero items.
+            if recognized_items:
+                matched["items"] = recognized_items
         else:
             new_id = restaurant_id or f"scraped_{uuid.uuid4().hex[:6]}"
             matched = {
@@ -602,7 +618,7 @@ def get_restaurant_menu():
                 "open_hours": ["11:00-21:00"],
                 "tags": ["實體菜單辨識", "AI標記"],
                 "price_level": 2,
-                "items": enriched.get("items", [])
+                "items": recognized_items
             }
             RESTAURANT_CATALOG.append(matched)
     elif not matched:
@@ -737,7 +753,8 @@ def get_restaurant_menu():
         "restaurant_id": matched["restaurant_id"],
         "name": matched["name"],
         "recommended_items": top_recommended,
-        "filtered_items": filtered_items
+        "filtered_items": filtered_items,
+        "menu_recognition": menu_recognition,
     })
 
 

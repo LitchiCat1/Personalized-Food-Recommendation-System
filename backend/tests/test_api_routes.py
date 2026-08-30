@@ -79,6 +79,33 @@ class ApiRouteTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 400)
                 self.assertIn("error", response.get_json())
 
+    def test_menu_photo_route_exposes_recognition_failure(self):
+        image_base64 = base64.b64encode(b"\x89PNG\r\n\x1a\nmenu-image").decode("ascii")
+        parsed = {
+            "items": [],
+            "recognition_status": "error",
+            "recognition_error": "Gemini HTTP 429: quota exceeded",
+        }
+
+        with self.mock_auth("user-a"):
+            with patch.object(self.app_module, "parse_menu_image_with_gemini", return_value=parsed):
+                response = self.client.post(
+                    "/restaurant/menu",
+                    json={
+                        "restaurant_id": "menu-test-restaurant",
+                        "name": "測試菜單辨識店",
+                        "user_id": "user-a",
+                        "menu_image": image_base64,
+                    },
+                    headers=self.auth_headers(),
+                )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["recommended_items"], [])
+        self.assertEqual(data["menu_recognition"]["recognition_status"], "error")
+        self.assertIn("429", data["menu_recognition"]["recognition_error"])
+
     def test_record_route_deduplicates_client_record_id(self):
         payload = {
             "user_id": "user-a",

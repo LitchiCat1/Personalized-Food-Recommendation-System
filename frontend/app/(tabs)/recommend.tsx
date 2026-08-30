@@ -16,6 +16,7 @@ import SegmentedControl from '@/components/ui/segmented-control';
 import FeedbackBanner from '@/components/ui/feedback-banner';
 import FoodMap from '@/components/maps/FoodMap';
 import { saveRecord } from '@/lib/scanner';
+import { resolveImageBase64 } from '@/lib/image';
 import {
   fetchHealthyFoodRecommendations,
   fetchRestaurantAiSummary,
@@ -77,8 +78,8 @@ export default function RecommendScreen() {
         base64: true,
         quality: 0.8,
       });
-      if (result.canceled || !result.assets?.[0]?.base64) return null;
-      return result.assets[0].base64;
+      if (result.canceled) return null;
+      return resolveImageBase64(result.assets?.[0]);
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -86,8 +87,8 @@ export default function RecommendScreen() {
       base64: true,
       quality: 0.8,
     });
-    if (result.canceled || !result.assets?.[0]?.base64) return null;
-    return result.assets[0].base64;
+    if (result.canceled) return null;
+    return resolveImageBase64(result.assets?.[0]);
   };
 
   const handleUploadMenuPhoto = (restaurant: HealthyFoodRestaurant) => {
@@ -97,12 +98,13 @@ export default function RecommendScreen() {
   const runMenuPhotoUpload = async (restaurant: HealthyFoodRestaurant, source: 'camera' | 'library') => {
     setPhotoSourceTarget(null);
     setMenuUploadFeedback(null);
-    const base64 = await captureMenuPhoto(source);
-    if (!base64) return;
-
     setMenuLoading(true);
     setUploadingMenu(true);
     try {
+      const base64 = await captureMenuPhoto(source);
+      if (!base64) {
+        throw new Error('圖片無法讀取，請重新選擇照片或改用相機拍攝。');
+      }
       const response = await fetchRestaurantDetailedMenu(
         apiBaseUrl,
         {
@@ -120,12 +122,20 @@ export default function RecommendScreen() {
       setViewingMenuRest((prev) =>
         prev ? { ...prev, recommended_items: response.recommended_items, filtered_items: response.filtered_items } : null
       );
+      if (response.menu_recognition?.recognition_status === 'error') {
+        setMenuUploadFeedback({
+          tone: 'error',
+          title: '菜單辨識失敗',
+          message: response.menu_recognition.recognition_error || '請確認照片清晰包含菜單品項與價格，或稍後再試一次。',
+        });
+        return;
+      }
       const itemCount = (response.recommended_items?.length || 0) + (response.filtered_items?.length || 0);
       if (itemCount === 0) {
         setMenuUploadFeedback({
           tone: 'error',
           title: '沒有辨識到餐點',
-          message: '請確認照片清晰包含菜單品項與價格，或稍後再試一次。',
+          message: response.menu_recognition?.recognition_error || '請確認照片清晰包含菜單品項與價格，或稍後再試一次。',
         });
       } else {
         setMenuUploadFeedback({ tone: 'success', title: 'AI 辨識完成', message: '已成功解析實體菜單圖片並產生個人化推薦！' });

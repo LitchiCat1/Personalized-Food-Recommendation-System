@@ -5,7 +5,13 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
-from services.nutrition_label_service import get_gemini_api_keys, extract_json_block, decode_image_base64
+from services.nutrition_label_service import (
+    decode_image_base64,
+    extract_json_block,
+    extract_number,
+    get_gemini_api_keys,
+    get_gemini_models,
+)
 
 # Modern User-Agents to prevent anti-bot blocking
 USER_AGENTS = [
@@ -291,29 +297,117 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
     return {"items": fallback_items}
 
 
+def _normalize_menu_items(raw_items) -> list[dict]:
+    """Normalize the few fields needed to safely display an OCR menu result."""
+    if isinstance(raw_items, dict):
+        raw_items = [raw_items]
+    if not isinstance(raw_items, list):
+        return []
+
+    normalized = []
+    ignored_names = {"品名", "品項", "價格", "金額", "數量", "合計", "總計", "外帶", "內用"}
+    for index, raw_item in enumerate(raw_items):
+        if not isinstance(raw_item, dict):
+            continue
+        name = raw_item.get("name") or raw_item.get("item_name") or raw_item.get("dish_name")
+        if not isinstance(name, str):
+            continue
+        name = re.sub(r"\s+", " ", name).strip()
+        if not name or name in ignored_names:
+            continue
+
+        price = extract_number(
+            raw_item.get("price") or raw_item.get("price_twd") or raw_item.get("價格"),
+            as_int=True,
+        )
+        if price is None or price <= 0:
+            continue
+
+        item = dict(raw_item)
+        item["name"] = name
+        item["item_id"] = str(item.get("item_id") or f"menu_{index + 1:03d}")
+        item["price"] = price
+        normalized.append(item)
+
+    items_by_name = {}
+    for item in normalized:
+        items_by_name.setdefault(item["name"], []).append(item)
+    for same_name_items in items_by_name.values():
+        prices = {item["price"] for item in same_name_items}
+        if len(same_name_items) == 2 and len(prices) == 2:
+            small, large = sorted(same_name_items, key=lambda item: item["price"])
+            small["name"] += " (小)"
+            large["name"] += " (大)"
+    return normalized
+
+
+def _extract_menu_items_from_response(body: dict) -> tuple[list[dict], str | None]:
+    """Read Gemini text from all response parts and recover partial OCR when needed."""
+    candidate = (body.get("candidates") or [{}])[0]
+    finish_reason = candidate.get("finishReason")
+    parts = (candidate.get("content") or {}).get("parts") or []
+    response_text = "\n".join(
+        part.get("text", "") for part in parts if isinstance(part, dict) and isinstance(part.get("text"), str)
+    ).strip()
+    if not response_text:
+        return [], finish_reason
+
+    try:
+        parsed = extract_json_block(response_text)
+        items = parsed.get("items") or parsed.get("menu_items") or parsed.get("dishes") or []
+        return _normalize_menu_items(items), finish_reason
+    except (AttributeError, TypeError, ValueError, KeyError):
+        # A dense menu can hit the output limit after several complete rows.
+        # Recover those rows instead of throwing away the usable prefix.
+        recovered = []
+        for object_text in re.findall(r"\{[^{}]+\}", response_text):
+            try:
+                parsed_object = json.loads(object_text)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(parsed_object, dict) and any(
+                key in parsed_object for key in ("name", "item_name", "dish_name")
+            ):
+                recovered.append(parsed_object)
+        if recovered:
+            return _normalize_menu_items(recovered), finish_reason
+
+        pattern = re.compile(
+            r"[\"'](?:name|item_name|dish_name)[\"']\s*:\s*[\"']([^\"']+)[\"']"
+            r"[\s\S]{0,180}?[\"'](?:price|price_twd|價格)[\"']\s*:\s*[\"']?([0-9]+)"
+        )
+        for index, match in enumerate(pattern.finditer(response_text)):
+            recovered.append({"item_id": f"menu_{index + 1:03d}", "name": match.group(1), "price": int(match.group(2))})
+        return _normalize_menu_items(recovered), finish_reason
+
+
 def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐廳") -> dict:
-    """Uses Gemini Vision API to OCR and parse a menu photo Base64 into structured items with nutrition estimates."""
+    """Use Gemini Vision to OCR a menu photo, returning status details for the UI."""
     if not image_base64:
-        return {"items": []}
+        return {"items": [], "recognition_status": "error", "recognition_error": "缺少菜單圖片"}
 
     try:
         _img_bytes, image_base64, image_mime_type = decode_image_base64(image_base64)
     except ValueError as e:
         print(f"[!] Menu photo decode failed: {e}")
-        return {"items": []}
+        return {"items": [], "recognition_status": "error", "recognition_error": str(e)}
 
     keys = get_gemini_api_keys()
     if not keys:
         print("[!] No Gemini API key found for menu image parsing")
-        fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
-        return {"items": fallback_items}
+        return {
+            "items": [],
+            "recognition_status": "error",
+            "recognition_error": "後端未設定 Gemini API key，請在 Render 設定 GEMINI_API_KEYS 後重新部署。",
+        }
     
     prompt = f"""
     你是一位台灣經驗豐富的臨床膳食評估師與營養師。
     請識別這張「{restaurant_name}」實體菜單照片中的餐點名稱與價格。這張照片可能是密集的價目表或菜單看板，
     上面可能有非常多品項（十幾到數十項都有可能）；請務必逐一列出照片中「每一項」看得到的餐點，不要只挑幾項
     或只列出範例，也不要因為品項太多而省略。即使照片邊緣模糊、部分文字不清楚，仍請根據可辨識的部分盡量列出
-    合理的品項名稱與價格，不要整個放棄辨識。
+    合理的品項名稱與價格，不要整個放棄辨識。沒有標示價格的分類標題（例如飲料、啤酒）不要當作品項；同一道餐點
+    若有小碗／大碗兩個價格，請分成兩筆，並在名稱中明確加上「(小)」與「(大)」。
 
     為每道餐點估算 11 項營養指標即可，數值不需要非常精確，合理概略估計即可（後端會另外做物理一致性校正，
     1g蛋白質=4kcal, 1g碳水=4kcal, 1g脂肪=9kcal，你不需要自己保證完全吻合）：
@@ -344,7 +438,8 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
       ]
     }}
     """
-    candidate_models = ["gemini-2.5-flash", "gemini-2.5-pro"]
+    candidate_models = get_gemini_models()
+    last_error = "Gemini 未回傳可用的菜單品項"
     for gemini_key in keys:
         for model_name in candidate_models:
             try:
@@ -355,34 +450,47 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
                             "parts": [
                                 {"text": prompt},
                                 {
-                                    "inlineData": {
-                                        "mimeType": image_mime_type,
+                                    "inline_data": {
+                                        "mime_type": image_mime_type,
                                         "data": image_base64
                                     }
                                 }
                             ]
                         }
                     ],
-                    "generationConfig": {"response_mime_type": "application/json", "maxOutputTokens": 8192}
+                    "generationConfig": {"responseMimeType": "application/json", "maxOutputTokens": 8192}
                 }
                 res = requests.post(url, json=payload, timeout=25)
                 if res.status_code == 200:
                     body = res.json()
-                    candidate = (body.get("candidates") or [{}])[0]
-                    finish_reason = candidate.get("finishReason")
-                    parts = (candidate.get("content") or {}).get("parts") or []
-                    parsed_text = parts[0].get("text", "") if parts else ""
-                    items = extract_json_block(parsed_text).get("items", []) if parsed_text else []
+                    items, finish_reason = _extract_menu_items_from_response(body)
                     if items:
                         print(f"[Scraper] Successfully parsed menu photo using key {gemini_key[:8]}... model: {model_name}, {len(items)} items")
                         balanced_items = [validate_and_balance_nutrition(item) for item in items]
-                        return {"items": balanced_items}
+                        return {
+                            "items": balanced_items,
+                            "recognition_status": "recognized",
+                            "recognition_model": model_name,
+                        }
+                    last_error = f"Gemini 回傳 0 個品項（finishReason={finish_reason or 'unknown'}）"
                     print(f"[!] Key {gemini_key[:8]}... Vision model {model_name} returned zero items (finishReason={finish_reason}), trying next key/model...")
                 else:
-                    print(f"[!] Key {gemini_key[:8]}... Vision model {model_name} status {res.status_code}, trying next key/model...")
+                    try:
+                        api_message = (res.json().get("error") or {}).get("message", "")
+                    except (TypeError, ValueError):
+                        api_message = ""
+                    if res.status_code == 429:
+                        last_error = "Gemini 使用額度已達上限，請稍後再試，或在 Render 更新 GEMINI_API_KEYS。"
+                    elif res.status_code in (401, 403):
+                        last_error = "Gemini API key 無效或沒有模型存取權限，請檢查 Render 的 GEMINI_API_KEYS。"
+                    elif res.status_code == 503:
+                        last_error = "Gemini 目前服務繁忙，請稍後再試。"
+                    else:
+                        last_error = f"Gemini 暫時無法辨識菜單（HTTP {res.status_code}）。"
+                    print(f"[!] Key {gemini_key[:8]}... Vision model {model_name} status {res.status_code}: {api_message[:180]}")
             except Exception as e:
-                print(f"[!] Gemini Vision error with model {model_name}: {e}")
+                last_error = "Gemini Vision 連線失敗，請稍後再試。"
+                print(f"[!] Gemini Vision error with model {model_name}: {type(e).__name__}")
 
-    fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
-    return {"items": fallback_items}
+    return {"items": [], "recognition_status": "error", "recognition_error": last_error}
 

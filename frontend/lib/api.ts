@@ -503,12 +503,18 @@ export async function fetchRestaurantDetailedMenu(
   apiBaseUrl: string,
   params: { restaurant_id: string; name: string; address?: string; budget?: number; user_id?: string; lat?: number; lng?: number; menu_image?: string },
   auth?: ApiAuth
-): Promise<{ restaurant_id: string; name: string; recommended_items: HealthyFoodRecommendation[]; filtered_items: any[] }> {
+): Promise<{
+  restaurant_id: string;
+  name: string;
+  recommended_items: HealthyFoodRecommendation[];
+  filtered_items: any[];
+  menu_recognition?: { recognition_status?: 'recognized' | 'error'; recognition_error?: string; recognition_model?: string } | null;
+}> {
   const resp = await fetch(`${apiBaseUrl}/restaurant/menu`, {
     method: 'POST',
     headers: buildHeaders(auth, 'application/json'),
     body: JSON.stringify(params),
   });
-  return parseJson<{ restaurant_id: string; name: string; recommended_items: HealthyFoodRecommendation[]; filtered_items: any[] }>(resp);
+  return parseJson(resp);
 }
 

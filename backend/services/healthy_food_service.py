@@ -1,8 +1,9 @@
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from math import atan2, cos, radians, sin, sqrt
 
+from services.app_time_service import app_now
 from services.google_places_service import fetch_google_places_restaurants
 from services.medical_risk_service import evaluate_medical_risk
 from services.nutrition_progress_service import build_daily_nutrition_progress
@@ -67,7 +68,7 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
     lng = float(params.get("lng", 121.5645))
     radius_km = min(max(float(params.get("radius_km", 5)), 0.5), 10)
     category = _normalize_category(params.get("category", "all"))
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = app_now()
     conditions = user.get("health_conditions", [])
     allergens = user.get("allergens", [])
 
@@ -105,8 +106,6 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                 "saturated_fat": item.get("saturated_fat"),
                 "trans_fat": item.get("trans_fat"),
                 "fiber": item.get("fiber"),
-                "calcium": item.get("calcium"),
-                "iron": item.get("iron"),
                 "is_fried": item.get("is_fried"),
             }
             medical_risk = evaluate_medical_risk(candidate, conditions, allergens, disease_rules, taxonomy, user_profile=user)
@@ -210,8 +209,6 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                     "saturated_fat": item.get("saturated_fat"),
                     "trans_fat": item.get("trans_fat"),
                     "fiber": item.get("fiber"),
-                    "calcium": item.get("calcium"),
-                    "iron": item.get("iron"),
                     "is_fried": item.get("is_fried"),
                 }
                 medical_risk = evaluate_medical_risk(candidate, conditions, allergens, disease_rules, taxonomy, user_profile=user)
@@ -300,7 +297,7 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
     lng = float(params.get("lng", 121.5645))
     radius_km = min(max(float(params.get("radius_km", 3)), 0.5), 10)
     category = _normalize_category(params.get("category", "all"))
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = app_now()
 
     remaining = build_daily_nutrition_progress(storage, user_id, user, now)["remaining"]
 

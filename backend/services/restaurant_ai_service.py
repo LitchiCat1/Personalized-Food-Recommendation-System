@@ -115,8 +115,6 @@ def normalize_restaurant_summary(parsed: dict, budget: int) -> dict:
                 "saturated_fat": float(item.get("saturated_fat", 0) or 0) if isinstance(item, dict) else 0,
                 "trans_fat": float(item.get("trans_fat", 0) or 0) if isinstance(item, dict) else 0,
                 "fiber": float(item.get("fiber", 0) or 0) if isinstance(item, dict) else 0,
-                "calcium": float(item.get("calcium", 0) or 0) if isinstance(item, dict) else 0,
-                "iron": float(item.get("iron", 0) or 0) if isinstance(item, dict) else 0,
             }
             item_obj = validate_and_balance_nutrition(item_obj)
             recommended_foods.append(item_obj)

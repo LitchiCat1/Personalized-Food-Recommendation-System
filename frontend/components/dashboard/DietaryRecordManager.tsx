@@ -234,8 +234,6 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
         total_trans_fat: totals.trans_fat,
         total_sodium: totals.sodium,
         total_fiber: totals.fiber,
-        total_calcium: totals.calcium,
-        total_iron: totals.iron,
         source: 'manual',
       }, { accessToken });
       invalidateDietaryRecords();

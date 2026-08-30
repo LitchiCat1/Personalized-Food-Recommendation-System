@@ -77,8 +77,6 @@ export function buildDietaryTrend(records: DietaryRecord[], options: DietaryTren
       trans_fat: current.trans_fat + nutrients.trans_fat,
       sodium: current.sodium + nutrients.sodium,
       fiber: current.fiber + nutrients.fiber,
-      calcium: current.calcium + nutrients.calcium,
-      iron: current.iron + nutrients.iron,
     });
   }
 
@@ -101,8 +99,6 @@ function getRecordNutrients(record: DietaryRecord) {
     trans_fat: getRecordNutrient(record.total_trans_fat, foods, 'trans_fat'),
     sodium: getRecordNutrient(record.total_sodium, foods, 'sodium'),
     fiber: getRecordNutrient(record.total_fiber, foods, 'fiber'),
-    calcium: getRecordNutrient(record.total_calcium, foods, 'calcium'),
-    iron: getRecordNutrient(record.total_iron, foods, 'iron'),
   };
 }
 
@@ -127,8 +123,6 @@ function createEmptyDay(date: string): DailyTotals {
     trans_fat: 0,
     fiber: 0,
     sodium: 0,
-    calcium: 0,
-    iron: 0,
   };
 }
 
@@ -145,8 +139,6 @@ function roundDay(day: DailyTotals): HistoryDay {
     trans_fat: roundOne(day.trans_fat),
     fiber: roundOne(day.fiber),
     sodium: Math.round(day.sodium),
-    calcium: Math.round(day.calcium),
-    iron: roundOne(day.iron),
   };
 }
 
@@ -163,8 +155,6 @@ function buildSummary(daily: HistoryDay[]): HistoryResponse['summary'] {
     avg_trans_fat: roundOne(daily.reduce((sum, day) => sum + day.trans_fat, 0) / daily.length),
     avg_sodium: Math.round(daily.reduce((sum, day) => sum + day.sodium, 0) / daily.length),
     avg_fiber: roundOne(daily.reduce((sum, day) => sum + day.fiber, 0) / daily.length),
-    avg_calcium: Math.round(daily.reduce((sum, day) => sum + day.calcium, 0) / daily.length),
-    avg_iron: roundOne(daily.reduce((sum, day) => sum + day.iron, 0) / daily.length),
     recorded_days: daily.length,
     total_records: totalRecords,
     avg_records_per_day: Math.round((totalRecords / daily.length) * 10) / 10,

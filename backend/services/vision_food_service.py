@@ -145,8 +145,6 @@ def build_vision_food_response(
             "sugar": matched_food.get("sugar", 0),
             "saturated_fat": matched_food.get("saturated_fat", 0),
             "trans_fat": matched_food.get("trans_fat", 0),
-            "calcium": matched_food.get("calcium", 0),
-            "iron": matched_food.get("iron", 0),
             "is_fried": matched_food.get("is_fried") is True
             or is_fried_food_name(matched_food.get("name_zh"), matched_food.get("name_en"), name_zh),
             "source": matched_food.get("source", "TFDA"),
@@ -166,8 +164,6 @@ def build_vision_food_response(
             "trans_fat": round((nutrients.get("trans_fat") or 0) * scale, 1),
             "sodium": round((nutrients.get("sodium") or 0) * scale),
             "fiber": round((nutrients.get("fiber") or 0) * scale, 1),
-            "calcium": round((nutrients.get("calcium") or 0) * scale),
-            "iron": round((nutrients.get("iron") or 0) * scale, 1),
             "is_fried": nutrients.get("is_fried") is True,
         }
         total_calories += scaled_nutrition["calories"]

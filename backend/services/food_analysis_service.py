@@ -67,8 +67,6 @@ def check_food_safety(
             "saturated_fat": nutrients.get("saturated_fat"),
             "trans_fat": nutrients.get("trans_fat"),
             "fiber": nutrients.get("fiber"),
-            "calcium": nutrients.get("calcium"),
-            "iron": nutrients.get("iron"),
             "is_fried": nutrients.get("is_fried"),
         },
         user_conditions,

@@ -46,6 +46,11 @@ NUTRIENT_MAP = {
 }
 
 
+def mg_to_g(value):
+    """TFDA 的反式脂肪含量單位是 mg/100g，App 其他脂肪欄位一律用 g。"""
+    return None if value is None else round(value / 1000.0, 3)
+
+
 def safe_float(v):
     """安全轉換數值，處理 '--', 'Tr', '微量', 'NA', 等"""
     if v is None:
@@ -132,7 +137,8 @@ def main():
             # 額外營養素
             "sugar": n.get("sugar"),
             "saturated_fat": n.get("saturated_fat"),
-            "trans_fat": n.get("trans_fat"),
+            # TFDA 的反式脂肪含量單位是 mg，其他脂肪是 g，統一轉成 g
+            "trans_fat": mg_to_g(n.get("trans_fat")),
             "cholesterol": n.get("cholesterol"),
             "potassium": n.get("potassium"),
             "calcium": n.get("calcium"),

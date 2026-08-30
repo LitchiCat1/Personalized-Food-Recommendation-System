@@ -43,8 +43,6 @@ def search_foods(storage, tfda_db: dict, query: str, limit: int, user_id: str | 
                 "sugar": get_nutrient_value(food, "sugar"),
                 "saturated_fat": food.get("saturated_fat") or 0,
                 "trans_fat": food.get("trans_fat") or 0,
-                "calcium": food.get("calcium") or 0,
-                "iron": food.get("iron") or 0,
                 "is_fried": food.get("is_fried") is True
                 or is_fried_food_name(food.get("name_zh", key), food.get("name_en")),
                 "unit": food.get("unit", "per 100g"),

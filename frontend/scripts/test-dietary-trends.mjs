@@ -49,7 +49,6 @@ test('shows one recorded day and aggregates every record on that local date', ()
   assert.equal(trend.daily[0].calories, 350);
   assert.equal(trend.daily[0].protein, 22);
   assert.equal(trend.daily[0].sugar, 6);
-  assert.equal(trend.daily[0].calcium, 200);
   assert.equal(trend.daily[0].sodium, 650);
 });
 

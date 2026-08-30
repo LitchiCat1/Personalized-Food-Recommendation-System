@@ -14,8 +14,6 @@ export const RECORD_NUTRIENT_FIELDS = [
   { key: 'trans_fat', label: '反式脂肪', unit: 'g', required: false },
   { key: 'fiber', label: '膳食纖維', unit: 'g', required: true },
   { key: 'sodium', label: '鈉 (Sodium)', unit: 'mg', required: true },
-  { key: 'calcium', label: '鈣 (Calcium)', unit: 'mg', required: false },
-  { key: 'iron', label: '鐵 (Iron)', unit: 'mg', required: false },
 ] as const;
 
 export type RecordNutrientKey = typeof RECORD_NUTRIENT_FIELDS[number]['key'];
@@ -116,8 +114,6 @@ export function createManualRecordFoodDraft(): RecordFoodDraft {
     trans_fat: '',
     sodium: '',
     fiber: '',
-    calcium: '',
-    iron: '',
     is_fried: 'false',
     source: 'manual',
     warnings: [],
@@ -189,8 +185,6 @@ export function getEditableRecordFoods(record: DietaryRecord): FoodRecordItem[] 
     trans_fat: record.total_trans_fat || 0,
     sodium: record.total_sodium || 0,
     fiber: record.total_fiber || 0,
-    calcium: record.total_calcium || 0,
-    iron: record.total_iron || 0,
     is_fried: record.contains_fried_food || false,
     source: record.source,
     warnings: [],
@@ -209,8 +203,6 @@ export function createRecordFoodDrafts(record: DietaryRecord): RecordFoodDraft[]
     trans_fat: String(toFiniteNumber(food.trans_fat)),
     sodium: String(toFiniteNumber(food.sodium)),
     fiber: String(toFiniteNumber(food.fiber)),
-    calcium: String(toFiniteNumber(food.calcium)),
-    iron: String(toFiniteNumber(food.iron)),
     is_fried: food.is_fried ? 'true' : 'false',
     source: food.source,
     warnings: food.warnings,

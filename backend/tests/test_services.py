@@ -1,3 +1,4 @@
+import json
 import os
 import unittest
 from datetime import datetime, timezone
@@ -9,7 +10,12 @@ from services.food_service import search_foods
 from services.healthy_food_service import build_healthy_food_recommendations, load_restaurant_catalog
 from services.history_service import build_history_response
 from services.open_food_facts_service import build_open_food_facts_product
-from services.nutrition_progress_service import build_daily_nutrition_progress, calculate_pdf_daily_targets
+from services.app_time_service import app_today
+from services.nutrition_progress_service import (
+    build_daily_nutrition_progress,
+    build_nutrition_goal_types,
+    calculate_pdf_daily_targets,
+)
 from services.profile_service import build_bmr_response, build_user_profile
 from services.restaurant_ai_service import build_restaurant_summary_prompt, normalize_restaurant_summary, validate_restaurant_summary_input
 from services.vision_food_service import build_vision_food_response
@@ -72,7 +78,6 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertAlmostEqual(kidney["protein"], ideal_weight * 0.6)
         self.assertEqual(kidney["fiber"], 17.5)
         self.assertEqual(kidney["sodium"], 1500)
-        self.assertEqual(kidney["calcium"], 800)
 
     def test_disease_rules_load(self):
         rules = load_disease_rules(os.path.dirname(os.path.dirname(__file__)))
@@ -152,8 +157,6 @@ class ServiceSmokeTests(unittest.TestCase):
                 "sugar": 8.5,
                 "saturated_fat": 2.1,
                 "trans_fat": 0.2,
-                "calcium": 12,
-                "iron": 0.7,
             },
             "apple": {"name_zh": "apple", "category": "fruit", "calories": 51},
         }
@@ -165,8 +168,6 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertEqual(fried_result["sugar"], 8.5)
         self.assertEqual(fried_result["saturated_fat"], 2.1)
         self.assertEqual(fried_result["trans_fat"], 0.2)
-        self.assertEqual(fried_result["calcium"], 12)
-        self.assertEqual(fried_result["iron"], 0.7)
         self.assertTrue(fried_result["is_fried"])
 
     def test_detection_reliability_and_portion_range(self):
@@ -303,6 +304,62 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertEqual(progress["status"]["sodium"], "over")
         self.assertEqual(progress["status"]["protein"], "within_target")
         self.assertGreater(progress["progress_percent"]["calories"], 100)
+
+    def test_kidney_disease_treats_protein_as_upper_limit(self):
+        """CKD 的蛋白質目標是 W x 0.6 的嚴格限量，超過要判成 over 而不是達標。"""
+        class HighProteinStorage:
+            def get_records(self, user_id: str, date: str | None = None, limit: int = 500):
+                return [{"total_protein": 114, "total_calories": 1500}]
+
+        ckd_user = {"height": 170, "weight": 65, "health_conditions": ["ckd"]}
+        healthy_user = {"height": 170, "weight": 65, "health_conditions": []}
+
+        self.assertEqual(build_nutrition_goal_types(ckd_user)["protein"], "upper_limit")
+        self.assertEqual(build_nutrition_goal_types(healthy_user)["protein"], "minimum_target")
+
+        progress = build_daily_nutrition_progress(HighProteinStorage(), "user-a", ckd_user)
+        self.assertEqual(progress["goal_type"]["protein"], "upper_limit")
+        self.assertEqual(progress["status"]["protein"], "over")
+        self.assertGreater(progress["over_by"]["protein"], 0)
+
+        healthy_progress = build_daily_nutrition_progress(HighProteinStorage(), "user-a", healthy_user)
+        self.assertEqual(healthy_progress["status"]["protein"], "target_met")
+
+    def test_app_today_uses_local_date_not_utc(self):
+        """紀錄 timestamp 用本地時間，UTC 的日界會讓本地凌晨抓到昨天的資料。"""
+        self.assertEqual(app_today(datetime(2026, 7, 18, 17, 0, tzinfo=timezone.utc)), "2026-07-19")
+        self.assertEqual(app_today(datetime(2026, 7, 18, 3, 0, tzinfo=timezone.utc)), "2026-07-18")
+
+    def test_daily_progress_uses_local_date_for_record_lookup(self):
+        class DateCapturingStorage:
+            requested_date = None
+
+            def get_records(self, user_id: str, date: str | None = None, limit: int = 500):
+                DateCapturingStorage.requested_date = date
+                return []
+
+        build_daily_nutrition_progress(
+            DateCapturingStorage(),
+            "user-a",
+            {"height": 170, "weight": 65},
+            datetime(2026, 7, 18, 17, 0, tzinfo=timezone.utc),
+        )
+        self.assertEqual(DateCapturingStorage.requested_date, "2026-07-19")
+
+    def test_tfda_trans_fat_is_stored_in_grams(self):
+        """TFDA 原始資料的反式脂肪單位是 mg，轉檔時必須換成 g。"""
+        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "nutrition_db_tw.json")
+        with open(db_path, "r", encoding="utf-8") as f:
+            tfda_db = json.load(f)
+
+        values = [
+            food["trans_fat"]
+            for food in tfda_db.values()
+            if isinstance(food.get("trans_fat"), (int, float))
+        ]
+        self.assertTrue(values)
+        # 每 100 g 的反式脂肪不可能超過總脂肪 100 g；mg 未換算時最大值會是 2122
+        self.assertLess(max(values), 100)
 
     def test_restaurant_prompt_includes_disease_rules_and_over_target_progress(self):
         rules = load_disease_rules(os.path.dirname(os.path.dirname(__file__)))

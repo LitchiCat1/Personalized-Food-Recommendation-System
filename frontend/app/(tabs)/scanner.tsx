@@ -133,8 +133,6 @@ function OCRDraftCard({
           { label: '反式脂肪', value: draft.nutrition_per_serving?.trans_fat ?? '--', unit: 'g', color: Palette.status.error },
           { label: '膳食纖維', value: draft.nutrition_per_serving?.fiber ?? '--', unit: 'g', color: Palette.accent.cyan },
           { label: '鈉 (Sodium)', value: draft.nutrition_per_serving?.sodium ?? '--', unit: 'mg', color: Palette.accent.pink },
-          { label: '鈣 (Calcium)', value: draft.nutrition_per_serving?.calcium ?? '--', unit: 'mg', color: Palette.accent.green },
-          { label: '鐵 (Iron)', value: draft.nutrition_per_serving?.iron ?? '--', unit: 'mg', color: Palette.accent.blue },
         ].map((item) => (
           <View key={item.label} style={styles.nutritionItem}>
             <Text style={styles.nutritionLabel}>{item.label}</Text>

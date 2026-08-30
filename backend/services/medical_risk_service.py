@@ -12,8 +12,6 @@ NUTRIENT_FIELDS = {
     "saturated_fat": ("saturated_fat", "g"),
     "trans_fat": ("trans_fat", "g"),
     "fiber": ("fiber", "g"),
-    "calcium": ("calcium", "mg"),
-    "iron": ("iron", "mg"),
 }
 
 
@@ -479,21 +477,6 @@ def evaluate_medical_risk(
                     "nutrient": "sodium",
                     "value": sodium_val,
                     "limit": sodium_limit,
-                    "unit": "mg",
-                })
-            # 鈣含量 (< 800mg)
-            calcium_val = normalize_number(nutrients.get("calcium"))
-            calcium_limit = 800.0 / 3.0
-            if calcium_val > calcium_limit:
-                risks.append({
-                    "type": "nutrient_limit",
-                    "severity": "block",
-                    "condition_id": condition_id,
-                    "condition_label_zh": condition_label,
-                    "message": f"{condition_label}風險：單餐鈣含量 {calcium_val:.0f} mg 超過限額 {calcium_limit:.0f} mg (防高磷高血鈣)。",
-                    "nutrient": "calcium",
-                    "value": calcium_val,
-                    "limit": calcium_limit,
                     "unit": "mg",
                 })
 

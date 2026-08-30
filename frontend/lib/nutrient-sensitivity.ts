@@ -1,12 +1,12 @@
 import type { MedicalConditionRule } from '@/lib/api';
 
-export type TrackedNutrientKey = 'protein' | 'carbs' | 'sugar' | 'fat' | 'saturated_fat' | 'trans_fat' | 'sodium' | 'fiber' | 'calcium' | 'iron';
+export type TrackedNutrientKey = 'protein' | 'carbs' | 'sugar' | 'fat' | 'saturated_fat' | 'trans_fat' | 'sodium' | 'fiber';
 
 export type NutrientSensitivityMap = Record<TrackedNutrientKey, string[]>;
 
 type SensitivityRule = Pick<MedicalConditionRule, 'id' | 'condition' | 'label_zh' | 'aliases' | 'risk_nutrients'>;
 
-const TRACKED_NUTRIENTS = new Set<TrackedNutrientKey>(['protein', 'carbs', 'sugar', 'fat', 'saturated_fat', 'trans_fat', 'sodium', 'fiber', 'calcium', 'iron']);
+const TRACKED_NUTRIENTS = new Set<TrackedNutrientKey>(['protein', 'carbs', 'sugar', 'fat', 'saturated_fat', 'trans_fat', 'sodium', 'fiber']);
 
 const FALLBACK_RULES: SensitivityRule[] = [
   {
@@ -34,7 +34,6 @@ const FALLBACK_RULES: SensitivityRule[] = [
     risk_nutrients: {
       sodium: { label_zh: '鈉' },
       protein: { label_zh: '蛋白質' },
-      calcium: { label_zh: '鈣' },
     },
   },
   {
@@ -85,8 +84,6 @@ export function buildNutrientSensitivityMap(
     trans_fat: [],
     sodium: [],
     fiber: [],
-    calcium: [],
-    iron: [],
   };
   const rules: SensitivityRule[] = [
     ...medicalRules,

@@ -43,8 +43,6 @@ export type OCRDraft = {
     sugar?: number;
     saturated_fat?: number;
     trans_fat?: number;
-    calcium?: number;
-    iron?: number;
   };
   nutrition_per_100g?: Record<string, number | null>;
   ocr_text?: string;
@@ -174,8 +172,6 @@ async function performSaveRecord(params: SaveRecordParams): Promise<void> {
   const totalTransFat = params.foods.reduce((sum, item) => sum + (item.nutrition.trans_fat || 0), 0);
   const totalSodium = params.foods.reduce((sum, item) => sum + item.nutrition.sodium, 0);
   const totalFiber = params.foods.reduce((sum, item) => sum + item.nutrition.fiber, 0);
-  const totalCalcium = params.foods.reduce((sum, item) => sum + (item.nutrition.calcium || 0), 0);
-  const totalIron = params.foods.reduce((sum, item) => sum + (item.nutrition.iron || 0), 0);
 
   const resp = await fetch(`${params.apiBaseUrl}/record`, {
     method: 'POST',
@@ -195,8 +191,6 @@ async function performSaveRecord(params: SaveRecordParams): Promise<void> {
         trans_fat: food.nutrition.trans_fat || 0,
         sodium: food.nutrition.sodium,
         fiber: food.nutrition.fiber,
-        calcium: food.nutrition.calcium || 0,
-        iron: food.nutrition.iron || 0,
         is_fried: food.nutrition.is_fried === true,
         source: food.source || params.source,
         warnings: food.warnings,
@@ -210,8 +204,6 @@ async function performSaveRecord(params: SaveRecordParams): Promise<void> {
       total_trans_fat: Math.round(totalTransFat * 10) / 10,
       total_sodium: Math.round(totalSodium),
       total_fiber: Math.round(totalFiber * 10) / 10,
-      total_calcium: Math.round(totalCalcium),
-      total_iron: Math.round(totalIron * 10) / 10,
       source: params.source,
     }),
   });
@@ -265,8 +257,6 @@ export async function manualSearchFood(params: {
       trans_fat: food.trans_fat || 0,
       sodium: food.sodium || 0,
       fiber: food.fiber || 0,
-      calcium: food.calcium || 0,
-      iron: food.iron || 0,
       is_fried: food.is_fried === true,
     },
     gi: 'medium',
@@ -360,8 +350,6 @@ export function buildOCRDetectedFood(draft: OCRDraft): DetectedFood {
       trans_fat: Number(draft.nutrition_per_serving?.trans_fat || 0),
       sodium: Number(draft.nutrition_per_serving?.sodium || 0),
       fiber: Number(draft.nutrition_per_serving?.fiber || 0),
-      calcium: Number(draft.nutrition_per_serving?.calcium || 0),
-      iron: Number(draft.nutrition_per_serving?.iron || 0),
     },
     gi: 'medium',
     allergens: [],

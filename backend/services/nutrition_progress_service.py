@@ -1,4 +1,6 @@
-from datetime import datetime, timezone
+from datetime import datetime
+
+from services.app_time_service import app_today
 
 
 DEFAULT_DAILY_NUTRITION_TARGETS = {
@@ -11,8 +13,6 @@ DEFAULT_DAILY_NUTRITION_TARGETS = {
     "trans_fat": 0,
     "fiber": 25,
     "sodium": 2000,
-    "calcium": 1000,
-    "iron": 15,
 }
 
 NUTRITION_GOAL_TYPES = {
@@ -25,8 +25,6 @@ NUTRITION_GOAL_TYPES = {
     "trans_fat": "upper_limit",
     "fiber": "minimum_target",
     "sodium": "upper_limit",
-    "calcium": "minimum_target",
-    "iron": "minimum_target",
 }
 
 RECORD_TOTAL_FIELDS = {
@@ -39,8 +37,6 @@ RECORD_TOTAL_FIELDS = {
     "trans_fat": "total_trans_fat",
     "fiber": "total_fiber",
     "sodium": "total_sodium",
-    "calcium": "total_calcium",
-    "iron": "total_iron",
 }
 
 CONDITION_ALIASES = {
@@ -59,6 +55,28 @@ CONDITION_ALIASES = {
 }
 
 
+def normalize_conditions(user: dict) -> set:
+    raw_conditions = user.get("health_conditions", []) or user.get("healthConditions", [])
+    return {
+        CONDITION_ALIASES.get(str(condition).strip().lower(), str(condition).strip().lower())
+        for condition in raw_conditions
+        if str(condition).strip()
+    }
+
+
+def build_nutrition_goal_types(user: dict) -> dict:
+    """依疾病調整目標的方向。
+
+    慢性腎臟病的蛋白質目標是 W x 0.6 的「嚴格限量」，方向與一般人的
+    「至少要吃到」相反；沿用預設的 minimum_target 會把 114 g 蛋白質
+    判成達標，等於給腎病患者相反的建議。
+    """
+    goal_types = dict(NUTRITION_GOAL_TYPES)
+    if "kidney_disease" in normalize_conditions(user):
+        goal_types["protein"] = "upper_limit"
+    return goal_types
+
+
 def _number(value, fallback: float = 0) -> float:
     try:
         return float(value)
@@ -71,13 +89,14 @@ def _display_number(value: float) -> int | float:
     return int(rounded) if rounded.is_integer() else rounded
 
 
-def _progress_status(nutrient: str, consumed: float, target: float) -> str:
+def _progress_status(nutrient: str, consumed: float, target: float, goal_types: dict | None = None) -> str:
+    goal_type = (goal_types or NUTRITION_GOAL_TYPES)[nutrient]
     if target <= 0:
         return "within_target" if consumed <= 0 else "over"
     if consumed > target:
-        return "over" if NUTRITION_GOAL_TYPES[nutrient] == "upper_limit" else "target_met"
+        return "over" if goal_type == "upper_limit" else "target_met"
     if consumed >= target * 0.8:
-        return "near_limit" if NUTRITION_GOAL_TYPES[nutrient] == "upper_limit" else "near_target"
+        return "near_limit" if goal_type == "upper_limit" else "near_target"
     return "within_target"
 
 
@@ -106,12 +125,7 @@ def calculate_pdf_daily_targets(user: dict) -> dict:
     is_overweight = bmi >= 24.0
     
     # 決定不同疾病下的每日總熱量需求 E
-    raw_conditions = user.get("health_conditions", []) or user.get("healthConditions", [])
-    conditions = {
-        CONDITION_ALIASES.get(str(condition).strip().lower(), str(condition).strip().lower())
-        for condition in raw_conditions
-        if str(condition).strip()
-    }
+    conditions = normalize_conditions(user)
     
     e_candidates = []
     if "diabetes" in conditions:
@@ -140,8 +154,6 @@ def calculate_pdf_daily_targets(user: dict) -> dict:
         "trans_fat": 0.0,
         "fiber": 25.0,
         "sodium": 2000.0,
-        "calcium": 1000.0,
-        "iron": 15.0,
     }
     
     # Apply matching disease-specific clinical guidelines from PDF:
@@ -220,27 +232,16 @@ def calculate_pdf_daily_targets(user: dict) -> dict:
         sodium_vals.append(1500.0)
     targets["sodium"] = min(sodium_vals)
     
-    # 9. 鈣
-    calcium_vals = [1000.0]
-    if "hypertension" in conditions:
-        calcium_vals.append(1100.0)
-    if "kidney_disease" in conditions:
-        calcium_vals.append(800.0)
-    targets["calcium"] = min(calcium_vals)
-    
-    # 10. 鐵
-    targets["iron"] = 15.0
-    
     return targets
 
 
 def build_daily_nutrition_progress(storage, user_id: str, user: dict, now: datetime | None = None) -> dict:
-    current_time = now or datetime.now(timezone.utc)
-    today = current_time.strftime("%Y-%m-%d")
+    today = app_today(now)
     records = storage.get_records(user_id, today, limit=500)
 
     # 根據 PDF 指引動態計算目標值
     targets = calculate_pdf_daily_targets(user)
+    goal_types = build_nutrition_goal_types(user)
 
     consumed = {
         nutrient: sum(_number(record.get(field)) for record in records)
@@ -257,7 +258,7 @@ def build_daily_nutrition_progress(storage, user_id: str, user: dict, now: datet
 
     return {
         "date": today,
-        "goal_type": NUTRITION_GOAL_TYPES,
+        "goal_type": goal_types,
         "targets": {key: _display_number(value) for key, value in targets.items()},
         "consumed": {key: _display_number(value) for key, value in consumed.items()},
         "remaining": {key: _display_number(value) for key, value in remaining.items()},
@@ -267,7 +268,7 @@ def build_daily_nutrition_progress(storage, user_id: str, user: dict, now: datet
             for nutrient in targets
         },
         "status": {
-            nutrient: _progress_status(nutrient, consumed[nutrient], targets[nutrient])
+            nutrient: _progress_status(nutrient, consumed[nutrient], targets[nutrient], goal_types)
             for nutrient in targets
         },
     }

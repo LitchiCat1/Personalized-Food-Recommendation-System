@@ -9,12 +9,10 @@ NUTRIENT_FIELDS = (
     "trans_fat",
     "fiber",
     "sodium",
-    "calcium",
-    "iron",
 )
 
 NUTRITION_FIELDS = (ENERGY_FIELD, *NUTRIENT_FIELDS)
-WHOLE_NUMBER_FIELDS = {"calories", "sodium", "calcium", "iron"}
+WHOLE_NUMBER_FIELDS = {"calories", "sodium"}
 
 FRIED_FOOD_KEYWORDS = (
     "油炸",

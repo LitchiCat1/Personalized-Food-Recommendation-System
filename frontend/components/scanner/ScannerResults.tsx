@@ -129,8 +129,6 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
               { label: '反式脂肪', value: food.nutrition.trans_fat ?? 0, unit: 'g', color: Palette.accent.purple },
               { label: '膳食纖維', value: food.nutrition.fiber, unit: 'g', color: Palette.accent.cyan },
               { label: '鈉 (Sodium)', value: food.nutrition.sodium, unit: 'mg', color: food.nutrition.sodium > 800 ? Palette.status.warning : Palette.accent.pink },
-              { label: '鈣 (Calcium)', value: food.nutrition.calcium ?? 0, unit: 'mg', color: Palette.accent.cyan },
-              { label: '鐵 (Iron)', value: food.nutrition.iron ?? 0, unit: 'mg', color: Palette.accent.cyan },
             ].map((item) => (
               <View key={item.label} style={[styles.nutritionItem, { minWidth: wp(26) }]}>
                 <Text style={styles.nutritionLabel}>{item.label}</Text>

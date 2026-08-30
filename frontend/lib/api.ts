@@ -10,8 +10,6 @@ export type HistoryDay = {
   trans_fat: number;
   sodium: number;
   fiber: number;
-  calcium: number;
-  iron: number;
 };
 
 export type HistoryResponse = {
@@ -28,8 +26,6 @@ export type HistoryResponse = {
     avg_trans_fat?: number;
     avg_sodium?: number;
     avg_fiber?: number;
-    avg_calcium?: number;
-    avg_iron?: number;
     recorded_days?: number;
     total_records?: number;
     avg_records_per_day?: number;
@@ -48,8 +44,6 @@ export type FoodRecordItem = {
   refined_sugar?: number;
   saturated_fat?: number;
   trans_fat?: number;
-  calcium?: number;
-  iron?: number;
   is_fried?: boolean;
   source?: string;
   warnings?: string[];
@@ -71,8 +65,6 @@ export type DietaryRecord = {
   total_refined_sugar?: number;
   total_saturated_fat?: number;
   total_trans_fat?: number;
-  total_calcium?: number;
-  total_iron?: number;
   contains_fried_food?: boolean;
   source?: string;
 };
@@ -87,8 +79,6 @@ export type NutritionTargets = {
   trans_fat: number;
   fiber: number;
   sodium: number;
-  calcium: number;
-  iron: number;
 };
 
 export type RecordsResponse = {
@@ -116,8 +106,6 @@ export type CreateDietaryRecordPayload = {
   total_trans_fat: number;
   total_sodium: number;
   total_fiber: number;
-  total_calcium: number;
-  total_iron: number;
   source: 'manual';
 };
 
@@ -145,8 +133,6 @@ export type HealthyFoodRecommendation = {
   trans_fat?: number;
   sodium: number;
   fiber?: number;
-  calcium?: number;
-  iron?: number;
   is_fried?: boolean;
   gi?: 'low' | 'medium' | 'high' | null;
   match_score: number;

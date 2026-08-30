@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.0.8c - 2026-08-31 (營養指標精簡與時區／單位修正)
+
+### Changed
+
+- **移除鈣與鐵兩項營養指標**：追蹤欄位從 11 項縮減為 9 項（熱量、蛋白質、碳水、精緻糖、脂肪、飽和脂肪、反式脂肪、纖維、鈉）。餐廳目錄的鈣鐵值本來全為 0，AI 菜單爬蟲也只是依菜名關鍵字給 4 級常數（豆製品 150 mg／蔬菜 60 mg 之類），無法反映實際餐點；與其顯示猜測值不如拿掉。異動範圍涵蓋 `NUTRITION_FIELDS`、每日目標計算、記錄 schema、掃描與營養標示 OCR、餐廳目錄、前端進度條與趨勢頁。
+- **慢性腎臟病單餐鈣上限規則一併移除**：`medical_risk_service` 原有「單餐鈣 > 266 mg 阻擋」的 CKD 規則隨鈣欄位移除；該規則因目錄鈣值全為 0，實際上從未觸發過。
+- **Postgres `records` 資料表**：`total_calcium` / `total_iron` 不再寫入或讀取，但既有欄位保留不刪，舊資料不受影響；新建資料庫不會再建立這兩欄。
+
+### Fixed
+
+- **反式脂肪數值放大 1000 倍**：TFDA 原始資料的反式脂肪含量單位是 mg/100g（其他脂肪是 g/100g），`convert_tfda.py` 直接沿用未換算，導致 `nutrition_db_tw.json` 有 405 筆食品的反式脂肪被當成公克數，一顆蛋算成 29.94 g、葡萄籽油算成 2122 g。因為每日反式脂肪目標是 0 g（上限），只要記錄到蛋或乳製品就必然判定超標，首頁進度條會顯示「165 / 0 g」這種數字。轉檔時改為 mg→g 換算，並一併修正既有的 `nutrition_db_tw.json`；修正後同一份菜單的一週達標天數從 2/7 變成 7/7。
+- **慢性腎臟病的蛋白質判定方向相反**：`calculate_pdf_daily_targets` 對 CKD 把蛋白質目標壓到 `W x 0.6`（嚴格限量），但 `NUTRITION_GOAL_TYPES` 固定把蛋白質視為 `minimum_target`，導致 CKD 使用者吃到 114 g 蛋白質會被判成「達標」而不是「超標」，等於給出相反的建議。新增 `build_nutrition_goal_types(user)`，CKD 的蛋白質改為 `upper_limit`。
+- **「今天」用 UTC 判斷**：伺服器跑在 UTC，但飲食紀錄的 timestamp 與店家 `open_hours` 都是本地時間。本地 00:00–08:00 這段時間，店家推薦的「今日剩餘營養」會拿到昨天的攝取量；店家營業狀態也用 UTC 時鐘比對本地營業時間（本地凌晨 00:31 會有 16/20 家被判成營業中）。新增 `services/app_time_service.py` 以固定偏移量（預設 +8，可用 `APP_UTC_OFFSET_HOURS` 調整）統一換算，`build_daily_nutrition_progress`、`storage.get_history` / `get_today_records`、店家營業判斷、以及未帶 timestamp 的紀錄預設時間全部改用本地時間。
+
+### Added
+
+- **7 天飲食測試資料產生器** (`backend/scripts/seed_week_test_data.py`)：一次灌入 7 天飲食紀錄並依疾病別條件逐日檢查達標情形，營養值取自 TFDA 資料庫依克數換算。支援 `--scenario` / `--profile` / `--dry-run` / `--clear` / `--report`，詳見 Operations Runbook 2.5 節。
+
 ## v0.0.8b - 2026-08-30 (菜單照片辨識修正版)
 
 ### Fixed

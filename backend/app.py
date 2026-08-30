@@ -14,6 +14,7 @@ import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from repositories.storage import StorageRepository
+from services.app_time_service import app_now
 from services.auth_service import AuthError, is_auth_required, is_supabase_auth_configured, verify_supabase_user
 from services.disease_rule_service import build_disease_rules_response, build_medical_metadata_response, load_allergen_taxonomy, load_disease_rules
 from services.env_service import load_local_env
@@ -406,7 +407,8 @@ def normalize_record_foods(foods):
 
 def normalize_record_timestamp(value):
     if value is None:
-        return datetime.now(timezone.utc).isoformat()
+        # 用本地時間，讓 timestamp 的日期前綴＝使用者的當天（掃描紀錄沒有帶 timestamp）
+        return app_now().isoformat()
     if not isinstance(value, str) or not value.strip():
         raise ValueError("timestamp 必須是有效的 ISO 日期時間")
 
@@ -675,8 +677,6 @@ def get_restaurant_menu():
             "saturated_fat": item.get("saturated_fat"),
             "trans_fat": item.get("trans_fat"),
             "fiber": item.get("fiber"),
-            "calcium": item.get("calcium"),
-            "iron": item.get("iron"),
             "is_fried": item.get("is_fried"),
         }
         medical_risk = evaluate_medical_risk(candidate, conditions, allergens, DISEASE_RULES, ALLERGEN_TAXONOMY, user_profile=user)

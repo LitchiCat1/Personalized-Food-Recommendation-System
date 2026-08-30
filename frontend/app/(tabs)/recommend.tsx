@@ -164,8 +164,6 @@ export default function RecommendScreen() {
     saturated_fat?: number;
     trans_fat?: number;
     fiber?: number;
-    calcium?: number;
-    iron?: number;
     price?: number;
   }) => {
     const foodName = item.item_name || item.name || '推薦餐點';
@@ -183,8 +181,6 @@ export default function RecommendScreen() {
         saturated_fat: Number(item.saturated_fat ?? 0),
         trans_fat: Number(item.trans_fat ?? 0),
         fiber: Number(item.fiber ?? (foodName.includes('青菜') || foodName.includes('沙拉') || foodName.includes('蔬菜') ? 3.5 : 1.0)),
-        calcium: Number(item.calcium ?? 0),
-        iron: Number(item.iron ?? 0),
         source: 'manual',
       };
 

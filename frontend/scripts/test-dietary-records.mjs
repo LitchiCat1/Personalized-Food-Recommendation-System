@@ -94,8 +94,6 @@ test('creates a blank manual draft and totals validated foods in the existing sc
     trans_fat: 0,
     fiber: 1.25,
     sodium: 1.25,
-    calcium: 0,
-    iron: 0,
   });
   assert.equal(validation.foods[0].is_fried, false);
 });

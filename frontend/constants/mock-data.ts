@@ -15,8 +15,6 @@ export const DAILY_NUTRITION = {
   // PRD: 鈉含量、纖維素追蹤 (高血壓/腎臟病患者需要)
   sodium: { current: 1800, target: 2000, unit: 'mg', color: '#F472B6', label: '鈉 (Sodium)' },
   fiber: { current: 18, target: 25, unit: 'g', color: '#4ADE80', label: '膳食纖維' },
-  calcium: { current: 280, target: 1000, unit: 'mg', color: '#10B981', label: '鈣 (Calcium)' },
-  iron: { current: 4.5, target: 15, unit: 'mg', color: '#EC4899', label: '鐵 (Iron)' },
 };
 
 export type MealEntry = {
@@ -34,8 +32,6 @@ export type MealEntry = {
   sugar?: number;
   saturated_fat?: number;
   trans_fat?: number;
-  calcium?: number;
-  iron?: number;
   is_fried?: boolean;
   // PRD: 疾病禁忌標記
   warnings?: string[];
@@ -164,8 +160,6 @@ export type DetectedFood = {
     sugar?: number;
     saturated_fat?: number;
     trans_fat?: number;
-    calcium?: number;
-    iron?: number;
     is_fried?: boolean;
   };
   originalNutrition?: {
@@ -178,8 +172,6 @@ export type DetectedFood = {
     sugar?: number;
     saturated_fat?: number;
     trans_fat?: number;
-    calcium?: number;
-    iron?: number;
     is_fried?: boolean;
   };
   portionAdjusted?: boolean;

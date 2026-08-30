@@ -4,6 +4,8 @@ import os
 import sys
 import unittest
 from datetime import datetime, timedelta, timezone
+
+from services.app_time_service import app_now
 from unittest.mock import patch
 
 
@@ -236,8 +238,6 @@ class ApiRouteTests(unittest.TestCase):
                     "trans_fat": 0,
                     "sodium": 95,
                     "fiber": 2,
-                    "calcium": 120,
-                    "iron": 1.2,
                     "is_fried": True,
                 },
                 {
@@ -251,8 +251,6 @@ class ApiRouteTests(unittest.TestCase):
                     "trans_fat": 0,
                     "sodium": 1,
                     "fiber": 2.6,
-                    "calcium": 6,
-                    "iron": 0.3,
                     "is_fried": False,
                 },
             ],
@@ -274,8 +272,6 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(record["total_sugar"], 5.7)
         self.assertEqual(record["total_saturated_fat"], 0.9)
         self.assertEqual(record["total_trans_fat"], 0)
-        self.assertEqual(record["total_calcium"], 126)
-        self.assertEqual(record["total_iron"], 1.5)
         self.assertTrue(record["contains_fried_food"])
         self.assertEqual(record["foods"][0]["sugar"], 1.5)
 
@@ -431,8 +427,6 @@ class ApiRouteTests(unittest.TestCase):
                 "carbs": 4.1,
                 "sugar": 1.2,
                 "sodium": 5,
-                "calcium": 18,
-                "iron": 0.6,
             },
         }
 
@@ -443,7 +437,6 @@ class ApiRouteTests(unittest.TestCase):
         data = response.get_json()
         self.assertEqual(data["food"]["user_id"], "user-a")
         self.assertTrue(data["food"]["is_fried"])
-        self.assertEqual(data["food"]["nutrition_per_100g"]["calcium"], 18)
         self.assertIn("owner_key", data["food"])
 
         with self.mock_auth("user-a"):
@@ -521,7 +514,7 @@ class ApiRouteTests(unittest.TestCase):
             {
                 "user_id": "user-a",
                 "client_record_id": "over-target-record",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": app_now().isoformat(),
                 "total_calories": 1900,
                 "total_protein": 80,
                 "total_carbs": 200,

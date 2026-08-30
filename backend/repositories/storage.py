@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import uuid
 
 from psycopg2.extras import Json, RealDictCursor
+from services.app_time_service import app_now, app_today
 from services.nutrient_service import NUTRITION_FIELDS, get_nutrient_value, nutrient_number
 
 
@@ -47,13 +48,11 @@ class StorageRepository:
                     total_sugar DOUBLE PRECISION DEFAULT 0,
                     total_saturated_fat DOUBLE PRECISION DEFAULT 0,
                     total_trans_fat DOUBLE PRECISION DEFAULT 0,
-                    total_calcium DOUBLE PRECISION DEFAULT 0,
-                    total_iron DOUBLE PRECISION DEFAULT 0,
                     source TEXT DEFAULT 'camera'
                 );
                 """
             )
-            for nutrient in ("sugar", "saturated_fat", "trans_fat", "calcium", "iron"):
+            for nutrient in ("sugar", "saturated_fat", "trans_fat"):
                 cursor.execute(
                     f"ALTER TABLE records ADD COLUMN IF NOT EXISTS total_{nutrient} DOUBLE PRECISION DEFAULT 0;"
                 )
@@ -188,9 +187,8 @@ class StorageRepository:
                         user_id, client_record_id, timestamp, meal_type, foods,
                         total_calories, total_protein, total_carbs,
                         total_fat, total_sodium, total_fiber, total_sugar,
-                        total_saturated_fat, total_trans_fat, total_calcium,
-                        total_iron, source
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        total_saturated_fat, total_trans_fat, source
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         record.get("user_id"),
@@ -207,8 +205,6 @@ class StorageRepository:
                         record.get("total_sugar", 0),
                         record.get("total_saturated_fat", 0),
                         record.get("total_trans_fat", 0),
-                        record.get("total_calcium", 0),
-                        record.get("total_iron", 0),
                         record.get("source", "camera"),
                     ),
                 )
@@ -231,8 +227,7 @@ class StorageRepository:
                     """
                     SELECT user_id, client_record_id, timestamp, meal_type, foods, total_calories, total_protein,
                            total_carbs, total_fat, total_sodium, total_fiber,
-                           total_sugar, total_saturated_fat, total_trans_fat,
-                           total_calcium, total_iron, source
+                           total_sugar, total_saturated_fat, total_trans_fat, source
                     FROM records
                     WHERE user_id = %s AND client_record_id = %s
                     LIMIT 1
@@ -264,14 +259,13 @@ class StorageRepository:
                         total_calories = %s, total_protein = %s, total_carbs = %s,
                         total_fat = %s, total_sodium = %s, total_fiber = %s,
                         total_sugar = %s, total_saturated_fat = %s,
-                        total_trans_fat = %s, total_calcium = %s, total_iron = %s,
+                        total_trans_fat = %s,
                         source = %s
                     WHERE user_id = %s AND client_record_id = %s
                     RETURNING user_id, client_record_id, timestamp, meal_type, foods,
                               total_calories, total_protein, total_carbs, total_fat,
                               total_sodium, total_fiber, total_sugar,
-                              total_saturated_fat, total_trans_fat, total_calcium,
-                              total_iron, source
+                              total_saturated_fat, total_trans_fat, source
                     """,
                     (
                         record.get("timestamp"),
@@ -286,8 +280,6 @@ class StorageRepository:
                         record.get("total_sugar", 0),
                         record.get("total_saturated_fat", 0),
                         record.get("total_trans_fat", 0),
-                        record.get("total_calcium", 0),
-                        record.get("total_iron", 0),
                         record.get("source", "camera"),
                         user_id,
                         client_record_id,
@@ -321,8 +313,7 @@ class StorageRepository:
                     RETURNING user_id, client_record_id, timestamp, meal_type, foods,
                               total_calories, total_protein, total_carbs, total_fat,
                               total_sodium, total_fiber, total_sugar,
-                              total_saturated_fat, total_trans_fat, total_calcium,
-                              total_iron, source
+                              total_saturated_fat, total_trans_fat, source
                     """,
                     (user_id, client_record_id),
                 )
@@ -347,8 +338,7 @@ class StorageRepository:
             sql = """
                 SELECT user_id, client_record_id, timestamp, meal_type, foods, total_calories, total_protein,
                        total_carbs, total_fat, total_sodium, total_fiber,
-                       total_sugar, total_saturated_fat, total_trans_fat,
-                       total_calcium, total_iron, source
+                       total_sugar, total_saturated_fat, total_trans_fat, source
                 FROM records
                 WHERE user_id = %s
             """
@@ -378,10 +368,10 @@ class StorageRepository:
         return [self._enrich_record_totals(r) for r in slice_records]
 
     def get_today_records(self, user_id: str):
-        return self.get_records(user_id, datetime.now(timezone.utc).strftime("%Y-%m-%d"), limit=500)
+        return self.get_records(user_id, app_today(), limit=500)
 
     def get_history(self, user_id: str, days: int):
-        end_date = datetime.now(timezone.utc).replace(tzinfo=None)
+        end_date = app_now().replace(tzinfo=None)
         start_date = end_date - timedelta(days=days)
 
         if self.use_postgres:

@@ -69,6 +69,30 @@ python -m py_compile "backend/app.py" "backend/services/auth_service.py" "backen
 
 食物辨識目前採 Gemini Vision 初判，再由後端查 TFDA/自訂食品資料庫取得營養值；不再部署本機影像模型。
 
+### 2.5 一週飲食測試資料
+
+不必真的記錄一星期，`backend/scripts/seed_week_test_data.py` 會一次灌入 7 天飲食紀錄，
+再依 `calculate_pdf_daily_targets` 的疾病別條件逐日檢查是否達標。營養值全部取自
+`nutrition_db_tw.json` (TFDA) 依克數換算，和 App 自己查到的數字一致。
+
+```powershell
+python backend/scripts/seed_week_test_data.py --scenario mixed
+```
+
+常用參數：
+
+- `--scenario mixed|compliant|over` — 混合週（5 天達標 + 2 天破戒）、全達標、全超標
+- `--profile healthy|diabetes|hypertension|kidney_disease|gout|hyperlipidemia` — 一併設定使用者健康條件
+- `--skip-profile` — 沿用後端既有 profile，不覆蓋
+- `--dry-run` — 不寫入後端，直接在本機算出每日達標結果（調菜單份量時用）
+- `--clear` — 刪除同情境先前灌入的紀錄
+- `--report out.json` — 輸出完整逐日結果
+- `--api-url` / `--user-id` / `--token` — 打雲端後端時使用（`--token` 為 Supabase access token）
+
+`client_record_id` 是 `seed_<情境>_<日期>_<餐別>`，重跑只會補上新的一天，不會產生重複紀錄。
+沒有設定 `DATABASE_URL` 時後端使用記憶體儲存，重啟 Flask 資料就會消失，需要重跑腳本。
+
+
 ## 3. 本機環境變數
 
 ### 3.1 後端
@@ -93,9 +117,12 @@ SUPABASE_AUTH_REQUIRED=true
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 GOOGLE_PLACES_API_KEY=your-google-maps-and-places-key
+APP_UTC_OFFSET_HOURS=8
 ```
 
 `RESTAURANT_CATALOG_PATH` 可省略；未設定時後端會使用 `backend/data/restaurant_catalog.json`。若要測試替代餐廳資料源，請指定 JSON 檔路徑，不要把 API token 或私有商家資料寫入 repo。
+
+`APP_UTC_OFFSET_HOURS` 可省略；未設定時預設 8（台灣 UTC+8，無日光節約時間）。伺服器（Render）跑在 UTC，但飲食紀錄的 timestamp、店家 `open_hours` 都是本地時間，因此「今天吃了多少」「店家現在有沒有開」一律以這個偏移量換算。換地區部署時改這個值即可，不需要 tz database。
 
 `DISEASE_RULES_PATH` 可省略；未設定時後端會使用 `backend/config/disease_rules.json`。替代規則檔必須包含 `rule_version`、`review_status`、`last_reviewed`、`reviewed_by`、`evidence_level`、`references` 與 `medical_disclaimer`，否則啟動時會失敗。
 

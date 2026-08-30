@@ -40,8 +40,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -67,8 +65,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       }
     ]
@@ -113,8 +109,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 3.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -140,8 +134,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 1.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       }
     ]
@@ -187,8 +179,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -214,8 +204,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 3.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       }
     ]
@@ -260,8 +248,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 2.0,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -284,8 +270,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 2.0,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       }
     ]
@@ -334,8 +318,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 3.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -362,8 +344,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 3.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       }
     ]
@@ -411,8 +391,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 2.0,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -438,8 +416,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 3.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       }
     ]
@@ -485,8 +461,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -512,8 +486,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 1.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       }
     ]
@@ -559,8 +531,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -586,8 +556,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 3.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       }
     ]
@@ -634,8 +602,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 3.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -661,8 +627,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 3.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       }
     ]
@@ -708,8 +672,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 2.0,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -732,8 +694,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 1.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       }
     ]
@@ -784,8 +744,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -815,8 +773,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -847,8 +803,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -876,8 +830,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -908,8 +860,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -942,8 +892,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       }
     ]
@@ -982,8 +930,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -1004,8 +950,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -1027,8 +971,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 1.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -1049,8 +991,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 1.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       }
     ]
@@ -1100,8 +1040,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 2.0,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -1134,8 +1072,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 2.0,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -1167,8 +1103,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 1.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": true
       },
       {
@@ -1194,8 +1128,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -1223,8 +1155,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       }
     ]
@@ -1277,8 +1207,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -1310,8 +1238,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -1343,8 +1269,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 2.0,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -1380,8 +1304,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -1413,8 +1335,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 3.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -1448,8 +1368,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       }
     ]
@@ -1522,8 +1440,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 2.0,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -1544,8 +1460,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 2.0,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -1567,8 +1481,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 0.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       },
       {
@@ -1589,8 +1501,6 @@
         "saturated_fat": 0.0,
         "trans_fat": 0.0,
         "fiber": 1.5,
-        "calcium": 0,
-        "iron": 0.0,
         "is_fried": false
       }
     ]

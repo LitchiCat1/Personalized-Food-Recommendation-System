@@ -160,8 +160,6 @@ export default function HistoryScreen() {
               <ProgressBar label="反式脂肪" current={summary.avg_trans_fat || 0} target={0} unit="g" color={Palette.status.error} />
               <ProgressBar label="膳食纖維" current={summary.avg_fiber || 0} target={25} unit="g" color={Palette.accent.green} />
               <ProgressBar label="鈉 (Sodium)" current={summary.avg_sodium || 0} target={2000} unit="mg" color={(summary.avg_sodium || 0) > 1800 ? Palette.status.warning : Palette.accent.pink} />
-              <ProgressBar label="鈣 (Calcium)" current={summary.avg_calcium || 0} target={1000} unit="mg" color={Palette.accent.green} />
-              <ProgressBar label="鐵 (Iron)" current={summary.avg_iron || 0} target={15} unit="mg" color={Palette.accent.blue} />
             </View>
           </SectionBlock>
 

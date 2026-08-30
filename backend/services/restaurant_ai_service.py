@@ -211,6 +211,44 @@ def call_gemini_restaurant_summary(
                 "temperature": 0.2,
                 "responseMimeType": "application/json",
                 "maxOutputTokens": 1400,
+                "responseSchema": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "restaurant_type": {"type": "STRING"},
+                        "likely_foods": {"type": "ARRAY", "items": {"type": "STRING"}},
+                        "recommended_foods": {
+                            "type": "ARRAY",
+                            "items": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "name": {"type": "STRING"},
+                                    "reason": {"type": "STRING"},
+                                },
+                                "required": ["name", "reason"],
+                            },
+                        },
+                        "price_range_twd": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "min": {"type": "INTEGER"},
+                                "max": {"type": "INTEGER"},
+                            },
+                            "required": ["min", "max"],
+                        },
+                        "budget_fit": {"type": "STRING", "enum": ["適合", "可能超出", "不確定"]},
+                        "health_tips": {"type": "ARRAY", "items": {"type": "STRING"}},
+                        "confidence": {"type": "STRING", "enum": ["low", "medium", "high"]},
+                    },
+                    "required": [
+                        "restaurant_type",
+                        "likely_foods",
+                        "recommended_foods",
+                        "price_range_twd",
+                        "budget_fit",
+                        "health_tips",
+                        "confidence",
+                    ],
+                },
             },
         },
         timeout=30,

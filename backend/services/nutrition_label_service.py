@@ -1,5 +1,6 @@
 import base64
 import binascii
+import ast
 import json
 import os
 import re
@@ -122,6 +123,37 @@ def _iter_json_candidates(text: str):
                 start = None
 
 
+def _escape_control_chars_in_json_strings(value: str) -> str:
+    """Repair literal line breaks/tabs inside quoted model strings."""
+    output: list[str] = []
+    in_string = False
+    escaped = False
+    for char in value:
+        if in_string:
+            if escaped:
+                output.append(char)
+                escaped = False
+            elif char == "\\":
+                output.append(char)
+                escaped = True
+            elif char == '"':
+                output.append(char)
+                in_string = False
+            elif char == "\n":
+                output.append("\\n")
+            elif char == "\r":
+                output.append("\\r")
+            elif char == "\t":
+                output.append("\\t")
+            else:
+                output.append(char)
+        else:
+            output.append(char)
+            if char == '"':
+                in_string = True
+    return "".join(output)
+
+
 def extract_json_block(text: str) -> dict:
     """Extract the last parseable JSON object from a model response.
 
@@ -142,12 +174,19 @@ def extract_json_block(text: str) -> dict:
 
     last_error: Exception | None = None
     for candidate in reversed(candidates):
-        for value in (candidate, re.sub(r",\s*([}\]])", r"\1", candidate)):
+        repaired = re.sub(r",\s*([}\]])", r"\1", candidate)
+        repaired = re.sub(r"([,{]\s*)([A-Za-z_][A-Za-z0-9_-]*)\s*:", r'\1"\2":', repaired)
+        repaired = _escape_control_chars_in_json_strings(repaired)
+        for value in (candidate, repaired):
             try:
                 parsed = json.loads(value)
             except (json.JSONDecodeError, TypeError, ValueError) as error:
                 last_error = error
-                continue
+                try:
+                    parsed = ast.literal_eval(value)
+                except (SyntaxError, ValueError, TypeError) as literal_error:
+                    last_error = literal_error
+                    continue
             if isinstance(parsed, dict):
                 return parsed
             last_error = ValueError("Gemini JSON 根節點必須是物件")

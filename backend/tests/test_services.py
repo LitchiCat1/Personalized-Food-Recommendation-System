@@ -381,6 +381,12 @@ class ServiceSmokeTests(unittest.TestCase):
         parsed = extract_json_block(response)
         self.assertEqual(parsed["items"][0]["name"], "滷肉飯")
 
+        python_style = "{'restaurant_type': '便當店', 'likely_foods': ['便當'],}"
+        self.assertEqual(extract_json_block(python_style)["restaurant_type"], "便當店")
+
+        raw_newline = '{"health_tips": ["醬汁另外放\n再確認份量"]}'
+        self.assertIn("再確認份量", extract_json_block(raw_newline)["health_tips"][0])
+
     def test_restaurant_summary_returns_safe_fallback_for_invalid_json(self):
         class InvalidJsonResponse:
             status_code = 200

@@ -5,7 +5,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
-from services.nutrition_label_service import get_gemini_api_keys, extract_json_block
+from services.nutrition_label_service import decode_image_base64, extract_json_block, get_gemini_api_keys
 
 # Modern User-Agents to prevent anti-bot blocking
 USER_AGENTS = [
@@ -270,16 +270,16 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
     """Uses Gemini Vision API to OCR and parse a menu photo Base64 into structured items with nutrition estimates."""
     if not image_base64:
         return {"items": []}
-    
-    if "base64," in image_base64:
-        image_base64 = image_base64.split("base64,")[1]
-    image_base64 = image_base64.strip()
+
+    try:
+        _, image_base64, mime_type = decode_image_base64(image_base64)
+    except ValueError as error:
+        return {"items": [], "error": str(error)}
     
     keys = get_gemini_api_keys()
     if not keys:
         print("[!] No Gemini API key found for menu image parsing")
-        fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
-        return {"items": fallback_items}
+        return {"items": [], "error": "缺少 Gemini API key，無法解析菜單照片"}
     
     prompt = f"""
     你是一位台灣經驗豐富的臨床膳食評估師與營養師。
@@ -323,7 +323,7 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
                                 {"text": prompt},
                                 {
                                     "inlineData": {
-                                        "mimeType": "image/jpeg",
+                                        "mimeType": mime_type,
                                         "data": image_base64
                                     }
                                 }
@@ -345,6 +345,5 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
             except Exception as e:
                 print(f"[!] Gemini Vision error with model {model_name}: {e}")
     
-    fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
-    return {"items": fallback_items}
+    return {"items": [], "error": "Gemini Vision 無法辨識菜單內容，請拍攝清晰且完整的菜單照片後重試"}
 

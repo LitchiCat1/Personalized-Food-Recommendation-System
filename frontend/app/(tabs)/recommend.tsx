@@ -62,12 +62,31 @@ export default function RecommendScreen() {
   const [addingFoodName, setAddingFoodName] = useState<string | null>(null);
   const [uploadingMenu, setUploadingMenu] = useState(false);
 
-  const handleUploadMenuPhoto = async (restaurant: HealthyFoodRestaurant) => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      base64: true,
-      quality: 0.8,
-    });
+  const handleSelectMenuPhoto = async (restaurant: HealthyFoodRestaurant, source: 'camera' | 'library') => {
+    let result: ImagePicker.ImagePickerResult;
+    try {
+      if (source === 'camera') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('需要相機權限', '請允許相機權限後再拍攝菜單。');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          base64: true,
+          quality: 0.8,
+        });
+      } else {
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          base64: true,
+          quality: 0.8,
+        });
+      }
+    } catch (error: any) {
+      Alert.alert('無法取得菜單照片', error?.message || '請確認裝置支援相機或相簿存取。');
+      return;
+    }
 
     if (result.canceled || !result.assets?.[0]?.base64) return;
     const base64 = result.assets[0].base64;
@@ -395,8 +414,14 @@ export default function RecommendScreen() {
               <SecondaryButton
                 disabled={uploadingMenu}
                 icon={<Ionicons name="camera-outline" size={14} color={Palette.accent.green} />}
-                label={uploadingMenu ? "正在用 AI 辨識菜單..." : "📷 上傳 / 更新實體菜單照片"}
-                onPress={() => viewingMenuRest && handleUploadMenuPhoto(viewingMenuRest)}
+                label={uploadingMenu ? "正在用 AI 辨識菜單..." : "拍攝菜單"}
+                onPress={() => viewingMenuRest && handleSelectMenuPhoto(viewingMenuRest, 'camera')}
+              />
+              <SecondaryButton
+                disabled={uploadingMenu}
+                icon={<Ionicons name="images-outline" size={14} color={Palette.accent.green} />}
+                label="從相簿選取"
+                onPress={() => viewingMenuRest && handleSelectMenuPhoto(viewingMenuRest, 'library')}
               />
             </View>
 
@@ -425,8 +450,14 @@ export default function RecommendScreen() {
                         <SecondaryButton
                           disabled={uploadingMenu}
                           icon={<Ionicons name="camera-outline" size={16} color={Palette.accent.green} />}
-                          label={uploadingMenu ? "正在用 AI 辨識菜單..." : "📷 拍照 / 📁 上傳實體菜單"}
-                          onPress={() => viewingMenuRest && handleUploadMenuPhoto(viewingMenuRest)}
+                          label={uploadingMenu ? "正在用 AI 辨識菜單..." : "拍攝菜單"}
+                          onPress={() => viewingMenuRest && handleSelectMenuPhoto(viewingMenuRest, 'camera')}
+                        />
+                        <SecondaryButton
+                          disabled={uploadingMenu}
+                          icon={<Ionicons name="images-outline" size={16} color={Palette.accent.green} />}
+                          label="從相簿選取"
+                          onPress={() => viewingMenuRest && handleSelectMenuPhoto(viewingMenuRest, 'library')}
                         />
                       </View>
                     );

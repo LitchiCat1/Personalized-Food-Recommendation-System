@@ -433,6 +433,77 @@ class ApiRouteTests(unittest.TestCase):
                 response = self.client.get("/map-food-recommend/user-a?budget=150&lat=24.9890&lng=121.3443&radius_km=3&category=all", headers=self.auth_headers())
         self.assertEqual(response.status_code, 503)
 
+    def test_restaurant_menu_requires_auth_before_parsing_photo(self):
+        with patch.object(self.app_module, "parse_menu_image_with_gemini") as parse_menu:
+            response = self.client.post(
+                "/restaurant/menu",
+                json={"user_id": "user-a", "name": "測試小吃", "menu_image": "not-base64"},
+            )
+
+        self.assertEqual(response.status_code, 401)
+        parse_menu.assert_not_called()
+
+    def test_restaurant_menu_photo_returns_personalized_items_without_catalog_mutation(self):
+        parsed_items = [{
+            "item_id": "photo-item-1",
+            "name": "清蒸雞胸餐",
+            "price": 120,
+            "calories": 360,
+            "protein": 35,
+            "carbs": 25,
+            "fat": 10,
+            "sodium": 300,
+            "sugar": 2,
+            "saturated_fat": 2,
+            "trans_fat": 0,
+            "fiber": 4,
+            "calcium": 60,
+            "iron": 2,
+            "gi": "low",
+            "allergens": [],
+            "is_fried": False,
+        }]
+        with self.mock_auth("user-a"):
+            with patch.object(self.app_module, "parse_menu_image_with_gemini", return_value={"items": parsed_items}) as parse_menu:
+                response = self.client.post(
+                    "/restaurant/menu",
+                    json={
+                        "user_id": "user-a",
+                        "restaurant_id": "photo-test",
+                        "name": "測試小吃",
+                        "address": "測試路 1 號",
+                        "budget": 150,
+                        "menu_image": "aGVsbG8=",
+                    },
+                    headers=self.auth_headers(),
+                )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["recommended_items"][0]["item_name"], "清蒸雞胸餐")
+        self.assertEqual(data["recommended_items"][0]["restaurant_id"], "photo-test")
+        self.assertEqual(data["recommended_items"][0]["fiber"], 4)
+        self.assertEqual(data["recommended_items"][0]["calcium"], 60)
+        self.assertFalse(data["recommended_items"][0]["is_fried"])
+        self.assertFalse(any(item.get("restaurant_id") == "photo-test" for item in self.app_module.RESTAURANT_CATALOG))
+        parse_menu.assert_called_once_with("aGVsbG8=", "測試小吃")
+
+    def test_restaurant_menu_rejects_photo_parser_error(self):
+        with self.mock_auth("user-a"):
+            with patch.object(
+                self.app_module,
+                "parse_menu_image_with_gemini",
+                return_value={"items": [], "error": "圖片格式不正確"},
+            ):
+                response = self.client.post(
+                    "/restaurant/menu",
+                    json={"user_id": "user-a", "name": "測試小吃", "menu_image": "bad"},
+                    headers=self.auth_headers(),
+                )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.get_json()["error"], "圖片格式不正確")
+
     def test_health_metadata_in_map_food_route(self):
         fake_restaurants = [
             {

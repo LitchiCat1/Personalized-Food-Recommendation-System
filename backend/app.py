@@ -565,11 +565,18 @@ def get_restaurant_menu():
     動態獲取餐廳詳細菜單。如果本地資料庫不存在，則調用爬蟲與 Gemini 動態分析。
     """
     data = request.get_json(silent=True) or {}
-    restaurant_id = data.get("restaurant_id", "")
-    name = data.get("name", "").strip()
-    address = data.get("address", "").strip()
-    menu_image = data.get("menu_image", "").strip()
-    
+    restaurant_id = data.get("restaurant_id") if isinstance(data.get("restaurant_id"), str) else ""
+    name = data.get("name").strip() if isinstance(data.get("name"), str) else ""
+    address = data.get("address").strip() if isinstance(data.get("address"), str) else ""
+    menu_image = data.get("menu_image").strip() if isinstance(data.get("menu_image"), str) else ""
+    user_id = data.get("user_id") if isinstance(data.get("user_id"), str) else ""
+
+    if not is_auth_required() and not user_id:
+        user_id = "demo_user"
+
+    # Authenticate before invoking Gemini so uploaded menus cannot trigger work anonymously.
+    require_user_access(user_id)
+
     if not name:
         return jsonify({"error": "缺少 restaurant name"}), 400
 
@@ -583,23 +590,34 @@ def get_restaurant_menu():
     if menu_image:
         print(f"[Scraper] 使用 Gemini Vision AI 辨識 {name} 的實體菜單圖片")
         enriched = parse_menu_image_with_gemini(menu_image, name)
+        if enriched.get("error"):
+            return jsonify({"error": enriched["error"]}), 502
+        parsed_items = enriched.get("items") or []
+        if not parsed_items:
+            return jsonify({"error": "未辨識到菜單品項，請拍攝清晰且完整的菜單照片"}), 422
+
+        # Keep a user's uploaded menu request-scoped; never overwrite shared catalog data.
         if matched:
-            matched["items"] = enriched.get("items", [])
+            matched = {**matched, "items": parsed_items}
         else:
-            new_id = restaurant_id or f"scraped_{uuid.uuid4().hex[:6]}"
+            new_id = restaurant_id or f"photo_{uuid.uuid4().hex[:8]}"
+            try:
+                lat = float(data.get("lat") or 25.0338)
+                lng = float(data.get("lng") or 121.5645)
+            except (TypeError, ValueError):
+                lat, lng = 25.0338, 121.5645
             matched = {
                 "restaurant_id": new_id,
                 "name": name,
-                "lat": float(data.get("lat") or 25.0338),
-                "lng": float(data.get("lng") or 121.5645),
+                "lat": lat,
+                "lng": lng,
                 "address": address or "台灣",
                 "phone": "",
                 "open_hours": ["11:00-21:00"],
                 "tags": ["實體菜單辨識", "AI標記"],
                 "price_level": 2,
-                "items": enriched.get("items", [])
+                "items": parsed_items,
             }
-            RESTAURANT_CATALOG.append(matched)
     elif not matched:
         # 2. 本地不存在 ➔ 呼叫爬蟲與 Gemini 即時分析
         print(f"[Scraper] 即時線上擷取並生成 {name} 的菜單")
@@ -630,12 +648,16 @@ def get_restaurant_menu():
             print(f"[!] 無法寫入本地 catalog 檔案: {e}")
 
     # 3. 對所有菜單項目進行醫學過濾與個人化偏好契合度評分
-    user_id = data.get("user_id", "demo_user")
     user = storage.get_user(user_id)
+    if not user:
+        return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
     conditions = user.get("health_conditions", []) if user else []
     allergens = user.get("allergens", []) if user else []
-    budget = int(data.get("budget", 150))
-    target_calories = (user.get("daily_calorie_target", 2100) / 3) if user else 650
+    try:
+        budget = max(0, int(data.get("budget", 150)))
+    except (TypeError, ValueError):
+        return jsonify({"error": "budget 必須是有效數字"}), 400
+    target_calories = user.get("daily_calorie_target", 2100) / 3
     
     recommended_items = []
     filtered_items = []
@@ -716,8 +738,15 @@ def get_restaurant_menu():
                 "calories": item.get("calories", 0),
                 "protein": item.get("protein", 0),
                 "carbs": item.get("carbs", 0),
+                "sugar": item.get("sugar", 0),
                 "fat": item.get("fat", 0),
+                "saturated_fat": item.get("saturated_fat", 0),
+                "trans_fat": item.get("trans_fat", 0),
                 "sodium": item.get("sodium", 0),
+                "fiber": item.get("fiber", 0),
+                "calcium": item.get("calcium", 0),
+                "iron": item.get("iron", 0),
+                "is_fried": item.get("is_fried", False),
                 "gi": item.get("gi"),
                 "match_score": match_score,
                 "reasons": reasons,

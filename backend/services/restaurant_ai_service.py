@@ -255,9 +255,41 @@ def call_gemini_restaurant_summary(
     )
     resp.raise_for_status()
     try:
-        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        payload = resp.json()
+        candidate = (payload.get("candidates") or [])[0]
+        parts = ((candidate.get("content") or {}).get("parts") or [])
+        if not parts:
+            raise ValueError("Gemini candidates.content.parts 為空")
+
+        # Gemini JSON mode normally returns text, but newer gateways may expose
+        # the schema result as a parsed object. Accept both representations.
+        first_part = parts[0] or {}
+        structured = first_part.get("structuredData") or first_part.get("json")
+        if isinstance(structured, dict):
+            return structured
+
+        text = first_part.get("text")
+        if not isinstance(text, str):
+            raise ValueError("Gemini part 缺少 text")
         return extract_json_block(text)
     except (ValueError, KeyError, IndexError, TypeError) as error:
+        # Keep diagnostics useful without logging prompts, restaurant data, or
+        # credentials. This is intentionally bounded for production logs.
+        try:
+            payload = resp.json()
+            candidate = (payload.get("candidates") or [{}])[0] or {}
+            parts = ((candidate.get("content") or {}).get("parts") or [])
+            first_part = parts[0] if parts else {}
+            raw_text = first_part.get("text") if isinstance(first_part, dict) else None
+            snippet = repr(raw_text[:300]) if isinstance(raw_text, str) else "<non-text>"
+            print(
+                "[WARN] Gemini restaurant response shape invalid "
+                f"finish_reason={candidate.get('finishReason')} "
+                f"part_keys={sorted(first_part.keys()) if isinstance(first_part, dict) else []} "
+                f"snippet={snippet}"
+            )
+        except Exception:
+            pass
         raise GeminiResponseFormatError("Gemini 店家摘要回應格式無效") from error
 
 

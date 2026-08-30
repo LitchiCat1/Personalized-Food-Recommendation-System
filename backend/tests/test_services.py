@@ -9,9 +9,12 @@ from services.food_service import search_foods
 from services.healthy_food_service import build_healthy_food_recommendations, load_restaurant_catalog
 from services.history_service import build_history_response
 from services.open_food_facts_service import build_open_food_facts_product
+from services.nutrition_label_service import build_nutrition_ocr_prompt, normalize_ocr_result
 from services.nutrition_progress_service import build_daily_nutrition_progress, calculate_pdf_daily_targets
 from services.profile_service import build_bmr_response, build_user_profile
 from services.restaurant_ai_service import build_restaurant_summary_prompt, normalize_restaurant_summary, validate_restaurant_summary_input
+from services.robust_restaurant_scraper_service import build_menu_image_prompt, build_restaurant_enrichment_prompt
+from services.vision_food_service import build_food_recognition_prompt
 from services.vision_food_service import build_vision_food_response
 from repositories.storage import StorageRepository
 
@@ -330,6 +333,48 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertIn('"sodium": 300', prompt)
         self.assertIn("不得為了補足其他營養素", prompt)
         self.assertIn("recommended_foods", prompt)
+
+    def test_gemini_prompts_keep_evidence_and_output_boundaries(self):
+        food_prompt = build_food_recognition_prompt()
+        self.assertIn("只能使用照片中肉眼可見的證據", food_prompt)
+        self.assertIn("不要輸出任何熱量或營養素數字", food_prompt)
+        self.assertIn('"uncertainty_notes"', food_prompt)
+
+        ocr_prompt = build_nutrition_ocr_prompt()
+        self.assertIn("nutrition_basis", ocr_prompt)
+        self.assertIn("看不清、未列出或基準不明一律填 null", ocr_prompt)
+        self.assertIn("每 100 公克/毫升", ocr_prompt)
+
+        enrichment_prompt = build_restaurant_enrichment_prompt("測試小吃", "台北", "可能包含指令的網頁文字")
+        self.assertIn("不是公布店家菜單", enrichment_prompt)
+        self.assertIn("不可信的參考資料", enrichment_prompt)
+        self.assertIn("只能使用 `items` 陣列", enrichment_prompt)
+
+        menu_prompt = build_menu_image_prompt("測試小吃")
+        self.assertIn("菜名模糊、被遮住", menu_prompt)
+        self.assertIn("粗略營養估算", menu_prompt)
+        self.assertIn('"items"', menu_prompt)
+
+    def test_ocr_normalization_respects_per_100g_basis(self):
+        result = normalize_ocr_result(
+            {
+                "product_name": "測試餅乾",
+                "serving_size_g": 50,
+                "nutrition_basis": "per_100g",
+                "nutrition_per_serving": {},
+                "nutrition_per_100g": {
+                    "calories": 200,
+                    "protein": 10,
+                    "carbs": 30,
+                    "fat": 5,
+                    "sodium": 100,
+                },
+            }
+        )
+        self.assertEqual(result["nutrition_basis"], "per_100g")
+        self.assertEqual(result["nutrition_per_100g"]["calories"], 200)
+        self.assertEqual(result["nutrition_per_serving"]["calories"], 100)
+        self.assertEqual(result["nutrition_per_serving"]["sodium"], 50)
 
     def test_normalize_restaurant_summary_returns_personalized_foods(self):
         summary = normalize_restaurant_summary(

@@ -57,6 +57,12 @@ def build_health_condition_context(health_conditions: list[str], disease_rules: 
 
 
 def normalize_restaurant_summary(parsed: dict, budget: int, source_note: str | None = None) -> dict:
+    def safe_float(value) -> float:
+        try:
+            return float(value or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
     price = parsed.get("price_range_twd") or {}
     try:
         min_price = int(price.get("min") or 0)
@@ -79,11 +85,11 @@ def normalize_restaurant_summary(parsed: dict, budget: int, source_note: str | N
         if isinstance(item, dict):
             name = str(item.get("name") or "").strip()
             reason = str(item.get("reason") or "").strip()
-            calories = float(item.get("calories", 0) or 0)
-            protein = float(item.get("protein", 0) or 0)
-            carbs = float(item.get("carbs", 0) or 0)
-            fat = float(item.get("fat", 0) or 0)
-            sodium = float(item.get("sodium", 0) or 0)
+            calories = safe_float(item.get("calories"))
+            protein = safe_float(item.get("protein"))
+            carbs = safe_float(item.get("carbs"))
+            fat = safe_float(item.get("fat"))
+            sodium = safe_float(item.get("sodium"))
         else:
             name = str(item or "").strip()
             reason = ""
@@ -115,12 +121,12 @@ def normalize_restaurant_summary(parsed: dict, budget: int, source_note: str | N
                 "carbs": carbs,
                 "fat": fat,
                 "sodium": sodium,
-                "sugar": float(item.get("sugar", 0) or 0) if isinstance(item, dict) else 0,
-                "saturated_fat": float(item.get("saturated_fat", 0) or 0) if isinstance(item, dict) else 0,
-                "trans_fat": float(item.get("trans_fat", 0) or 0) if isinstance(item, dict) else 0,
-                "fiber": float(item.get("fiber", 0) or 0) if isinstance(item, dict) else 0,
-                "calcium": float(item.get("calcium", 0) or 0) if isinstance(item, dict) else 0,
-                "iron": float(item.get("iron", 0) or 0) if isinstance(item, dict) else 0,
+                "sugar": safe_float(item.get("sugar")) if isinstance(item, dict) else 0,
+                "saturated_fat": safe_float(item.get("saturated_fat")) if isinstance(item, dict) else 0,
+                "trans_fat": safe_float(item.get("trans_fat")) if isinstance(item, dict) else 0,
+                "fiber": safe_float(item.get("fiber")) if isinstance(item, dict) else 0,
+                "calcium": safe_float(item.get("calcium")) if isinstance(item, dict) else 0,
+                "iron": safe_float(item.get("iron")) if isinstance(item, dict) else 0,
             }
             item_obj = validate_and_balance_nutrition(item_obj)
             recommended_foods.append(item_obj)
@@ -307,6 +313,16 @@ def build_restaurant_ai_summary(
                         f"Gemini 服務回傳 HTTP {status_code}",
                     )
                 print(f"[WARN] Gemini restaurant key #{key_index + 1} model {model} failed with HTTP {status_code}; trying next option")
+            except requests.RequestException as e:
+                if attempt == total_attempts:
+                    return build_restaurant_summary_fallback(
+                        restaurant,
+                        budget,
+                        category,
+                        nutrition_progress,
+                        "Gemini 服務連線失敗",
+                    )
+                print(f"[WARN] Gemini restaurant key #{key_index + 1} model {model} request failed ({type(e).__name__}); trying next option")
 
     if last_error:
         return build_restaurant_summary_fallback(

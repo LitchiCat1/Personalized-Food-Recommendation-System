@@ -8,6 +8,10 @@ from services.nutrition_label_service import extract_json_block, get_gemini_api_
 RETRYABLE_GEMINI_STATUS_CODES = {401, 403, 404, 429, 500, 502, 503, 504}
 
 
+class GeminiResponseFormatError(ValueError):
+    """Raised when Gemini returns a response that cannot satisfy the JSON contract."""
+
+
 def validate_restaurant_summary_input(restaurant: dict, budget: int, category: str, health_conditions: list[str]) -> tuple[dict, int, str, list[str]]:
     if not isinstance(restaurant, dict):
         raise ValueError("restaurant must be an object")
@@ -52,7 +56,7 @@ def build_health_condition_context(health_conditions: list[str], disease_rules: 
     return context
 
 
-def normalize_restaurant_summary(parsed: dict, budget: int) -> dict:
+def normalize_restaurant_summary(parsed: dict, budget: int, source_note: str | None = None) -> dict:
     price = parsed.get("price_range_twd") or {}
     try:
         min_price = int(price.get("min") or 0)
@@ -134,7 +138,7 @@ def normalize_restaurant_summary(parsed: dict, budget: int) -> dict:
         "budget_fit": budget_fit,
         "health_tips": health_tips[:4],
         "confidence": confidence,
-        "source_note": "Google Places + Gemini 推測，非店家正式菜單；實際品項與價格請以店家現場為準。",
+        "source_note": source_note or "Google Places + Gemini 推測，非店家正式菜單；實際品項與價格請以店家現場為準。",
     }
 
 
@@ -206,8 +210,40 @@ def call_gemini_restaurant_summary(
         timeout=30,
     )
     resp.raise_for_status()
-    text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-    return extract_json_block(text)
+    try:
+        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        return extract_json_block(text)
+    except (ValueError, KeyError, IndexError, TypeError) as error:
+        raise GeminiResponseFormatError("Gemini 店家摘要回應格式無效") from error
+
+
+def build_restaurant_summary_fallback(
+    restaurant: dict,
+    budget: int,
+    category: str,
+    nutrition_progress: dict | None = None,
+    reason: str = "Gemini 暫時無法提供可解析的摘要",
+) -> dict:
+    """Return a safe, explicit low-confidence result when the model cannot answer."""
+    tips = [f"{reason}；請以店家現場菜單、價格與營養標示為準。"]
+    status = (nutrition_progress or {}).get("status") or {}
+    if status.get("sodium") == "over":
+        tips.append("今日鈉已超標，點餐時優先選清淡少湯、醬料另放的品項。")
+    elif status.get("sodium") == "near_limit":
+        tips.append("今日鈉接近上限，避免濃湯、醬料與加工配料。")
+    restaurant_type = str(category or "店家").strip()
+    if restaurant_type == "all":
+        restaurant_type = "店家"
+    return {
+        "restaurant_type": restaurant_type[:30],
+        "likely_foods": [],
+        "recommended_foods": [],
+        "price_range_twd": {"min": 0, "max": 0},
+        "budget_fit": "不確定",
+        "health_tips": tips[:4],
+        "confidence": "low",
+        "source_note": "Google Places 基本資料；Gemini 摘要暫時不可用，非店家正式菜單。",
+    }
 
 
 def build_restaurant_ai_summary(
@@ -229,6 +265,7 @@ def build_restaurant_ai_summary(
     total_attempts = len(api_keys) * len(models)
     attempt = 0
     last_error: requests.HTTPError | None = None
+    format_failures = 0
 
     for key_index, api_key in enumerate(api_keys):
         for model in models:
@@ -245,13 +282,46 @@ def build_restaurant_ai_summary(
                     disease_rules,
                 )
                 return normalize_restaurant_summary(parsed, budget)
+            except GeminiResponseFormatError as e:
+                format_failures += 1
+                print(f"[WARN] Gemini restaurant key #{key_index + 1} model {model} returned invalid JSON; trying next option")
+                if attempt == total_attempts:
+                    return build_restaurant_summary_fallback(
+                        restaurant,
+                        budget,
+                        category,
+                        nutrition_progress,
+                        "Gemini 回應格式無法解析",
+                    )
             except requests.HTTPError as e:
                 last_error = e
                 status_code = e.response.status_code if e.response is not None else None
-                if status_code not in RETRYABLE_GEMINI_STATUS_CODES or attempt == total_attempts:
+                if status_code not in RETRYABLE_GEMINI_STATUS_CODES:
                     raise
+                if attempt == total_attempts:
+                    return build_restaurant_summary_fallback(
+                        restaurant,
+                        budget,
+                        category,
+                        nutrition_progress,
+                        f"Gemini 服務回傳 HTTP {status_code}",
+                    )
                 print(f"[WARN] Gemini restaurant key #{key_index + 1} model {model} failed with HTTP {status_code}; trying next option")
 
     if last_error:
-        raise last_error
+        return build_restaurant_summary_fallback(
+            restaurant,
+            budget,
+            category,
+            nutrition_progress,
+            "Gemini 服務暫時無法使用",
+        )
+    if format_failures:
+        return build_restaurant_summary_fallback(
+            restaurant,
+            budget,
+            category,
+            nutrition_progress,
+            "Gemini 回應格式無法解析",
+        )
     raise ValueError("Gemini 店家摘要失敗")

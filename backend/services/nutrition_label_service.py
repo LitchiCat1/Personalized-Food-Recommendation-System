@@ -85,18 +85,76 @@ def build_custom_food_search_result(food_doc: dict) -> dict:
     }
 
 
+def _iter_json_candidates(text: str):
+    """Yield top-level JSON objects/arrays while ignoring braces inside strings."""
+    start = None
+    stack: list[str] = []
+    in_string = False
+    escaped = False
+    for index, char in enumerate(text):
+        if start is None:
+            if char in "{[":
+                start = index
+                stack = [char]
+            continue
+
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+        elif char in "{[":
+            stack.append(char)
+        elif char in "}]":
+            if not stack or (char == "}" and stack[-1] != "{") or (char == "]" and stack[-1] != "["):
+                start = None
+                stack = []
+                continue
+            stack.pop()
+            if not stack:
+                yield text[start : index + 1]
+                start = None
+
+
 def extract_json_block(text: str) -> dict:
-    cleaned = text.strip()
-    cleaned = re.sub(r"^```json\s*", "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"^```\s*", "", cleaned)
+    """Extract the last parseable JSON object from a model response.
+
+    Gemini can occasionally add a short preamble, repeat the schema, or emit a
+    trailing comma despite JSON mode. Keeping extraction tolerant here avoids
+    leaking a Python JSONDecodeError to the API client while preserving strict
+    object validation at each caller.
+    """
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("Gemini 回應為空，無法解析 JSON")
+
+    cleaned = text.strip().lstrip("\ufeff")
+    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s*```$", "", cleaned)
-    try:
-        return json.loads(cleaned)
-    except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
-        if not match:
-            raise
-        return json.loads(match.group(0))
+    candidates = list(_iter_json_candidates(cleaned))
+    if not candidates:
+        raise ValueError("Gemini 回應不含 JSON 物件")
+
+    last_error: Exception | None = None
+    for candidate in reversed(candidates):
+        for value in (candidate, re.sub(r",\s*([}\]])", r"\1", candidate)):
+            try:
+                parsed = json.loads(value)
+            except (json.JSONDecodeError, TypeError, ValueError) as error:
+                last_error = error
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+            last_error = ValueError("Gemini JSON 根節點必須是物件")
+
+    if last_error:
+        raise ValueError("Gemini 回應 JSON 格式無效") from last_error
+    raise ValueError("Gemini 回應 JSON 格式無效")
 
 
 def detect_image_mime(img_bytes: bytes) -> str | None:

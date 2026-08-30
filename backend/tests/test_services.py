@@ -9,10 +9,10 @@ from services.food_service import search_foods
 from services.healthy_food_service import build_healthy_food_recommendations, load_restaurant_catalog
 from services.history_service import build_history_response
 from services.open_food_facts_service import build_open_food_facts_product
-from services.nutrition_label_service import build_nutrition_ocr_prompt, normalize_ocr_result
+from services.nutrition_label_service import build_nutrition_ocr_prompt, extract_json_block, normalize_ocr_result
 from services.nutrition_progress_service import build_daily_nutrition_progress, calculate_pdf_daily_targets
 from services.profile_service import build_bmr_response, build_user_profile
-from services.restaurant_ai_service import build_restaurant_summary_prompt, normalize_restaurant_summary, validate_restaurant_summary_input
+from services.restaurant_ai_service import build_restaurant_ai_summary, build_restaurant_summary_prompt, normalize_restaurant_summary, validate_restaurant_summary_input
 from services.robust_restaurant_scraper_service import build_menu_image_prompt, build_restaurant_enrichment_prompt
 from services.vision_food_service import build_food_recognition_prompt
 from services.vision_food_service import build_vision_food_response
@@ -375,6 +375,30 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertEqual(result["nutrition_per_100g"]["calories"], 200)
         self.assertEqual(result["nutrition_per_serving"]["calories"], 100)
         self.assertEqual(result["nutrition_per_serving"]["sodium"], 50)
+
+    def test_json_extractor_handles_model_preamble_and_trailing_comma(self):
+        response = "模型說明：先看這個 schema {\"items\": []}\n實際結果：{\"items\":[{\"name\":\"滷肉飯\",}],}"
+        parsed = extract_json_block(response)
+        self.assertEqual(parsed["items"][0]["name"], "滷肉飯")
+
+    def test_restaurant_summary_returns_safe_fallback_for_invalid_json(self):
+        class InvalidJsonResponse:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"candidates": [{"content": {"parts": [{"text": "{\\n  \\\"restaurant_type\\\": \\\"便當店\\\"\\n}"}]}}]}
+
+        with patch.dict(os.environ, {"GEMINI_API_KEYS": "test-key"}, clear=True):
+            with patch("services.restaurant_ai_service.get_gemini_models", return_value=["test-model"]):
+                with patch("services.restaurant_ai_service.requests.post", return_value=InvalidJsonResponse()):
+                    result = build_restaurant_ai_summary({"name": "測試店"}, 150, "all", [], {}, {})
+
+        self.assertEqual(result["confidence"], "low")
+        self.assertEqual(result["budget_fit"], "不確定")
+        self.assertIn("Gemini 摘要暫時不可用", result["source_note"])
 
     def test_normalize_restaurant_summary_returns_personalized_foods(self):
         summary = normalize_restaurant_summary(

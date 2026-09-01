@@ -81,7 +81,9 @@ python backend/scripts/seed_week_test_data.py --scenario mixed
 
 常用參數：
 
-- `--scenario mixed|compliant|over` — 混合週（5 天達標 + 2 天破戒）、全達標、全超標
+- `--source curated|recommend` — `curated` 用內建台灣家常菜單（營養值查 TFDA）；`recommend` 直接抓 `/healthy-food-recommend` 的推薦餐點，依 match_score 輪流分攤到七天三餐，用來測「整週照推薦吃能不能達標」
+- `--budget` / `--lat` / `--lng` / `--radius-km` / `--category` — `--source recommend` 查詢推薦時的參數
+- `--scenario mixed|compliant|over` — `--source curated` 專用：混合週（5 天達標 + 2 天破戒）、全達標、全超標
 - `--profile healthy|diabetes|hypertension|kidney_disease|gout|hyperlipidemia` — 一併設定使用者健康條件
 - `--skip-profile` — 沿用後端既有 profile，不覆蓋
 - `--dry-run` — 不寫入後端，直接在本機算出每日達標結果（調菜單份量時用）
@@ -89,8 +91,35 @@ python backend/scripts/seed_week_test_data.py --scenario mixed
 - `--report out.json` — 輸出完整逐日結果
 - `--api-url` / `--user-id` / `--token` — 打雲端後端時使用（`--token` 為 Supabase access token）
 
-`client_record_id` 是 `seed_<情境>_<日期>_<餐別>`，重跑只會補上新的一天，不會產生重複紀錄。
+`client_record_id` 是 `seed_<情境或 recommend>_<日期>_<餐別>`，重跑只會補上新的一天，不會產生重複紀錄。
 沒有設定 `DATABASE_URL` 時後端使用記憶體儲存，重啟 Flask 資料就會消失，需要重跑腳本。
+
+`--source recommend` 的兩個已知限制：推薦 API 每道餐點只回傳熱量、蛋白質、碳水、脂肪、鈉，膳食纖維／精緻糖／飽和脂肪／反式脂肪不在 payload 裡，只能記 0，所以纖維一定不達標；另外當半徑內沒有營業中的店家時，`build_healthy_food_recommendations` 會啟用開發用 fallback，把全部店家搬到使用者附近並一律視為營業中，此時推薦清單不代表真實可買到的餐點。
+
+
+### 2.6 在 Render 上跑一週測試
+
+Render 後端 `SUPABASE_AUTH_REQUIRED=true`，每個請求都要帶 Supabase access token，
+而且 `require_user_access` 只允許存取 token 擁有者自己的資料。token 一律走環境變數，
+不要寫在指令列（會留在 shell 歷史）。
+
+```powershell
+$env:NUTRILENS_API_URL = "https://<backend>.onrender.com"
+$env:NUTRILENS_ACCESS_TOKEN = "<在 App 登入後取得的 access token>"
+python backend/scripts/seed_week_test_data.py --source recommend --skip-profile
+```
+
+沒給 `--user-id` 時，腳本會依序取 `NUTRILENS_TEST_USER`、access token 的 `sub`、`demo_user`；
+在 Render 上請讓它自動用 token 的 `sub`，否則會被 403 擋掉。
+已經在 App 完成 onboarding 的帳號建議加 `--skip-profile`，避免測試腳本覆寫真實的身高體重與疾病設定。
+
+與本機環境的差異：
+
+- Render 跑在 UTC。`APP_UTC_OFFSET_HOURS=8` 已寫進 `render.yaml`，「今天」與店家營業時間才會用台灣時間判斷。
+- Render 有 `DATABASE_URL`，資料寫進 Postgres 會**永久保留**（本機是記憶體，重啟就沒了）。
+  測完請務必用同樣參數加 `--clear` 清掉，否則測試資料會混進真實飲食紀錄。
+- 反式脂肪單位、腎臟病蛋白質方向、UTC 時區三項修正都在 v0.0.8c；
+  Render 服務要切到該分支並重新部署後才會生效。
 
 
 ## 3. 本機環境變數
@@ -172,7 +201,7 @@ GEMINI_API_KEYS=key1,key2,key3
 - Backend Render URL：由 Blueprint 建立 `personalized-food-recommendation-backend` 後由 Render 指派，每次部署各自不同
 - Frontend Render Static Site：由 Blueprint 建立 `personalized-food-recommendation-frontend`，部署後使用 Render 指派網址
 - Render service id：以部署者自己的 Render Dashboard 顯示為準
-- 部署分支：`v0.0.7c`
+- 部署分支：`v0.0.8c`
 - 後端儲存：Supabase Postgres Session Pooler
 - 後端 Auth：`SUPABASE_AUTH_REQUIRED=true`
 

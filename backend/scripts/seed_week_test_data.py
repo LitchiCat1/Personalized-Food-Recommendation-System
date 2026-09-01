@@ -6,14 +6,27 @@
 所有營養值都來自 backend/nutrition_db_tw.json (TFDA)，依克數換算，
 所以灌進去的數字跟 App 自己查到的完全一致。
 
-用法（後端要先跑起來）：
+兩種資料來源：
+    --source curated   （預設）用本檔案內建的台灣家常菜單，營養值查 TFDA
+    --source recommend 直接抓 App 的店家推薦餐點，平均分攤到七天，
+                       用來回答「整週都照推薦系統吃，能不能符合設定條件」
+
+打 Render（後端強制 Supabase Auth，token 請走環境變數不要寫在指令裡）：
+    $env:NUTRILENS_API_URL      = "https://<backend>.onrender.com"
+    $env:NUTRILENS_ACCESS_TOKEN = "<Supabase access token>"
+    python backend/scripts/seed_week_test_data.py --source recommend
+    （沒給 --user-id 時會自動取 token 的 sub 當 user_id，因為 Render 會擋掉別人的資料）
+
+用法（本機後端要先跑起來）：
     python backend/scripts/seed_week_test_data.py --scenario mixed
+    python backend/scripts/seed_week_test_data.py --source recommend --budget 150
     python backend/scripts/seed_week_test_data.py --profile diabetes --scenario compliant
     python backend/scripts/seed_week_test_data.py --dry-run
     python backend/scripts/seed_week_test_data.py --clear
 """
 
 import argparse
+import base64
 import json
 import os
 import sys
@@ -139,6 +152,7 @@ OVER_DAYS = [
 MIXED_PATTERN = ["compliant", "compliant", "over", "compliant", "compliant", "over", "compliant"]
 
 MEAL_TIMES = {"早餐": time(8, 0), "午餐": time(12, 30), "晚餐": time(19, 0), "點心": time(15, 30)}
+MEAL_ORDER = ("早餐", "午餐", "晚餐")
 
 # ─── 使用者檔案樣板 ───────────────────────────────────────────
 PROFILE_PRESETS = {
@@ -234,26 +248,146 @@ def build_records(tfda_db: dict, user_id: str, scenario: str, days: int, end_dat
     return records
 
 
+def seed_record_ids(tag: str, days: int, end_date) -> list:
+    """同一組 (tag, 日期, 餐別) 永遠對應同一個 client_record_id，重跑不會重複。"""
+    return [
+        f"seed_{tag}_{(end_date - timedelta(days=offset)).strftime('%Y%m%d')}_{meal_type}"
+        for offset in range(days)
+        for meal_type in MEAL_ORDER
+    ]
+
+
+def build_recommendation_food(item: dict) -> dict:
+    """把一筆推薦餐點轉成飲食紀錄的 food。
+
+    推薦 API 只回傳 calories/protein/carbs/fat/sodium；
+    膳食纖維、精緻糖、飽和脂肪、反式脂肪不在 payload 裡，只能記 0。
+    """
+    food = {
+        "name": f"{item.get('item_name', '推薦餐點')}（{item.get('restaurant_name', '未知店家')}）",
+        "restaurant_id": item.get("restaurant_id"),
+        "item_id": item.get("item_id"),
+        "price": item.get("price"),
+        "match_score": item.get("match_score"),
+        "is_fried": bool(item.get("is_fried")),
+    }
+    for nutrient in NUTRITION_FIELDS:
+        food[nutrient] = round(_number(item.get(nutrient)), 2)
+    return food
+
+
+def build_records_from_recommendations(user_id: str, items: list, days: int, end_date, tzinfo) -> list:
+    """把推薦餐點平均分攤到每一天的三餐。
+
+    依 match_score 排序後輪流發牌（第 i 名 -> 第 i%days 天），
+    避免高分餐點全部集中在同一天。
+    """
+    if not items:
+        raise SystemExit("[fail] 推薦 API 沒有回傳任何餐點，無法建立紀錄")
+
+    records = []
+    for slot_index in range(days * len(MEAL_ORDER)):
+        item = items[slot_index % len(items)]
+        offset = days - 1 - (slot_index % days)
+        meal_type = MEAL_ORDER[slot_index // days]
+        day = end_date - timedelta(days=offset)
+        records.append(
+            {
+                "user_id": user_id,
+                "client_record_id": f"seed_recommend_{day.strftime('%Y%m%d')}_{meal_type}",
+                "timestamp": datetime.combine(day, MEAL_TIMES[meal_type], tzinfo=tzinfo).isoformat(),
+                "meal_type": meal_type,
+                "source": "manual",
+                "foods": [build_recommendation_food(item)],
+            }
+        )
+    records.sort(key=lambda record: record["timestamp"])
+    return records
+
+
+def print_recommendation_plan(records: list):
+    print("\n推薦餐點分攤結果")
+    current_date = None
+    for record in records:
+        date_str = record["timestamp"][:10]
+        if date_str != current_date:
+            current_date = date_str
+            print(f"  {date_str}")
+        food = record["foods"][0]
+        price = food.get("price")
+        price_text = f" NT${price}" if price is not None else ""
+        print(f"    {record['meal_type']}  {food['name']}{price_text}  {food['calories']:.0f} kcal  Na {food['sodium']:.0f} mg")
+
+
 # ─── API ─────────────────────────────────────────────────────
 def api_headers(token: str | None) -> dict:
     return {"Authorization": f"Bearer {token}"} if token else {}
 
 
+def user_id_from_token(token: str | None) -> str | None:
+    """從 Supabase access token 取出 sub（user id）。
+
+    只解 JWT payload 不驗簽章——驗證是後端的事，這裡只是省去人工查 UUID。
+    """
+    if not token or token.count(".") != 2:
+        return None
+    payload_b64 = token.split(".")[1]
+    payload_b64 += "=" * (-len(payload_b64) % 4)
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64).decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return None
+    subject = payload.get("sub")
+    return str(subject) if subject else None
+
+
+def raise_for_auth(response, label: str):
+    if response.status_code in (401, 403):
+        hint = (
+            "token 無效或已過期，請重新登入取得新的 access token"
+            if response.status_code == 401
+            else "user_id 與 token 的擁有者不符；Render 只允許存取自己的資料，"
+            "請拿掉 --user-id 讓腳本自動用 token 的 sub"
+        )
+        raise SystemExit(f"[fail] {label} 回應 {response.status_code}：{hint}")
+
+
 def upsert_profile(api_url: str, token: str | None, user_id: str, profile_key: str) -> dict:
     payload = {**BASE_PROFILE, **PROFILE_PRESETS[profile_key], "user_id": user_id}
-    response = requests.post(f"{api_url}/user", json=payload, headers=api_headers(token), timeout=30)
+    response = requests.post(f"{api_url}/user", json=payload, headers=api_headers(token), timeout=60)
+    raise_for_auth(response, "POST /user")
     response.raise_for_status()
     return response.json()["user"]
 
 
 def get_profile(api_url: str, token: str | None, user_id: str) -> dict:
-    response = requests.get(f"{api_url}/user/{user_id}", headers=api_headers(token), timeout=30)
+    response = requests.get(f"{api_url}/user/{user_id}", headers=api_headers(token), timeout=60)
+    raise_for_auth(response, f"GET /user/{user_id}")
+    if response.status_code == 404:
+        raise SystemExit(f"[fail] Render 上找不到 {user_id} 的 profile，請先在 App 完成 onboarding，或拿掉 --skip-profile")
     response.raise_for_status()
     return response.json()
 
 
+def fetch_recommendations(api_url: str, token: str | None, user_id: str, params: dict) -> list:
+    response = requests.get(
+        f"{api_url}/healthy-food-recommend/{user_id}",
+        params=params,
+        headers=api_headers(token),
+        timeout=60,
+    )
+    raise_for_auth(response, "GET /healthy-food-recommend")
+    response.raise_for_status()
+    payload = response.json()
+    items = payload.get("recommended") or []
+    filtered = payload.get("filtered_out") or []
+    print(f"[ok] 推薦 API 回傳 {len(items)} 道可吃餐點、{len(filtered)} 道被預算或疾病條件擋掉")
+    return items
+
+
 def post_record(api_url: str, token: str | None, record: dict) -> tuple[bool, str]:
-    response = requests.post(f"{api_url}/record", json=record, headers=api_headers(token), timeout=30)
+    response = requests.post(f"{api_url}/record", json=record, headers=api_headers(token), timeout=60)
+    raise_for_auth(response, "POST /record")
     if response.status_code not in (200, 201):
         return False, f"HTTP {response.status_code} {response.text[:200]}"
     return True, "已存在" if response.json().get("deduplicated") else "新增"
@@ -271,8 +405,9 @@ def get_day_totals(api_url: str, token: str | None, user_id: str, date_str: str)
         f"{api_url}/records/{user_id}",
         params={"date": date_str, "limit": 500},
         headers=api_headers(token),
-        timeout=30,
+        timeout=60,
     )
+    raise_for_auth(response, f"GET /records/{user_id}")
     response.raise_for_status()
     payload = response.json()
     records = payload.get("records", [])
@@ -385,13 +520,38 @@ def build_local_days_report(records: list, targets: dict, goal_types: dict) -> l
 
 
 
+def print_missing_nutrient_note(source: str):
+    if source != "recommend":
+        return
+    print(
+        "\n注意：店家推薦 API 每道餐點只回傳熱量、蛋白質、碳水、脂肪、鈉五項，"
+        "\n      膳食纖維、精緻糖、飽和脂肪、反式脂肪不在 payload 裡，因此這四項一律記為 0。"
+        "\n      也就是說「照推薦吃一週」在目前的資料下，纖維必然不達標，不是菜色本身的問題。"
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description="灌入 7 天飲食測試資料並檢查是否符合設定條件")
     parser.add_argument("--api-url", default=os.environ.get("NUTRILENS_API_URL", "http://127.0.0.1:5000"))
-    parser.add_argument("--user-id", default=os.environ.get("NUTRILENS_TEST_USER", "demo_user"))
+    parser.add_argument(
+        "--user-id",
+        default=None,
+        help="預設依序取 NUTRILENS_TEST_USER、access token 的 sub、demo_user",
+    )
     parser.add_argument("--token", default=os.environ.get("NUTRILENS_ACCESS_TOKEN"), help="Supabase access token（雲端後端才需要）")
     parser.add_argument("--days", type=int, default=7)
     parser.add_argument("--scenario", choices=["mixed", "compliant", "over"], default="mixed")
+    parser.add_argument(
+        "--source",
+        choices=["curated", "recommend"],
+        default="curated",
+        help="curated=內建台灣家常菜單；recommend=抓 App 店家推薦餐點平攤到七天",
+    )
+    parser.add_argument("--budget", type=int, default=150, help="--source recommend 的單餐預算")
+    parser.add_argument("--lat", type=float, default=25.0338)
+    parser.add_argument("--lng", type=float, default=121.5645)
+    parser.add_argument("--radius-km", type=float, default=5)
+    parser.add_argument("--category", default="all")
     parser.add_argument("--profile", choices=sorted(PROFILE_PRESETS), default="healthy")
     parser.add_argument("--skip-profile", action="store_true", help="沿用後端既有的使用者檔案，不覆蓋")
     parser.add_argument("--clear", action="store_true", help="刪除同情境先前灌入的紀錄後結束")
@@ -400,40 +560,71 @@ def main():
     args = parser.parse_args()
 
     api_url = args.api_url.rstrip("/")
+    args.user_id = (
+        args.user_id
+        or os.environ.get("NUTRILENS_TEST_USER")
+        or user_id_from_token(args.token)
+        or "demo_user"
+    )
+    if args.token:
+        print(f"[ok] 目標 {api_url}（帶 Bearer token），user_id={args.user_id}")
     tfda_db = load_tfda_db()
     verify_food_catalog(tfda_db)
 
     now_local = datetime.now().astimezone()
     tzinfo = now_local.tzinfo
     end_date = now_local.date()
-    records = build_records(tfda_db, args.user_id, args.scenario, args.days, end_date, tzinfo)
+    tag = "recommend" if args.source == "recommend" else args.scenario
 
     if args.clear:
         # 多往前清一週，日期換過之後舊紀錄才不會留下來
-        stale = build_records(tfda_db, args.user_id, args.scenario, args.days + 7, end_date, tzinfo)
+        stale_ids = seed_record_ids(tag, args.days + 7, end_date)
         removed = sum(
-            1 for record in stale if delete_record(api_url, args.token, args.user_id, record["client_record_id"])
+            1 for record_id in stale_ids if delete_record(api_url, args.token, args.user_id, record_id)
         )
-        print(f"[ok] 已刪除 {removed} 筆 {args.scenario} 情境紀錄")
+        print(f"[ok] 已刪除 {removed} 筆 {tag} 紀錄")
         return
+
+    # recommend 模式要先有 profile，推薦 API 才算得出疾病過濾與剩餘熱量
+    user = None
+    if args.source == "recommend" or not args.dry_run:
+        if args.skip_profile:
+            user = get_profile(api_url, args.token, args.user_id)
+            print(f"[ok] 沿用既有檔案：{user.get('name')} 條件={user.get('health_conditions')}")
+        else:
+            user = upsert_profile(api_url, args.token, args.user_id, args.profile)
+            print(f"[ok] 使用者檔案已設定：{user.get('name')} 條件={user.get('health_conditions')} TDEE={user.get('tdee')}")
+
+    if args.source == "recommend":
+        items = fetch_recommendations(
+            api_url,
+            args.token,
+            args.user_id,
+            {
+                "budget": args.budget,
+                "lat": args.lat,
+                "lng": args.lng,
+                "radius_km": args.radius_km,
+                "category": args.category,
+            },
+        )
+        records = build_records_from_recommendations(args.user_id, items, args.days, end_date, tzinfo)
+        print_recommendation_plan(records)
+    else:
+        records = build_records(tfda_db, args.user_id, args.scenario, args.days, end_date, tzinfo)
 
     if args.dry_run:
-        for record in records:
-            names = "、".join(food["name"] for food in record["foods"])
-            print(f"{record['timestamp'][:16]} {record['meal_type']}: {names}")
-        print(f"[dry-run] 共 {len(records)} 筆紀錄，未寫入後端。")
-        user = build_local_profile(args.user_id, args.profile)
-        targets = round_targets_for_display(calculate_pdf_daily_targets(user))
-        goal_types = build_nutrition_goal_types(user)
+        if args.source == "curated":
+            for record in records:
+                names = "、".join(food["name"] for food in record["foods"])
+                print(f"{record['timestamp'][:16]} {record['meal_type']}: {names}")
+        print(f"\n[dry-run] 共 {len(records)} 筆紀錄，未寫入後端。")
+        report_user = user or build_local_profile(args.user_id, args.profile)
+        targets = round_targets_for_display(calculate_pdf_daily_targets(report_user))
+        goal_types = build_nutrition_goal_types(report_user)
         print_report(build_local_days_report(records, targets, goal_types), targets, goal_types)
+        print_missing_nutrient_note(args.source)
         return
-
-    if args.skip_profile:
-        user = get_profile(api_url, args.token, args.user_id)
-        print(f"[ok] 沿用既有檔案：{user.get('name')} 條件={user.get('health_conditions')}")
-    else:
-        user = upsert_profile(api_url, args.token, args.user_id, args.profile)
-        print(f"[ok] 使用者檔案已設定：{user.get('name')} 條件={user.get('health_conditions')} TDEE={user.get('tdee')}")
 
     created = deduplicated = 0
     for record in records:
@@ -466,6 +657,7 @@ def main():
 
     targets = server_targets or local_targets
     print_report(days_report, targets, goal_types)
+    print_missing_nutrient_note(args.source)
 
     if args.report:
         payload = {
@@ -473,6 +665,7 @@ def main():
             "api_url": api_url,
             "user_id": args.user_id,
             "profile": args.profile if not args.skip_profile else "existing",
+            "source": args.source,
             "scenario": args.scenario,
             "days": args.days,
             "targets": targets,

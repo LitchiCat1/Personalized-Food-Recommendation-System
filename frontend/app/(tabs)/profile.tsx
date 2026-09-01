@@ -14,7 +14,8 @@ import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
 import FeedbackBanner from '@/components/ui/feedback-banner';
-import { fetchMedicalMetadata, fetchUserProfile, saveUserProfile } from '@/lib/api';
+import { clearWeekRecords, fetchMedicalMetadata, fetchUserProfile, saveUserProfile, seedWeekRecords } from '@/lib/api';
+import type { WeekSeedSource } from '@/lib/api';
 import { isSupabaseAuthConfigured, supabase } from '@/lib/supabase';
 
 type MedicalMetadata = Awaited<ReturnType<typeof fetchMedicalMetadata>>;
@@ -27,7 +28,7 @@ const PROFILE_SECTIONS = [
 
 export default function ProfileScreen() {
   const { gridCol2, isDesktop } = useResponsive();
-  const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser } = useStore();
+  const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser, invalidateDietaryRecords } = useStore();
   const initialUserRef = useRef(user);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +36,7 @@ export default function ProfileScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const [profileFeedback, setProfileFeedback] = useState<{ tone: 'success' | 'error'; title: string; message?: string } | null>(null);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [seedBusy, setSeedBusy] = useState<'recommend' | 'curated' | 'clear' | null>(null);
   const [activeSection, setActiveSection] = useState('personal');
   const [medicalMetadata, setMedicalMetadata] = useState<MedicalMetadata | null>(null);
   const [profileDraft, setProfileDraft] = useState({
@@ -256,6 +258,47 @@ export default function ProfileScreen() {
     }
   };
 
+  const runSeedAction = async (
+    busyKey: 'recommend' | 'curated' | 'clear',
+    action: () => Promise<{ tone: 'success' | 'error'; title: string; message?: string }>
+  ) => {
+    setSeedBusy(busyKey);
+    setProfileFeedback(null);
+    try {
+      setProfileFeedback(await action());
+      invalidateDietaryRecords();
+    } catch (err: any) {
+      setProfileFeedback({ tone: 'error', title: '測試資料操作失敗', message: err?.message || '請確認後端連線與登入狀態。' });
+    } finally {
+      setSeedBusy(null);
+    }
+  };
+
+  const handleSeedWeek = (source: WeekSeedSource) =>
+    runSeedAction(source, async () => {
+      const summary = await seedWeekRecords(apiBaseUrl, user.userId, { source, days: 7, budget: 150 }, { accessToken });
+      const realData = summary.data_source === 'google_places';
+      return {
+        tone: realData ? 'success' : 'error',
+        title: `已灌入 ${summary.days} 天資料（新增 ${summary.created} 筆、已存在 ${summary.deduplicated} 筆）`,
+        message: `${summary.start_date} ~ ${summary.end_date}，取自 ${summary.restaurants} 家店共 ${summary.dishes_available} 道餐點。${summary.note}`,
+      };
+    });
+
+  const handleClearSeed = () =>
+    runSeedAction('clear', async () => {
+      const [recommendResult, curatedResult] = await Promise.all([
+        clearWeekRecords(apiBaseUrl, user.userId, { source: 'recommend', days: 7 }, { accessToken }),
+        clearWeekRecords(apiBaseUrl, user.userId, { source: 'curated', days: 7 }, { accessToken }),
+      ]);
+      const removed = recommendResult.removed + curatedResult.removed;
+      return {
+        tone: 'success',
+        title: removed > 0 ? `已刪除 ${removed} 筆測試紀錄` : '沒有找到可刪除的測試紀錄',
+        message: '只會刪掉這個按鈕灌進去的資料，手動或掃描新增的紀錄不受影響。',
+      };
+    });
+
   const handleSignOut = () => {
     setProfileFeedback(null);
     if (!isSupabaseAuthConfigured || !supabase) {
@@ -429,6 +472,29 @@ export default function ProfileScreen() {
       </View>
       ) : null}
       </View>
+
+      <SectionBlock title="測試資料" subtitle="一鍵灌入 7 天飲食紀錄，用來驗證趨勢與達標判定。">
+        <View style={styles.seedActions}>
+          <PrimaryButton
+            label={seedBusy === 'recommend' ? '灌入中…' : '灌入 7 天（店家搜尋餐點）'}
+            onPress={() => handleSeedWeek('recommend')}
+            disabled={seedBusy !== null}
+          />
+          <SecondaryButton
+            label={seedBusy === 'curated' ? '灌入中…' : '灌入 7 天（本地測試店家）'}
+            onPress={() => handleSeedWeek('curated')}
+            disabled={seedBusy !== null}
+          />
+          <SecondaryButton
+            label={seedBusy === 'clear' ? '刪除中…' : '清除測試資料'}
+            onPress={handleClearSeed}
+            disabled={seedBusy !== null}
+          />
+        </View>
+        <Text style={styles.seedHint}>
+          店家搜尋餐點會用附近真實店家的菜單；沒有 Google Places 金鑰時會退回本地測試店家，並在結果訊息中標明。
+        </Text>
+      </SectionBlock>
 
       <Modal visible={profileModalVisible} transparent animationType="fade" onRequestClose={() => setProfileModalVisible(false)}>
         <View style={styles.modalLayer}>
@@ -678,6 +744,15 @@ const styles = StyleSheet.create({
   allergenChipActive: { backgroundColor: 'rgba(226,85,85,0.10)', borderColor: 'rgba(226,85,85,0.24)' },
   allergenChipText: { ...Typography.caption, color: Palette.text.secondary },
   allergenChipTextActive: { color: Palette.status.error },
+  seedActions: {
+    gap: Spacing.sm,
+  },
+  seedHint: {
+    ...Typography.caption,
+    color: Palette.text.muted,
+    marginTop: Spacing.sm,
+    lineHeight: 18,
+  },
   goalList: { gap: Spacing.md },
   goalItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, padding: Spacing.md },
   goalIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },

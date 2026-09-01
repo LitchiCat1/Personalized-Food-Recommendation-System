@@ -43,6 +43,8 @@ from services.vision_food_service import (
 )
 from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini, parse_menu_image_with_gemini
 from services.medical_risk_service import evaluate_medical_risk
+from services.google_places_service import fetch_google_places_restaurants
+from services.week_seed_service import SEED_SOURCES, clear_week_records, seed_week_records
 
 
 load_local_env()
@@ -519,6 +521,63 @@ def delete_record(user_id, client_record_id):
     if not deleted:
         return jsonify({"error": "找不到飲食紀錄"}), 404
     return jsonify({"message": "飲食紀錄已刪除", "record": deleted})
+
+
+# ─── 3.5 一週測試資料（我的 → 開發者工具） ──────────────────
+def _seed_request_params(data: dict) -> dict:
+    return {
+        "budget": data.get("budget", 150),
+        "lat": data.get("lat", 25.0338),
+        "lng": data.get("lng", 121.5645),
+        "radius_km": data.get("radius_km", 3),
+        "category": data.get("category", "all"),
+    }
+
+
+@app.route("/seed/week-records/<user_id>", methods=["POST"])
+def create_week_seed_records(user_id):
+    require_user_access(user_id)
+    data = request.get_json(silent=True) or {}
+    source = str(data.get("source", "recommend")).strip().lower()
+    if source not in SEED_SOURCES:
+        return jsonify({"error": "source 必須是 recommend 或 curated"}), 400
+
+    user = storage.get_user(user_id)
+    if not user:
+        return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
+
+    try:
+        summary = seed_week_records(
+            storage,
+            user_id,
+            user,
+            source,
+            data.get("days", 7),
+            _seed_request_params(data),
+            RESTAURANT_CATALOG,
+            DISEASE_RULES,
+            ALLERGEN_TAXONOMY,
+            fetch_places=fetch_google_places_restaurants,
+            enrich_restaurant=enrich_restaurant_with_gemini,
+        )
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    return jsonify({"message": f"已灌入 {summary['days']} 天測試資料", **summary}), 201
+
+
+@app.route("/seed/week-records/<user_id>", methods=["DELETE"])
+def delete_week_seed_records(user_id):
+    require_user_access(user_id)
+    source = str(request.args.get("source", "recommend")).strip().lower()
+    if source not in SEED_SOURCES:
+        return jsonify({"error": "source 必須是 recommend 或 curated"}), 400
+    try:
+        days = int(request.args.get("days", 7))
+    except (TypeError, ValueError):
+        return jsonify({"error": "days 必須是有效數字"}), 400
+    summary = clear_week_records(storage, user_id, days, source)
+    return jsonify({"message": f"已刪除 {summary['removed']} 筆測試紀錄", **summary})
 
 
 # ─── 4. History & Trends (PRD: 飲食趨勢回顧) ─────────────────

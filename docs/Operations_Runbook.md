@@ -97,6 +97,16 @@ python backend/scripts/seed_week_test_data.py --scenario mixed
 `--source recommend` 的兩個已知限制：推薦 API 每道餐點只回傳熱量、蛋白質、碳水、脂肪、鈉，膳食纖維／精緻糖／飽和脂肪／反式脂肪不在 payload 裡，只能記 0，所以纖維一定不達標；另外當半徑內沒有營業中的店家時，`build_healthy_food_recommendations` 會啟用開發用 fallback，把全部店家搬到使用者附近並一律視為營業中，此時推薦清單不代表真實可買到的餐點。
 
 
+### 2.5.1 App 內一鍵灌入（我的 → 測試資料）
+
+不想開終端機時，「我的」頁最下方有「測試資料」區塊：
+
+- **灌入 7 天（店家搜尋餐點）** — `source=recommend`。Google Places 找附近真實店家 → 取菜單（本地已知或 Gemini 估算）→ 過濾預算與疾病禁忌 → 輪流分攤到七天三餐。
+- **灌入 7 天（本地測試店家）** — `source=curated`，只用 `restaurant_catalog.json`，不需要任何外部金鑰。
+- **清除測試資料** — 兩種 source 一起刪，只刪 `seed_<source>_<日期>_<餐別>` 這些 id，手動或掃描新增的紀錄不受影響。
+
+結果訊息會標明 `data_source`：`google_places` 才是真實店家菜單；`local_catalog_fallback` 代表沒有金鑰或附近查無店家，資料只是本地模擬。重複按不會產生重複紀錄。
+
 ### 2.6 在 Render 上跑一週測試
 
 Render 後端 `SUPABASE_AUTH_REQUIRED=true`，每個請求都要帶 Supabase access token，

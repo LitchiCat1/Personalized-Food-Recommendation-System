@@ -16,6 +16,7 @@
 
 ### Added
 
+- **「我的」頁一鍵灌入 7 天測試資料**：新增 `POST /seed/week-records/<user_id>` 與 `DELETE`（皆需 Supabase Auth，且 `require_user_access` 只允許操作自己的資料），前端在「我的」頁底部新增「測試資料」區塊，本機與 Render 都能用。`source=recommend` 會走 Google Places 找出附近真實店家，逐家取得菜單（本地已知菜單，或由 Gemini 即時估算）後再依預算與疾病禁忌過濾，把餐點輪流分攤到七天三餐；沒有 `GOOGLE_PLACES_API_KEY` 或附近查無店家時會退回本地測試餐廳目錄，並在 `data_source` 與畫面訊息明確標示資料不是真實店家。因為直接讀菜單品項而不是推薦 API 的 response，膳食纖維、糖、飽和脂肪、反式脂肪都留得住。`client_record_id` 為 `seed_<source>_<日期>_<餐別>`，重跑只會補上新的一天，「清除測試資料」也只會刪掉這些 id。
 - **7 天飲食測試資料產生器** (`backend/scripts/seed_week_test_data.py`)：一次灌入 7 天飲食紀錄並依疾病別條件逐日檢查達標情形，營養值取自 TFDA 資料庫依克數換算。支援 `--scenario` / `--profile` / `--dry-run` / `--clear` / `--report`，詳見 Operations Runbook 2.5 節。
 
 ## v0.0.8b - 2026-08-30 (菜單照片辨識修正版)

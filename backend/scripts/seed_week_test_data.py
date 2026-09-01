@@ -34,6 +34,22 @@ from datetime import datetime, time, timedelta
 
 import requests
 
+# Windows 主控台預設是 cp950，編不出勾叉符號會直接 UnicodeEncodeError
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(errors="replace")
+
+
+def _console_supports(text: str) -> bool:
+    try:
+        text.encode(sys.stdout.encoding or "utf-8")
+    except (UnicodeEncodeError, LookupError, TypeError):
+        return False
+    return True
+
+
+PASS_MARK = "✅" if _console_supports("✅❌") else "[OK]"
+FAIL_MARK = "❌" if _console_supports("✅❌") else "[!!]"
+
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
@@ -465,7 +481,7 @@ def print_report(days_report: list, targets: dict, goal_types: dict):
     for day in days_report:
         checks = day["checks"]
         failed = [LABELS[n] for n in NUTRITION_FIELDS if not checks[n]["passed"]]
-        mark = "✅ 全數達標" if not failed else "❌ " + "、".join(failed)
+        mark = f"{PASS_MARK} 全數達標" if not failed else f"{FAIL_MARK} " + "、".join(failed)
         print(
             f"{day['date']:<12}"
             f"{checks['calories']['consumed']:>7.0f}"

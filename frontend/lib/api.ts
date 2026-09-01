@@ -468,6 +468,58 @@ export async function fetchHealthyFoodRecommendations(
   }
 }
 
+export type WeekSeedSource = 'recommend' | 'curated';
+
+export type WeekSeedSummary = {
+  message: string;
+  days: number;
+  records: number;
+  created: number;
+  deduplicated: number;
+  dishes_available: number;
+  restaurants: number;
+  data_source: 'google_places' | 'local_catalog' | 'local_catalog_fallback';
+  note: string;
+  start_date: string;
+  end_date: string;
+};
+
+export async function seedWeekRecords(
+  apiBaseUrl: string,
+  userId: string,
+  params: { source: WeekSeedSource; days?: number; budget?: number; lat?: number; lng?: number; radiusKm?: number; category?: string },
+  auth?: ApiAuth
+): Promise<WeekSeedSummary> {
+  const resp = await fetch(`${apiBaseUrl}/seed/week-records/${encodeURIComponent(userId)}`, {
+    method: 'POST',
+    headers: buildHeaders(auth, 'application/json'),
+    body: JSON.stringify({
+      source: params.source,
+      days: params.days ?? 7,
+      budget: params.budget ?? 150,
+      lat: params.lat,
+      lng: params.lng,
+      radius_km: params.radiusKm,
+      category: params.category,
+    }),
+  });
+  return parseJson<WeekSeedSummary>(resp);
+}
+
+export async function clearWeekRecords(
+  apiBaseUrl: string,
+  userId: string,
+  params: { source: WeekSeedSource; days?: number },
+  auth?: ApiAuth
+): Promise<{ message: string; removed: number; source: WeekSeedSource }> {
+  const query = new URLSearchParams({ source: params.source, days: String(params.days ?? 7) });
+  const resp = await fetch(`${apiBaseUrl}/seed/week-records/${encodeURIComponent(userId)}?${query.toString()}`, {
+    method: 'DELETE',
+    headers: buildHeaders(auth),
+  });
+  return parseJson(resp);
+}
+
 export async function fetchRestaurantAiSummary(
   apiBaseUrl: string,
   userId: string,

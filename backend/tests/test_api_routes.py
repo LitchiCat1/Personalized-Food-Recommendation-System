@@ -222,6 +222,54 @@ class ApiRouteTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 400)
                 self.assertIn("error", response.get_json())
 
+    def test_week_seed_route_creates_and_clears_seven_days(self):
+        with self.mock_auth("user-a"):
+            self.client.post(
+                "/user",
+                json={"user_id": "user-a", "name": "Seed User", "height": 170, "weight": 65, "age": 25},
+                headers=self.auth_headers(),
+            )
+            response = self.client.post(
+                "/seed/week-records/user-a",
+                json={"source": "curated", "days": 7, "budget": 150},
+                headers=self.auth_headers(),
+            )
+
+        self.assertEqual(response.status_code, 201)
+        summary = response.get_json()
+        self.assertEqual(summary["days"], 7)
+        self.assertEqual(summary["records"], 21)
+        self.assertEqual(summary["created"], 21)
+        self.assertEqual(summary["data_source"], "local_catalog")
+
+        # 重跑同一天不會產生重複紀錄
+        with self.mock_auth("user-a"):
+            again = self.client.post(
+                "/seed/week-records/user-a",
+                json={"source": "curated", "days": 7},
+                headers=self.auth_headers(),
+            )
+        self.assertEqual(again.get_json()["deduplicated"], 21)
+
+        # 直接讀菜單品項才留得住纖維，走推薦 API 的 response 只剩五項
+        with self.mock_auth("user-a"):
+            history = self.client.get("/history/user-a?days=7", headers=self.auth_headers())
+        self.assertGreater(sum(day["fiber"] for day in history.get_json()["daily"]), 0)
+
+        with self.mock_auth("user-a"):
+            cleared = self.client.delete(
+                "/seed/week-records/user-a?source=curated&days=7", headers=self.auth_headers()
+            )
+        self.assertEqual(cleared.status_code, 200)
+        self.assertEqual(cleared.get_json()["removed"], 21)
+
+    def test_week_seed_route_rejects_unknown_source(self):
+        with self.mock_auth("user-a"):
+            response = self.client.post(
+                "/seed/week-records/user-a", json={"source": "whatever"}, headers=self.auth_headers()
+            )
+        self.assertEqual(response.status_code, 400)
+
     def test_record_route_recalculates_totals_instead_of_trusting_payload(self):
         payload = {
             "user_id": "user-a",

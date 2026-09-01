@@ -11,6 +11,7 @@ from services.healthy_food_service import build_healthy_food_recommendations, lo
 from services.history_service import build_history_response
 from services.open_food_facts_service import build_open_food_facts_product
 from services.app_time_service import app_today
+from services.week_seed_service import plan_daily_dishes
 from services.nutrition_progress_service import (
     build_daily_nutrition_progress,
     build_nutrition_goal_types,
@@ -304,6 +305,28 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertEqual(progress["status"]["sodium"], "over")
         self.assertEqual(progress["status"]["protein"], "within_target")
         self.assertGreater(progress["progress_percent"]["calories"], 100)
+
+    def test_week_seed_plan_gives_every_day_a_different_menu(self):
+        """菜色少於一週的量時，輪流發牌會讓好幾天長得一模一樣。"""
+        for dish_count in (3, 4, 5, 6, 12, 21, 33):
+            plan = plan_daily_dishes(dish_count, 7, "user-a:recommend:2026-09-02")
+            self.assertEqual(len(plan), 7)
+            day_sets = [tuple(sorted(day)) for day in plan]
+            self.assertEqual(
+                len(set(day_sets)), 7, f"{dish_count} 道菜時有重複的天：{day_sets}"
+            )
+            for day in plan:
+                self.assertEqual(len(day), 3)
+                self.assertTrue(all(0 <= index < dish_count for index in day))
+
+        # 五道以上就不該在同一天重複同一道菜
+        for dish_count in (5, 8, 21):
+            for day in plan_daily_dishes(dish_count, 7, "seed"):
+                self.assertEqual(len(set(day)), 3)
+
+    def test_week_seed_plan_is_deterministic_for_the_same_seed(self):
+        self.assertEqual(plan_daily_dishes(12, 7, "same"), plan_daily_dishes(12, 7, "same"))
+        self.assertNotEqual(plan_daily_dishes(12, 7, "same"), plan_daily_dishes(12, 7, "other"))
 
     def test_kidney_disease_treats_protein_as_upper_limit(self):
         """CKD 的蛋白質目標是 W x 0.6 的嚴格限量，超過要判成 over 而不是達標。"""

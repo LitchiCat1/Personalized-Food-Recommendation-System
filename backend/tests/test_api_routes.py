@@ -242,6 +242,15 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(summary["created"], 21)
         self.assertEqual(summary["data_source"], "local_catalog")
 
+        with self.mock_auth("user-a"):
+            records = self.client.get("/records/user-a?limit=500", headers=self.auth_headers()).get_json()["records"]
+        by_day = {}
+        for record in records:
+            by_day.setdefault(record["timestamp"][:10], []).append(record["foods"][0]["name"])
+        self.assertEqual(len(by_day), 7)
+        day_menus = [tuple(sorted(names)) for names in by_day.values()]
+        self.assertEqual(len(set(day_menus)), 7, f"有幾天的菜單一模一樣：{day_menus}")
+
         # 重跑同一天不會產生重複紀錄
         with self.mock_auth("user-a"):
             again = self.client.post(

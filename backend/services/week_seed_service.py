@@ -8,6 +8,9 @@ Google Places 找出附近真實店家 → 該店菜單（本地已知菜單，�
 標明，不會假裝資料是真實店家來的。
 """
 
+import itertools
+import random
+import time
 from datetime import datetime, timedelta
 
 from services.app_time_service import app_now, get_app_timezone
@@ -19,9 +22,10 @@ MEAL_HOURS = {"早餐": (8, 0), "午餐": (12, 30), "晚餐": (19, 0)}
 
 SEED_SOURCES = ("recommend", "curated")
 MAX_DAYS = 14
-# 最多向 Gemini 估算幾家店的菜單，以及湊到幾道菜就停止
-MAX_MENU_ENRICHMENTS = 3
-ENOUGH_DISHES = 12
+# 找到的店家沒有菜單時要送去 Gemini 分析，但那是外部呼叫，
+# 用「時間預算」而不是固定次數控制，才不會在 Render 上把整個 request 拖到逾時。
+MENU_ANALYSIS_BUDGET_SECONDS = 45
+MAX_MENU_ANALYSES = 6
 
 
 def seed_client_record_id(source: str, day, meal_type: str) -> str:
@@ -145,11 +149,16 @@ def collect_recommendation_dishes(
         else:
             unknown_places.append((name, place))
 
-    # 第二輪才向 Gemini 估算菜單。單次估算最壞情況是「金鑰數 x 模型數」次 20 秒請求，
-    # 不設上限整個 request 會在 Render 逾時，所以湊夠菜色就停。
+    # 第二輪：沒有菜單的店家送去 Gemini 分析。單次分析最壞情況是
+    # 「金鑰數 x 模型數」次 20 秒請求，所以用時間預算擋住，湊滿七天份就停。
+    target_dishes = params.get("target_dishes") or 21
+    deadline = time.monotonic() + MENU_ANALYSIS_BUDGET_SECONDS
     enrich_calls = 0
     for name, place in unknown_places:
-        if len(dishes) >= ENOUGH_DISHES or enrich_calls >= MAX_MENU_ENRICHMENTS:
+        if len(dishes) >= target_dishes or enrich_calls >= MAX_MENU_ANALYSES:
+            break
+        if time.monotonic() >= deadline:
+            print(f"[week-seed] 菜單分析已用滿 {MENU_ANALYSIS_BUDGET_SECONDS}s 預算，剩餘店家略過")
             break
         enrich_calls += 1
         try:
@@ -174,38 +183,65 @@ def collect_recommendation_dishes(
         note = f"搜尋到 {len(places)} 家真實店家，但都沒有取得可用的菜單營養資料，已改用本地測試餐廳目錄。"
         return dishes, "local_catalog_fallback", note
 
-    note = f"取自 Google Places 搜尋到的 {resolved_restaurants} 家真實店家菜單（未標示營養的品項由 Gemini 估算）。"
+    note = f"取自 Google Places 搜尋到的 {resolved_restaurants} 家真實店家，其中 {enrich_calls} 家沒有現成菜單、由 Gemini 分析後估算營養。"
     if enrich_failures:
-        note += f" 另有 {enrich_failures} 家因菜單估算失敗略過。"
+        note += f" 另有 {enrich_failures} 家分析失敗略過。"
     return dishes, "google_places", note
 
 
+def plan_daily_dishes(dish_count: int, days: int, seed: str) -> list[list[int]]:
+    """排出每天三餐要吃哪幾道，盡量讓七天彼此都不一樣。
+
+    菜色夠多時直接洗牌切段；菜色少於一週的量時改列舉「可重複的三道組合」，
+    優先挑三道都不同的組合，這樣即使只有 3 道菜，七天也不會長得一模一樣。
+    """
+    meals = len(MEAL_ORDER)
+    rng = random.Random(seed)
+
+    if dish_count >= days * meals:
+        order = list(range(dish_count))
+        rng.shuffle(order)
+        return [order[index * meals:(index + 1) * meals] for index in range(days)]
+
+    combos = [list(combo) for combo in itertools.combinations_with_replacement(range(dish_count), meals)]
+    rng.shuffle(combos)
+    combos.sort(key=lambda combo: -len(set(combo)))  # 先用三道都不同的組合
+
+    plan = [list(combo) for combo in combos[:days]]
+    while len(plan) < days:  # 菜色實在太少（例如只有 1~2 道）才會重複
+        plan.append(list(combos[len(plan) % len(combos)]))
+    for combo in plan:
+        rng.shuffle(combo)  # 早午晚的順序也不要固定
+    return plan
+
+
 def build_week_records(user_id: str, dishes: list, days: int, source: str, end_date) -> list[dict]:
-    """把菜色輪流發牌到每天三餐，避免高分餐點全擠在同一天。"""
+    """把菜色發到每天三餐，七天的組合彼此不重複。"""
     tzinfo = get_app_timezone()
     records = []
-    slots = days * len(MEAL_ORDER)
-    for slot_index in range(slots):
-        dish = dishes[slot_index % len(dishes)]
-        day = end_date - timedelta(days=days - 1 - (slot_index % days))
-        meal_type = MEAL_ORDER[slot_index // days]
-        hour, minute = MEAL_HOURS[meal_type]
-        foods = [dict(dish)]
-        totals = {
-            nutrient: round(sum(_number(food.get(nutrient)) for food in foods), 2)
-            for nutrient in NUTRITION_FIELDS
-        }
-        records.append(
-            {
-                "user_id": user_id,
-                "client_record_id": seed_client_record_id(source, day, meal_type),
-                "timestamp": datetime(day.year, day.month, day.day, hour, minute, tzinfo=tzinfo).isoformat(),
-                "meal_type": meal_type,
-                "foods": foods,
-                **{f"total_{nutrient}": total for nutrient, total in totals.items()},
-                "source": "manual",
+    plan = plan_daily_dishes(len(dishes), days, f"{user_id}:{source}:{end_date.isoformat()}")
+    for day_index, dish_indexes in enumerate(plan):
+        day = end_date - timedelta(days=days - 1 - day_index)
+        for meal_index, dish_index in enumerate(dish_indexes):
+            meal_type = MEAL_ORDER[meal_index]
+            dish = dishes[dish_index]
+            hour, minute = MEAL_HOURS[meal_type]
+            foods = [dict(dish)]
+            totals = {
+                nutrient: round(sum(_number(food.get(nutrient)) for food in foods), 2)
+                for nutrient in NUTRITION_FIELDS
             }
-        )
+            records.append(
+                {
+                    "user_id": user_id,
+                    "client_record_id": seed_client_record_id(source, day, meal_type),
+                    "timestamp": datetime(day.year, day.month, day.day, hour, minute, tzinfo=tzinfo).isoformat(),
+                    "meal_type": meal_type,
+                    "foods": foods,
+                    **{f"total_{nutrient}": total for nutrient, total in totals.items()},
+                    "source": "manual",
+                }
+            )
     records.sort(key=lambda record: record["timestamp"])
     return records
 
@@ -229,7 +265,13 @@ def seed_week_records(
 
     if source == "recommend":
         dishes, data_source, note = collect_recommendation_dishes(
-            user, params, restaurant_catalog, disease_rules, allergen_taxonomy, fetch_places, enrich_restaurant
+            {**user},
+            {**params, "target_dishes": days * len(MEAL_ORDER)},
+            restaurant_catalog,
+            disease_rules,
+            allergen_taxonomy,
+            fetch_places,
+            enrich_restaurant,
         )
     else:
         dishes = collect_catalog_dishes(restaurant_catalog, user, disease_rules, allergen_taxonomy, budget)

@@ -23,7 +23,7 @@ export default function DesktopSidebar() {
         <Text style={styles.brand}>NutriLens</Text>
         <Text style={styles.tagline}>AI food safety radar</Text>
         <View style={styles.versionPill}>
-          <Text style={styles.versionText}>v0.0.8d</Text>
+          <Text style={styles.versionText}>v0.0.8e</Text>
         </View>
       </View>
 

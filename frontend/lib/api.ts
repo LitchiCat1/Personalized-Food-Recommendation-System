@@ -288,9 +288,28 @@ function buildHeaders(auth?: ApiAuth, contentType?: string): HeadersInit {
 }
 
 async function parseJson<T>(resp: Response): Promise<T> {
-  const data = await resp.json();
+  // 後端逾時、502、或路由不存在時回的是 HTML 或空 body，
+  // 先 resp.json() 會丟出 "Unexpected token '<'"，把真正的狀態碼蓋掉。
+  const raw = await resp.text();
+  let data: any = null;
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = null;
+    }
+  }
+
   if (!resp.ok) {
-    throw new Error(data.error || 'API request failed');
+    if (data?.error) throw new Error(data.error);
+    if (resp.status === 404) throw new Error(`找不到這個 API（HTTP 404）。後端可能還是舊版本，請確認 Render 部署的分支。`);
+    if (resp.status === 401 || resp.status === 403) throw new Error(`沒有權限（HTTP ${resp.status}）。請登出後重新登入，讓 access token 更新。`);
+    if (resp.status >= 500) throw new Error(`後端錯誤（HTTP ${resp.status}）。可能是處理逾時，請看 Render logs。`);
+    throw new Error(`API 請求失敗（HTTP ${resp.status}）${raw ? `：${raw.slice(0, 160)}` : ''}`);
+  }
+
+  if (data === null) {
+    throw new Error('後端回應不是有效的 JSON，可能中途被截斷或逾時。');
   }
   return data as T;
 }
@@ -490,7 +509,7 @@ export async function seedWeekRecords(
   params: { source: WeekSeedSource; days?: number; budget?: number; lat?: number; lng?: number; radiusKm?: number; category?: string },
   auth?: ApiAuth
 ): Promise<WeekSeedSummary> {
-  const resp = await fetch(`${apiBaseUrl}/seed/week-records/${encodeURIComponent(userId)}`, {
+  return fetchJsonWithNetworkMessage<WeekSeedSummary>(`${apiBaseUrl}/seed/week-records/${encodeURIComponent(userId)}`, {
     method: 'POST',
     headers: buildHeaders(auth, 'application/json'),
     body: JSON.stringify({
@@ -503,7 +522,6 @@ export async function seedWeekRecords(
       category: params.category,
     }),
   });
-  return parseJson<WeekSeedSummary>(resp);
 }
 
 export async function clearWeekRecords(
@@ -513,11 +531,10 @@ export async function clearWeekRecords(
   auth?: ApiAuth
 ): Promise<{ message: string; removed: number; source: WeekSeedSource }> {
   const query = new URLSearchParams({ source: params.source, days: String(params.days ?? 7) });
-  const resp = await fetch(`${apiBaseUrl}/seed/week-records/${encodeURIComponent(userId)}?${query.toString()}`, {
-    method: 'DELETE',
-    headers: buildHeaders(auth),
-  });
-  return parseJson(resp);
+  return fetchJsonWithNetworkMessage<{ message: string; removed: number; source: WeekSeedSource }>(
+    `${apiBaseUrl}/seed/week-records/${encodeURIComponent(userId)}?${query.toString()}`,
+    { method: 'DELETE', headers: buildHeaders(auth) }
+  );
 }
 
 export async function fetchRestaurantAiSummary(

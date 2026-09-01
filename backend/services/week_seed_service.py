@@ -19,6 +19,9 @@ MEAL_HOURS = {"早餐": (8, 0), "午餐": (12, 30), "晚餐": (19, 0)}
 
 SEED_SOURCES = ("recommend", "curated")
 MAX_DAYS = 14
+# 最多向 Gemini 估算幾家店的菜單，以及湊到幾道菜就停止
+MAX_MENU_ENRICHMENTS = 3
+ENOUGH_DISHES = 12
 
 
 def seed_client_record_id(source: str, day, meal_type: str) -> str:
@@ -102,7 +105,7 @@ def collect_recommendation_dishes(
     category = str(params.get("category", "all") or "all").strip().lower()
 
     try:
-        places = fetch_places(lat, lng, radius_km, category, budget, limit=8)
+        places = fetch_places(lat, lng, radius_km, category, budget, limit=6)
     except Exception as error:  # 金鑰未設定、Billing 未開、配額用盡都走這裡
         dishes = collect_catalog_dishes(restaurant_catalog, user, disease_rules, allergen_taxonomy, budget)
         note = f"Google Places 無法使用（{error}），已改用本地測試餐廳目錄，資料不是真實店家。"
@@ -117,29 +120,54 @@ def collect_recommendation_dishes(
     allergens = user.get("allergens", []) or []
     catalog_by_name = {str(r.get("name", "")).strip().lower(): r for r in restaurant_catalog}
 
+    def add_dishes(restaurant, items) -> int:
+        added = 0
+        for item in items:
+            if _passes_filters(item, restaurant, budget, conditions, allergens, disease_rules, allergen_taxonomy, user):
+                dishes.append(_dish_from_item(item, restaurant))
+                added += 1
+        return added
+
     dishes = []
     resolved_restaurants = 0
+    enrich_failures = 0
+
+    # 第一輪只用本地已知菜單，不打任何外部 API
+    unknown_places = []
     for place in places:
         name = str(place.get("name", "")).strip()
         if not name:
             continue
         known = catalog_by_name.get(name.lower())
         if known and known.get("items"):
-            restaurant, items = known, known["items"]
+            if add_dishes(known, known["items"]):
+                resolved_restaurants += 1
         else:
+            unknown_places.append((name, place))
+
+    # 第二輪才向 Gemini 估算菜單。單次估算最壞情況是「金鑰數 x 模型數」次 20 秒請求，
+    # 不設上限整個 request 會在 Render 逾時，所以湊夠菜色就停。
+    enrich_calls = 0
+    for name, place in unknown_places:
+        if len(dishes) >= ENOUGH_DISHES or enrich_calls >= MAX_MENU_ENRICHMENTS:
+            break
+        enrich_calls += 1
+        try:
             enriched = enrich_restaurant(name, place.get("address") or "台灣", "")
-            items = enriched.get("items", []) or []
-            restaurant = {
-                "restaurant_id": place.get("restaurant_id", f"places_{name}"),
-                "name": name,
-                "address": place.get("address", ""),
-            }
+        except Exception as error:  # 單一店家失敗不該讓整批都拿不到資料
+            print(f"[week-seed] {name} 菜單估算失敗: {error}")
+            enrich_failures += 1
+            continue
+        items = enriched.get("items", []) or []
         if not items:
             continue
-        resolved_restaurants += 1
-        for item in items:
-            if _passes_filters(item, restaurant, budget, conditions, allergens, disease_rules, allergen_taxonomy, user):
-                dishes.append(_dish_from_item(item, restaurant))
+        restaurant = {
+            "restaurant_id": place.get("restaurant_id", f"places_{name}"),
+            "name": name,
+            "address": place.get("address", ""),
+        }
+        if add_dishes(restaurant, items):
+            resolved_restaurants += 1
 
     if not dishes:
         dishes = collect_catalog_dishes(restaurant_catalog, user, disease_rules, allergen_taxonomy, budget)
@@ -147,6 +175,8 @@ def collect_recommendation_dishes(
         return dishes, "local_catalog_fallback", note
 
     note = f"取自 Google Places 搜尋到的 {resolved_restaurants} 家真實店家菜單（未標示營養的品項由 Gemini 估算）。"
+    if enrich_failures:
+        note += f" 另有 {enrich_failures} 家因菜單估算失敗略過。"
     return dishes, "google_places", note
 
 

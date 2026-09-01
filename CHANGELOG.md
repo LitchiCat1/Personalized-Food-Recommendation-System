@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- **一鍵灌入在 Render 上按了會失敗**：`source=recommend` 原本會對 Google Places 找到的每一家店都呼叫 `enrich_restaurant_with_gemini`，而該函式最壞情況會跑「金鑰數 × 模型數」次 20 秒的請求，八家店就足以讓整個 request 在 Render 逾時。改成兩輪：先用本地已知菜單湊菜色（零外部呼叫），不夠才向 Gemini 估算，且上限 3 家、湊滿 12 道就停；單一店家估算失敗改為記錄後略過，不再讓整批失敗。
+- **API 錯誤訊息會被 JSON 解析錯誤蓋掉**：`parseJson` 先呼叫 `resp.json()` 再檢查 `resp.ok`，後端逾時、502 或路由不存在時回的是 HTML 或空 body，使用者只會看到 `Unexpected token '<'`，真正的狀態碼完全看不到。改成先讀 text 再嘗試解析，並針對 404／401／403／5xx 給出可行動的說明。
 - **反式脂肪數值放大 1000 倍**：TFDA 原始資料的反式脂肪含量單位是 mg/100g（其他脂肪是 g/100g），`convert_tfda.py` 直接沿用未換算，導致 `nutrition_db_tw.json` 有 405 筆食品的反式脂肪被當成公克數，一顆蛋算成 29.94 g、葡萄籽油算成 2122 g。因為每日反式脂肪目標是 0 g（上限），只要記錄到蛋或乳製品就必然判定超標，首頁進度條會顯示「165 / 0 g」這種數字。轉檔時改為 mg→g 換算，並一併修正既有的 `nutrition_db_tw.json`；修正後同一份菜單的一週達標天數從 2/7 變成 7/7。
 - **慢性腎臟病的蛋白質判定方向相反**：`calculate_pdf_daily_targets` 對 CKD 把蛋白質目標壓到 `W x 0.6`（嚴格限量），但 `NUTRITION_GOAL_TYPES` 固定把蛋白質視為 `minimum_target`，導致 CKD 使用者吃到 114 g 蛋白質會被判成「達標」而不是「超標」，等於給出相反的建議。新增 `build_nutrition_goal_types(user)`，CKD 的蛋白質改為 `upper_limit`。
 - **「今天」用 UTC 判斷**：伺服器跑在 UTC，但飲食紀錄的 timestamp 與店家 `open_hours` 都是本地時間。本地 00:00–08:00 這段時間，店家推薦的「今日剩餘營養」會拿到昨天的攝取量；店家營業狀態也用 UTC 時鐘比對本地營業時間（本地凌晨 00:31 會有 16/20 家被判成營業中）。新增 `services/app_time_service.py` 以固定偏移量（預設 +8，可用 `APP_UTC_OFFSET_HOURS` 調整）統一換算，`build_daily_nutrition_progress`、`storage.get_history` / `get_today_records`、店家營業判斷、以及未帶 timestamp 的紀錄預設時間全部改用本地時間。

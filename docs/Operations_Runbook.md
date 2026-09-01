@@ -118,7 +118,7 @@ python backend/scripts/seed_week_test_data.py --source recommend --skip-profile
 - Render 跑在 UTC。`APP_UTC_OFFSET_HOURS=8` 已寫進 `render.yaml`，「今天」與店家營業時間才會用台灣時間判斷。
 - Render 有 `DATABASE_URL`，資料寫進 Postgres 會**永久保留**（本機是記憶體，重啟就沒了）。
   測完請務必用同樣參數加 `--clear` 清掉，否則測試資料會混進真實飲食紀錄。
-- 反式脂肪單位、腎臟病蛋白質方向、UTC 時區三項修正都在 v0.0.8c；
+- 反式脂肪單位、腎臟病蛋白質方向、UTC 時區三項修正都在 v0.0.8d；
   Render 服務要切到該分支並重新部署後才會生效。
 
 
@@ -201,7 +201,7 @@ GEMINI_API_KEYS=key1,key2,key3
 - Backend Render URL：由 Blueprint 建立 `personalized-food-recommendation-backend` 後由 Render 指派，每次部署各自不同
 - Frontend Render Static Site：由 Blueprint 建立 `personalized-food-recommendation-frontend`，部署後使用 Render 指派網址
 - Render service id：以部署者自己的 Render Dashboard 顯示為準
-- 部署分支：`v0.0.8c`
+- 部署分支：`v0.0.8d`
 - 後端儲存：Supabase Postgres Session Pooler
 - 後端 Auth：`SUPABASE_AUTH_REQUIRED=true`
 

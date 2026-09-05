@@ -1,4 +1,5 @@
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from math import isfinite
 from math import cos, radians, sin, sqrt, atan2
@@ -35,6 +36,41 @@ def _haversine_km(lat1, lon1, lat2, lon2):
     a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
     return radius * c
+
+
+# Places API (New) 依 field mask 計費，每按一次「更新地圖」就是一次計費請求。
+# 同一組座標／半徑／類型在短時間內重複搜尋（重新整理、切分頁、連按）直接吃快取。
+_SEARCH_CACHE: dict = {}
+SEARCH_CACHE_TTL_SECONDS = 600
+SEARCH_CACHE_MAX_ENTRIES = 64
+
+
+def clear_search_cache() -> None:
+    """測試與需要強制重新查詢時使用。"""
+    _SEARCH_CACHE.clear()
+
+
+def _search_cache_key(lat: float, lng: float, radius_km: float, category: str, budget: int, limit: int) -> tuple:
+    # 座標取到小數第 3 位（約 100 公尺），走幾步不會重新計費
+    return (round(lat, 3), round(lng, 3), round(radius_km, 2), category or "all", budget, limit)
+
+
+def _search_cache_get(key: tuple):
+    entry = _SEARCH_CACHE.get(key)
+    if not entry:
+        return None
+    cached_at, value = entry
+    if time.time() - cached_at > SEARCH_CACHE_TTL_SECONDS:
+        _SEARCH_CACHE.pop(key, None)
+        return None
+    return value
+
+
+def _search_cache_put(key: tuple, value):
+    if len(_SEARCH_CACHE) >= SEARCH_CACHE_MAX_ENTRIES:
+        oldest = min(_SEARCH_CACHE, key=lambda item: _SEARCH_CACHE[item][0])
+        _SEARCH_CACHE.pop(oldest, None)
+    _SEARCH_CACHE[key] = (time.time(), value)
 
 
 def get_google_places_api_key() -> str:
@@ -186,47 +222,49 @@ def _fetch_new_places_api(lat: float, lng: float, radius_m: float, key: str) -> 
 
 
 def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, category: str, budget: int, limit: int = 12) -> list[dict]:
+    cache_key = _search_cache_key(lat, lng, radius_km, category, budget, limit)
+    cached = _search_cache_get(cache_key)
+    if cached is not None:
+        print(f"[places] 命中快取，未送出計費請求 ({cache_key})")
+        return [dict(restaurant) for restaurant in cached]
+
     key = get_google_places_api_key()
     radius_m = int(max(500, min(radius_km * 1000, 10000)))
     
-    results = []
-    legacy_failed = False
-    legacy_err_msg = ""
-    try:
-        response = requests.get(
-            GOOGLE_PLACES_NEARBY_URL,
-            params={
-                "key": key,
-                "location": f"{lat},{lng}",
-                "radius": radius_m,
-                "type": "restaurant",
-                "keyword": _category_keyword(category),
-                "language": "zh-TW",
-            },
-            timeout=10,
-        )
-        if response.status_code != 200:
-            legacy_failed = True
-            legacy_err_msg = f"HTTP {response.status_code}: {response.text}"
-        else:
-            payload = response.json()
-            status = payload.get("status")
-            if status not in {"OK", "ZERO_RESULTS"}:
-                legacy_failed = True
-                legacy_err_msg = payload.get("error_message") or f"Status {status}"
-            else:
-                results = payload.get("results", [])
-    except Exception as exc:
-        legacy_failed = True
-        legacy_err_msg = str(exc)
+    # 先打 Places API (New)：一次請求就把 website / Google Maps 連結一起帶回來，
+    # 舊版 Nearby Search 拿不到這些欄位，還要對每一家店再送一次 Place Details（較貴的 SKU）。
+    results = _fetch_new_places_api(lat, lng, radius_m, key)
 
-    # Automatic fallback to Google Places API (New) v1 if legacy API is not enabled
-    if legacy_failed:
-        print(f"[Google Places] Legacy API call failed ({legacy_err_msg}). Trying Places API (New) fallback...")
-        results = _fetch_new_places_api(lat, lng, radius_m, key)
+    if not results:
+        print("[Google Places] Places API (New) 沒有結果，改用舊版 Nearby Search")
+        try:
+            response = requests.get(
+                GOOGLE_PLACES_NEARBY_URL,
+                params={
+                    "key": key,
+                    "location": f"{lat},{lng}",
+                    "radius": radius_m,
+                    "type": "restaurant",
+                    "keyword": _category_keyword(category),
+                    "language": "zh-TW",
+                },
+                timeout=10,
+            )
+            if response.status_code != 200:
+                print(f"[Google Places] 舊版 Nearby Search 失敗 HTTP {response.status_code}")
+            else:
+                payload = response.json()
+                status = payload.get("status")
+                if status not in {"OK", "ZERO_RESULTS"}:
+                    print(f"[Google Places] 舊版 Nearby Search 失敗：{payload.get('error_message') or status}")
+                else:
+                    results = payload.get("results", [])
+        except Exception as exc:
+            print(f"[Google Places] 舊版 Nearby Search 例外：{exc}")
         if not results:
-            # If both failed, raise the exception with the actual detailed error message
-            raise GooglePlacesAPIError(legacy_err_msg or "Google Places API failed. Please check key permissions.")
+            raise GooglePlacesAPIError(
+                "Google Places 兩種 API 都沒有回傳結果，請確認金鑰權限與 Billing 設定。"
+            )
 
     candidates = []
     for place in results:
@@ -321,4 +359,6 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
         if place.get("_new_places_api"):
             restaurant.update(_build_place_links(place.get("website"), place.get("url")))
 
-    return [restaurant for restaurant, _ in selected_candidates]
+    result = [restaurant for restaurant, _ in selected_candidates]
+    _search_cache_put(cache_key, [dict(restaurant) for restaurant in result])
+    return result

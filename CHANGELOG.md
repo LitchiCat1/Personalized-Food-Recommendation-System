@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- **店家推薦沒有依「不能吃的食物」過濾**：`/map-food-recommend`（Render 上實際使用的 Google Places 路徑）從頭到尾沒有呼叫 `evaluate_medical_risk`，疾病禁忌與過敏原完全沒有生效——只有 Places 失敗退回本地目錄時才會過濾。現在會用店名與店家類型比對：命中疾病 `blocked_keywords`（例如高血脂遇到「炸雞」）直接擋掉並列入 `filtered_out`；過敏原則新增店家層級關鍵字（`allergen_taxonomy.json` 的 `venue_keywords`，例如甲殼類對到「海鮮」「生猛」），因為同一家店通常仍有可吃的品項，改為顯示警告而非隱藏。逐道菜的過濾維持在「完整菜單」執行。
+- **店家搜尋費用過高**：`fetch_google_places_restaurants` 每次都先打舊版 Nearby Search，成功時還要對每一家店各送一次 Place Details（較貴的 SKU），一次搜尋最多 13 次計費請求。改為優先使用 Places API (New)——單一請求就會依 field mask 一併回傳 `websiteUri` 與 `googleMapsUri`，完全不需要 Details；舊版只在新版沒有結果時才當備援。另外加上 10 分鐘的搜尋快取（座標取到小數第 3 位，約 100 公尺），連按「更新地圖」5 次只會送出 1 次計費請求。
 - **七天灌入的菜單好幾天一模一樣**：原本用 `slot_index % 菜色數` 輪流發牌，菜色少於一週的量時會嚴重重複——只找到 3 道菜時七天有 6 天完全相同，14 道菜還會出現同一天吃兩次同一道。改為 `plan_daily_dishes`：菜色足夠就洗牌切段，不足則列舉「可重複的三道組合」並優先取三道都不同的組合，3 道菜以上就能保證七天互不相同、5 道以上連同一天內也不重複。seed 取自 user_id + source + 日期，同一天重按結果一致。
 - **沒有菜單的店家會被略過**：原本為了避開逾時，把 Gemini 菜單分析寫死上限 3 家。改用 45 秒時間預算：附近店家只要沒有現成菜單就送去分析，湊滿七天所需的 21 道或用完預算才停，最多 6 家。
 - **一鍵灌入在 Render 上按了會失敗**：`source=recommend` 原本會對 Google Places 找到的每一家店都呼叫 `enrich_restaurant_with_gemini`，而該函式最壞情況會跑「金鑰數 × 模型數」次 20 秒的請求，八家店就足以讓整個 request 在 Render 逾時。改成兩輪：先用本地已知菜單湊菜色（零外部呼叫），不夠才向 Gemini 估算，且上限 3 家、湊滿 12 道就停；單一店家估算失敗改為記錄後略過，不再讓整批失敗。

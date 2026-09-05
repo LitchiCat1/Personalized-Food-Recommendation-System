@@ -6,6 +6,7 @@ from math import atan2, cos, radians, sin, sqrt
 from services.app_time_service import app_now
 from services.google_places_service import fetch_google_places_restaurants
 from services.medical_risk_service import evaluate_medical_risk
+from services.nutrient_service import NUTRITION_FIELDS, is_fried_food_name
 from services.nutrition_progress_service import build_daily_nutrition_progress
 from services.disease_rule_service import load_disease_rules, load_allergen_taxonomy
 
@@ -287,6 +288,48 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
     }
 
 
+def _venue_allergen_cautions(restaurant: dict, allergens: list, taxonomy: dict) -> list[str]:
+    """店名層級的過敏原提醒。
+
+    Places 沒有菜色資料，「生猛海鮮熱炒」不會命中 蝦／蟹 這種菜色關鍵字，
+    但店家類型本身就足以提醒使用者點餐時要確認。這裡只給警告不擋掉，
+    因為同一家店通常仍有可以吃的品項。
+    """
+    if not allergens:
+        return []
+    from services.disease_rule_service import normalize_allergen_ids
+
+    selected = set(normalize_allergen_ids(allergens, taxonomy))
+    haystack = f"{restaurant.get('name', '')} {' '.join(str(tag) for tag in restaurant.get('tags', []))}".lower()
+    cautions = []
+    for group in taxonomy.get("groups", []):
+        if group.get("id") not in selected:
+            continue
+        hit = next((word for word in group.get("venue_keywords", []) if word.lower() in haystack), None)
+        if hit:
+            cautions.append(f"這家店以「{hit}」為主，你設定了{group.get('label_zh')}過敏，點餐前請向店家確認")
+    return cautions
+
+
+def _places_risk_candidate(restaurant: dict, item: dict) -> dict:
+    """用店名 + 店家類型當作比對文字。
+
+    Places 沒有菜色營養，所有營養欄位都是 0，靠的是
+    `detect_allergen_hits` 與 `_condition_keyword_hits` 的關鍵字比對。
+    """
+    tags = " ".join(str(tag) for tag in restaurant.get("tags", []) if tag)
+    name = restaurant.get("name", "")
+    return {
+        "label": item.get("item_id", name),
+        "name_zh": f"{name} {tags}".strip(),
+        "item_name": item.get("item_name", ""),
+        "gi": item.get("gi"),
+        "allergens": [],
+        "is_fried": is_fried_food_name(name, tags),
+        **{nutrient: item.get(nutrient, 0) for nutrient in NUTRITION_FIELDS},
+    }
+
+
 def build_google_places_food_recommendations(storage, user_id: str, params: dict):
     user = storage.get_user(user_id)
     if not user:
@@ -302,6 +345,12 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
     remaining = build_daily_nutrition_progress(storage, user_id, user, now)["remaining"]
 
     data_source = "google_places"
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    disease_rules = load_disease_rules(base_dir)
+    taxonomy = load_allergen_taxonomy(base_dir)
+    conditions = user.get("health_conditions", []) or []
+    allergens = user.get("allergens", []) or []
+
     from services.google_places_service import GooglePlacesConfigError
     try:
         restaurants = fetch_google_places_restaurants(lat, lng, radius_km, category, budget, limit=12)
@@ -309,10 +358,7 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
         raise
     except Exception as e:
         print(f"[Google Places API error] {e}. Falling back to coordinate-shifted local catalog.")
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        disease_rules = load_disease_rules(base_dir)
         restaurant_catalog = load_restaurant_catalog(base_dir)
-        taxonomy = load_allergen_taxonomy(base_dir)
         offline_recommendations = build_healthy_food_recommendations(
             storage, disease_rules, restaurant_catalog, user_id, params, taxonomy
         )
@@ -331,7 +377,52 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
             "filtered_out": offline_recommendations.get("filtered_out", []),
         }
 
-    recommendations = [item for restaurant in restaurants for item in restaurant.get("recommended_items", [])]
+    # Google Places 只給店名與店家類型，沒有菜色營養，但店名／類型本身就足以
+    # 擋掉明顯衝突的店家（海鮮過敏遇到海產店、高血脂遇到炸雞店）。
+    # 之前這條路徑完全沒有套用疾病與過敏原規則，等於「沒有根據不能吃的食物做推薦」。
+    recommendations = []
+    filtered_out = []
+    for restaurant in restaurants:
+        restaurant_allowed = []
+        restaurant_blocked = []
+        for item in restaurant.get("recommended_items", []):
+            medical_risk = evaluate_medical_risk(
+                _places_risk_candidate(restaurant, item),
+                conditions,
+                allergens,
+                disease_rules,
+                taxonomy,
+                user_profile=user,
+            )
+            venue_cautions = _venue_allergen_cautions(restaurant, allergens, taxonomy)
+            if venue_cautions:
+                medical_risk = {
+                    **medical_risk,
+                    "has_caution": True,
+                    "caution_reasons": [*medical_risk["caution_reasons"], *venue_cautions],
+                }
+            item["medical_risk"] = medical_risk
+            if medical_risk["block_reasons"]:
+                blocked = {
+                    "restaurant_id": restaurant["restaurant_id"],
+                    "restaurant_name": restaurant["name"],
+                    "item_name": item.get("item_name", restaurant["name"]),
+                    "price": item.get("price", 0),
+                    "reasons": medical_risk["block_reasons"],
+                    "medical_risk": medical_risk,
+                }
+                restaurant_blocked.append(blocked)
+                filtered_out.append(blocked)
+            else:
+                if medical_risk["caution_reasons"]:
+                    item["reasons"] = [*item.get("reasons", []), *medical_risk["caution_reasons"]]
+                restaurant_allowed.append(item)
+
+        restaurant["recommended_items"] = restaurant_allowed
+        restaurant["filtered_items"] = restaurant_blocked
+        recommendations.extend(restaurant_allowed)
+
+    restaurants = [restaurant for restaurant in restaurants if restaurant["recommended_items"]]
     recommendations.sort(key=lambda item: item["match_score"], reverse=True)
     return {
         "user_id": user_id,
@@ -342,9 +433,12 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
         "remaining": remaining,
         "data_source": "google_places",
         "nutrition_available": False,
-        "nutrition_note": "Google Places does not expose nutritional data; use it for location discovery only.",
+        "nutrition_note": (
+            "Google Places 不提供菜色營養，這裡只用店名與店家類型比對疾病禁忌與過敏原；"
+            "逐道菜的過濾要開啟「完整菜單」才會執行。"
+        ),
         "recommended": recommendations[:12],
         "restaurants": restaurants,
-        "filtered_out": [],
+        "filtered_out": filtered_out,
     }
 

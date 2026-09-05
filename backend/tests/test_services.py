@@ -1,13 +1,15 @@
 import json
 import os
 import unittest
+
+import services.healthy_food_service as healthy_food_service_module
 from datetime import datetime, timezone
 from unittest.mock import patch
 
 from services.disease_rule_service import build_allergen_taxonomy_response, build_disease_rules_response, build_medical_metadata_response, load_allergen_taxonomy, load_disease_rules, normalize_allergen_ids, normalize_condition_ids
 from services.food_analysis_service import build_detection_reliability, build_portion_range
 from services.food_service import search_foods
-from services.healthy_food_service import build_healthy_food_recommendations, load_restaurant_catalog
+from services.healthy_food_service import build_google_places_food_recommendations, build_healthy_food_recommendations, load_restaurant_catalog
 from services.history_service import build_history_response
 from services.open_food_facts_service import build_open_food_facts_product
 from services.app_time_service import app_today
@@ -305,6 +307,78 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertEqual(progress["status"]["sodium"], "over")
         self.assertEqual(progress["status"]["protein"], "within_target")
         self.assertGreater(progress["progress_percent"]["calories"], 100)
+
+    def test_google_places_recommendations_apply_conditions_and_allergens(self):
+        """Places 路徑之前完全沒套疾病與過敏原規則，等於沒有依「不能吃的食物」推薦。"""
+        def places(name):
+            return {
+                "restaurant_id": f"g_{name}",
+                "name": name,
+                "tags": ["Google Places"],
+                "lat": 25.0338,
+                "lng": 121.5645,
+                "recommended_items": [
+                    {
+                        "restaurant_id": f"g_{name}",
+                        "restaurant_name": name,
+                        "item_id": f"g_{name}_visit",
+                        "item_name": "到店後選擇符合預算的餐點",
+                        "price": 120,
+                        "match_score": 70,
+                        "calories": 0,
+                        "protein": 0,
+                        "carbs": 0,
+                        "fat": 0,
+                        "sodium": 0,
+                        "reasons": [],
+                    }
+                ],
+            }
+
+        class PlacesStorage:
+            def __init__(self, conditions, allergens):
+                self.conditions = conditions
+                self.allergens = allergens
+
+            def get_user(self, user_id):
+                return {
+                    "user_id": user_id,
+                    "height": 170,
+                    "weight": 65,
+                    "health_conditions": self.conditions,
+                    "allergens": self.allergens,
+                }
+
+            def get_records(self, user_id, date=None, limit=500):
+                return []
+
+        venues = ["頂呱呱炸雞", "阿宏生猛海鮮熱炒", "清粥小菜"]
+        with patch.object(
+            healthy_food_service_module,
+            "fetch_google_places_restaurants",
+            lambda *args, **kwargs: [places(name) for name in venues],
+        ):
+            blocked = build_google_places_food_recommendations(
+                PlacesStorage(["hyperlipidemia"], ["shellfish"]), "user-a", {"budget": 150}
+            )
+            unrestricted = build_google_places_food_recommendations(
+                PlacesStorage([], []), "user-a", {"budget": 150}
+            )
+
+        recommended_names = [item["restaurant_name"] for item in blocked["recommended"]]
+        self.assertNotIn("頂呱呱炸雞", recommended_names)  # 高血脂：油炸店擋掉
+        self.assertEqual([item["restaurant_name"] for item in blocked["filtered_out"]], ["頂呱呱炸雞"])
+
+        # 海鮮店不擋掉（同店仍有可吃的品項），但要出現過敏警告
+        seafood = next(item for item in blocked["recommended"] if item["restaurant_name"] == "阿宏生猛海鮮熱炒")
+        self.assertTrue(
+            any("過敏" in reason for reason in seafood["medical_risk"]["caution_reasons"]),
+            seafood["medical_risk"]["caution_reasons"],
+        )
+
+        # 沒有設定任何條件時不應該擋掉任何店家
+        self.assertEqual(len(unrestricted["recommended"]), 3)
+        self.assertEqual(unrestricted["filtered_out"], [])
 
     def test_week_seed_plan_gives_every_day_a_different_menu(self):
         """菜色少於一週的量時，輪流發牌會讓好幾天長得一模一樣。"""

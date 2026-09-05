@@ -246,6 +246,23 @@ render deploys list srv-d7u2qhdckfvc73ei96l0 --output json
 
 latest deploy 應為 `live`。
 
+### 6.0 確認線上跑的是哪一版
+
+`/health` 會回傳 Render 自動注入的分支與 commit，不用靠「某個路由存不存在」來猜：
+
+```bash
+curl -s https://<backend>.onrender.com/health
+```
+
+```json
+{ "app_version": "v0.0.8f", "deployed_branch": "v0.0.8f", "deployed_commit": "739924f", "started_at": "..." }
+```
+
+`deployed_branch` 不是預期的分支，或 `started_at` 還是很久以前，就代表那次 Deploy 沒有真的生效——
+Render 改了 Settings 的 Branch **不會自動重新部署**，要再按一次 Manual Deploy → Deploy latest commit。
+另一個徵兆是 `restaurants` 大於 `restaurant_catalog.json` 的筆數：那是執行期被菜單爬蟲追加的，
+代表 process 已經跑很久沒重啟。
+
 ### 6.2 Health check
 
 根路徑可讀性檢查：

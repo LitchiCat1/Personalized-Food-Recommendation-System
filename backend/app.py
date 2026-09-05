@@ -144,6 +144,10 @@ print(f"[OK] Restaurant catalog loaded: {len(RESTAURANT_CATALOG)} restaurants")
 # ═══════════════════════════════════════════════════════════════
 
 
+APP_VERSION = "v0.0.8f"
+STARTED_AT = app_now().isoformat()
+
+
 @app.route("/", methods=["GET"])
 def index():
     return jsonify({
@@ -175,6 +179,12 @@ def health():
         "auth_required": is_auth_required(),
         "supabase_auth_configured": is_supabase_auth_configured(),
         "custom_foods": len(storage.get_custom_foods()),
+        # 部署後可以直接從 /health 看出線上跑的是哪一版，不用靠路由存不存在來猜。
+        # RENDER_GIT_BRANCH / RENDER_GIT_COMMIT 由 Render 自動注入。
+        "deployed_branch": os.environ.get("RENDER_GIT_BRANCH") or "local",
+        "deployed_commit": (os.environ.get("RENDER_GIT_COMMIT") or "local")[:7],
+        "app_version": APP_VERSION,
+        "started_at": STARTED_AT,
     })
 
 

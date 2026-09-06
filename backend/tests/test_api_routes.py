@@ -233,7 +233,7 @@ class ApiRouteTests(unittest.TestCase):
             for name in names
         ]
 
-    def _seed_menu(self, name, address, text):
+    def _seed_menu(self, name, address, text, deadline=None):
         return {
             "items": [
                 {

@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from services.app_time_service import app_now, get_app_timezone
 from services.medical_risk_service import evaluate_medical_risk
 from services.nutrient_service import NUTRITION_FIELDS, normalize_nutrition_fields
+from services.robust_restaurant_scraper_service import validate_and_balance_nutrition
 from services.nutrition_progress_service import build_nutrition_goal_types, calculate_pdf_daily_targets
 
 MEAL_ORDER = ("早餐", "午餐", "晚餐")
@@ -66,7 +67,12 @@ def _dish_from_item(item: dict, restaurant: dict) -> dict:
 
     直接吃菜單原始欄位，纖維／糖／飽和脂肪／反式脂肪都留得住；
     走推薦 API 的 response 反而只剩五項。
+
+    快取存的是模型的原始輸出，所以在這裡再跑一次一致性校正：已經建檔的
+    店家不必重新分析，也能補上模型留白的飽和脂肪與糖。校正是冪等的，
+    對建檔時就已經校正過的資料不會再動。
     """
+    item = validate_and_balance_nutrition(dict(item))
     dish = {
         "name": f"{item.get('name', '餐點')}（{restaurant.get('name', '未知店家')}）",
         "restaurant_id": restaurant.get("restaurant_id"),

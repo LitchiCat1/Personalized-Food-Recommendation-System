@@ -169,7 +169,7 @@ def collect_recommendation_dishes(
             break
         enrich_calls += 1
         try:
-            enriched = enrich_restaurant(name, place.get("address") or "台灣", "")
+            enriched = enrich_restaurant(name, place.get("address") or "台灣", "", deadline)
         except Exception as error:  # 單一店家失敗不該讓整批都拿不到資料
             print(f"[week-seed] {name} 菜單估算失敗: {error}")
             enrich_failures += 1

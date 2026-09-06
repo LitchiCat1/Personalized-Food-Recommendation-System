@@ -2,6 +2,7 @@ import json
 import os
 import random
 import re
+import time
 import requests
 from bs4 import BeautifulSoup
 
@@ -207,7 +208,7 @@ def validate_and_balance_nutrition(item: dict) -> dict:
 MENU_GENERATION_TIMEOUT_SECONDS = 30
 
 
-def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_text: str = "") -> dict:
+def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_text: str = "", deadline: float | None = None) -> dict:
     keys = get_gemini_api_keys()
     if not keys:
         print("[!] No Gemini API key found for scraper - using realistic templates")
@@ -262,9 +263,13 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
     unavailable_models = set()
     for gemini_key in keys:
         for model_name in candidate_models:
-            # 模型不存在是帳號層級的事，換一把金鑰重試同一個模型只是浪費時間
+            # 模型不存在或太慢都是模型層級的事，換一把金鑰重試同一個模型只是浪費時間
             if model_name in unavailable_models:
                 continue
+            if deadline is not None and time.monotonic() >= deadline:
+                print("[!] 菜單分析已超出呼叫端給的時間預算，停止重試")
+                unavailable_models.update(candidate_models)
+                break
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
                 payload = {
@@ -283,8 +288,14 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
                     if res.status_code == 404:
                         unavailable_models.add(model_name)
                     print(f"[!] Key {gemini_key[:8]}... model {model_name} status {res.status_code}, trying next key/model...")
+            except requests.Timeout:
+                # 逾時代表這個模型在預算內生不完，別再拿其他金鑰重試同一個
+                unavailable_models.add(model_name)
+                print(f"[!] Gemini Model {model_name} 逾時 {MENU_GENERATION_TIMEOUT_SECONDS}s，跳過這個模型")
             except Exception as e:
                 print(f"[!] Gemini Model {model_name} error: {e}")
+        if len(unavailable_models) >= len(candidate_models):
+            break
 
     if len(unavailable_models) == len(candidate_models):
         print(f"[!] 所有模型都回 404：{sorted(unavailable_models)}。請用 GEMINI_MODELS 指定金鑰有權限的模型。")

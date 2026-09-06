@@ -12,12 +12,15 @@ from services.nutrient_service import get_nutrient_value
 RETRYABLE_GEMINI_STATUS_CODES = {401, 403, 404, 429, 500, 502, 503, 504}
 # Keep defaults aligned with models currently exposed by the v1beta API. Older
 # 1.5/2.0 model ids are retained only when explicitly configured by deployers.
+# 固定版號的模型會被停用：gemini-2.5-flash 與 gemini-2.5-flash-lite 對新金鑰
+# 已經回 404「no longer available to new users」，只有最早開通的那把還能用。
+# 所以把不會過期的 -latest 別名排在前面，固定版號只當備援。
+# 目前實際可用的組合可用 GET /health/gemini?generate=1 查。
 DEFAULT_GEMINI_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
+    "gemini-flash-lite-latest",
     "gemini-flash-latest",
-    "gemini-3.5-flash",
-    "gemini-2.5-pro",
+    "gemini-3.5-flash-lite",
+    "gemini-3.6-flash",
 ]
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 

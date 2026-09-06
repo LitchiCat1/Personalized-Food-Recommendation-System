@@ -734,3 +734,19 @@ class GeminiKeyRotationTests(unittest.TestCase):
 
         self.assertTrue(result["items"])
         self.assertIn("key-c", [key for key, _ in tried])
+
+
+class GeminiModelDefaultsTests(unittest.TestCase):
+    def test_the_first_choice_model_is_a_non_expiring_alias(self):
+        """固定版號的模型會被 Google 停用（2.5-flash 已經對新金鑰回 404）。
+        首選要用 -latest 別名，模型改朝換代時服務才不會整個停擺。"""
+        from services.nutrition_label_service import DEFAULT_GEMINI_MODELS
+
+        self.assertTrue(DEFAULT_GEMINI_MODELS[0].endswith("-latest"), DEFAULT_GEMINI_MODELS)
+        self.assertTrue(any(m.endswith("-latest") for m in DEFAULT_GEMINI_MODELS[:2]))
+
+    def test_the_retired_models_are_gone_from_the_defaults(self):
+        from services.nutrition_label_service import DEFAULT_GEMINI_MODELS
+
+        for retired in ("gemini-2.5-flash", "gemini-2.5-flash-lite"):
+            self.assertNotIn(retired, DEFAULT_GEMINI_MODELS)

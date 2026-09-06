@@ -611,3 +611,67 @@ class NutritionZeroFallbackTests(unittest.TestCase):
             {"name": "雞腿便當", "calories": 800, "protein": 35, "carbs": 80, "fat": 35, "sugar": 0}
         )
         self.assertGreater(drink["sugar"], rice_box["sugar"])
+
+
+class MealTimeAwarePlanningTests(unittest.TestCase):
+    """一天三餐要挑那個時段真的有開的店，不能早上八點排炸雞。"""
+
+    TARGETS = {
+        "calories": 1600, "protein": 50, "carbs": 200, "sugar": 20,
+        "fat": 45, "saturated_fat": 13, "trans_fat": 0, "fiber": 25, "sodium": 2000,
+    }
+
+    @staticmethod
+    def _periods(open_hour, close_hour):
+        return [
+            {"day": day, "open_minute": open_hour * 60, "close_minute": close_hour * 60}
+            for day in range(7)
+        ]
+
+    def _dish(self, name, periods):
+        return {
+            "name": name, "opening_periods": periods,
+            "calories": 400, "protein": 18, "carbs": 50, "sugar": 4,
+            "fat": 12, "saturated_fat": 3, "trans_fat": 0, "fiber": 6, "sodium": 500,
+        }
+
+    def test_a_dinner_only_venue_never_lands_on_breakfast(self):
+        from services.week_seed_service import build_nutrition_goal_types
+
+        breakfast = [self._dish(f"早餐店餐點{i}", self._periods(6, 11)) for i in range(4)]
+        dinner = [self._dish(f"晚餐店餐點{i}", self._periods(17, 22)) for i in range(4)]
+        dishes = breakfast + dinner
+        goal_types = build_nutrition_goal_types({})
+
+        plan = plan_daily_dishes(dishes, 7, "meal-time", self.TARGETS, goal_types, weekdays=[0, 1, 2, 3, 4, 5, 6])
+
+        self.assertEqual(len(plan), 7)
+        for day in plan:
+            breakfast_names = [dishes[index]["name"] for index in day[0]]
+            dinner_names = [dishes[index]["name"] for index in day[2]]
+            self.assertTrue(breakfast_names, "早餐不能空著")
+            self.assertTrue(all(name.startswith("早餐店") for name in breakfast_names), breakfast_names)
+            self.assertTrue(all(name.startswith("晚餐店") for name in dinner_names), dinner_names)
+
+    def test_a_venue_closed_on_that_weekday_is_skipped_only_on_that_day(self):
+        from services.week_seed_service import build_nutrition_goal_types
+
+        # 只有週日（Places day 0）營業的店
+        sunday_only = self._dish("週日限定", [{"day": 0, "open_minute": 0, "close_minute": 24 * 60}])
+        everyday = [self._dish(f"天天開{i}", self._periods(0, 24)) for i in range(4)]
+        dishes = [sunday_only] + everyday
+        goal_types = build_nutrition_goal_types({})
+
+        monday_plan = plan_daily_dishes(dishes, 1, "s", self.TARGETS, goal_types, weekdays=[1])
+        picked = [dishes[index]["name"] for meal in monday_plan[0] for index in meal]
+        self.assertNotIn("週日限定", picked)
+
+    def test_venues_without_opening_hours_stay_available_for_every_meal(self):
+        """營業時間不明就排除的話，資料一缺整份計畫就排不出來。"""
+        from services.week_seed_service import build_nutrition_goal_types
+
+        dishes = [self._dish(f"時間未知{i}", []) for i in range(4)]
+        plan = plan_daily_dishes(dishes, 3, "s", self.TARGETS, build_nutrition_goal_types({}), weekdays=[0, 1, 2])
+        self.assertEqual(len(plan), 3)
+        for day in plan:
+            self.assertTrue(all(meal for meal in day), "每一餐都要有東西吃")

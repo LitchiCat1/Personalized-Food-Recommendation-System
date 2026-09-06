@@ -528,6 +528,17 @@ export type VenueIndexSummary = {
   total_cached: number;
 };
 
+export async function clearNearbyVenueIndex(
+  apiBaseUrl: string,
+  userId: string,
+  auth?: ApiAuth
+): Promise<{ message: string; removed: number }> {
+  return fetchJsonWithNetworkMessage(`${apiBaseUrl}/restaurants/index/${encodeURIComponent(userId)}`, {
+    method: 'DELETE',
+    headers: buildHeaders(auth),
+  });
+}
+
 export async function indexNearbyVenues(
   apiBaseUrl: string,
   userId: string,

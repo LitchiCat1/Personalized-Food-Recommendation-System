@@ -147,6 +147,51 @@ def _fetch_legacy_place_links(place_id: str, key: str) -> dict:
         return {}
 
 
+def _opening_periods(place: dict) -> list[dict]:
+    """抽出每週營業時段，統一成 {day, open_minute, close_minute}。
+
+    新版 Places 的 regularOpeningHours.periods 長 
+    {"open": {"day": 1, "hour": 7, "minute": 0}, "close": {...}}；
+    舊版 Nearby Search 的 opening_hours.periods 用 "0730" 字串。
+    兩邊都轉成「星期幾 + 當天第幾分鐘」，缺資料就回空清單代表未知。
+    """
+    def to_minutes(hour, minute):
+        return int(hour) * 60 + int(minute)
+
+    periods = []
+    regular = place.get("regular_opening_hours") or {}
+    for period in regular.get("periods") or []:
+        start, end = period.get("open") or {}, period.get("close") or {}
+        if "hour" not in start:
+            continue
+        # 沒有 close 代表 24 小時營業
+        close_minute = to_minutes(end.get("hour", 23), end.get("minute", 59)) if end else 24 * 60
+        periods.append({
+            "day": int(start.get("day", 0)),
+            "open_minute": to_minutes(start.get("hour", 0), start.get("minute", 0)),
+            "close_minute": close_minute,
+        })
+    if periods:
+        return periods
+
+    legacy = (place.get("opening_hours") or {}).get("periods") or []
+    for period in legacy:
+        start, end = period.get("open") or {}, period.get("close") or {}
+        raw_open = str(start.get("time", ""))
+        if len(raw_open) != 4:
+            continue
+        raw_close = str(end.get("time", "")) if end else ""
+        close_minute = (
+            to_minutes(raw_close[:2], raw_close[2:]) if len(raw_close) == 4 else 24 * 60
+        )
+        periods.append({
+            "day": int(start.get("day", 0)),
+            "open_minute": to_minutes(raw_open[:2], raw_open[2:]),
+            "close_minute": close_minute,
+        })
+    return periods
+
+
 def _score_place(distance_km: float, rating, user_ratings_total, is_open, budget: int, price_level) -> int:
     distance_score = max(0, 42 - int(distance_km * 8))
     rating_score = int(float(rating or 0) * 8)
@@ -168,7 +213,8 @@ def _fetch_new_places_api(lat: float, lng: float, radius_m: float, key: str, max
         "X-Goog-FieldMask": (
             "places.id,places.displayName,places.formattedAddress,places.location,places.types,"
             "places.priceLevel,places.rating,places.userRatingCount,places.websiteUri,"
-            "places.googleMapsUri,places.businessStatus,places.currentOpeningHours"
+            "places.googleMapsUri,places.businessStatus,places.currentOpeningHours,"
+            "places.regularOpeningHours"
         ),
     }
     payload = {
@@ -220,6 +266,9 @@ def _fetch_new_places_api(lat: float, lng: float, radius_m: float, key: str, max
                     # 連已歇業的店也是，而且還白拿排序的營業加分。沒拿到資料就留空。
                     "opening_hours": p.get("currentOpeningHours") or {},
                     "business_status": p.get("businessStatus", ""),
+                    # 每週固定營業時段。灌入七天要按用餐時間挑店，
+                    # currentOpeningHours 只說「現在」開不開，撐不起這件事。
+                    "regular_opening_hours": p.get("regularOpeningHours") or {},
                     "types": p.get("types", []),
                     "website": p.get("websiteUri"),
                     "url": p.get("googleMapsUri"),
@@ -342,6 +391,7 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
             "tags": ["Google Places", "真實店家", *(place.get("types") or [])[:2]],
             "price_level": price_level,
             "is_open": is_open,
+            "opening_periods": _opening_periods(place),
             "rating": rating,
             "user_ratings_total": user_ratings_total,
             "match_score": score,

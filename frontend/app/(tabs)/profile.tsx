@@ -14,7 +14,7 @@ import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
 import FeedbackBanner from '@/components/ui/feedback-banner';
-import { clearWeekRecords, fetchMedicalMetadata, fetchUserProfile, indexNearbyVenues, saveUserProfile, seedWeekRecords } from '@/lib/api';
+import { clearNearbyVenueIndex, clearWeekRecords, fetchMedicalMetadata, fetchUserProfile, indexNearbyVenues, saveUserProfile, seedWeekRecords } from '@/lib/api';
 import type { WeekSeedSource } from '@/lib/api';
 import { isSupabaseAuthConfigured, supabase } from '@/lib/supabase';
 
@@ -36,7 +36,7 @@ export default function ProfileScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const [profileFeedback, setProfileFeedback] = useState<{ tone: 'success' | 'error'; title: string; message?: string } | null>(null);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
-  const [seedBusy, setSeedBusy] = useState<'index' | 'recommend' | 'clear' | null>(null);
+  const [seedBusy, setSeedBusy] = useState<'index' | 'recommend' | 'clear' | 'rebuild' | null>(null);
   const [activeSection, setActiveSection] = useState('personal');
   const [medicalMetadata, setMedicalMetadata] = useState<MedicalMetadata | null>(null);
   const [profileDraft, setProfileDraft] = useState({
@@ -259,7 +259,7 @@ export default function ProfileScreen() {
   };
 
   const runSeedAction = async (
-    busyKey: 'index' | 'recommend' | 'clear',
+    busyKey: 'index' | 'recommend' | 'clear' | 'rebuild',
     action: () => Promise<{ tone: 'success' | 'error'; title: string; message?: string }>
   ) => {
     setSeedBusy(busyKey);
@@ -282,6 +282,16 @@ export default function ProfileScreen() {
         tone: summary.analysed > 0 || summary.already_cached > 0 ? 'success' : 'error',
         title: `附近 ${summary.found} 家店：本次建檔 ${summary.analysed} 家，已建檔過 ${summary.already_cached} 家${rest}`,
         message: `資料庫目前累積 ${summary.total_cached} 家店的菜單${summary.failed ? `，${summary.failed} 家分析失敗` : ''}。建檔後灌入七天資料就不必再等 Gemini。`,
+      };
+    });
+
+  const handleRebuildIndex = () =>
+    runSeedAction('rebuild', async () => {
+      const result = await clearNearbyVenueIndex(apiBaseUrl, user.userId, { accessToken });
+      return {
+        tone: 'success',
+        title: result.removed > 0 ? `已清除 ${result.removed} 家店的菜單檔案` : '菜單檔案本來就是空的',
+        message: '按①重新建檔，這次會照現在的規則來：已歇業的店不收，並記下每家店的營業時段。',
       };
     });
 
@@ -504,9 +514,14 @@ export default function ProfileScreen() {
             onPress={handleClearSeed}
             disabled={seedBusy !== null}
           />
+          <SecondaryButton
+            label={seedBusy === 'rebuild' ? '清除中…' : '清除店家菜單檔案（重建用）'}
+            onPress={handleRebuildIndex}
+            disabled={seedBusy !== null}
+          />
         </View>
         <Text style={styles.seedHint}>
-先按①把附近店家的菜單建檔進資料庫（一家要 20~30 秒，可以重複按累積），再按②灌入七天。已建檔的店家不會重複分析，所以②會很快。拿不到真實菜單時會直接說明原因，不會用模擬資料充數。
+先按①把附近店家的菜單建檔進資料庫（一家要 20~30 秒，可以重複按累積），再按②灌入七天。已建檔的店家不會重複分析，所以②會很快。三餐會按店家營業時段挑，早餐不會排到只做晚餐的店。拿不到真實菜單時會直接說明原因，不會用模擬資料充數。
         </Text>
       </SectionBlock>
 

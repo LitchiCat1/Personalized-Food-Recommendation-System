@@ -566,6 +566,19 @@ class StorageRepository:
             return self.db.restaurant_menus.count_documents({})
         return len(self.mem_restaurant_menus)
 
+    def clear_restaurant_menus(self) -> int:
+        """清空菜單快取。建檔邏輯改過之後（例如開始過濾歇業店家），
+        舊資料是用舊規則建的，要重建才拿得到乾淨的結果。"""
+        removed = self.count_restaurant_menus()
+        if self.use_menu_postgres:
+            with self.menu_pg_conn.cursor() as cursor:
+                cursor.execute("DELETE FROM restaurant_menus")
+        elif self.use_mongo:
+            self.db.restaurant_menus.delete_many({})
+        else:
+            self.mem_restaurant_menus.clear()
+        return removed
+
     def save_restaurant_menu(self, name: str, items: list, venue: dict | None = None) -> None:
         venue = venue or {}
         place_id = venue.get("google_place_id") or ""

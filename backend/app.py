@@ -578,6 +578,14 @@ def index_nearby_restaurants(user_id):
     return jsonify({"message": f"已建檔 {summary['analysed']} 家店", **summary})
 
 
+@app.route("/restaurants/index/<user_id>", methods=["DELETE"])
+def clear_nearby_restaurant_index(user_id):
+    """清空店家菜單快取，讓建檔可以用目前的規則重來一次。"""
+    require_user_access(user_id)
+    removed = storage.clear_restaurant_menus()
+    return jsonify({"message": f"已清除 {removed} 家店的菜單檔案", "removed": removed})
+
+
 @app.route("/seed/week-records/<user_id>", methods=["POST"])
 def create_week_seed_records(user_id):
     require_user_access(user_id)

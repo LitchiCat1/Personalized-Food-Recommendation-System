@@ -80,6 +80,8 @@ def _dish_from_item(item: dict, restaurant: dict) -> dict:
         "item_id": item.get("item_id", item.get("name")),
         "price": item.get("price", 0),
         "is_fried": item.get("is_fried") is True,
+        # 灌入七天要按用餐時段挑店，所以菜色要記得自己來自哪個營業時段
+        "opening_periods": restaurant.get("opening_periods") or [],
         **normalize_nutrition_fields(item),
     }
     return dish
@@ -221,7 +223,47 @@ def score_day(dishes: list, combo, targets: dict, goal_types: dict) -> tuple[int
     return passed, shortfall
 
 
-def _best_addition(dishes: list, combo: list, targets: dict, goal_types: dict, order=None):
+def _venue_open_at(periods: list, weekday: int, minute: int):
+    """店家在某天某個時刻有沒有開。沒有營業時段資料時回 None（不知道）。
+
+    不知道就不能當成沒開——那會把大半店家排除掉；也不能當成有開，
+    那就回到「假裝所有店都開著」的老問題。交給呼叫端決定怎麼處理。
+    """
+    if not periods:
+        return None
+    for period in periods:
+        if int(period.get("day", -1)) != weekday:
+            continue
+        start = int(period.get("open_minute", 0))
+        end = int(period.get("close_minute", 24 * 60))
+        if end <= start:  # 跨午夜，例如 18:00~02:00
+            if minute >= start or minute < end:
+                return True
+        elif start <= minute < end:
+            return True
+    return False
+
+
+def _meal_eligibility(dishes: list, weekday: int) -> list[list[int]]:
+    """每一餐可以選哪些菜——店家在那個時段有開才算數。
+
+    營業時間不明的店留在每一餐的候選裡，否則資料一缺就整份計畫排不出來。
+    """
+    eligibility = []
+    for meal_type in MEAL_ORDER:
+        hour, minute = MEAL_HOURS[meal_type]
+        at_minute = hour * 60 + minute
+        allowed = [
+            index
+            for index, dish in enumerate(dishes)
+            if _venue_open_at(dish.get("opening_periods") or [], weekday, at_minute) is not False
+        ]
+        # 那個時段一家店都沒開就不設限，至少排得出東西，不會整週開天窗
+        eligibility.append(allowed or list(range(len(dishes))))
+    return eligibility
+
+
+def _best_addition(dishes: list, combo: list, targets: dict, goal_types: dict, order=None, allowed=None):
     """挑一道加進來後最有幫助、且不會撐破任何上限的菜。
 
     `order` 決定同分時先看哪一道。每天給不同的順序，營養值相同的菜色
@@ -229,7 +271,10 @@ def _best_addition(dishes: list, combo: list, targets: dict, goal_types: dict, o
     """
     passed, shortfall = score_day(dishes, combo, targets, goal_types)
     best = None
+    allowed_set = None if allowed is None else set(allowed)
     for index in (order if order is not None else range(len(dishes))):
+        if allowed_set is not None and index not in allowed_set:
+            continue
         candidate = combo + [index]
         totals = day_totals(dishes, candidate)
         if any(
@@ -246,62 +291,87 @@ def _best_addition(dishes: list, combo: list, targets: dict, goal_types: dict, o
     return best[1] if best else None
 
 
-def _least_harmful_addition(dishes: list, combo: list, targets: dict, goal_types: dict) -> int:
+def _least_harmful_addition(dishes: list, combo: list, targets: dict, goal_types: dict, allowed=None) -> int:
     """一定要再加一道時，挑破壞最小的那道。"""
     return min(
-        range(len(dishes)),
+        allowed if allowed else range(len(dishes)),
         key=lambda index: score_day(dishes, combo + [index], targets, goal_types)[1],
     )
 
 
-def _build_day(dishes: list, targets: dict, goal_types: dict, first_index: int, order=None) -> list:
-    """從一道菜開始，每次加最有幫助的一道，直到全部達標或加不動。
+def _build_day(dishes: list, targets: dict, goal_types: dict, first_index: int, eligibility: list, order=None) -> list[list[int]]:
+    """逐餐挑菜，每餐只從那個時段有開的店裡選，並讓整天加總逼近每日目標。
 
-    不先固定「三道主餐」再補配菜——那樣熱量與鈉會先被主餐吃光，
-    之後任何青菜都會撐破上限，纖維永遠補不起來。
+    先前是「先湊出最佳的一天，再隨機分成三餐」，所以早上八點會排到炸雞。
+    現在改成一餐一餐長：先讓每餐都有東西吃，再把剩下的額度加在幫助最大的
+    那一餐上。挑的時候仍以整天加總計分，不是各餐各自最佳化——疾病目標
+    本來就是一整天的。
     """
     meals = len(MEAL_ORDER)
-    combo = [first_index]
-    while len(combo) < MAX_DISHES_PER_DAY:
-        if len(combo) >= meals and score_day(dishes, combo, targets, goal_types)[0] == len(NUTRITION_FIELDS):
-            break
-        addition = _best_addition(dishes, combo, targets, goal_types, order)
+    plate = [[] for _ in range(meals)]
+
+    # 起始那道放進它吃得到的最早一餐，讓每天有不同的起點
+    first_meal = next((index for index in range(meals) if first_index in eligibility[index]), None)
+    if first_meal is None:
+        first_meal = 0
+        first_index = eligibility[0][0]
+    plate[first_meal].append(first_index)
+
+    def flat():
+        return [index for meal in plate for index in meal]
+
+    # 每一餐都要有東西吃
+    for meal_index in range(meals):
+        if plate[meal_index]:
+            continue
+        addition = _best_addition(dishes, flat(), targets, goal_types, order, eligibility[meal_index])
         if addition is None:
-            # 三餐都要有東西吃，湊不滿時只能挑破壞最小的，
-            # 而且要真的加進 combo 才會被計分（先前是在分餐時複製，等於沒算到）
-            if len(combo) < meals:
-                combo.append(_least_harmful_addition(dishes, combo, targets, goal_types))
+            addition = _least_harmful_addition(dishes, flat(), targets, goal_types, eligibility[meal_index])
+        plate[meal_index].append(addition)
+
+    # 還有額度就補在最有幫助的那一餐
+    while len(flat()) < MAX_DISHES_PER_DAY:
+        if score_day(dishes, flat(), targets, goal_types)[0] == len(NUTRITION_FIELDS):
+            break
+        best = None
+        for meal_index in range(meals):
+            if len(plate[meal_index]) >= MAX_DISHES_PER_MEAL:
                 continue
+            addition = _best_addition(dishes, flat(), targets, goal_types, order, eligibility[meal_index])
+            if addition is None:
+                continue
+            score = score_day(dishes, flat() + [addition], targets, goal_types)
+            if best is None or (score[0], -score[1]) > (best[0][0], -best[0][1]):
+                best = (score, meal_index, addition)
+        if best is None:
             break
-        combo.append(addition)
-    return combo
+        plate[best[1]].append(best[2])
 
-
-def _split_into_meals(combo: list, rng: random.Random) -> list[list[int]]:
-    """把一天的菜色分到三餐，每餐至少一道，且不超過 MAX_DISHES_PER_MEAL。"""
-    meals = len(MEAL_ORDER)
-    shuffled = list(combo)
-    rng.shuffle(shuffled)
-    plate = [[shuffled[index]] for index in range(min(meals, len(shuffled)))]
-    while len(plate) < meals:  # _build_day 保證至少三道，這裡只是保險
-        plate.append([shuffled[-1]])
-    for index in shuffled[meals:]:
-        target_meal = min(plate, key=len)
-        if len(target_meal) >= MAX_DISHES_PER_MEAL:
-            break
-        target_meal.append(index)
     return plate
 
 
-def _vary_day(combo: list, rotation, seen: set):
-    """把一天的其中一道換掉，換出一組還沒用過的組合。"""
-    for position in range(len(combo)):
-        for replacement in rotation:
-            candidate = combo[:position] + [replacement] + combo[position + 1:]
-            key = tuple(sorted(candidate))
-            if key not in seen:
-                return candidate, key
-    return combo, None
+def _vary_day(plate: list, rotation, seen: set, eligibility: list):
+    """把其中一道換掉，換出一組還沒排過的一天。
+
+    換進來的菜必須也是那一餐吃得到的，否則變化會把時段限制破壞掉。
+    """
+    for meal_index, meal in enumerate(plate):
+        allowed = set(eligibility[meal_index])
+        for position in range(len(meal)):
+            for replacement in rotation:
+                if replacement not in allowed or replacement in meal:
+                    continue
+                candidate = [list(entry) for entry in plate]
+                candidate[meal_index][position] = replacement
+                key = _plate_key(candidate)
+                if key not in seen:
+                    return candidate, key
+    return plate, None
+
+
+def _plate_key(plate: list) -> tuple:
+    """一天的識別：哪一餐吃哪些菜。同樣的菜換餐吃算不同的一天。"""
+    return tuple(tuple(sorted(meal)) for meal in plate)
 
 
 def index_nearby_venues(
@@ -367,6 +437,7 @@ def index_nearby_venues(
                 # 存下來才查得出這筆快取是什麼時候、什麼狀態下建的
                 "business_status": place.get("business_status", ""),
                 "is_open_at_index_time": place.get("is_open"),
+                "opening_periods": place.get("opening_periods") or [],
             },
         )
         analysed += 1
@@ -381,11 +452,21 @@ def index_nearby_venues(
     }
 
 
-def plan_daily_dishes(dishes: list, days: int, seed: str, targets: dict, goal_types: dict) -> list[list[list[int]]]:
+def plan_daily_dishes(
+    dishes: list,
+    days: int,
+    seed: str,
+    targets: dict,
+    goal_types: dict,
+    weekdays: list | None = None,
+) -> list[list[list[int]]]:
     """排出每天三餐吃哪些菜，優先讓整天加總符合疾病別的每日目標。
 
     回傳 [天][餐] = 該餐的菜色索引清單。一餐可以配多道
     （例如主餐 + 一份青菜），否則蛋白質與纖維的下限幾乎不可能達成。
+
+    `weekdays` 是每一天的星期別（0=週日，對齊 Google Places），用來判斷
+    那天那個時段哪些店有開；沒給就當成營業時間未知，不做時段限制。
     """
     rng = random.Random(seed)
     dish_count = len(dishes)
@@ -401,23 +482,30 @@ def plan_daily_dishes(dishes: list, days: int, seed: str, targets: dict, goal_ty
     for offset in range(dish_count * 2):
         if len(plan) == days:
             break
+        day_index = len(plan)
+        weekday = weekdays[day_index] if weekdays and day_index < len(weekdays) else None
+        eligibility = (
+            _meal_eligibility(dishes, weekday)
+            if weekday is not None
+            else [list(range(dish_count)) for _ in MEAL_ORDER]
+        )
         start = starts[offset % dish_count]
         # 每天用不同的候選順序，營養一樣的菜色才不會七天長成同一組
         rotation = starts[offset % dish_count:] + starts[:offset % dish_count]
-        combo = _build_day(dishes, targets, goal_types, start, rotation)
-        key = tuple(sorted(combo))
+        plate = _build_day(dishes, targets, goal_types, start, eligibility, rotation)
+        key = _plate_key(plate)
         if key in seen:
             # 菜色營養一樣時貪婪法會收斂成同一組，換掉其中一道湊出不同的一天
-            combo, key = _vary_day(combo, rotation, seen)
+            plate, key = _vary_day(plate, rotation, seen, eligibility)
             if key is None:
                 continue
         seen.add(key)
-        plan.append(combo)
+        plan.append(plate)
 
     while len(plan) < days:  # 菜色太少時只能重複
-        plan.append(list(plan[len(plan) % max(len(plan), 1)]) if plan else [0])
+        plan.append([list(meal) for meal in plan[len(plan) % max(len(plan), 1)]] if plan else [[0] for _ in MEAL_ORDER])
 
-    return [_split_into_meals(combo, rng) for combo in plan[:days]]
+    return plan[:days]
 
 
 def build_week_records(user_id: str, dishes: list, days: int, source: str, end_date, user: dict) -> list[dict]:
@@ -426,9 +514,14 @@ def build_week_records(user_id: str, dishes: list, days: int, source: str, end_d
     targets = calculate_pdf_daily_targets(user)
     goal_types = build_nutrition_goal_types(user)
     records = []
-    plan = plan_daily_dishes(dishes, days, f"{user_id}:{source}:{end_date.isoformat()}", targets, goal_types)
+    day_dates = [end_date - timedelta(days=days - 1 - index) for index in range(days)]
+    # Google Places 的 day 是 0=週日，Python 的 isoweekday 是 1=週一…7=週日
+    weekdays = [day.isoweekday() % 7 for day in day_dates]
+    plan = plan_daily_dishes(
+        dishes, days, f"{user_id}:{source}:{end_date.isoformat()}", targets, goal_types, weekdays
+    )
     for day_index, meal_plan in enumerate(plan):
-        day = end_date - timedelta(days=days - 1 - day_index)
+        day = day_dates[day_index]
         for meal_index, dish_indexes in enumerate(meal_plan):
             meal_type = MEAL_ORDER[meal_index]
             hour, minute = MEAL_HOURS[meal_type]

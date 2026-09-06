@@ -31,6 +31,7 @@ from services.nutrition_label_service import (
     get_gemini_api_keys,
     normalize_nutrition_payload,
     normalize_ocr_result,
+    probe_gemini_models,
     scale_nutrition_per_100g,
 )
 from services.nutrition_progress_service import build_daily_nutrition_progress, calculate_pdf_daily_targets, round_targets_for_display
@@ -576,6 +577,15 @@ def index_nearby_restaurants(user_id):
     except SeedDataUnavailable as error:
         return jsonify({"error": str(error)}), 409
     return jsonify({"message": f"已建檔 {summary['analysed']} 家店", **summary})
+
+
+@app.route("/health/gemini", methods=["GET"])
+def gemini_model_diagnostics():
+    """每把金鑰實際能用哪些模型。設定的清單對不上權限時只會看到一堆 404。"""
+    try:
+        return jsonify(probe_gemini_models())
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 503
 
 
 @app.route("/restaurants/index/<user_id>", methods=["DELETE"])

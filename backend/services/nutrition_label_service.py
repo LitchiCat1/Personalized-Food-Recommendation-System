@@ -172,6 +172,53 @@ def get_gemini_api_keys(explicit_key: str | None = None) -> list[str]:
     return keys
 
 
+def probe_gemini_models(timeout: float = 10.0) -> dict:
+    """問 Google 每一把金鑰實際能用哪些模型。
+
+    設定裡的模型清單跟金鑰的實際權限對不上時，只會看到一連串 404，
+    分不出是模型名寫錯還是金鑰沒開通。這裡直接查，不用猜。
+    金鑰只回前 8 碼，不會把完整值吐出來。
+    """
+    configured = get_gemini_models()
+    report = []
+    usable_everywhere = None
+    for key in get_gemini_api_keys():
+        entry = {"key": f"{key[:8]}...", "available": [], "error": None}
+        try:
+            res = requests.get(
+                "https://generativelanguage.googleapis.com/v1beta/models",
+                params={"key": key},
+                timeout=timeout,
+            )
+            if res.status_code != 200:
+                entry["error"] = f"HTTP {res.status_code}"
+            else:
+                names = [
+                    model.get("name", "").removeprefix("models/")
+                    for model in res.json().get("models", [])
+                    if "generateContent" in (model.get("supportedGenerationMethods") or [])
+                ]
+                entry["available"] = sorted(name for name in names if name)
+        except Exception as error:
+            entry["error"] = str(error)
+        if entry["available"]:
+            found = set(entry["available"])
+            usable_everywhere = found if usable_everywhere is None else (usable_everywhere & found)
+        entry["configured_and_usable"] = [m for m in configured if m in set(entry["available"])]
+        report.append(entry)
+
+    return {
+        "configured_models": configured,
+        "keys": report,
+        # 設定清單裡沒有任何一把金鑰能用的模型 = 白白浪費重試時間
+        "configured_but_unusable": [
+            model for model in configured
+            if not any(model in set(entry["available"]) for entry in report if entry["available"])
+        ],
+        "usable_by_every_key": sorted(usable_everywhere or []),
+    }
+
+
 def get_gemini_models() -> list[str]:
     raw_models = [os.environ.get("GEMINI_MODELS"), os.environ.get("GEMINI_MODEL")]
     models: list[str] = []

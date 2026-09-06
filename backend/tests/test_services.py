@@ -574,3 +574,40 @@ class ServiceSmokeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NutritionZeroFallbackTests(unittest.TestCase):
+    """模型留白的欄位不能當成 0 用——那是上限類目標的假達標。"""
+
+    def test_zero_saturated_fat_is_estimated_from_the_fat_it_must_be_part_of(self):
+        from services.robust_restaurant_scraper_service import validate_and_balance_nutrition
+
+        item = validate_and_balance_nutrition(
+            {"name": "炸雞腿便當", "calories": 800, "protein": 35, "carbs": 80, "fat": 35,
+             "saturated_fat": 0, "sugar": 0, "fiber": 0, "sodium": 900}
+        )
+        self.assertGreater(item["saturated_fat"], 0)
+        self.assertLessEqual(item["saturated_fat"], item["fat"])
+        self.assertGreater(item["sugar"], 0)
+        self.assertLessEqual(item["sugar"], item["carbs"])
+
+    def test_a_reported_value_is_left_alone(self):
+        from services.robust_restaurant_scraper_service import validate_and_balance_nutrition
+
+        item = validate_and_balance_nutrition(
+            {"name": "雞腿便當", "calories": 800, "protein": 35, "carbs": 80, "fat": 35,
+             "saturated_fat": 6.5, "sugar": 3.0, "fiber": 4.0, "sodium": 900}
+        )
+        self.assertEqual(item["saturated_fat"], 6.5)
+        self.assertEqual(item["sugar"], 3.0)
+
+    def test_sweet_drinks_get_a_much_higher_sugar_estimate_than_a_rice_box(self):
+        from services.robust_restaurant_scraper_service import validate_and_balance_nutrition
+
+        drink = validate_and_balance_nutrition(
+            {"name": "珍珠奶茶", "calories": 400, "protein": 4, "carbs": 70, "fat": 10, "sugar": 0}
+        )
+        rice_box = validate_and_balance_nutrition(
+            {"name": "雞腿便當", "calories": 800, "protein": 35, "carbs": 80, "fat": 35, "sugar": 0}
+        )
+        self.assertGreater(drink["sugar"], rice_box["sugar"])

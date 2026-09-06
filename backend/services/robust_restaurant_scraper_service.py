@@ -192,6 +192,20 @@ def validate_and_balance_nutrition(item: dict) -> dict:
         else:
             fiber = 0.5
 
+    # 模型常把飽和脂肪與糖留白或填 0。纖維早就有這層推估，這兩項更需要：
+    # 它們是「上限」類目標，假的 0 會直接變成假的達標，比缺值還危險。
+    if saturated_fat == 0 and fat > 0:
+        is_fried_name = any(k in name for k in ["炸", "脆", "酥", "排骨", "雞腿", "培根", "香腸"])
+        saturated_fat = round(fat * (0.35 if is_fried_name else 0.25), 1)
+
+    if sugar == 0 and carbs > 0:
+        if any(k in name for k in ["奶茶", "紅茶", "綠茶", "可樂", "汽水", "果汁", "冰沙", "蛋糕", "甜", "布丁", "拿鐵"]):
+            sugar = round(carbs * 0.6, 1)
+        elif any(k in name for k in ["糖醋", "照燒", "蜜汁", "滷", "醬燒", "三杯"]):
+            sugar = round(carbs * 0.15, 1)
+        else:
+            sugar = round(carbs * 0.05, 1)
+
     item["calories"] = round(calories)
     item["protein"] = round(protein, 1)
     item["carbs"] = round(carbs, 1)

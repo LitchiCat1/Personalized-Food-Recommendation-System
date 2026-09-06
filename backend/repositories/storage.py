@@ -16,6 +16,7 @@ class StorageRepository:
         self.mem_users = mem_users
         self.mem_records = mem_records
         self.mem_custom_foods = mem_custom_foods
+        self.mem_restaurant_menus: dict = {}
         if self.use_postgres:
             self._init_postgres_tables()
 
@@ -92,6 +93,16 @@ class StorageRepository:
             cursor.execute("ALTER TABLE custom_foods DROP CONSTRAINT IF EXISTS custom_foods_pkey;")
             cursor.execute("ALTER TABLE custom_foods ALTER COLUMN owner_key SET NOT NULL;")
             cursor.execute("ALTER TABLE custom_foods ADD PRIMARY KEY (owner_key);")
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS restaurant_menus (
+                    venue_key TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    doc JSONB NOT NULL,
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                );
+                """
+            )
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_records_user_timestamp ON records (user_id, timestamp DESC);")
             cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_records_user_client_record ON records (user_id, client_record_id);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_custom_foods_user_id ON custom_foods (user_id);")
@@ -474,6 +485,48 @@ class StorageRepository:
     def _custom_food_owner_key(self, user_id: str | None, food_id: str) -> str:
         normalized_user_id = user_id or "demo_user"
         return f"{normalized_user_id}:{food_id}"
+
+    # ─── 店家菜單快取 ────────────────────────────────────────
+    # Gemini 分析一家店要 20~30 秒，Render 的檔案系統又是暫存的
+    # （寫回 restaurant_catalog.json 重啟就沒了），所以存進資料庫。
+    @staticmethod
+    def venue_cache_key(name: str) -> str:
+        return str(name or "").strip().lower()
+
+    def get_restaurant_menu(self, name: str):
+        key = self.venue_cache_key(name)
+        if not key:
+            return None
+        if self.use_postgres:
+            with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("SELECT doc FROM restaurant_menus WHERE venue_key = %s LIMIT 1", (key,))
+                row = cursor.fetchone()
+            return row["doc"] if row else None
+        if self.use_mongo:
+            return self.db.restaurant_menus.find_one({"venue_key": key}, {"_id": 0})
+        return self.mem_restaurant_menus.get(key)
+
+    def save_restaurant_menu(self, name: str, items: list) -> None:
+        key = self.venue_cache_key(name)
+        if not key or not items:
+            return
+        doc = {"venue_key": key, "name": name, "items": items}
+        if self.use_postgres:
+            with self.pg_conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO restaurant_menus (venue_key, name, doc, updated_at)
+                    VALUES (%s, %s, %s, NOW())
+                    ON CONFLICT (venue_key)
+                    DO UPDATE SET name = EXCLUDED.name, doc = EXCLUDED.doc, updated_at = NOW()
+                    """,
+                    (key, name, Json(doc)),
+                )
+            return
+        if self.use_mongo:
+            self.db.restaurant_menus.update_one({"venue_key": key}, {"$set": doc}, upsert=True)
+            return
+        self.mem_restaurant_menus[key] = doc
 
     def get_custom_food(self, food_id: str, user_id: str | None = None):
         if not user_id:

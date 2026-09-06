@@ -293,6 +293,40 @@ class ApiRouteTests(unittest.TestCase):
             )
         self.assertEqual(cleared.get_json()["removed"], 21)
 
+    def test_week_seed_caches_analysed_menus_so_the_second_run_skips_gemini(self):
+        """Gemini 分析一家店要 20~30 秒，同一家店不該每次都重算。"""
+        calls = []
+
+        def counting_menu(name, address, text, deadline=None):
+            calls.append(name)
+            return self._seed_menu(name, address, text, deadline)
+
+        with self.mock_auth("user-a"):
+            self.client.post(
+                "/user",
+                json={"user_id": "user-a", "name": "Seed User", "height": 170, "weight": 65, "age": 25},
+                headers=self.auth_headers(),
+            )
+            for _ in range(2):
+                with patch.object(
+                    self.app_module, "fetch_google_places_restaurants",
+                    lambda *a, **k: self._seed_places(["快取店家 A", "快取店家 B"]),
+                ), patch.object(self.app_module, "enrich_restaurant_with_gemini", counting_menu):
+                    self.client.delete(
+                        "/seed/week-records/user-a?source=recommend&days=7", headers=self.auth_headers()
+                    )
+                    response = self.client.post(
+                        "/seed/week-records/user-a",
+                        json={"source": "recommend", "days": 7},
+                        headers=self.auth_headers(),
+                    )
+                    self.assertEqual(response.status_code, 201)
+
+        self.assertEqual(
+            sorted(set(calls)), ["快取店家 A", "快取店家 B"], "應該只分析過這兩家店"
+        )
+        self.assertEqual(len(calls), 2, f"第二次應該吃快取，實際又分析了：{calls}")
+
     def test_week_seed_route_reports_why_instead_of_seeding_fake_data(self):
         """拿不到真實菜單時要明講原因，不能改用本地模擬目錄充數。"""
         with self.mock_auth("user-a"):

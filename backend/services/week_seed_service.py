@@ -101,6 +101,7 @@ def collect_recommendation_dishes(
     allergen_taxonomy: dict,
     fetch_places,
     enrich_restaurant,
+    storage=None,
 ) -> tuple[list[dict], str, str]:
     """回傳 (菜色, data_source, 說明)。"""
     budget = int(params.get("budget", 150))
@@ -142,17 +143,21 @@ def collect_recommendation_dishes(
     dishes = []
     resolved_restaurants = 0
     enrich_failures = 0
+    cache_hits = 0
 
-    # 第一輪只用本地已知菜單，不打任何外部 API
+    # 第一輪不打任何外部 API：先用資料庫裡分析過的菜單，再用目錄裡的
     unknown_places = []
     for place in places:
         name = str(place.get("name", "")).strip()
         if not name:
             continue
-        known = catalog_by_name.get(name.lower())
+        cached = storage.get_restaurant_menu(name) if storage else None
+        known = cached or catalog_by_name.get(name.lower())
         if known and known.get("items"):
-            if add_dishes(known, known["items"]):
+            if add_dishes({**known, "name": name}, known["items"]):
                 resolved_restaurants += 1
+                if cached:
+                    cache_hits += 1
         else:
             unknown_places.append((name, place))
 
@@ -177,6 +182,9 @@ def collect_recommendation_dishes(
         items = enriched.get("items", []) or []
         if not items:
             continue
+        if storage:
+            # 存起來，下一次同一家店就不用再等 Gemini
+            storage.save_restaurant_menu(name, items)
         restaurant = {
             "restaurant_id": place.get("restaurant_id", f"places_{name}"),
             "name": name,
@@ -194,10 +202,10 @@ def collect_recommendation_dishes(
             f"也可能是所有餐點都超過 {budget} 元或被健康條件擋掉。請稍後再試或調高預算。"
         )
 
-    note = (
-        f"分析了 {enrich_calls} 家沒有現成菜單的店家，"
-        f"共 {resolved_restaurants} 家有可用餐點（營養由 Gemini 估算）。"
-    )
+    note = f"共 {resolved_restaurants} 家店有可用餐點"
+    if cache_hits:
+        note += f"（其中 {cache_hits} 家直接用之前分析過的菜單快取）"
+    note += f"，這次向 Gemini 分析了 {enrich_calls} 家。"
     if enrich_failures:
         note += f" 另有 {enrich_failures} 家分析失敗略過。"
     return dishes, "google_places", note
@@ -416,6 +424,7 @@ def seed_week_records(
         allergen_taxonomy,
         fetch_places,
         enrich_restaurant,
+        storage,
     )
 
     records = build_week_records(user_id, dishes, days, source, end_date, user)

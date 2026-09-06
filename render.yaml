@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: personalized-food-recommendation-frontend
+    name: nutrilens-frontend
     runtime: static
     repo: https://github.com/LitchiCat1/Personalized-Food-Recommendation-System
     rootDir: frontend
@@ -15,28 +15,28 @@ services:
       - key: EXPO_PUBLIC_API_BASE_URL
         fromService:
           type: web
-          name: personalized-food-recommendation-backend
+          name: nutrilens-backend
           envVarKey: RENDER_EXTERNAL_HOSTNAME
       - key: EXPO_PUBLIC_SUPABASE_URL
         fromService:
           type: web
-          name: personalized-food-recommendation-backend
+          name: nutrilens-backend
           envVarKey: SUPABASE_URL
       - key: EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
         fromService:
           type: web
-          name: personalized-food-recommendation-backend
+          name: nutrilens-backend
           envVarKey: SUPABASE_PUBLISHABLE_KEY
       - key: EXPO_PUBLIC_SUPABASE_AUTH_REQUIRED
         value: "true"
       - key: GOOGLE_PLACES_API_KEY
         fromService:
           type: web
-          name: personalized-food-recommendation-backend
+          name: nutrilens-backend
           envVarKey: GOOGLE_PLACES_API_KEY
 
   - type: web
-    name: personalized-food-recommendation-backend
+    name: nutrilens-backend
     runtime: python
     repo: https://github.com/LitchiCat1/Personalized-Food-Recommendation-System
     plan: free

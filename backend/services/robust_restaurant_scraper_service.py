@@ -216,36 +216,10 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
         return {"items": fallback_items}
     
     prompt = f"""
-    你是一位台灣經驗豐富的臨床膳食評估師與營養師。
-    請根據這家台灣餐廳的名稱與描述，產生該餐廳最經典常見的 3~4 道餐點，並為每道餐點精準估算 11 項營養指標（需符合 1g蛋白質=4kcal, 1g碳水=4kcal, 1g脂肪=9kcal 熱量平衡公式）：
-
-    餐廳名稱：{restaurant_name}
-    餐廳地址：{address}
-    網頁文字參考：{scraped_text[:500]}
-
-    請輸出合法 JSON 格式（不要包含任何 markdown codeblock 或文字說明）：
-    {{
-      "items": [
-        {{
-          "item_id": "m_001",
-          "name": "餐點名稱",
-          "price": 120,
-          "calories": 480,
-          "protein": 32.0,
-          "carbs": 45.0,
-          "fat": 14.0,
-          "sugar": 2.0,
-          "saturated_fat": 3.5,
-          "trans_fat": 0.0,
-          "fiber": 3.0,
-          "sodium": 420,
-          "is_fried": false,
-          "gi": "low",
-          "allergens": [],
-          "tags": ["高蛋白", "低GI"]
-        }}
-      ]
-    }}
+    台灣餐廳「{restaurant_name}」（{address}）最常見的 3 道餐點，估算營養。
+    只輸出 JSON，不要 markdown、不要說明。數值概略即可，後端會校正熱量一致性。
+    只需要這幾個欄位，其餘不要輸出：
+    {{"items":[{{"name":"餐點名稱","price":120,"calories":480,"protein":32,"carbs":45,"fat":14,"fiber":3,"sodium":420,"is_fried":false}}]}}
     """
     # 全 repo 其他 Gemini 呼叫都用 get_gemini_models()（可由 GEMINI_MODELS 覆寫）。
     # 這裡原本寫死 2.5-flash / 2.5-pro，金鑰沒有這兩個模型權限時整串 404，
@@ -261,6 +235,7 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
 
     candidate_models = sorted(get_gemini_models(), key=_speed_rank)
     unavailable_models = set()
+    timed_out_models = set()
     for gemini_key in keys:
         for model_name in candidate_models:
             # 模型不存在或太慢都是模型層級的事，換一把金鑰重試同一個模型只是浪費時間
@@ -274,7 +249,8 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
                 payload = {
                     "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {"response_mime_type": "application/json"}
+                    # 輸出封頂，模型才不會慢慢寫到逾時
+                    "generationConfig": {"response_mime_type": "application/json", "maxOutputTokens": 900},
                 }
                 res = requests.post(url, json=payload, timeout=MENU_GENERATION_TIMEOUT_SECONDS)
                 if res.status_code == 200:
@@ -291,14 +267,18 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
             except requests.Timeout:
                 # 逾時代表這個模型在預算內生不完，別再拿其他金鑰重試同一個
                 unavailable_models.add(model_name)
+                timed_out_models.add(model_name)
                 print(f"[!] Gemini Model {model_name} 逾時 {MENU_GENERATION_TIMEOUT_SECONDS}s，跳過這個模型")
             except Exception as e:
                 print(f"[!] Gemini Model {model_name} error: {e}")
         if len(unavailable_models) >= len(candidate_models):
             break
 
-    if len(unavailable_models) == len(candidate_models):
-        print(f"[!] 所有模型都回 404：{sorted(unavailable_models)}。請用 GEMINI_MODELS 指定金鑰有權限的模型。")
+    if timed_out_models:
+        print(f"[!] 這些模型在 {MENU_GENERATION_TIMEOUT_SECONDS}s 內生不完：{sorted(timed_out_models)}")
+    not_found = unavailable_models - timed_out_models
+    if not_found:
+        print(f"[!] 這些模型金鑰沒有權限（404）：{sorted(not_found)}。可用 GEMINI_MODELS 指定其他模型。")
     fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
     return {"items": fallback_items}
 

@@ -49,6 +49,9 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      # 店家菜單快取要放另一個 Supabase 時才填；留空就跟 DATABASE_URL 同一個
+      - key: MENU_DATABASE_URL
+        sync: false
       - key: FLASK_DEBUG
         value: "false"
       - key: SUPABASE_AUTH_REQUIRED

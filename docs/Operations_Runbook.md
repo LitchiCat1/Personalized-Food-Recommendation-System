@@ -161,6 +161,8 @@ APP_UTC_OFFSET_HOURS=8
 
 `RESTAURANT_CATALOG_PATH` 可省略；未設定時後端會使用 `backend/data/restaurant_catalog.json`。若要測試替代餐廳資料源，請指定 JSON 檔路徑，不要把 API token 或私有商家資料寫入 repo。
 
+`MENU_DATABASE_URL` 可省略；未設定時店家菜單快取（`restaurant_menus`）會跟使用者資料放在 `DATABASE_URL` 的同一個資料庫。菜單快取是全體共用、不屬於任何使用者的資料，想避免它佔用主資料庫容量時，可以另開一個 Supabase 專案，把它的連線字串填進這個變數。連線失敗會自動退回主資料庫並在啟動日誌標明。`/health` 的 `menu_cache_database` 會顯示 `separate`／`shared`／`memory`，`cached_restaurant_menus` 顯示已建檔家數。
+
 `APP_UTC_OFFSET_HOURS` 可省略；未設定時預設 8（台灣 UTC+8，無日光節約時間）。伺服器（Render）跑在 UTC，但飲食紀錄的 timestamp、店家 `open_hours` 都是本地時間，因此「今天吃了多少」「店家現在有沒有開」一律以這個偏移量換算。換地區部署時改這個值即可，不需要 tz database。
 
 `DISEASE_RULES_PATH` 可省略；未設定時後端會使用 `backend/config/disease_rules.json`。替代規則檔必須包含 `rule_version`、`review_status`、`last_reviewed`、`reviewed_by`、`evidence_level`、`references` 與 `medical_disclaimer`，否則啟動時會失敗。

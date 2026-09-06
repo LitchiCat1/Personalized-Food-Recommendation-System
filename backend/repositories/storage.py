@@ -8,17 +8,23 @@ from services.nutrient_service import NUTRITION_FIELDS, get_nutrient_value, nutr
 
 
 class StorageRepository:
-    def __init__(self, db, use_mongo: bool, mem_users: dict, mem_records: list, mem_custom_foods: list, pg_conn=None):
+    def __init__(self, db, use_mongo: bool, mem_users: dict, mem_records: list, mem_custom_foods: list, pg_conn=None, menu_pg_conn=None):
         self.db = db
         self.use_mongo = use_mongo
         self.pg_conn = pg_conn
         self.use_postgres = pg_conn is not None
+        # 店家菜單是全體共用的快取，不屬於任何使用者，可以放另一個資料庫，
+        # 免得吃掉主資料庫的容量。沒設定就跟其他資料放一起。
+        self.menu_pg_conn = menu_pg_conn or pg_conn
+        self.use_menu_postgres = self.menu_pg_conn is not None
         self.mem_users = mem_users
         self.mem_records = mem_records
         self.mem_custom_foods = mem_custom_foods
         self.mem_restaurant_menus: dict = {}
         if self.use_postgres:
             self._init_postgres_tables()
+        if self.use_menu_postgres:
+            self._init_menu_tables()
 
     def _init_postgres_tables(self):
         with self.pg_conn.cursor() as cursor:
@@ -93,6 +99,13 @@ class StorageRepository:
             cursor.execute("ALTER TABLE custom_foods DROP CONSTRAINT IF EXISTS custom_foods_pkey;")
             cursor.execute("ALTER TABLE custom_foods ALTER COLUMN owner_key SET NOT NULL;")
             cursor.execute("ALTER TABLE custom_foods ADD PRIMARY KEY (owner_key);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_records_user_timestamp ON records (user_id, timestamp DESC);")
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_records_user_client_record ON records (user_id, client_record_id);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_custom_foods_user_id ON custom_foods (user_id);")
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_foods_owner_key ON custom_foods (owner_key);")
+
+    def _init_menu_tables(self):
+        with self.menu_pg_conn.cursor() as cursor:
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS restaurant_menus (
@@ -103,10 +116,6 @@ class StorageRepository:
                 );
                 """
             )
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_records_user_timestamp ON records (user_id, timestamp DESC);")
-            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_records_user_client_record ON records (user_id, client_record_id);")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_custom_foods_user_id ON custom_foods (user_id);")
-            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_foods_owner_key ON custom_foods (owner_key);")
 
     def _fetch_json_doc(self, table: str, key_field: str, key_value: str):
         with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -497,8 +506,8 @@ class StorageRepository:
         key = self.venue_cache_key(name)
         if not key:
             return None
-        if self.use_postgres:
-            with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
+        if self.use_menu_postgres:
+            with self.menu_pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("SELECT doc FROM restaurant_menus WHERE venue_key = %s LIMIT 1", (key,))
                 row = cursor.fetchone()
             return row["doc"] if row else None
@@ -507,8 +516,8 @@ class StorageRepository:
         return self.mem_restaurant_menus.get(key)
 
     def count_restaurant_menus(self) -> int:
-        if self.use_postgres:
-            with self.pg_conn.cursor() as cursor:
+        if self.use_menu_postgres:
+            with self.menu_pg_conn.cursor() as cursor:
                 cursor.execute("SELECT COUNT(*) FROM restaurant_menus")
                 return int(cursor.fetchone()[0])
         if self.use_mongo:
@@ -520,8 +529,8 @@ class StorageRepository:
         if not key or not items:
             return
         doc = {"venue_key": key, "name": name, "items": items, **(venue or {})}
-        if self.use_postgres:
-            with self.pg_conn.cursor() as cursor:
+        if self.use_menu_postgres:
+            with self.menu_pg_conn.cursor() as cursor:
                 cursor.execute(
                     """
                     INSERT INTO restaurant_menus (venue_key, name, doc, updated_at)

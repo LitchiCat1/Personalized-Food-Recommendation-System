@@ -83,7 +83,22 @@ except Exception:
 _mem_users = {}
 _mem_records = []
 _mem_custom_foods = []
-storage = StorageRepository(db, USE_MONGO, _mem_users, _mem_records, _mem_custom_foods, pg_conn=pg_conn)
+# 店家菜單快取可以放另一個 Supabase／Postgres；沒設定就跟其他資料同一個
+menu_pg_conn = None
+menu_database_url = os.environ.get("MENU_DATABASE_URL")
+if menu_database_url:
+    try:
+        menu_pg_conn = psycopg2.connect(menu_database_url, sslmode="require")
+        menu_pg_conn.autocommit = True
+        print("[OK] Menu cache PostgreSQL connected")
+    except Exception as e:
+        menu_pg_conn = None
+        print(f"[WARN] Menu cache PostgreSQL unavailable, falling back to main database - {e}")
+
+storage = StorageRepository(
+    db, USE_MONGO, _mem_users, _mem_records, _mem_custom_foods,
+    pg_conn=pg_conn, menu_pg_conn=menu_pg_conn,
+)
 
 app = Flask(__name__)
 CORS(app)
@@ -168,6 +183,8 @@ def health():
     return jsonify({
         "status": "ok",
         "postgres": pg_conn is not None,
+        "menu_cache_database": "separate" if menu_pg_conn is not None else ("shared" if pg_conn is not None else "memory"),
+        "cached_restaurant_menus": storage.count_restaurant_menus(),
         "mongo": USE_MONGO,
         "recognition_engine": "gemini-vision-db-lookup",
         "foods_in_db": len(NUTRITION_DB),

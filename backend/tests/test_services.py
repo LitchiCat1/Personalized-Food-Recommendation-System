@@ -820,3 +820,49 @@ class CalorieBandScoringTests(unittest.TestCase):
         over = score_day([self._dish(2400)], [0], self.TARGETS, goal_types)
         inside = score_day([self._dish(1500)], [0], self.TARGETS, goal_types)
         self.assertGreater(inside[0], over[0])
+
+
+class OpenNowRecommendationTests(unittest.TestCase):
+    """推薦是「現在要去吃」，所以現在沒開的店不該出現。"""
+
+    def _venue(self, name, is_open):
+        return {
+            "restaurant_id": f"google_{name}", "name": name, "lat": 25.03, "lng": 121.56,
+            "address": "台北", "distance_km": 0.4, "tags": ["Google Places"],
+            "price_level": 1, "is_open": is_open, "rating": 4.2, "user_ratings_total": 30,
+            "match_score": 60, "data_source": "google_places", "nutrition_available": False,
+            "recommended_items": [{
+                "restaurant_id": f"google_{name}", "restaurant_name": name,
+                "restaurant_lat": 25.03, "restaurant_lng": 121.56, "address": "台北",
+                "distance_km": 0.4, "tags": ["Google Places"],
+                "item_id": f"{name}_visit", "item_name": "到店後選擇符合預算的餐點",
+                "price": 100, "calories": 0, "protein": 0, "carbs": 0, "fat": 0,
+                "sodium": 0, "gi": None, "match_score": 60,
+                "nutrition_available": False, "reasons": [],
+            }],
+        }
+
+    def _build(self, venues):
+        storage = StorageRepository(None, False, {}, [], [])
+        storage.upsert_user({"user_id": "u1", "name": "U", "height": 170, "weight": 65, "age": 30})
+        with patch.object(healthy_food_service_module, "fetch_google_places_restaurants",
+                          return_value=venues):
+            return build_google_places_food_recommendations(storage, "u1", {"budget": 150})
+
+    def test_a_venue_that_is_closed_right_now_is_not_recommended(self):
+        result = self._build([self._venue("開著的店", True), self._venue("打烊的店", False)])
+        names = [r["name"] for r in result["restaurants"]]
+        self.assertIn("開著的店", names)
+        self.assertNotIn("打烊的店", names)
+
+    def test_the_user_is_told_how_many_were_dropped_for_being_closed(self):
+        """清單無故變短會像壞掉，要說明少了幾家。"""
+        result = self._build([self._venue("開著的店", True), self._venue("打烊的店", False)])
+        self.assertEqual(result["closed_now"], 1)
+        self.assertIn("1", result["opening_note"])
+
+    def test_unknown_opening_hours_are_still_recommended(self):
+        """不知道營業時間不等於沒開，全丟掉會讓清單常常空的。"""
+        result = self._build([self._venue("時間未知的店", None)])
+        self.assertEqual([r["name"] for r in result["restaurants"]], ["時間未知的店"])
+        self.assertIsNone(result["opening_note"])

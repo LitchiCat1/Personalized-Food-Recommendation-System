@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 
 from services.app_time_service import app_now, get_app_timezone
 from services.medical_risk_service import evaluate_medical_risk
+from services.google_places_service import venue_open_at
 from services.nutrient_service import NUTRITION_FIELDS, normalize_nutrition_fields
 from services.robust_restaurant_scraper_service import validate_and_balance_nutrition
 from services.nutrition_progress_service import build_nutrition_goal_types, calculate_pdf_daily_targets
@@ -237,27 +238,6 @@ def score_day(dishes: list, combo, targets: dict, goal_types: dict) -> tuple[int
     return passed, shortfall
 
 
-def _venue_open_at(periods: list, weekday: int, minute: int):
-    """店家在某天某個時刻有沒有開。沒有營業時段資料時回 None（不知道）。
-
-    不知道就不能當成沒開——那會把大半店家排除掉；也不能當成有開，
-    那就回到「假裝所有店都開著」的老問題。交給呼叫端決定怎麼處理。
-    """
-    if not periods:
-        return None
-    for period in periods:
-        if int(period.get("day", -1)) != weekday:
-            continue
-        start = int(period.get("open_minute", 0))
-        end = int(period.get("close_minute", 24 * 60))
-        if end <= start:  # 跨午夜，例如 18:00~02:00
-            if minute >= start or minute < end:
-                return True
-        elif start <= minute < end:
-            return True
-    return False
-
-
 def _meal_eligibility(dishes: list, weekday: int) -> list[list[int]]:
     """每一餐可以選哪些菜——店家在那個時段有開才算數。
 
@@ -270,7 +250,7 @@ def _meal_eligibility(dishes: list, weekday: int) -> list[list[int]]:
         allowed = [
             index
             for index, dish in enumerate(dishes)
-            if _venue_open_at(dish.get("opening_periods") or [], weekday, at_minute) is not False
+            if venue_open_at(dish.get("opening_periods") or [], weekday, at_minute) is not False
         ]
         # 那個時段一家店都沒開就不設限，至少排得出東西，不會整週開天窗
         eligibility.append(allowed or list(range(len(dishes))))

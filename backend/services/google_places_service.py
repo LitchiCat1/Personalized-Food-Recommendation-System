@@ -7,6 +7,8 @@ from urllib.parse import urlparse
 
 import requests
 
+from services.app_time_service import app_now
+
 
 GOOGLE_PLACES_NEARBY_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
 GOOGLE_PLACES_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
@@ -192,6 +194,38 @@ def _opening_periods(place: dict) -> list[dict]:
     return periods
 
 
+def venue_open_at(periods: list, weekday: int, minute: int):
+    """店家在某天某個時刻有沒有開。沒有營業時段資料時回 None（不知道）。
+
+    不知道就不能當成沒開——那會把大半店家排除掉；也不能當成有開，
+    那就回到「假裝所有店都開著」的老問題。交給呼叫端決定怎麼處理。
+    """
+    if not periods:
+        return None
+    for period in periods:
+        if int(period.get("day", -1)) != weekday:
+            continue
+        start = int(period.get("open_minute", 0))
+        end = int(period.get("close_minute", 24 * 60))
+        if end <= start:  # 跨午夜，例如 18:00~02:00
+            if minute >= start or minute < end:
+                return True
+        elif start <= minute < end:
+            return True
+    return False
+
+
+def venue_open_now(periods: list, now=None):
+    """用每週營業時段推「現在」開不開。
+
+    Places 的 currentOpeningHours 不一定會回 openNow，但週間時段幾乎都有，
+    可以自己算，比直接當成未知能救回更多店家。
+    """
+    now = now or app_now()
+    # Google 的 day 是 0=週日，Python 的 isoweekday 是 1=週一…7=週日
+    return venue_open_at(periods, now.isoweekday() % 7, now.hour * 60 + now.minute)
+
+
 def _score_place(distance_km: float, rating, user_ratings_total, is_open, budget: int, price_level) -> int:
     distance_score = max(0, 42 - int(distance_km * 8))
     rating_score = int(float(rating or 0) * 8)
@@ -346,7 +380,12 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
         # 新版 API 叫 openNow，舊版叫 open_now；兩個都沒有就是「不知道」，
         # 不能當成營業中——那正是先前顯示假「營業中」的原因。
         raw_open = opening_hours.get("open_now", opening_hours.get("openNow"))
-        is_open = None if raw_open is None else bool(raw_open)
+        periods = _opening_periods(place)
+        if raw_open is None:
+            # openNow 沒回時用每週時段自己算，不要輕易放棄成「未知」
+            is_open = venue_open_now(periods)
+        else:
+            is_open = bool(raw_open)
         rating = place.get("rating")
         user_ratings_total = place.get("user_ratings_total")
         price_level = place.get("price_level")
@@ -391,7 +430,7 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
             "tags": ["Google Places", "真實店家", *(place.get("types") or [])[:2]],
             "price_level": price_level,
             "is_open": is_open,
-            "opening_periods": _opening_periods(place),
+            "opening_periods": periods,
             "rating": rating,
             "user_ratings_total": user_ratings_total,
             "match_score": score,

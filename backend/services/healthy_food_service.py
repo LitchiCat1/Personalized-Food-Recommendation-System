@@ -377,6 +377,12 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
             "filtered_out": offline_recommendations.get("filtered_out", []),
         }
 
+    # 推薦是「現在要去吃」，所以現在沒開的店不推薦。
+    # 建檔那條路徑不套這個條件——它是為整週準備菜單，晚餐店照樣要建。
+    # 拿不到營業時間的店留著：不知道不等於沒開。
+    closed_now = [r for r in restaurants if r.get("is_open") is False]
+    restaurants = [r for r in restaurants if r.get("is_open") is not False]
+
     # Google Places 只給店名與店家類型，沒有菜色營養，但店名／類型本身就足以
     # 擋掉明顯衝突的店家（海鮮過敏遇到海產店、高血脂遇到炸雞店）。
     # 之前這條路徑完全沒有套用疾病與過敏原規則，等於「沒有根據不能吃的食物做推薦」。
@@ -433,6 +439,11 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
         "remaining": remaining,
         "data_source": "google_places",
         "nutrition_available": False,
+        "closed_now": len(closed_now),
+        "opening_note": (
+            f"附近 {len(closed_now)} 家店現在沒有營業，已排除。"
+            if closed_now else None
+        ),
         "nutrition_note": (
             "Google Places 不提供菜色營養，這裡只用店名與店家類型比對疾病禁忌與過敏原；"
             "逐道菜的過濾要開啟「完整菜單」才會執行。"

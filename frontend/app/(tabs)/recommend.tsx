@@ -384,6 +384,22 @@ export default function RecommendScreen() {
             ) : null}
           </SectionBlock>
 
+          {healthyData?.opening_note ? (
+            <View style={styles.openingNotice}>
+              <Ionicons name="time-outline" size={15} color={Palette.text.secondary} />
+              <Text style={styles.openingNoticeText}>{healthyData.opening_note}</Text>
+            </View>
+          ) : null}
+
+          {mapRestaurants.length === 0 && healthyData && !healthyLoading ? (
+            <View style={styles.openingNotice}>
+              <Ionicons name="moon-outline" size={15} color={Palette.text.secondary} />
+              <Text style={styles.openingNoticeText}>
+                附近現在沒有營業中的店家。可以稍後再看，或改用掃描記錄手邊的餐點。
+              </Text>
+            </View>
+          ) : null}
+
           {mapRestaurants.length && mapLocation ? (
             <>
               <View style={styles.mapCard}>
@@ -697,6 +713,11 @@ function NutritionMini({ label, value, color }: { label: string; value: string; 
 
 const styles = StyleSheet.create({
   emptyText: { ...Typography.body, color: Palette.text.tertiary, textAlign: 'center' },
+  openingNotice: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    backgroundColor: Palette.bg.card, borderRadius: Radius.lg, padding: Spacing.md,
+  },
+  openingNoticeText: { ...Typography.small, color: Palette.text.secondary, flex: 1 },
   mealTop: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
   mealInfo: { flex: 1, gap: Spacing.sm },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },

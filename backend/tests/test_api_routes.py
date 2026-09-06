@@ -293,6 +293,47 @@ class ApiRouteTests(unittest.TestCase):
             )
         self.assertEqual(cleared.get_json()["removed"], 21)
 
+    def test_restaurant_index_builds_the_cache_and_skips_known_venues(self):
+        """建檔是獨立動作：第二次按時已建檔的店家不該再送去分析。"""
+        calls = []
+
+        def counting_menu(name, address, text, deadline=None):
+            calls.append(name)
+            return self._seed_menu(name, address, text, deadline)
+
+        with self.mock_auth("user-a"):
+            with patch.object(
+                self.app_module, "fetch_google_places_restaurants",
+                lambda *a, **k: self._seed_places(["建檔店 A", "建檔店 B"]),
+            ), patch.object(self.app_module, "enrich_restaurant_with_gemini", counting_menu):
+                first = self.client.post(
+                    "/restaurants/index/user-a", json={}, headers=self.auth_headers()
+                )
+                second = self.client.post(
+                    "/restaurants/index/user-a", json={}, headers=self.auth_headers()
+                )
+
+        self.assertEqual(first.status_code, 200)
+        first_body = first.get_json()
+        self.assertEqual(first_body["analysed"], 2)
+        self.assertEqual(first_body["already_cached"], 0)
+
+        second_body = second.get_json()
+        self.assertEqual(second_body["analysed"], 0)
+        self.assertEqual(second_body["already_cached"], 2)
+        self.assertEqual(len(calls), 2, f"第二次不該再分析：{calls}")
+
+    def test_restaurant_index_reports_when_nothing_is_nearby(self):
+        with self.mock_auth("user-a"):
+            with patch.object(
+                self.app_module, "fetch_google_places_restaurants", lambda *a, **k: []
+            ):
+                response = self.client.post(
+                    "/restaurants/index/user-a", json={}, headers=self.auth_headers()
+                )
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("搜尋不到店家", response.get_json()["error"])
+
     def test_week_seed_caches_analysed_menus_so_the_second_run_skips_gemini(self):
         """Gemini 分析一家店要 20~30 秒，同一家店不該每次都重算。"""
         calls = []

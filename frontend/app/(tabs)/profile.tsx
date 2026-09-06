@@ -14,7 +14,7 @@ import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
 import FeedbackBanner from '@/components/ui/feedback-banner';
-import { clearWeekRecords, fetchMedicalMetadata, fetchUserProfile, saveUserProfile, seedWeekRecords } from '@/lib/api';
+import { clearWeekRecords, fetchMedicalMetadata, fetchUserProfile, indexNearbyVenues, saveUserProfile, seedWeekRecords } from '@/lib/api';
 import type { WeekSeedSource } from '@/lib/api';
 import { isSupabaseAuthConfigured, supabase } from '@/lib/supabase';
 
@@ -36,7 +36,7 @@ export default function ProfileScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const [profileFeedback, setProfileFeedback] = useState<{ tone: 'success' | 'error'; title: string; message?: string } | null>(null);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
-  const [seedBusy, setSeedBusy] = useState<'recommend' | 'clear' | null>(null);
+  const [seedBusy, setSeedBusy] = useState<'index' | 'recommend' | 'clear' | null>(null);
   const [activeSection, setActiveSection] = useState('personal');
   const [medicalMetadata, setMedicalMetadata] = useState<MedicalMetadata | null>(null);
   const [profileDraft, setProfileDraft] = useState({
@@ -259,7 +259,7 @@ export default function ProfileScreen() {
   };
 
   const runSeedAction = async (
-    busyKey: 'recommend' | 'clear',
+    busyKey: 'index' | 'recommend' | 'clear',
     action: () => Promise<{ tone: 'success' | 'error'; title: string; message?: string }>
   ) => {
     setSeedBusy(busyKey);
@@ -273,6 +273,17 @@ export default function ProfileScreen() {
       setSeedBusy(null);
     }
   };
+
+  const handleIndexVenues = () =>
+    runSeedAction('index', async () => {
+      const summary = await indexNearbyVenues(apiBaseUrl, user.userId, { budget: 150 }, { accessToken });
+      const rest = summary.remaining ? `，還有 ${summary.remaining} 家沒建（再按一次繼續）` : '';
+      return {
+        tone: summary.analysed > 0 || summary.already_cached > 0 ? 'success' : 'error',
+        title: `附近 ${summary.found} 家店：本次建檔 ${summary.analysed} 家，已建檔過 ${summary.already_cached} 家${rest}`,
+        message: `資料庫目前累積 ${summary.total_cached} 家店的菜單${summary.failed ? `，${summary.failed} 家分析失敗` : ''}。建檔後灌入七天資料就不必再等 Gemini。`,
+      };
+    });
 
   const handleSeedWeek = () =>
     runSeedAction('recommend', async () => {
@@ -478,8 +489,13 @@ export default function ProfileScreen() {
 
       <SectionBlock title="測試資料" subtitle="一鍵灌入 7 天飲食紀錄，用來驗證趨勢與達標判定。">
         <View style={styles.seedActions}>
+          <SecondaryButton
+            label={seedBusy === 'index' ? '建檔中…' : '① 建立附近店家菜單檔案'}
+            onPress={handleIndexVenues}
+            disabled={seedBusy !== null}
+          />
           <PrimaryButton
-            label={seedBusy === 'recommend' ? '分析附近店家中…' : '灌入 7 天（附近真實店家）'}
+            label={seedBusy === 'recommend' ? '規劃七天菜單中…' : '② 灌入 7 天（附近真實店家）'}
             onPress={handleSeedWeek}
             disabled={seedBusy !== null}
           />
@@ -490,7 +506,7 @@ export default function ProfileScreen() {
           />
         </View>
         <Text style={styles.seedHint}>
-          會用 Google Places 找附近真實店家，沒有現成菜單的交給 Gemini 分析營養。拿不到真實菜單時會直接說明原因，不會用模擬資料充數。分析需要時間，請等 30~60 秒。
+先按①把附近店家的菜單建檔進資料庫（一家要 20~30 秒，可以重複按累積），再按②灌入七天。已建檔的店家不會重複分析，所以②會很快。拿不到真實菜單時會直接說明原因，不會用模擬資料充數。
         </Text>
       </SectionBlock>
 

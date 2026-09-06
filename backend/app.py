@@ -44,7 +44,7 @@ from services.vision_food_service import (
 from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini, parse_menu_image_with_gemini
 from services.medical_risk_service import evaluate_medical_risk
 from services.google_places_service import fetch_google_places_restaurants
-from services.week_seed_service import CLEARABLE_SOURCES, SEED_SOURCES, SeedDataUnavailable, clear_week_records, seed_week_records
+from services.week_seed_service import CLEARABLE_SOURCES, SEED_SOURCES, SeedDataUnavailable, clear_week_records, index_nearby_venues, seed_week_records
 
 
 load_local_env()
@@ -542,6 +542,23 @@ def _seed_request_params(data: dict) -> dict:
         "radius_km": data.get("radius_km", 3),
         "category": data.get("category", "all"),
     }
+
+
+@app.route("/restaurants/index/<user_id>", methods=["POST"])
+def index_nearby_restaurants(user_id):
+    """把附近店家的菜單建檔，之後灌入七天資料就不必等 Gemini。"""
+    require_user_access(user_id)
+    data = request.get_json(silent=True) or {}
+    try:
+        summary = index_nearby_venues(
+            storage,
+            {**_seed_request_params(data), "limit": data.get("limit", 10)},
+            fetch_google_places_restaurants,
+            enrich_restaurant_with_gemini,
+        )
+    except SeedDataUnavailable as error:
+        return jsonify({"error": str(error)}), 409
+    return jsonify({"message": f"已建檔 {summary['analysed']} 家店", **summary})
 
 
 @app.route("/seed/week-records/<user_id>", methods=["POST"])

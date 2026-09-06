@@ -507,6 +507,36 @@ export type WeekSeedSummary = {
   end_date: string;
 };
 
+export type VenueIndexSummary = {
+  message: string;
+  found: number;
+  already_cached: number;
+  analysed: number;
+  failed: number;
+  remaining: number;
+  total_cached: number;
+};
+
+export async function indexNearbyVenues(
+  apiBaseUrl: string,
+  userId: string,
+  params: { budget?: number; lat?: number; lng?: number; radiusKm?: number; category?: string; limit?: number },
+  auth?: ApiAuth
+): Promise<VenueIndexSummary> {
+  return fetchJsonWithNetworkMessage<VenueIndexSummary>(`${apiBaseUrl}/restaurants/index/${encodeURIComponent(userId)}`, {
+    method: 'POST',
+    headers: buildHeaders(auth, 'application/json'),
+    body: JSON.stringify({
+      budget: params.budget ?? 150,
+      lat: params.lat,
+      lng: params.lng,
+      radius_km: params.radiusKm,
+      category: params.category,
+      limit: params.limit ?? 10,
+    }),
+  });
+}
+
 export async function seedWeekRecords(
   apiBaseUrl: string,
   userId: string,

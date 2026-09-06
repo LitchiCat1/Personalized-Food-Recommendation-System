@@ -506,11 +506,20 @@ class StorageRepository:
             return self.db.restaurant_menus.find_one({"venue_key": key}, {"_id": 0})
         return self.mem_restaurant_menus.get(key)
 
-    def save_restaurant_menu(self, name: str, items: list) -> None:
+    def count_restaurant_menus(self) -> int:
+        if self.use_postgres:
+            with self.pg_conn.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) FROM restaurant_menus")
+                return int(cursor.fetchone()[0])
+        if self.use_mongo:
+            return self.db.restaurant_menus.count_documents({})
+        return len(self.mem_restaurant_menus)
+
+    def save_restaurant_menu(self, name: str, items: list, venue: dict | None = None) -> None:
         key = self.venue_cache_key(name)
         if not key or not items:
             return
-        doc = {"venue_key": key, "name": name, "items": items}
+        doc = {"venue_key": key, "name": name, "items": items, **(venue or {})}
         if self.use_postgres:
             with self.pg_conn.cursor() as cursor:
                 cursor.execute(

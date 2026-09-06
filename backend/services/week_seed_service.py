@@ -328,6 +328,79 @@ def _vary_day(combo: list, rotation, seen: set):
     return combo, None
 
 
+def index_nearby_venues(
+    storage,
+    params: dict,
+    fetch_places,
+    enrich_restaurant,
+    budget_seconds: float = MENU_ANALYSIS_BUDGET_SECONDS,
+) -> dict:
+    """把附近店家的菜單建檔進資料庫。
+
+    分析一家店要 20~30 秒，塞在「灌入七天」那個請求裡會逾時。拆成獨立的
+    建檔動作，可以重複按，每次在時間預算內處理幾家沒建過的，累積下去。
+    """
+    lat = float(params.get("lat", 25.0338))
+    lng = float(params.get("lng", 121.5645))
+    radius_km = min(max(float(params.get("radius_km", 3)), 0.5), 10)
+    category = str(params.get("category", "all") or "all").strip().lower()
+    budget = int(params.get("budget", 150))
+    limit = min(max(int(params.get("limit", 10)), 1), 20)
+
+    try:
+        places = fetch_places(lat, lng, radius_km, category, budget, limit=limit)
+    except Exception as error:
+        raise SeedDataUnavailable(f"店家搜尋失敗：{error}") from error
+    if not places:
+        raise SeedDataUnavailable(f"半徑 {radius_km} km 內搜尋不到店家，請調整定位或把半徑放大。")
+
+    deadline = time.monotonic() + budget_seconds
+    already_cached = 0
+    analysed = 0
+    failed = 0
+    remaining = 0
+    for place in places:
+        name = str(place.get("name", "")).strip()
+        if not name:
+            continue
+        if storage.get_restaurant_menu(name):
+            already_cached += 1
+            continue
+        if time.monotonic() >= deadline:
+            remaining += 1
+            continue
+        try:
+            enriched = enrich_restaurant(name, place.get("address") or "台灣", "", deadline)
+        except Exception as error:
+            print(f"[venue-index] {name} 菜單分析失敗: {error}")
+            failed += 1
+            continue
+        items = enriched.get("items", []) or []
+        if not items:
+            failed += 1
+            continue
+        storage.save_restaurant_menu(
+            name,
+            items,
+            venue={
+                "address": place.get("address", ""),
+                "lat": place.get("lat"),
+                "lng": place.get("lng"),
+                "google_place_id": place.get("google_place_id", ""),
+            },
+        )
+        analysed += 1
+
+    return {
+        "found": len(places),
+        "already_cached": already_cached,
+        "analysed": analysed,
+        "failed": failed,
+        "remaining": remaining,
+        "total_cached": storage.count_restaurant_menus(),
+    }
+
+
 def plan_daily_dishes(dishes: list, days: int, seed: str, targets: dict, goal_types: dict) -> list[list[list[int]]]:
     """排出每天三餐吃哪些菜，優先讓整天加總符合疾病別的每日目標。
 

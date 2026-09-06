@@ -119,3 +119,64 @@ class GooglePlacesServiceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BusinessStatusTests(unittest.TestCase):
+    """推薦的店必須真的還在營業，而且不能假裝知道營業時間。"""
+
+    def setUp(self):
+        clear_search_cache()
+        os.environ["GOOGLE_PLACES_API_KEY"] = "test-key"
+
+    def _search(self, places):
+        with patch("services.google_places_service.requests.post",
+                   return_value=FakeResponse(200, {"places": places})):
+            return fetch_google_places_restaurants(25.0338, 121.5645, 3, "all", 150, limit=10)
+
+    @staticmethod
+    def _v1_place(place_id, name, *, status="OPERATIONAL", open_now=None):
+        place = {
+            "id": place_id,
+            "displayName": {"text": name},
+            "formattedAddress": "台北",
+            "location": {"latitude": 25.0338, "longitude": 121.5645},
+            "types": ["restaurant"],
+            "rating": 4.5,
+            "userRatingCount": 100,
+            "businessStatus": status,
+        }
+        if open_now is not None:
+            place["currentOpeningHours"] = {"openNow": open_now}
+        return place
+
+    def test_permanently_closed_venues_are_dropped(self):
+        results = self._search([
+            self._v1_place("open-1", "還在開的店", open_now=True),
+            self._v1_place("gone-1", "已歇業的店", status="CLOSED_PERMANENTLY", open_now=True),
+            self._v1_place("paused-1", "暫停營業的店", status="CLOSED_TEMPORARILY"),
+        ])
+        names = [restaurant["name"] for restaurant in results]
+        self.assertIn("還在開的店", names)
+        self.assertNotIn("已歇業的店", names)
+        self.assertNotIn("暫停營業的店", names)
+
+    def test_missing_opening_hours_are_unknown_not_open(self):
+        """先前這裡寫死 True，等於對每一家店謊稱營業中。"""
+        results = self._search([self._v1_place("p1", "沒有營業時間資料的店")])
+        self.assertIsNone(results[0]["is_open"])
+
+    def test_a_venue_known_to_be_open_outranks_one_with_unknown_hours(self):
+        results = self._search([
+            self._v1_place("unknown", "營業時間未知"),
+            self._v1_place("open", "確定營業中", open_now=True),
+        ])
+        by_name = {restaurant["name"]: restaurant for restaurant in results}
+        self.assertTrue(by_name["確定營業中"]["is_open"])
+        self.assertIsNone(by_name["營業時間未知"]["is_open"])
+        self.assertGreater(by_name["確定營業中"]["match_score"], by_name["營業時間未知"]["match_score"])
+
+    def test_a_venue_that_is_closed_right_now_is_still_listed_but_marked(self):
+        """現在沒開不代表不能推薦，明天可能就去了；標示清楚就好。"""
+        results = self._search([self._v1_place("shut", "現在休息中", open_now=False)])
+        self.assertEqual(results[0]["name"], "現在休息中")
+        self.assertFalse(results[0]["is_open"])

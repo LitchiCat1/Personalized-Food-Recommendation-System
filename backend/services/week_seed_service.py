@@ -364,6 +364,9 @@ def index_nearby_venues(
                 "lat": place.get("lat"),
                 "lng": place.get("lng"),
                 "google_place_id": place_id,
+                # 存下來才查得出這筆快取是什麼時候、什麼狀態下建的
+                "business_status": place.get("business_status", ""),
+                "is_open_at_index_time": place.get("is_open"),
             },
         )
         analysed += 1

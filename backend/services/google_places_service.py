@@ -147,26 +147,33 @@ def _fetch_legacy_place_links(place_id: str, key: str) -> dict:
         return {}
 
 
-def _score_place(distance_km: float, rating, user_ratings_total, is_open: bool, budget: int, price_level) -> int:
+def _score_place(distance_km: float, rating, user_ratings_total, is_open, budget: int, price_level) -> int:
     distance_score = max(0, 42 - int(distance_km * 8))
     rating_score = int(float(rating or 0) * 8)
     popularity_score = min(12, int((int(user_ratings_total or 0) ** 0.5) / 2))
-    open_bonus = 12 if is_open else 0
+    # 只有「確定營業中」才加分；不知道營業時間的店不該贏過確定有開的店
+    open_bonus = 12 if is_open is True else 0
     estimated_price = _price_estimate(price_level)
     budget_score = 10 if estimated_price is None or estimated_price <= budget else -8
     return max(1, min(99, distance_score + rating_score + popularity_score + open_bonus + budget_score))
 
 
-def _fetch_new_places_api(lat: float, lng: float, radius_m: float, key: str) -> list[dict]:
+def _fetch_new_places_api(lat: float, lng: float, radius_m: float, key: str, max_results: int = 20) -> list[dict]:
     url = "https://places.googleapis.com/v1/places:searchNearby"
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": key,
-        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.priceLevel,places.rating,places.userRatingCount,places.websiteUri,places.googleMapsUri"
+        # businessStatus / currentOpeningHours 跟已經要的 rating、priceLevel 同一個
+        # 計費級別，加上去不會讓這次請求變貴。
+        "X-Goog-FieldMask": (
+            "places.id,places.displayName,places.formattedAddress,places.location,places.types,"
+            "places.priceLevel,places.rating,places.userRatingCount,places.websiteUri,"
+            "places.googleMapsUri,places.businessStatus,places.currentOpeningHours"
+        ),
     }
     payload = {
         "includedTypes": ["restaurant"],
-        "maxResultCount": 12,
+        "maxResultCount": max(1, min(int(max_results), 20)),
         "locationRestriction": {
             "circle": {
                 "center": {
@@ -209,7 +216,10 @@ def _fetch_new_places_api(lat: float, lng: float, radius_m: float, key: str) -> 
                     "rating": p.get("rating"),
                     "user_ratings_total": p.get("userRatingCount"),
                     "price_level": price_level,
-                    "opening_hours": {"open_now": True},
+                    # 之前這裡寫死 open_now=True，等於對每一家店都宣稱「營業中」，
+                    # 連已歇業的店也是，而且還白拿排序的營業加分。沒拿到資料就留空。
+                    "opening_hours": p.get("currentOpeningHours") or {},
+                    "business_status": p.get("businessStatus", ""),
                     "types": p.get("types", []),
                     "website": p.get("websiteUri"),
                     "url": p.get("googleMapsUri"),
@@ -233,7 +243,7 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
     
     # 先打 Places API (New)：一次請求就把 website / Google Maps 連結一起帶回來，
     # 舊版 Nearby Search 拿不到這些欄位，還要對每一家店再送一次 Place Details（較貴的 SKU）。
-    results = _fetch_new_places_api(lat, lng, radius_m, key)
+    results = _fetch_new_places_api(lat, lng, radius_m, key, max_results=limit)
 
     if not results:
         print("[Google Places] Places API (New) 沒有結果，改用舊版 Nearby Search")
@@ -277,9 +287,17 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
         if not isfinite(place_lat) or not isfinite(place_lng):
             continue
 
+        # 歇業或暫停營業的店不該出現在推薦裡，也不值得花 Gemini 額度分析菜單
+        business_status = str(place.get("business_status") or "").upper()
+        if business_status in {"CLOSED_PERMANENTLY", "CLOSED_TEMPORARILY"}:
+            continue
+
         distance_km = _haversine_km(lat, lng, float(place_lat), float(place_lng))
         opening_hours = place.get("opening_hours") or {}
-        is_open = bool(opening_hours.get("open_now", True))
+        # 新版 API 叫 openNow，舊版叫 open_now；兩個都沒有就是「不知道」，
+        # 不能當成營業中——那正是先前顯示假「營業中」的原因。
+        raw_open = opening_hours.get("open_now", opening_hours.get("openNow"))
+        is_open = None if raw_open is None else bool(raw_open)
         rating = place.get("rating")
         user_ratings_total = place.get("user_ratings_total")
         price_level = place.get("price_level")

@@ -620,7 +620,7 @@ function RestaurantCard({
         <View style={styles.rankBadge}><Text style={styles.rankText}>{index + 1}</Text></View>
         <View style={styles.mealInfo}>
           <Text style={styles.restaurantName}>{restaurant.name}</Text>
-          <Text style={styles.restaurantMeta}>{restaurant.tags.slice(0, 2).join('、')} · {restaurant.distance_km} km · {restaurant.is_open ? '營業中' : '未營業'}</Text>
+          <Text style={styles.restaurantMeta}>{restaurant.tags.slice(0, 2).join('、')} · {restaurant.distance_km} km · {restaurant.is_open === null || restaurant.is_open === undefined ? '營業時間未知' : restaurant.is_open ? '營業中' : '休息中'}</Text>
         </View>
         <DataPill tone="info">{restaurant.match_score}</DataPill>
       </View>

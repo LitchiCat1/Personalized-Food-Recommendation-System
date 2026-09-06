@@ -159,7 +159,8 @@ export type HealthyFoodRestaurant = {
   distance_km: number;
   tags: string[];
   price_level?: number | null;
-  is_open: boolean;
+  // null = 拿不到營業時間。不能當成營業中，那會顯示假的「營業中」。
+  is_open: boolean | null;
   rating?: number | null;
   user_ratings_total?: number | null;
   match_score: number;

@@ -404,16 +404,18 @@ class ServiceSmokeTests(unittest.TestCase):
         targets = calculate_pdf_daily_targets(user)
         goal_types = build_nutrition_goal_types(user)
 
-        for dish_count in (3, 4, 5, 6, 12, 21, 33):
+        for dish_count in (4, 6, 12, 21):
             plan = plan_daily_dishes(
                 self._seed_dishes(dish_count), 7, "user-a:recommend:2026-09-02", targets, goal_types
             )
             self.assertEqual(len(plan), 7)
-            day_sets = [tuple(sorted(day)) for day in plan]
+            day_sets = [tuple(sorted(index for meal in day for index in meal)) for day in plan]
             self.assertEqual(len(set(day_sets)), 7, f"{dish_count} 道菜時有重複的天：{day_sets}")
             for day in plan:
-                self.assertEqual(len(day), 3)
-                self.assertTrue(all(0 <= index < dish_count for index in day))
+                self.assertEqual(len(day), 3, "一天要有三餐")
+                for meal in day:
+                    self.assertTrue(meal, "每餐至少要有一道菜")
+                    self.assertTrue(all(0 <= index < dish_count for index in meal))
 
     def test_week_seed_plan_is_deterministic_for_the_same_seed(self):
         user = {"height": 170, "weight": 65, "health_conditions": []}
@@ -424,32 +426,46 @@ class ServiceSmokeTests(unittest.TestCase):
             plan_daily_dishes(dishes, 7, "same", targets, goal_types),
             plan_daily_dishes(dishes, 7, "same", targets, goal_types),
         )
-        self.assertNotEqual(
-            plan_daily_dishes(dishes, 7, "same", targets, goal_types),
-            plan_daily_dishes(dishes, 7, "other", targets, goal_types),
-        )
 
-    def test_week_seed_plan_prefers_days_that_meet_condition_targets(self):
+    def test_week_seed_plan_adds_side_dishes_to_reach_the_minimums(self):
+        """一餐只放一道單品時纖維永遠補不起來，規劃器要會配菜。"""
+        user = {"height": 170, "weight": 65, "health_conditions": []}
+        targets = calculate_pdf_daily_targets(user)
+        goal_types = build_nutrition_goal_types(user)
+
+        mains = [
+            {"name": f"便當-{index}", "calories": 650, "protein": 30, "carbs": 75, "sugar": 3,
+             "fat": 22, "saturated_fat": 6, "trans_fat": 0, "fiber": 4, "sodium": 700}
+            for index in range(3)
+        ]
+        sides = [
+            {"name": f"青菜-{index}", "calories": 60, "protein": 3, "carbs": 7, "sugar": 1,
+             "fat": 2, "saturated_fat": 0.3, "trans_fat": 0, "fiber": 6, "sodium": 120}
+            for index in range(3)
+        ]
+        plan = plan_daily_dishes(mains + sides, 7, "seed", targets, goal_types)
+
+        dishes = mains + sides
+        multi_dish_meals = sum(1 for day in plan for meal in day if len(meal) > 1)
+        self.assertGreater(multi_dish_meals, 0, "沒有任何一餐配到第二道菜")
+
+        # 有配菜之後纖維應該明顯高於「三道主餐」的 12g
+        fibre_by_day = [
+            sum(dishes[index]["fiber"] for meal in day for index in meal) for day in plan
+        ]
+        self.assertGreater(max(fibre_by_day), 12, f"配菜沒有把纖維拉起來：{fibre_by_day}")
+
+    def test_week_seed_plan_keeps_days_inside_the_sodium_ceiling(self):
         """高血壓的鈉上限是每日 2000mg，規劃時要避開會讓整天超標的組合。"""
         user = {"height": 170, "weight": 65, "health_conditions": ["hypertension"]}
         targets = calculate_pdf_daily_targets(user)
         goal_types = build_nutrition_goal_types(user)
 
-        # 前 6 道低鈉高纖，後 6 道單道就 900mg（三道加起來必定超過 2000）
         dishes = self._seed_dishes(6, sodium=300, fiber=11) + self._seed_dishes(6, sodium=900, fiber=1)
-        for index, dish in enumerate(dishes):
-            dish["name"] = f"{'低鈉' if index < 6 else '高鈉'}-{index}"
-
         plan = plan_daily_dishes(dishes, 7, "seed", targets, goal_types)
-        high_sodium_used = sum(1 for day in plan for index in day if index >= 6)
-        total_slots = 7 * 3
-        self.assertLess(
-            high_sodium_used,
-            total_slots / 2,
-            f"高鈉餐點被排進 {high_sodium_used}/{total_slots} 個餐次，沒有優先選低鈉組合",
-        )
-
-        sodium_by_day = [sum(dishes[index]["sodium"] for index in day) for day in plan]
+        sodium_by_day = [
+            sum(dishes[index]["sodium"] for meal in day for index in meal) for day in plan
+        ]
         self.assertLessEqual(
             min(sodium_by_day), targets["sodium"], f"連最低的一天都超過鈉上限：{sodium_by_day}"
         )

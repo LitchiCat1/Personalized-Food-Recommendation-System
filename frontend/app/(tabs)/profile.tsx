@@ -16,6 +16,7 @@ import SegmentedControl from '@/components/ui/segmented-control';
 import FeedbackBanner from '@/components/ui/feedback-banner';
 import { clearNearbyVenueIndex, clearWeekRecords, fetchMedicalMetadata, fetchUserProfile, indexNearbyVenues, saveUserProfile, seedWeekRecords } from '@/lib/api';
 import type { WeekSeedSource } from '@/lib/api';
+import { describeLocation, resolveLocation } from '@/lib/location';
 import { isSupabaseAuthConfigured, supabase } from '@/lib/supabase';
 
 type MedicalMetadata = Awaited<ReturnType<typeof fetchMedicalMetadata>>;
@@ -276,12 +277,19 @@ export default function ProfileScreen() {
 
   const handleIndexVenues = () =>
     runSeedAction('index', async () => {
-      const summary = await indexNearbyVenues(apiBaseUrl, user.userId, { budget: 150 }, { accessToken });
+      // 之前沒送座標，後端就用預設的台北 101，建的是那裡的店而不是你附近的
+      const location = await resolveLocation();
+      const summary = await indexNearbyVenues(
+        apiBaseUrl,
+        user.userId,
+        { budget: 150, lat: location.lat, lng: location.lng },
+        { accessToken }
+      );
       const rest = summary.remaining ? `，還有 ${summary.remaining} 家沒建（再按一次繼續）` : '';
       return {
         tone: summary.analysed > 0 || summary.already_cached > 0 ? 'success' : 'error',
         title: `附近 ${summary.found} 家店：本次建檔 ${summary.analysed} 家，已建檔過 ${summary.already_cached} 家${rest}`,
-        message: `資料庫目前累積 ${summary.total_cached} 家店的菜單${summary.failed ? `，${summary.failed} 家分析失敗` : ''}。建檔後灌入七天資料就不必再等 Gemini。`,
+        message: `${describeLocation(location)} 資料庫目前累積 ${summary.total_cached} 家店的菜單${summary.failed ? `，${summary.failed} 家分析失敗` : ''}。`,
       };
     });
 
@@ -298,7 +306,14 @@ export default function ProfileScreen() {
   const handleSeedWeek = () =>
     runSeedAction('recommend', async () => {
       const source: WeekSeedSource = 'recommend';
-      const summary = await seedWeekRecords(apiBaseUrl, user.userId, { source, days: 7, budget: 150 }, { accessToken });
+      // 灌入讀的是資料庫，但仍要送座標，才能把別的地點建的店排除掉
+      const location = await resolveLocation();
+      const summary = await seedWeekRecords(
+        apiBaseUrl,
+        user.userId,
+        { source, days: 7, budget: 150, lat: location.lat, lng: location.lng },
+        { accessToken }
+      );
       const realData = summary.data_source === 'google_places';
       const conditionText = summary.conditions.length ? summary.conditions.join('、') : '無疾病條件';
       const compliant = `${summary.fully_compliant_days}/${summary.days} 天完全符合（${conditionText}）`;

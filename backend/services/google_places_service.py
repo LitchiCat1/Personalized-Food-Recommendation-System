@@ -31,7 +31,7 @@ class GooglePlacesAPIError(Exception):
     pass
 
 
-def _haversine_km(lat1, lon1, lat2, lon2):
+def haversine_km(lat1, lon1, lat2, lon2):
     radius = 6371.0
     dlat = radians(lat2 - lat1)
     dlon = radians(lon2 - lon1)
@@ -375,7 +375,7 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
         if business_status in {"CLOSED_PERMANENTLY", "CLOSED_TEMPORARILY"}:
             continue
 
-        distance_km = _haversine_km(lat, lng, float(place_lat), float(place_lng))
+        distance_km = haversine_km(lat, lng, float(place_lat), float(place_lng))
         opening_hours = place.get("opening_hours") or {}
         # 新版 API 叫 openNow，舊版叫 open_now；兩個都沒有就是「不知道」，
         # 不能當成營業中——那正是先前顯示假「營業中」的原因。

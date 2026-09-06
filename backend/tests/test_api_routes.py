@@ -9,7 +9,13 @@ from services.app_time_service import app_now
 from unittest.mock import patch
 
 
-class ApiRouteTests(unittest.TestCase):
+class ApiTestBase(unittest.TestCase):
+    """共用的 app 啟動與登入輔助。
+
+    測試類別彼此繼承會把父類別的測試全部再跑一遍，所以骨架放這裡，
+    各組測試只繼承骨架。
+    """
+
     @classmethod
     def setUpClass(cls):
         os.environ["SUPABASE_AUTH_REQUIRED"] = "true"
@@ -34,6 +40,29 @@ class ApiRouteTests(unittest.TestCase):
     def mock_auth(self, user_id="user-a"):
         return patch.object(self.app_module, "verify_supabase_user", return_value={"id": user_id})
 
+    def _seed_menu(self, name, address, text, deadline=None):
+        return {
+            "items": [
+                {
+                    "item_id": f"{name}_{index}",
+                    "name": f"{name} 餐點{index}",
+                    "price": 110 + index,
+                    "calories": 500,
+                    "protein": 25,
+                    "carbs": 55,
+                    "fat": 16,
+                    "sugar": 3,
+                    "saturated_fat": 4,
+                    "trans_fat": 0,
+                    "fiber": 5,
+                    "sodium": 600,
+                }
+                for index in range(4)
+            ]
+        }
+
+
+class ApiRouteTests(ApiTestBase):
     def test_medical_metadata_route_exposes_governance_metadata(self):
         response = self.client.get("/medical-metadata")
 
@@ -234,27 +263,6 @@ class ApiRouteTests(unittest.TestCase):
             }
             for name in names
         ]
-
-    def _seed_menu(self, name, address, text, deadline=None):
-        return {
-            "items": [
-                {
-                    "item_id": f"{name}_{index}",
-                    "name": f"{name} 餐點{index}",
-                    "price": 110 + index,
-                    "calories": 500,
-                    "protein": 25,
-                    "carbs": 55,
-                    "fat": 16,
-                    "sugar": 3,
-                    "saturated_fat": 4,
-                    "trans_fat": 0,
-                    "fiber": 5,
-                    "sodium": 600,
-                }
-                for index in range(4)
-            ]
-        }
 
     def _index_two_venues(self, names=("真實店家 A", "真實店家 B")):
         with patch.object(
@@ -745,3 +753,66 @@ class ApiRouteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VenueDistanceTests(ApiTestBase):
+    """快取是跨地點累積的，灌入不能排到幾十公里外的店。"""
+
+    def _index_at(self, name, lat, lng):
+        places = [{
+            "restaurant_id": f"google_{name}", "name": name, "lat": lat, "lng": lng,
+            "address": "台灣", "tags": ["Google Places"], "google_place_id": f"p_{name}",
+            "distance_km": 0.2, "match_score": 70, "is_open": True,
+        }]
+        with patch.object(self.app_module, "fetch_google_places_restaurants", lambda *a, **k: places), \
+             patch.object(self.app_module, "enrich_restaurant_with_gemini", self._seed_menu):
+            return self.client.post(
+                "/restaurants/index/user-a",
+                json={"lat": lat, "lng": lng},
+                headers=self.auth_headers(),
+            )
+
+    def test_venues_indexed_somewhere_else_are_not_used(self):
+        with self.mock_auth("user-a"):
+            self.client.post(
+                "/user",
+                json={"user_id": "user-a", "name": "Seed User", "height": 170, "weight": 65, "age": 25},
+                headers=self.auth_headers(),
+            )
+            self._index_at("台北的店", 25.0338, 121.5645)
+            self._index_at("高雄的店", 22.6273, 120.3014)
+
+            response = self.client.post(
+                "/seed/week-records/user-a",
+                json={"source": "recommend", "days": 7, "budget": 150,
+                      "lat": 25.0338, "lng": 121.5645, "radius_km": 3},
+                headers=self.auth_headers(),
+            )
+            records = self.client.get(
+                "/records/user-a?limit=500", headers=self.auth_headers()
+            ).get_json()["records"]
+
+        self.assertEqual(response.status_code, 201)
+        eaten = {food["name"] for record in records for food in record["foods"]}
+        self.assertTrue(any("台北的店" in name for name in eaten), eaten)
+        self.assertFalse(any("高雄的店" in name for name in eaten), eaten)
+        self.assertIn("1 家在 3 km 外", response.get_json()["note"])
+
+    def test_seeding_far_from_everything_says_so_instead_of_seeding_nonsense(self):
+        with self.mock_auth("user-a"):
+            self.client.post(
+                "/user",
+                json={"user_id": "user-a", "name": "Seed User", "height": 170, "weight": 65, "age": 25},
+                headers=self.auth_headers(),
+            )
+            self._index_at("台北的店", 25.0338, 121.5645)
+
+            response = self.client.post(
+                "/seed/week-records/user-a",
+                json={"source": "recommend", "days": 7, "budget": 150,
+                      "lat": 22.6273, "lng": 120.3014, "radius_km": 3},
+                headers=self.auth_headers(),
+            )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("重新建檔", response.get_json()["error"])

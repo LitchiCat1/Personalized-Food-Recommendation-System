@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 
 from services.app_time_service import app_now, get_app_timezone
 from services.medical_risk_service import evaluate_medical_risk
-from services.google_places_service import venue_open_at
+from services.google_places_service import haversine_km, venue_open_at
 from services.nutrient_service import NUTRITION_FIELDS, normalize_nutrition_fields
 from services.robust_restaurant_scraper_service import validate_and_balance_nutrition
 from services.nutrition_progress_service import build_nutrition_goal_types, calculate_pdf_daily_targets
@@ -154,6 +154,31 @@ def collect_recommendation_dishes(
             "資料庫裡還沒有任何店家菜單。請先按「① 建立附近店家菜單檔案」，建好之後再灌入七天資料。"
         )
 
+    # 快取是跨地點累積的：在別的地方建過檔，那些店也會留著。
+    # 不按距離篩的話，七天菜單會排到幾十公里外的店。
+    lat = params.get("lat")
+    lng = params.get("lng")
+    radius_km = float(params.get("radius_km") or 3)
+    far_away = 0
+    if lat is not None and lng is not None:
+        nearby = []
+        for venue in venues:
+            venue_lat, venue_lng = venue.get("lat"), venue.get("lng")
+            if venue_lat is None or venue_lng is None:
+                nearby.append(venue)  # 沒有座標的舊資料先留著，不知道不等於很遠
+                continue
+            if haversine_km(float(lat), float(lng), float(venue_lat), float(venue_lng)) <= radius_km:
+                nearby.append(venue)
+            else:
+                far_away += 1
+        if nearby:
+            venues = nearby
+        elif far_away:
+            raise SeedDataUnavailable(
+                f"已建檔 {far_away} 家店，但都在 {radius_km:.0f} km 之外——那是在別的地點建的。"
+                "請在目前位置按「① 建立附近店家菜單檔案」重新建檔。"
+            )
+
     dishes = []
     used_venues = 0
     considered = 0
@@ -185,6 +210,8 @@ def collect_recommendation_dishes(
         f"已建檔 {len(venues)} 家店共 {considered} 道餐點，通過篩選 {len(dishes)} 道"
         f"（來自 {used_venues} 家）。"
     )
+    if far_away:
+        note += f"另有 {far_away} 家在 {radius_km:.0f} km 外，不列入。"
     if top_blocks:
         note += f"被擋掉的主因：{top_blocks}。"
     return dishes, "google_places", note

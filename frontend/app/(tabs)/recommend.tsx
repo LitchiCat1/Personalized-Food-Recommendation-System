@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TextInput, Pressable, Linking, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
@@ -17,6 +16,7 @@ import FeedbackBanner from '@/components/ui/feedback-banner';
 import FoodMap from '@/components/maps/FoodMap';
 import { saveRecord } from '@/lib/scanner';
 import { resolveImageBase64 } from '@/lib/image';
+import { describeLocation, resolveLocation } from '@/lib/location';
 import {
   fetchHealthyFoodRecommendations,
   fetchRestaurantAiSummary,
@@ -222,29 +222,10 @@ export default function RecommendScreen() {
   const handleHealthyFoodSearch = async () => {
     setHealthyLoading(true);
     setHealthyError(null);
-    let lat = 25.0338;
-    let lng = 121.5645;
     try {
-      const geoPromise = (async () => {
-        const permission = await Location.requestForegroundPermissionsAsync();
-        if (permission.granted) {
-          const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          return { lat: position.coords.latitude, lng: position.coords.longitude };
-        }
-        throw new Error('未授權定位');
-      })();
-
-      const timeoutPromise = new Promise<{ lat: number; lng: number }>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 10000)
-      );
-
-      const coords = await Promise.race([geoPromise, timeoutPromise]).catch(() => {
-        return { lat: 25.0338, lng: 121.5645 };
-      });
-
-      lat = coords.lat;
-      lng = coords.lng;
-      setLocationLabel(`定位座標：${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      const location = await resolveLocation();
+      const { lat, lng } = location;
+      setLocationLabel(describeLocation(location));
 
       const result = await fetchHealthyFoodRecommendations(
         apiBaseUrl,

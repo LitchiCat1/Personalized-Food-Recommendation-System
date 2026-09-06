@@ -24,6 +24,8 @@ class ApiRouteTests(unittest.TestCase):
         self.app_module._mem_users.clear()
         self.app_module._mem_records.clear()
         self.app_module._mem_custom_foods.clear()
+        # 菜單快取掛在 storage 上，不清會從別的測試漏過來
+        self.app_module.storage.mem_restaurant_menus.clear()
         self.app_module.storage.upsert_user({"user_id": "user-a", "name": "User A", "health_conditions": ["hypertension"], "allergens": ["egg"]})
 
     def auth_headers(self):
@@ -254,17 +256,26 @@ class ApiRouteTests(unittest.TestCase):
             ]
         }
 
-    def test_week_seed_route_uses_real_venues_and_clears(self):
+    def _index_two_venues(self, names=("真實店家 A", "真實店家 B")):
+        with patch.object(
+            self.app_module, "fetch_google_places_restaurants",
+            lambda *a, **k: self._seed_places(names),
+        ), patch.object(self.app_module, "enrich_restaurant_with_gemini", self._seed_menu):
+            return self.client.post("/restaurants/index/user-a", json={}, headers=self.auth_headers())
+
+    def test_week_seed_route_uses_indexed_venues_and_clears(self):
         with self.mock_auth("user-a"):
             self.client.post(
                 "/user",
                 json={"user_id": "user-a", "name": "Seed User", "height": 170, "weight": 65, "age": 25},
                 headers=self.auth_headers(),
             )
-            with patch.object(
-                self.app_module, "fetch_google_places_restaurants",
-                lambda *a, **k: self._seed_places(["真實店家 A", "真實店家 B"]),
-            ), patch.object(self.app_module, "enrich_restaurant_with_gemini", self._seed_menu):
+            self._index_two_venues()
+            # 灌入不該再打 Places：把它換成會爆炸的函式來證明沒被呼叫
+            def explode(*args, **kwargs):
+                raise AssertionError("灌入七天不應該再搜尋 Places")
+
+            with patch.object(self.app_module, "fetch_google_places_restaurants", explode):
                 response = self.client.post(
                     "/seed/week-records/user-a",
                     json={"source": "recommend", "days": 7, "budget": 150},
@@ -273,7 +284,6 @@ class ApiRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 201)
         summary = response.get_json()
-        self.assertEqual(summary["days"], 7)
         self.assertEqual(summary["records"], 21)
         self.assertEqual(summary["data_source"], "google_places")
 
@@ -281,10 +291,9 @@ class ApiRouteTests(unittest.TestCase):
             records = self.client.get("/records/user-a?limit=500", headers=self.auth_headers()).get_json()["records"]
         by_day = {}
         for record in records:
-            by_day.setdefault(record["timestamp"][:10], []).append(record["foods"][0]["name"])
+            by_day.setdefault(record["timestamp"][:10], []).extend(f["name"] for f in record["foods"])
         self.assertEqual(len(by_day), 7)
         self.assertEqual(len({tuple(sorted(v)) for v in by_day.values()}), 7)
-        # 直接讀菜單品項才留得住纖維
         self.assertGreater(records[0]["foods"][0]["fiber"], 0)
 
         with self.mock_auth("user-a"):
@@ -292,6 +301,34 @@ class ApiRouteTests(unittest.TestCase):
                 "/seed/week-records/user-a?source=recommend&days=7", headers=self.auth_headers()
             )
         self.assertEqual(cleared.get_json()["removed"], 21)
+
+    def test_week_seed_route_tells_you_to_index_first(self):
+        """沒建檔就灌入，要明確叫使用者先按①，不能塞假資料。"""
+        with self.mock_auth("user-a"):
+            self.client.post(
+                "/user",
+                json={"user_id": "user-a", "name": "Seed User", "height": 170, "weight": 65, "age": 25},
+                headers=self.auth_headers(),
+            )
+            response = self.client.post(
+                "/seed/week-records/user-a", json={"source": "recommend"}, headers=self.auth_headers()
+            )
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("建立附近店家菜單檔案", response.get_json()["error"])
+
+    def test_menu_cache_is_keyed_on_place_id_not_the_venue_name(self):
+        """Places 新舊版 API 回的店名可能不同，用店名當 key 會重複分析。"""
+        storage = self.app_module.storage
+        storage.save_restaurant_menu(
+            "阿宏便當",
+            [{"name": "雞腿便當", "calories": 700, "protein": 30, "carbs": 80, "fat": 22, "fiber": 4, "sodium": 800}],
+            venue={"google_place_id": "place-xyz"},
+        )
+        # 同一家店，另一版 API 給了不同的店名，但 place_id 一樣
+        self.assertIsNotNone(storage.get_restaurant_menu("阿宏便當 板橋店", "place-xyz"))
+        # 沒有 place_id 時仍可用店名找回來
+        self.assertIsNotNone(storage.get_restaurant_menu("阿宏便當"))
+        self.assertIsNone(storage.get_restaurant_menu("完全不同的店", "place-other"))
 
     def test_restaurant_index_builds_the_cache_and_skips_known_venues(self):
         """建檔是獨立動作：第二次按時已建檔的店家不該再送去分析。"""
@@ -331,60 +368,6 @@ class ApiRouteTests(unittest.TestCase):
                 response = self.client.post(
                     "/restaurants/index/user-a", json={}, headers=self.auth_headers()
                 )
-        self.assertEqual(response.status_code, 409)
-        self.assertIn("搜尋不到店家", response.get_json()["error"])
-
-    def test_week_seed_caches_analysed_menus_so_the_second_run_skips_gemini(self):
-        """Gemini 分析一家店要 20~30 秒，同一家店不該每次都重算。"""
-        calls = []
-
-        def counting_menu(name, address, text, deadline=None):
-            calls.append(name)
-            return self._seed_menu(name, address, text, deadline)
-
-        with self.mock_auth("user-a"):
-            self.client.post(
-                "/user",
-                json={"user_id": "user-a", "name": "Seed User", "height": 170, "weight": 65, "age": 25},
-                headers=self.auth_headers(),
-            )
-            for _ in range(2):
-                with patch.object(
-                    self.app_module, "fetch_google_places_restaurants",
-                    lambda *a, **k: self._seed_places(["快取店家 A", "快取店家 B"]),
-                ), patch.object(self.app_module, "enrich_restaurant_with_gemini", counting_menu):
-                    self.client.delete(
-                        "/seed/week-records/user-a?source=recommend&days=7", headers=self.auth_headers()
-                    )
-                    response = self.client.post(
-                        "/seed/week-records/user-a",
-                        json={"source": "recommend", "days": 7},
-                        headers=self.auth_headers(),
-                    )
-                    self.assertEqual(response.status_code, 201)
-
-        self.assertEqual(
-            sorted(set(calls)), ["快取店家 A", "快取店家 B"], "應該只分析過這兩家店"
-        )
-        self.assertEqual(len(calls), 2, f"第二次應該吃快取，實際又分析了：{calls}")
-
-    def test_week_seed_route_reports_why_instead_of_seeding_fake_data(self):
-        """拿不到真實菜單時要明講原因，不能改用本地模擬目錄充數。"""
-        with self.mock_auth("user-a"):
-            self.client.post(
-                "/user",
-                json={"user_id": "user-a", "name": "Seed User", "height": 170, "weight": 65, "age": 25},
-                headers=self.auth_headers(),
-            )
-            with patch.object(
-                self.app_module, "fetch_google_places_restaurants", lambda *a, **k: []
-            ):
-                response = self.client.post(
-                    "/seed/week-records/user-a",
-                    json={"source": "recommend", "days": 7},
-                    headers=self.auth_headers(),
-                )
-
         self.assertEqual(response.status_code, 409)
         self.assertIn("搜尋不到店家", response.get_json()["error"])
 

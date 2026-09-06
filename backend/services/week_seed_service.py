@@ -96,118 +96,46 @@ def _passes_filters(item: dict, restaurant: dict, budget: int, conditions, aller
 def collect_recommendation_dishes(
     user: dict,
     params: dict,
-    restaurant_catalog: list,
     disease_rules: dict,
     allergen_taxonomy: dict,
-    fetch_places,
-    enrich_restaurant,
-    storage=None,
+    storage,
 ) -> tuple[list[dict], str, str]:
-    """回傳 (菜色, data_source, 說明)。"""
+    """從建檔好的店家菜單挑出這位使用者能吃的餐點。
+
+    先前這裡會再打一次 Google Places，但兩次搜尋回的店家不保證相同
+    （新版 API 回空就會退回舊版，名單就不一樣），結果建檔了 10 家卻只有
+    1 家對得上。建檔就是為了這件事，所以這裡直接讀資料庫。
+    """
     budget = int(params.get("budget", 150))
-    lat = float(params.get("lat", 25.0338))
-    lng = float(params.get("lng", 121.5645))
-    radius_km = min(max(float(params.get("radius_km", 3)), 0.5), 10)
-    category = str(params.get("category", "all") or "all").strip().lower()
-
-    try:
-        places = fetch_places(lat, lng, radius_km, category, budget, limit=6)
-    except Exception as error:  # 金鑰未設定、Billing 未開、配額用盡都走這裡
-        raise SeedDataUnavailable(f"店家搜尋失敗，無法取得真實店家：{error}") from error
-
-    if not places:
-        raise SeedDataUnavailable(
-            f"半徑 {radius_km} km 內搜尋不到店家，請調整定位或把半徑放大。"
-        )
-
     conditions = user.get("health_conditions", []) or []
     allergens = user.get("allergens", []) or []
-    # 目錄裡混了兩種東西：內建的 20 家測試店（纖維／糖是佔位值，不能用），
-    # 以及 /restaurant/menu 分析真實店家後寫回來的快取（可以用，還能省一次 Gemini）。
-    # 只認後者，靠 restaurant_id 前綴或 AI 標記分辨。
-    catalog_by_name = {
-        str(r.get("name", "")).strip().lower(): r
-        for r in restaurant_catalog
-        if str(r.get("restaurant_id", "")).startswith(("scraped_", "google_", "places_"))
-        or "AI標記" in (r.get("tags") or [])
-    }
 
-    def add_dishes(restaurant, items) -> int:
-        added = 0
-        for item in items:
-            if _passes_filters(item, restaurant, budget, conditions, allergens, disease_rules, allergen_taxonomy, user):
-                dishes.append(_dish_from_item(item, restaurant))
-                added += 1
-        return added
-
-    dishes = []
-    resolved_restaurants = 0
-    enrich_failures = 0
-    cache_hits = 0
-
-    # 第一輪不打任何外部 API：先用資料庫裡分析過的菜單，再用目錄裡的
-    unknown_places = []
-    for place in places:
-        name = str(place.get("name", "")).strip()
-        if not name:
-            continue
-        cached = storage.get_restaurant_menu(name) if storage else None
-        known = cached or catalog_by_name.get(name.lower())
-        if known and known.get("items"):
-            if add_dishes({**known, "name": name}, known["items"]):
-                resolved_restaurants += 1
-                if cached:
-                    cache_hits += 1
-        else:
-            unknown_places.append((name, place))
-
-    # 第二輪：沒有菜單的店家送去 Gemini 分析。單次分析最壞情況是
-    # 「金鑰數 x 模型數」次 20 秒請求，所以用時間預算擋住，湊滿七天份就停。
-    target_dishes = params.get("target_dishes") or 21
-    deadline = time.monotonic() + MENU_ANALYSIS_BUDGET_SECONDS
-    enrich_calls = 0
-    for name, place in unknown_places:
-        if len(dishes) >= target_dishes or enrich_calls >= MAX_MENU_ANALYSES:
-            break
-        if time.monotonic() >= deadline:
-            print(f"[week-seed] 菜單分析已用滿 {MENU_ANALYSIS_BUDGET_SECONDS}s 預算，剩餘店家略過")
-            break
-        enrich_calls += 1
-        try:
-            enriched = enrich_restaurant(name, place.get("address") or "台灣", "", deadline)
-        except Exception as error:  # 單一店家失敗不該讓整批都拿不到資料
-            print(f"[week-seed] {name} 菜單估算失敗: {error}")
-            enrich_failures += 1
-            continue
-        items = enriched.get("items", []) or []
-        if not items:
-            continue
-        if storage:
-            # 存起來，下一次同一家店就不用再等 Gemini
-            storage.save_restaurant_menu(name, items)
-        restaurant = {
-            "restaurant_id": place.get("restaurant_id", f"places_{name}"),
-            "name": name,
-            "address": place.get("address", ""),
-        }
-        if add_dishes(restaurant, items):
-            resolved_restaurants += 1
-
-    if not dishes:
-        reason = "菜單分析沒有回傳可用餐點"
-        if enrich_failures:
-            reason = f"{enrich_failures} 家的菜單分析失敗"
+    venues = storage.list_restaurant_menus()
+    if not venues:
         raise SeedDataUnavailable(
-            f"搜尋到 {len(places)} 家店，但{reason}（常見原因是 Gemini 配額用盡或逾時），"
-            f"也可能是所有餐點都超過 {budget} 元或被健康條件擋掉。請稍後再試或調高預算。"
+            "資料庫裡還沒有任何店家菜單。請先按「① 建立附近店家菜單檔案」，建好之後再灌入七天資料。"
         )
 
-    note = f"共 {resolved_restaurants} 家店有可用餐點"
-    if cache_hits:
-        note += f"（其中 {cache_hits} 家直接用之前分析過的菜單快取）"
-    note += f"，這次向 Gemini 分析了 {enrich_calls} 家。"
-    if enrich_failures:
-        note += f" 另有 {enrich_failures} 家分析失敗略過。"
+    dishes = []
+    used_venues = 0
+    for venue in venues:
+        items = venue.get("items") or []
+        added = 0
+        for item in items:
+            if _passes_filters(item, venue, budget, conditions, allergens, disease_rules, allergen_taxonomy, user):
+                dishes.append(_dish_from_item(item, venue))
+                added += 1
+        if added:
+            used_venues += 1
+
+    if not dishes:
+        raise SeedDataUnavailable(
+            f"已建檔 {len(venues)} 家店，但沒有任何餐點通過篩選——"
+            f"可能是全部超過 {budget} 元，或被目前的疾病條件與過敏原擋掉。"
+            "請調高預算，或先按①建檔更多店家。"
+        )
+
+    note = f"取自資料庫裡已建檔的 {len(venues)} 家店，其中 {used_venues} 家有你能吃的餐點。"
     return dishes, "google_places", note
 
 
@@ -363,7 +291,8 @@ def index_nearby_venues(
         name = str(place.get("name", "")).strip()
         if not name:
             continue
-        if storage.get_restaurant_menu(name):
+        place_id = str(place.get("google_place_id") or "").strip()
+        if storage.get_restaurant_menu(name, place_id):
             already_cached += 1
             continue
         if time.monotonic() >= deadline:
@@ -386,7 +315,7 @@ def index_nearby_venues(
                 "address": place.get("address", ""),
                 "lat": place.get("lat"),
                 "lng": place.get("lng"),
-                "google_place_id": place.get("google_place_id", ""),
+                "google_place_id": place_id,
             },
         )
         analysed += 1
@@ -479,11 +408,8 @@ def seed_week_records(
     source: str,
     days: int,
     params: dict,
-    restaurant_catalog: list,
     disease_rules: dict,
     allergen_taxonomy: dict,
-    fetch_places=None,
-    enrich_restaurant=None,
 ) -> dict:
     days = min(max(int(days), 1), MAX_DAYS)
     budget = int(params.get("budget", 150))
@@ -491,12 +417,9 @@ def seed_week_records(
 
     dishes, data_source, note = collect_recommendation_dishes(
         {**user},
-        {**params, "target_dishes": days * len(MEAL_ORDER)},
-        restaurant_catalog,
+        params,
         disease_rules,
         allergen_taxonomy,
-        fetch_places,
-        enrich_restaurant,
         storage,
     )
 

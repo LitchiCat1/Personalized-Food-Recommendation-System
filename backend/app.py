@@ -598,11 +598,8 @@ def create_week_seed_records(user_id):
             source,
             data.get("days", 7),
             _seed_request_params(data),
-            RESTAURANT_CATALOG,
             DISEASE_RULES,
             ALLERGEN_TAXONOMY,
-            fetch_places=fetch_google_places_restaurants,
-            enrich_restaurant=enrich_restaurant_with_gemini,
         )
     except SeedDataUnavailable as error:
         # 拿不到真實店家菜單就明講原因，不用本地模擬資料充數

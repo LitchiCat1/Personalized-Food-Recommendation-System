@@ -116,6 +116,10 @@ class StorageRepository:
                 );
                 """
             )
+            # 店名會因 API 版本不同而有出入（分店名、全形半形），
+            # place_id 才是穩定的識別碼；店名只當備援索引。
+            cursor.execute("ALTER TABLE restaurant_menus ADD COLUMN IF NOT EXISTS name_key TEXT;")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_restaurant_menus_name ON restaurant_menus (name_key);")
 
     def _fetch_json_doc(self, table: str, key_field: str, key_value: str):
         with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -499,21 +503,59 @@ class StorageRepository:
     # Gemini 分析一家店要 20~30 秒，Render 的檔案系統又是暫存的
     # （寫回 restaurant_catalog.json 重啟就沒了），所以存進資料庫。
     @staticmethod
-    def venue_cache_key(name: str) -> str:
+    def venue_name_key(name: str) -> str:
         return str(name or "").strip().lower()
 
-    def get_restaurant_menu(self, name: str):
-        key = self.venue_cache_key(name)
-        if not key:
+    @classmethod
+    def venue_cache_key(cls, name: str = "", place_id: str = "") -> str:
+        """place_id 優先。Places 新舊版 API 回的店名可能不同，place_id 不會變。"""
+        place_id = str(place_id or "").strip()
+        if place_id:
+            return f"place:{place_id}"
+        name_key = cls.venue_name_key(name)
+        return f"name:{name_key}" if name_key else ""
+
+    def get_restaurant_menu(self, name: str = "", place_id: str = ""):
+        keys = []
+        if place_id:
+            keys.append(self.venue_cache_key(place_id=place_id))
+        name_key = self.venue_name_key(name)
+        if name_key:
+            keys.append(f"name:{name_key}")
+        if not keys:
             return None
+
         if self.use_menu_postgres:
             with self.menu_pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("SELECT doc FROM restaurant_menus WHERE venue_key = %s LIMIT 1", (key,))
+                cursor.execute(
+                    "SELECT doc FROM restaurant_menus WHERE venue_key = ANY(%s) OR name_key = %s LIMIT 1",
+                    (keys, name_key),
+                )
                 row = cursor.fetchone()
             return row["doc"] if row else None
         if self.use_mongo:
-            return self.db.restaurant_menus.find_one({"venue_key": key}, {"_id": 0})
-        return self.mem_restaurant_menus.get(key)
+            return self.db.restaurant_menus.find_one(
+                {"$or": [{"venue_key": {"$in": keys}}, {"name_key": name_key}]}, {"_id": 0}
+            )
+        for key in keys:
+            if key in self.mem_restaurant_menus:
+                return self.mem_restaurant_menus[key]
+        return next(
+            (doc for doc in self.mem_restaurant_menus.values() if doc.get("name_key") == name_key),
+            None,
+        )
+
+    def list_restaurant_menus(self, limit: int = 60) -> list[dict]:
+        """建檔過的店家全部拿出來。灌入七天時讀這個，不必再打一次 Places。"""
+        if self.use_menu_postgres:
+            with self.menu_pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    "SELECT doc FROM restaurant_menus ORDER BY updated_at DESC LIMIT %s", (limit,)
+                )
+                return [row["doc"] for row in cursor.fetchall()]
+        if self.use_mongo:
+            return list(self.db.restaurant_menus.find({}, {"_id": 0}).limit(limit))
+        return list(self.mem_restaurant_menus.values())[:limit]
 
     def count_restaurant_menus(self) -> int:
         if self.use_menu_postgres:
@@ -525,20 +567,24 @@ class StorageRepository:
         return len(self.mem_restaurant_menus)
 
     def save_restaurant_menu(self, name: str, items: list, venue: dict | None = None) -> None:
-        key = self.venue_cache_key(name)
+        venue = venue or {}
+        place_id = venue.get("google_place_id") or ""
+        key = self.venue_cache_key(name, place_id)
         if not key or not items:
             return
-        doc = {"venue_key": key, "name": name, "items": items, **(venue or {})}
+        name_key = self.venue_name_key(name)
+        doc = {"venue_key": key, "name": name, "name_key": name_key, "items": items, **venue}
         if self.use_menu_postgres:
             with self.menu_pg_conn.cursor() as cursor:
                 cursor.execute(
                     """
-                    INSERT INTO restaurant_menus (venue_key, name, doc, updated_at)
-                    VALUES (%s, %s, %s, NOW())
+                    INSERT INTO restaurant_menus (venue_key, name, name_key, doc, updated_at)
+                    VALUES (%s, %s, %s, %s, NOW())
                     ON CONFLICT (venue_key)
-                    DO UPDATE SET name = EXCLUDED.name, doc = EXCLUDED.doc, updated_at = NOW()
+                    DO UPDATE SET name = EXCLUDED.name, name_key = EXCLUDED.name_key,
+                                  doc = EXCLUDED.doc, updated_at = NOW()
                     """,
-                    (key, name, Json(doc)),
+                    (key, name, name_key, Json(doc)),
                 )
             return
         if self.use_mongo:

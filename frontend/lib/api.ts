@@ -194,6 +194,7 @@ export type HealthyFoodResponse = {
   closed_now?: number;
   opening_note?: string | null;
   venues_with_menu?: number;
+  calorie_note?: string | null;
 };
 
 export type RestaurantAiSummary = {

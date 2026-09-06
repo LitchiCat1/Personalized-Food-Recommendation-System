@@ -945,3 +945,67 @@ class IndexedMenuRecommendationTests(unittest.TestCase):
         self.assertEqual(result["venues_with_menu"], 0)
         self.assertFalse(result["nutrition_available"])
         self.assertIn("還沒建檔", result["nutrition_note"])
+
+
+class RemainingCalorieRecommendationTests(unittest.TestCase):
+    """吃下去會超過今日剩餘熱量的餐點不該推薦。"""
+
+    MENU = [
+        {"name": "小份沙拉", "price": 90, "calories": 200, "protein": 8, "carbs": 20,
+         "fat": 8, "sugar": 3, "saturated_fat": 2, "trans_fat": 0, "fiber": 6, "sodium": 300},
+        {"name": "大份炒飯", "price": 120, "calories": 900, "protein": 22, "carbs": 120,
+         "fat": 28, "sugar": 4, "saturated_fat": 7, "trans_fat": 0, "fiber": 3, "sodium": 600},
+    ]
+
+    def _storage(self, eaten_calories=0):
+        storage = StorageRepository(None, False, {}, [], [])
+        storage.upsert_user({"user_id": "u1", "name": "U", "height": 170, "weight": 65, "age": 30})
+        storage.save_restaurant_menu("阿美飯館", self.MENU, venue={"google_place_id": "p1"})
+        if eaten_calories:
+            storage.insert_record({
+                "user_id": "u1", "client_record_id": "eaten",
+                "timestamp": f"{app_today()}T09:00:00+08:00", "meal_type": "早餐",
+                "foods": [], "total_calories": eaten_calories, "total_protein": 0,
+                "total_carbs": 0, "total_fat": 0, "total_sodium": 0, "total_fiber": 0,
+                "total_sugar": 0, "total_saturated_fat": 0, "total_trans_fat": 0,
+                "source": "manual",
+            })
+        return storage
+
+    def _build(self, storage):
+        venue = {
+            "restaurant_id": "google_p1", "name": "阿美飯館", "lat": 25.03, "lng": 121.56,
+            "address": "台北", "distance_km": 0.3, "tags": ["Google Places"],
+            "google_place_id": "p1", "price_level": 1, "is_open": True, "rating": 4.3,
+            "user_ratings_total": 50, "match_score": 70, "data_source": "google_places",
+            "nutrition_available": False, "recommended_items": [],
+        }
+        with patch.object(healthy_food_service_module, "fetch_google_places_restaurants",
+                          return_value=[venue]):
+            return build_google_places_food_recommendations(storage, "u1", {"budget": 150})
+
+    def test_a_dish_bigger_than_the_remaining_allowance_is_not_recommended(self):
+        # 已吃 1200 kcal，目標約 1950，剩下約 750 → 900 kcal 的炒飯要被擋
+        result = self._build(self._storage(eaten_calories=1200))
+        names = [item["item_name"] for item in result["recommended"]]
+        self.assertIn("小份沙拉", names)
+        self.assertNotIn("大份炒飯", names)
+
+    def test_the_block_reason_names_the_remaining_allowance(self):
+        result = self._build(self._storage(eaten_calories=1200))
+        blocked = {entry["item_name"]: entry["reasons"] for entry in result["filtered_out"]}
+        self.assertTrue(any("剩餘熱量" in reason for reason in blocked["大份炒飯"]))
+        self.assertIsNotNone(result["calorie_note"])
+
+    def test_nothing_is_recommended_once_the_allowance_is_gone(self):
+        """額度用完時空清單要有解釋，不然看起來像壞掉。"""
+        result = self._build(self._storage(eaten_calories=5000))
+        self.assertEqual(result["recommended"], [])
+        self.assertIn("用完", result["calorie_note"])
+
+    def test_an_empty_stomach_still_sees_everything(self):
+        result = self._build(self._storage())
+        names = [item["item_name"] for item in result["recommended"]]
+        self.assertIn("小份沙拉", names)
+        self.assertIn("大份炒飯", names)
+        self.assertIsNone(result["calorie_note"])

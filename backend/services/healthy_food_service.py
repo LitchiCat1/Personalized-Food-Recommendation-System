@@ -341,7 +341,8 @@ def _number(value, fallback: float = 0.0) -> float:
 def _fit_penalty(item: dict, remaining: dict) -> int:
     """這道菜吃下去會不會撐破今天剩下的額度。撐得愈兇扣愈多。"""
     penalty = 0
-    for nutrient, weight in (("calories", 12), ("sodium", 18), ("saturated_fat", 8)):
+    # 熱量已經是硬條件（超過今日剩餘就不推薦），這裡只排序剩下的項目
+    for nutrient, weight in (("sodium", 18), ("saturated_fat", 8)):
         left = _number(remaining.get(nutrient))
         value = _number(item.get(nutrient))
         if left > 0 and value > left:
@@ -401,6 +402,25 @@ def _items_from_indexed_menu(
             })
             continue
 
+        # 吃下去會超過今天剩餘熱量的就不推薦。remaining 已經是
+        # max(0, 目標 - 已攝取)，所以 0 代表今天的額度用完了。
+        calories_left = _number(remaining.get("calories"))
+        calories = _number(menu_item.get("calories"))
+        if calories > calories_left:
+            blocked.append({
+                "restaurant_id": restaurant["restaurant_id"],
+                "restaurant_name": restaurant["name"],
+                "item_name": name,
+                "price": price,
+                "reasons": [
+                    f"{calories:.0f} kcal 超過今日剩餘熱量 {calories_left:.0f} kcal"
+                    if calories_left > 0
+                    else "今天的熱量額度已經用完"
+                ],
+                "over_remaining": True,
+            })
+            continue
+
         risk = evaluate_medical_risk(
             {
                 "label": entry["item_id"],
@@ -434,6 +454,20 @@ def _items_from_indexed_menu(
 
     allowed.sort(key=lambda entry: entry["match_score"], reverse=True)
     return allowed, blocked
+
+
+def _calorie_note(filtered_out: list, remaining: dict) -> str | None:
+    """清單因為熱量額度而變短時，要說出來。
+
+    空清單如果不解釋，看起來就像壞掉，而不是「你今天已經吃夠了」。
+    """
+    dropped = [entry for entry in filtered_out if entry.get("over_remaining")]
+    if not dropped:
+        return None
+    left = _number(remaining.get("calories"))
+    if left <= 0:
+        return "今天的熱量額度已經用完，這裡不再推薦餐點。想再吃可以先看趨勢頁確認。"
+    return f"今日剩餘熱量 {left:.0f} kcal，{len(dropped)} 道餐點吃下去會超過，已排除。"
 
 
 def build_google_places_food_recommendations(storage, user_id: str, params: dict):
@@ -561,6 +595,7 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
         "data_source": "google_places",
         "nutrition_available": venues_with_menu > 0,
         "venues_with_menu": venues_with_menu,
+        "calorie_note": _calorie_note(filtered_out, remaining),
         "closed_now": len(closed_now),
         "opening_note": (
             f"附近 {len(closed_now)} 家店現在沒有營業，已排除。"

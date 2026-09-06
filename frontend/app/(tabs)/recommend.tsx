@@ -384,6 +384,13 @@ export default function RecommendScreen() {
             ) : null}
           </SectionBlock>
 
+          {healthyData?.calorie_note ? (
+            <View style={styles.openingNotice}>
+              <Ionicons name="flame-outline" size={15} color={Palette.text.secondary} />
+              <Text style={styles.openingNoticeText}>{healthyData.calorie_note}</Text>
+            </View>
+          ) : null}
+
           {healthyData?.opening_note ? (
             <View style={styles.openingNotice}>
               <Ionicons name="time-outline" size={15} color={Palette.text.secondary} />
@@ -395,7 +402,9 @@ export default function RecommendScreen() {
             <View style={styles.openingNotice}>
               <Ionicons name="moon-outline" size={15} color={Palette.text.secondary} />
               <Text style={styles.openingNoticeText}>
-                附近現在沒有營業中的店家。可以稍後再看，或改用掃描記錄手邊的餐點。
+                {healthyData.calorie_note
+                  ? '今天沒有適合的餐點可以推薦，詳見上方說明。'
+                  : '附近現在沒有營業中的店家。可以稍後再看，或改用掃描記錄手邊的餐點。'}
               </Text>
             </View>
           ) : null}

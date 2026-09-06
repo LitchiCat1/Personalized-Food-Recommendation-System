@@ -782,3 +782,41 @@ class GeminiJsonShapeTests(unittest.TestCase):
         from services.nutrition_label_service import extract_json_items
 
         self.assertEqual(extract_json_items('{"error": "no menu"}'), [])
+
+
+class CalorieBandScoringTests(unittest.TestCase):
+    """吃得太少不是達標。只當上限的話，規劃器會靠少吃來過關。"""
+
+    TARGETS = {
+        "calories": 1600, "protein": 50, "carbs": 200, "sugar": 20,
+        "fat": 45, "saturated_fat": 13, "trans_fat": 0, "fiber": 25, "sodium": 2000,
+    }
+
+    @staticmethod
+    def _dish(calories):
+        return {"name": f"{calories}kcal", "calories": calories, "protein": 60, "carbs": 100,
+                "sugar": 5, "fat": 30, "saturated_fat": 8, "trans_fat": 0, "fiber": 30, "sodium": 900}
+
+    def test_a_starvation_day_does_not_count_as_meeting_the_calorie_target(self):
+        from services.week_seed_service import build_nutrition_goal_types
+
+        goal_types = build_nutrition_goal_types({})
+        starved = score_day([self._dish(400)], [0], self.TARGETS, goal_types)
+        self.assertLess(starved[0], len(self.TARGETS))
+
+    def test_a_day_inside_the_band_scores_better_than_one_far_below_it(self):
+        from services.week_seed_service import build_nutrition_goal_types
+
+        goal_types = build_nutrition_goal_types({})
+        dishes = [self._dish(1500), self._dish(400)]
+        in_band = score_day(dishes, [0], self.TARGETS, goal_types)
+        far_below = score_day(dishes, [1], self.TARGETS, goal_types)
+        self.assertGreater(in_band[0], far_below[0])
+
+    def test_going_over_the_ceiling_is_still_a_miss(self):
+        from services.week_seed_service import build_nutrition_goal_types
+
+        goal_types = build_nutrition_goal_types({})
+        over = score_day([self._dish(2400)], [0], self.TARGETS, goal_types)
+        inside = score_day([self._dish(1500)], [0], self.TARGETS, goal_types)
+        self.assertGreater(inside[0], over[0])

@@ -197,6 +197,12 @@ def day_totals(dishes: list, combo) -> dict:
     return totals
 
 
+# 熱量是區間，不是天花板：一天只吃 460 kcal 不該算「符合每日目標」。
+# 只當上限的話，貪婪法會發現「少吃」永遠不扣分，整天就停在三小道菜。
+# 0.85 跟趨勢頁的達標判定同一個下緣，兩邊才不會給出相反的結論。
+CALORIE_FLOOR_RATIO = 0.85
+
+
 def score_day(dishes: list, combo, targets: dict, goal_types: dict) -> tuple[int, float]:
     """一天三餐加總後，符合幾項每日目標。
 
@@ -210,7 +216,15 @@ def score_day(dishes: list, combo, targets: dict, goal_types: dict) -> tuple[int
     for nutrient in NUTRITION_FIELDS:
         target = _number(targets.get(nutrient))
         actual = totals[nutrient]
-        if goal_types[nutrient] == "upper_limit":
+        if nutrient == "calories" and target > 0:
+            floor = target * CALORIE_FLOOR_RATIO
+            if floor <= actual <= target:
+                passed += 1
+            elif actual > target:
+                shortfall += (actual - target) / target
+            else:
+                shortfall += (floor - actual) / target
+        elif goal_types[nutrient] == "upper_limit":
             if actual <= target:
                 passed += 1
             else:

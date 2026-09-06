@@ -750,3 +750,35 @@ class GeminiModelDefaultsTests(unittest.TestCase):
 
         for retired in ("gemini-2.5-flash", "gemini-2.5-flash-lite"):
             self.assertNotIn(retired, DEFAULT_GEMINI_MODELS)
+
+
+class GeminiJsonShapeTests(unittest.TestCase):
+    """新模型常常直接回陣列，不再包一層 {"items": [...]}。"""
+
+    def test_a_bare_array_is_read_as_the_item_list(self):
+        from services.nutrition_label_service import extract_json_items
+
+        self.assertEqual(
+            extract_json_items('[{"name": "雞腿飯"}, {"name": "排骨飯"}]'),
+            [{"name": "雞腿飯"}, {"name": "排骨飯"}],
+        )
+
+    def test_the_wrapped_shape_still_works(self):
+        from services.nutrition_label_service import extract_json_items
+
+        self.assertEqual(extract_json_items('{"items": [{"name": "雞腿飯"}]}'), [{"name": "雞腿飯"}])
+
+    def test_a_differently_named_wrapper_still_yields_the_list(self):
+        from services.nutrition_label_service import extract_json_items
+
+        self.assertEqual(extract_json_items('{"dishes": [{"name": "雞腿飯"}]}'), [{"name": "雞腿飯"}])
+
+    def test_a_fenced_array_is_unwrapped(self):
+        from services.nutrition_label_service import extract_json_items
+
+        self.assertEqual(extract_json_items('```json\n[{"name": "雞腿飯"}]\n```'), [{"name": "雞腿飯"}])
+
+    def test_nothing_usable_returns_an_empty_list_not_a_crash(self):
+        from services.nutrition_label_service import extract_json_items
+
+        self.assertEqual(extract_json_items('{"error": "no menu"}'), [])

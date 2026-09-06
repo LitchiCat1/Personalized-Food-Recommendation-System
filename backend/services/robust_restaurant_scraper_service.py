@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 from services.nutrition_label_service import (
     decode_image_base64,
     extract_json_block,
+    extract_json_items,
     extract_number,
     get_gemini_api_keys,
     get_gemini_models,
@@ -270,12 +271,12 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
                 payload = {
                     "contents": [{"parts": [{"text": prompt}]}],
                     # 輸出封頂，模型才不會慢慢寫到逾時
-                    "generationConfig": {"response_mime_type": "application/json", "maxOutputTokens": 900},
+                    "generationConfig": {"response_mime_type": "application/json", "maxOutputTokens": 1500},
                 }
                 res = requests.post(url, json=payload, timeout=MENU_GENERATION_TIMEOUT_SECONDS)
                 if res.status_code == 200:
                     parsed_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    items = extract_json_block(parsed_text).get("items", [])
+                    items = extract_json_items(parsed_text)
                     if items:
                         print(f"[Scraper] Successfully generated menu using key {gemini_key[:8]}... model: {model_name}")
                         balanced_items = [validate_and_balance_nutrition(item) for item in items]
@@ -360,8 +361,7 @@ def _extract_menu_items_from_response(body: dict) -> tuple[list[dict], str | Non
         return [], finish_reason
 
     try:
-        parsed = extract_json_block(response_text)
-        items = parsed.get("items") or parsed.get("menu_items") or parsed.get("dishes") or []
+        items = extract_json_items(response_text)
         return _normalize_menu_items(items), finish_reason
     except (AttributeError, TypeError, ValueError, KeyError):
         # A dense menu can hit the output limit after several complete rows.

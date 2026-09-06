@@ -92,7 +92,8 @@ def build_custom_food_search_result(food_doc: dict) -> dict:
     }
 
 
-def extract_json_block(text: str) -> dict:
+def extract_json_block(text: str):
+    """把模型回的文字轉成 JSON。可能是物件，也可能是最外層就是陣列。"""
     cleaned = text.strip()
     cleaned = re.sub(r"^```json\s*", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"^```\s*", "", cleaned)
@@ -100,10 +101,35 @@ def extract_json_block(text: str) -> dict:
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
-        if not match:
-            raise
-        return json.loads(match.group(0))
+        # 較新的模型常常直接回一個陣列，不再包一層 {"items": [...]}
+        for pattern in (r"\{.*\}", r"\[.*\]"):
+            match = re.search(pattern, cleaned, flags=re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group(0))
+                except json.JSONDecodeError:
+                    continue
+        raise
+
+
+def extract_json_items(text: str, key: str = "items") -> list:
+    """不管模型回 {"items": [...]} 還是直接回 [...]，都取出那個清單。
+
+    新模型愈來愈常省略外層物件，直接回陣列；先前寫死 .get("items") 會
+    炸在 'list' object has no attribute 'get'，整次分析就白費了。
+    """
+    parsed = extract_json_block(text)
+    if isinstance(parsed, list):
+        return parsed
+    if isinstance(parsed, dict):
+        value = parsed.get(key)
+        if isinstance(value, list):
+            return value
+        # 只有一層包裝但換了名字時，取第一個是清單的欄位
+        for candidate in parsed.values():
+            if isinstance(candidate, list):
+                return candidate
+    return []
 
 
 def detect_image_mime(img_bytes: bytes) -> str | None:

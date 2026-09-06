@@ -7,6 +7,7 @@ from services.app_time_service import app_now
 from services.google_places_service import fetch_google_places_restaurants
 from services.medical_risk_service import evaluate_medical_risk
 from services.nutrient_service import NUTRITION_FIELDS, is_fried_food_name
+from services.robust_restaurant_scraper_service import validate_and_balance_nutrition
 from services.nutrition_progress_service import build_daily_nutrition_progress
 from services.disease_rule_service import load_disease_rules, load_allergen_taxonomy
 
@@ -330,6 +331,111 @@ def _places_risk_candidate(restaurant: dict, item: dict) -> dict:
     }
 
 
+def _number(value, fallback: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _fit_penalty(item: dict, remaining: dict) -> int:
+    """這道菜吃下去會不會撐破今天剩下的額度。撐得愈兇扣愈多。"""
+    penalty = 0
+    for nutrient, weight in (("calories", 12), ("sodium", 18), ("saturated_fat", 8)):
+        left = _number(remaining.get(nutrient))
+        value = _number(item.get(nutrient))
+        if left > 0 and value > left:
+            penalty += min(weight, int(weight * (value - left) / left))
+    return penalty
+
+
+def _items_from_indexed_menu(
+    storage, restaurant: dict, budget: int, conditions, allergens,
+    disease_rules: dict, taxonomy: dict, user: dict, remaining: dict,
+):
+    """用建檔好的真實菜單挑出這家店可以吃的餐點。
+
+    Places 本身沒有菜色營養，所以原本每家店只掛一個「到店後再選」的佔位
+    品項，疾病規則只能拿店名跟店家類型去猜。已經建檔的店有逐道菜的營養，
+    就該真的逐道菜篩，這才是「推薦符合疾病禁忌的餐點」。
+
+    沒有建檔的店回 None，交給呼叫端沿用原本的佔位品項。
+    """
+    cached = storage.get_restaurant_menu(
+        restaurant.get("name", ""), restaurant.get("google_place_id", "")
+    )
+    items = (cached or {}).get("items") or []
+    if not items:
+        return None
+
+    allowed, blocked = [], []
+    for raw in items:
+        # 快取存的是模型原始輸出，這裡補上留白的飽和脂肪與糖，跟灌入同一套
+        menu_item = validate_and_balance_nutrition(dict(raw))
+        name = str(menu_item.get("name") or "餐點")
+        price = int(_number(menu_item.get("price")))
+        entry = {
+            "restaurant_id": restaurant["restaurant_id"],
+            "restaurant_name": restaurant["name"],
+            "restaurant_lat": restaurant.get("lat"),
+            "restaurant_lng": restaurant.get("lng"),
+            "address": restaurant.get("address", ""),
+            "distance_km": restaurant.get("distance_km", 0),
+            "tags": ["Google Places", "真實店家", "已建檔菜單"],
+            "item_id": str(menu_item.get("item_id") or f"{restaurant['restaurant_id']}_{name}"),
+            "item_name": name,
+            "price": price,
+            **{nutrient: menu_item.get(nutrient, 0) for nutrient in NUTRITION_FIELDS},
+            "is_fried": menu_item.get("is_fried") is True,
+            "gi": menu_item.get("gi"),
+            "nutrition_available": True,
+        }
+
+        if price > budget:
+            blocked.append({
+                "restaurant_id": restaurant["restaurant_id"],
+                "restaurant_name": restaurant["name"],
+                "item_name": name,
+                "price": price,
+                "reasons": [f"超過預算 {budget} 元"],
+            })
+            continue
+
+        risk = evaluate_medical_risk(
+            {
+                "label": entry["item_id"],
+                "name_zh": name,
+                "gi": menu_item.get("gi"),
+                "allergens": menu_item.get("allergens", []),
+                "is_fried": entry["is_fried"],
+                **{nutrient: menu_item.get(nutrient, 0) for nutrient in NUTRITION_FIELDS},
+            },
+            conditions, allergens, disease_rules, taxonomy, user_profile=user,
+        )
+        entry["medical_risk"] = risk
+        if risk["block_reasons"]:
+            blocked.append({
+                "restaurant_id": restaurant["restaurant_id"],
+                "restaurant_name": restaurant["name"],
+                "item_name": name,
+                "price": price,
+                "reasons": risk["block_reasons"],
+                "medical_risk": risk,
+            })
+            continue
+
+        entry["match_score"] = max(1, restaurant.get("match_score", 50) - _fit_penalty(entry, remaining))
+        entry["reasons"] = [
+            f"{restaurant['name']}，距離約 {restaurant.get('distance_km', 0)} km",
+            "已建檔菜單，營養由 Gemini 估算，逐道菜比對過疾病禁忌與過敏原",
+            *risk["caution_reasons"],
+        ]
+        allowed.append(entry)
+
+    allowed.sort(key=lambda entry: entry["match_score"], reverse=True)
+    return allowed, blocked
+
+
 def build_google_places_food_recommendations(storage, user_id: str, params: dict):
     user = storage.get_user(user_id)
     if not user:
@@ -388,7 +494,22 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
     # 之前這條路徑完全沒有套用疾病與過敏原規則，等於「沒有根據不能吃的食物做推薦」。
     recommendations = []
     filtered_out = []
+    venues_with_menu = 0
     for restaurant in restaurants:
+        # 有建檔菜單的店逐道菜篩，沒有的才退回「靠店名猜」的舊行為
+        from_menu = _items_from_indexed_menu(
+            storage, restaurant, budget, conditions, allergens, disease_rules, taxonomy, user, remaining
+        )
+        if from_menu is not None:
+            restaurant_allowed, restaurant_blocked = from_menu
+            restaurant["recommended_items"] = restaurant_allowed
+            restaurant["filtered_items"] = restaurant_blocked
+            restaurant["nutrition_available"] = True
+            filtered_out.extend(restaurant_blocked)
+            recommendations.extend(restaurant_allowed)
+            venues_with_menu += 1
+            continue
+
         restaurant_allowed = []
         restaurant_blocked = []
         for item in restaurant.get("recommended_items", []):
@@ -438,15 +559,19 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
         "location": {"lat": lat, "lng": lng},
         "remaining": remaining,
         "data_source": "google_places",
-        "nutrition_available": False,
+        "nutrition_available": venues_with_menu > 0,
+        "venues_with_menu": venues_with_menu,
         "closed_now": len(closed_now),
         "opening_note": (
             f"附近 {len(closed_now)} 家店現在沒有營業，已排除。"
             if closed_now else None
         ),
         "nutrition_note": (
-            "Google Places 不提供菜色營養，這裡只用店名與店家類型比對疾病禁忌與過敏原；"
-            "逐道菜的過濾要開啟「完整菜單」才會執行。"
+            f"{venues_with_menu} 家店已建檔菜單，逐道菜比對過疾病禁忌與過敏原；"
+            "其餘店家 Google Places 只給店名與類型，僅能用店名比對，到店後請用掃描確認。"
+            if venues_with_menu
+            else "附近店家都還沒建檔菜單，這裡只用店名與店家類型比對疾病禁忌與過敏原；"
+                 "到「我的 → ① 建立附近店家菜單檔案」建檔後才會逐道菜過濾。"
         ),
         "recommended": recommendations[:12],
         "restaurants": restaurants,

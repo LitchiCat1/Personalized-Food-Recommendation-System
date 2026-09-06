@@ -193,6 +193,7 @@ export type HealthyFoodResponse = {
   // 現在沒開的店不推薦，但要讓使用者知道少掉幾家，不然清單變短會像壞掉
   closed_now?: number;
   opening_note?: string | null;
+  venues_with_menu?: number;
 };
 
 export type RestaurantAiSummary = {

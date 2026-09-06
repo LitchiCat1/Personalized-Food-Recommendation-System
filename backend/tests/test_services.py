@@ -349,6 +349,10 @@ class ServiceSmokeTests(unittest.TestCase):
                     "allergens": self.allergens,
                 }
 
+            def get_restaurant_menu(self, name="", place_id=""):
+                # 這個案例測的是「沒有建檔菜單時靠店名比對」的路徑
+                return None
+
             def get_records(self, user_id, date=None, limit=500):
                 return []
 
@@ -866,3 +870,78 @@ class OpenNowRecommendationTests(unittest.TestCase):
         result = self._build([self._venue("時間未知的店", None)])
         self.assertEqual([r["name"] for r in result["restaurants"]], ["時間未知的店"])
         self.assertIsNone(result["opening_note"])
+
+
+class IndexedMenuRecommendationTests(unittest.TestCase):
+    """已建檔的店要逐道菜比對疾病禁忌，不是掛一個「到店後再選」的佔位品項。"""
+
+    def _storage(self, conditions=(), allergens=(), menu=None):
+        storage = StorageRepository(None, False, {}, [], [])
+        storage.upsert_user({
+            "user_id": "u1", "name": "U", "height": 170, "weight": 65, "age": 30,
+            "health_conditions": list(conditions), "allergens": list(allergens),
+        })
+        if menu:
+            storage.save_restaurant_menu("阿美飯館", menu, venue={"google_place_id": "p1"})
+        return storage
+
+    @staticmethod
+    def _venue():
+        return {
+            "restaurant_id": "google_p1", "name": "阿美飯館", "lat": 25.03, "lng": 121.56,
+            "address": "台北", "distance_km": 0.3, "tags": ["Google Places"],
+            "google_place_id": "p1", "price_level": 1, "is_open": True,
+            "rating": 4.3, "user_ratings_total": 50, "match_score": 70,
+            "data_source": "google_places", "nutrition_available": False,
+            "recommended_items": [{
+                "restaurant_id": "google_p1", "restaurant_name": "阿美飯館",
+                "distance_km": 0.3, "tags": ["Google Places"],
+                "item_id": "google_p1_visit", "item_name": "到店後選擇符合預算的餐點",
+                "price": 100, "calories": 0, "protein": 0, "carbs": 0, "fat": 0,
+                "sodium": 0, "gi": None, "match_score": 70,
+                "nutrition_available": False, "reasons": [],
+            }],
+        }
+
+    def _build(self, storage, budget=150):
+        with patch.object(healthy_food_service_module, "fetch_google_places_restaurants",
+                          return_value=[self._venue()]):
+            return build_google_places_food_recommendations(storage, "u1", {"budget": budget})
+
+    MENU = [
+        {"name": "清蒸鱈魚定食", "price": 130, "calories": 450, "protein": 30, "carbs": 45,
+         "fat": 12, "sugar": 3, "saturated_fat": 3, "trans_fat": 0, "fiber": 5, "sodium": 500},
+        {"name": "重鹹滷肉飯", "price": 90, "calories": 700, "protein": 20, "carbs": 90,
+         "fat": 25, "sugar": 5, "saturated_fat": 9, "trans_fat": 0, "fiber": 2, "sodium": 1800},
+        {"name": "頂級和牛套餐", "price": 900, "calories": 500, "protein": 35, "carbs": 20,
+         "fat": 30, "sugar": 2, "saturated_fat": 10, "trans_fat": 0, "fiber": 3, "sodium": 400},
+    ]
+
+    def test_real_dishes_replace_the_go_and_choose_placeholder(self):
+        result = self._build(self._storage(menu=self.MENU))
+        names = [item["item_name"] for item in result["recommended"]]
+        self.assertNotIn("到店後選擇符合預算的餐點", names)
+        self.assertIn("清蒸鱈魚定食", names)
+        self.assertTrue(result["nutrition_available"])
+        self.assertEqual(result["venues_with_menu"], 1)
+
+    def test_a_dish_breaking_a_disease_limit_is_filtered_out_with_the_reason(self):
+        result = self._build(self._storage(conditions=["hypertension"], menu=self.MENU))
+        names = [item["item_name"] for item in result["recommended"]]
+        self.assertIn("清蒸鱈魚定食", names)
+        self.assertNotIn("重鹹滷肉飯", names)
+        blocked = {entry["item_name"]: entry["reasons"] for entry in result["filtered_out"]}
+        self.assertIn("重鹹滷肉飯", blocked)
+        self.assertTrue(any("鈉" in reason for reason in blocked["重鹹滷肉飯"]))
+
+    def test_dishes_over_budget_are_filtered_out(self):
+        result = self._build(self._storage(menu=self.MENU))
+        blocked = {entry["item_name"]: entry["reasons"] for entry in result["filtered_out"]}
+        self.assertIn("頂級和牛套餐", blocked)
+        self.assertTrue(any("預算" in reason for reason in blocked["頂級和牛套餐"]))
+
+    def test_a_venue_without_an_indexed_menu_keeps_the_old_behaviour(self):
+        result = self._build(self._storage())
+        self.assertEqual(result["venues_with_menu"], 0)
+        self.assertFalse(result["nutrition_available"])
+        self.assertIn("還沒建檔", result["nutrition_note"])

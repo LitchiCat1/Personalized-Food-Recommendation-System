@@ -243,9 +243,16 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
       ]
     }}
     """
-    candidate_models = ["gemini-2.5-flash", "gemini-2.5-pro"]
+    # 全 repo 其他 Gemini 呼叫都用 get_gemini_models()（可由 GEMINI_MODELS 覆寫）。
+    # 這裡原本寫死 2.5-flash / 2.5-pro，金鑰沒有這兩個模型權限時整串 404，
+    # 最後退回 generate_fallback_menu()，而真實店名不在樣板清單裡會回空陣列。
+    candidate_models = get_gemini_models()
+    unavailable_models = set()
     for gemini_key in keys:
         for model_name in candidate_models:
+            # 模型不存在是帳號層級的事，換一把金鑰重試同一個模型只是浪費時間
+            if model_name in unavailable_models:
+                continue
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
                 payload = {
@@ -261,10 +268,14 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
                         balanced_items = [validate_and_balance_nutrition(item) for item in items]
                         return {"items": balanced_items}
                 else:
+                    if res.status_code == 404:
+                        unavailable_models.add(model_name)
                     print(f"[!] Key {gemini_key[:8]}... model {model_name} status {res.status_code}, trying next key/model...")
             except Exception as e:
                 print(f"[!] Gemini Model {model_name} error: {e}")
-    
+
+    if len(unavailable_models) == len(candidate_models):
+        print(f"[!] 所有模型都回 404：{sorted(unavailable_models)}。請用 GEMINI_MODELS 指定金鑰有權限的模型。")
     fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
     return {"items": fallback_items}
 

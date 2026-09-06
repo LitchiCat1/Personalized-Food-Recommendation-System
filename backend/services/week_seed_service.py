@@ -24,7 +24,7 @@ SEED_SOURCES = ("recommend", "curated")
 MAX_DAYS = 14
 # 找到的店家沒有菜單時要送去 Gemini 分析，但那是外部呼叫，
 # 用「時間預算」而不是固定次數控制，才不會在 Render 上把整個 request 拖到逾時。
-MENU_ANALYSIS_BUDGET_SECONDS = 45
+MENU_ANALYSIS_BUDGET_SECONDS = 75
 MAX_MENU_ANALYSES = 6
 
 

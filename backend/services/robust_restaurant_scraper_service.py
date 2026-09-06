@@ -204,6 +204,9 @@ def validate_and_balance_nutrition(item: dict) -> dict:
     return item
 
 
+MENU_GENERATION_TIMEOUT_SECONDS = 30
+
+
 def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_text: str = "") -> dict:
     keys = get_gemini_api_keys()
     if not keys:
@@ -213,7 +216,7 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
     
     prompt = f"""
     你是一位台灣經驗豐富的臨床膳食評估師與營養師。
-    請根據這家台灣餐廳的名稱與描述，產生該餐廳最經典常見的 4~6 道餐點，並為每道餐點精準估算 11 項營養指標（需符合 1g蛋白質=4kcal, 1g碳水=4kcal, 1g脂肪=9kcal 熱量平衡公式）：
+    請根據這家台灣餐廳的名稱與描述，產生該餐廳最經典常見的 3~4 道餐點，並為每道餐點精準估算 11 項營養指標（需符合 1g蛋白質=4kcal, 1g碳水=4kcal, 1g脂肪=9kcal 熱量平衡公式）：
 
     餐廳名稱：{restaurant_name}
     餐廳地址：{address}
@@ -246,7 +249,16 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
     # 全 repo 其他 Gemini 呼叫都用 get_gemini_models()（可由 GEMINI_MODELS 覆寫）。
     # 這裡原本寫死 2.5-flash / 2.5-pro，金鑰沒有這兩個模型權限時整串 404，
     # 最後退回 generate_fallback_menu()，而真實店名不在樣板清單裡會回空陣列。
-    candidate_models = get_gemini_models()
+    # 這裡只需要幾道菜，追求的是「快」而不是「準」：把輕量模型排到前面，
+    # 免得先卡在較慢的模型上把整個分析預算耗光。
+    def _speed_rank(model: str) -> int:
+        if "lite" in model:
+            return 0
+        if "flash" in model:
+            return 1
+        return 2
+
+    candidate_models = sorted(get_gemini_models(), key=_speed_rank)
     unavailable_models = set()
     for gemini_key in keys:
         for model_name in candidate_models:
@@ -259,7 +271,7 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
                     "contents": [{"parts": [{"text": prompt}]}],
                     "generationConfig": {"response_mime_type": "application/json"}
                 }
-                res = requests.post(url, json=payload, timeout=20)
+                res = requests.post(url, json=payload, timeout=MENU_GENERATION_TIMEOUT_SECONDS)
                 if res.status_code == 200:
                     parsed_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
                     items = extract_json_block(parsed_text).get("items", [])

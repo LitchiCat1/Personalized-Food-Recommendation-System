@@ -12,7 +12,7 @@ import MetricCard from '@/components/ui/metric-card';
 import DataPill from '@/components/ui/data-pill';
 import ProgressBar from '@/components/ui/progress-bar';
 import PrimaryButton from '@/components/ui/primary-button';
-import { fetchAllRecords, type HistoryDay, type HistoryResponse } from '@/lib/api';
+import { fetchAllRecordsWithTargets, type HistoryDay, type HistoryResponse, type NutritionTargets } from '@/lib/api';
 import { buildDietaryTrend, type DietaryTrendData } from '@/lib/dietary-trends';
 
 function buildInsights(summary: HistoryResponse['summary'], daily: HistoryDay[], target: number) {
@@ -38,8 +38,11 @@ function buildInsights(summary: HistoryResponse['summary'], daily: HistoryDay[],
 export default function HistoryScreen() {
   const { rs, isSmall, isDesktop } = useResponsive();
   const { user, apiBaseUrl, accessToken, dietaryRecordsRevision } = useStore();
-  const target = user.dailyCalorieTarget;
   const [trend, setTrend] = useState<DietaryTrendData | null>(null);
+  // 目標要跟首頁同一份：後端依疾病條件調整過的值。之前這頁用使用者自填的
+  // 熱量目標和一組寫死的通用成人數值，同一筆紀錄在兩頁會得到相反的結論。
+  const [targets, setTargets] = useState<NutritionTargets | null>(null);
+  const target = Math.round(targets?.calories ?? user.dailyCalorieTarget);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -52,9 +55,10 @@ export default function HistoryScreen() {
       setLoading(true);
       setError(null);
 
-      fetchAllRecords(apiBaseUrl, user.userId, { accessToken })
-        .then((records) => {
+      fetchAllRecordsWithTargets(apiBaseUrl, user.userId, { accessToken })
+        .then(({ records, targets: nextTargets }) => {
           if (!cancelled && requestRevision === useStore.getState().dietaryRecordsRevision) {
+            setTargets(nextTargets ?? null);
             setTrend(buildDietaryTrend(records, { maxDays: 7, userId: user.userId }));
           }
         })
@@ -152,14 +156,14 @@ export default function HistoryScreen() {
 
           <SectionBlock title="營養素區段均值" subtitle="比對連續紀錄均值與建議目標，找出長期偏差。">
             <View style={styles.progressStack}>
-              <ProgressBar label="蛋白質" current={summary.avg_protein || 0} target={130} unit="g" color={Palette.accent.blue} />
-              <ProgressBar label="總碳水化合物" current={summary.avg_carbs || 0} target={250} unit="g" color={Palette.accent.orange} />
-              <ProgressBar label="精緻糖" current={summary.avg_sugar || 0} target={25} unit="g" color={Palette.accent.orange} />
-              <ProgressBar label="總脂肪" current={summary.avg_fat || 0} target={70} unit="g" color={Palette.accent.purple} />
-              <ProgressBar label="飽和脂肪" current={summary.avg_saturated_fat || 0} target={20} unit="g" color={Palette.accent.purple} />
+              <ProgressBar label="蛋白質" current={summary.avg_protein || 0} target={targets?.protein ?? 130} unit="g" color={Palette.accent.blue} />
+              <ProgressBar label="總碳水化合物" current={summary.avg_carbs || 0} target={targets?.carbs ?? 250} unit="g" color={Palette.accent.orange} />
+              <ProgressBar label="精緻糖" current={summary.avg_sugar || 0} target={targets?.sugar ?? 25} unit="g" color={Palette.accent.orange} />
+              <ProgressBar label="總脂肪" current={summary.avg_fat || 0} target={targets?.fat ?? 70} unit="g" color={Palette.accent.purple} />
+              <ProgressBar label="飽和脂肪" current={summary.avg_saturated_fat || 0} target={targets?.saturated_fat ?? 20} unit="g" color={Palette.accent.purple} />
               <ProgressBar label="反式脂肪" current={summary.avg_trans_fat || 0} target={0} unit="g" color={Palette.status.error} />
-              <ProgressBar label="膳食纖維" current={summary.avg_fiber || 0} target={25} unit="g" color={Palette.accent.green} />
-              <ProgressBar label="鈉 (Sodium)" current={summary.avg_sodium || 0} target={2000} unit="mg" color={(summary.avg_sodium || 0) > 1800 ? Palette.status.warning : Palette.accent.pink} />
+              <ProgressBar label="膳食纖維" current={summary.avg_fiber || 0} target={targets?.fiber ?? 25} unit="g" color={Palette.accent.green} />
+              <ProgressBar label="鈉 (Sodium)" current={summary.avg_sodium || 0} target={targets?.sodium ?? 2000} unit="mg" color={(summary.avg_sodium || 0) > 1800 ? Palette.status.warning : Palette.accent.pink} />
             </View>
           </SectionBlock>
 

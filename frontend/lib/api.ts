@@ -376,19 +376,29 @@ export async function fetchRecords(
 }
 
 /** Fetch every record page so trend aggregation never drops a busy user's meals. */
-export async function fetchAllRecords(apiBaseUrl: string, userId: string, auth?: ApiAuth): Promise<DietaryRecord[]> {
+export async function fetchAllRecordsWithTargets(
+  apiBaseUrl: string,
+  userId: string,
+  auth?: ApiAuth
+): Promise<{ records: DietaryRecord[]; targets?: NutritionTargets }> {
   const pageSize = 250;
   const records: DietaryRecord[] = [];
   let offset = 0;
+  let targets: NutritionTargets | undefined;
 
   while (true) {
     const page = await fetchRecords(apiBaseUrl, userId, undefined, auth, { limit: pageSize, offset });
+    targets = targets ?? page.nutrition_targets;
     records.push(...(page.records || []));
     if ((page.records || []).length < pageSize) break;
     offset += pageSize;
   }
 
-  return records;
+  return { records, targets };
+}
+
+export async function fetchAllRecords(apiBaseUrl: string, userId: string, auth?: ApiAuth): Promise<DietaryRecord[]> {
+  return (await fetchAllRecordsWithTargets(apiBaseUrl, userId, auth)).records;
 }
 
 export async function createDietaryRecord(
@@ -532,7 +542,8 @@ export async function indexNearbyVenues(
       lng: params.lng,
       radius_km: params.radiusKm,
       category: params.category,
-      limit: params.limit ?? 10,
+      // Places 按請求計費，不是按筆數，所以一次要滿 20 家跟要 10 家一樣的錢
+      limit: params.limit ?? 20,
     }),
   });
 }

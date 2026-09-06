@@ -315,7 +315,7 @@ def index_nearby_venues(
     radius_km = min(max(float(params.get("radius_km", 3)), 0.5), 10)
     category = str(params.get("category", "all") or "all").strip().lower()
     budget = int(params.get("budget", 150))
-    limit = min(max(int(params.get("limit", 10)), 1), 20)
+    limit = min(max(int(params.get("limit", 20)), 1), 20)
 
     try:
         places = fetch_places(lat, lng, radius_km, category, budget, limit=limit)

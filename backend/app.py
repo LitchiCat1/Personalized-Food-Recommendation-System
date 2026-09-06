@@ -569,7 +569,7 @@ def index_nearby_restaurants(user_id):
     try:
         summary = index_nearby_venues(
             storage,
-            {**_seed_request_params(data), "limit": data.get("limit", 10)},
+            {**_seed_request_params(data), "limit": data.get("limit", 20)},
             fetch_google_places_restaurants,
             enrich_restaurant_with_gemini,
         )

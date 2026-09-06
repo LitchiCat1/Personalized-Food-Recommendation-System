@@ -23,6 +23,8 @@ MEAL_ORDER = ("早餐", "午餐", "晚餐")
 MEAL_HOURS = {"早餐": (8, 0), "午餐": (12, 30), "晚餐": (19, 0)}
 
 SEED_SOURCES = ("recommend",)
+# 灌入只剩 recommend，但刪除仍要能清掉舊版 curated 灌進去的紀錄
+CLEARABLE_SOURCES = ("recommend", "curated")
 MAX_DAYS = 14
 # 找到的店家沒有菜單時要送去 Gemini 分析，但那是外部呼叫，
 # 用「時間預算」而不是固定次數控制，才不會在 Render 上把整個 request 拖到逾時。

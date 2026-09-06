@@ -320,6 +320,14 @@ class ApiRouteTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 400)
 
+    def test_week_seed_delete_still_accepts_the_retired_curated_source(self):
+        """灌入只剩 recommend，但清除按鈕仍要能刪掉舊版 curated 留下的紀錄。"""
+        with self.mock_auth("user-a"):
+            response = self.client.delete(
+                "/seed/week-records/user-a?source=curated&days=7", headers=self.auth_headers()
+            )
+        self.assertEqual(response.status_code, 200)
+
     def test_record_route_recalculates_totals_instead_of_trusting_payload(self):
         payload = {
             "user_id": "user-a",

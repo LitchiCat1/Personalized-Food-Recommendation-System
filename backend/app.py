@@ -44,7 +44,7 @@ from services.vision_food_service import (
 from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini, parse_menu_image_with_gemini
 from services.medical_risk_service import evaluate_medical_risk
 from services.google_places_service import fetch_google_places_restaurants
-from services.week_seed_service import SEED_SOURCES, SeedDataUnavailable, clear_week_records, seed_week_records
+from services.week_seed_service import CLEARABLE_SOURCES, SEED_SOURCES, SeedDataUnavailable, clear_week_records, seed_week_records
 
 
 load_local_env()
@@ -550,7 +550,7 @@ def create_week_seed_records(user_id):
     data = request.get_json(silent=True) or {}
     source = str(data.get("source", "recommend")).strip().lower()
     if source not in SEED_SOURCES:
-        return jsonify({"error": "source 必須是 recommend 或 curated"}), 400
+        return jsonify({"error": f"source 必須是 {' 或 '.join(SEED_SOURCES)}"}), 400
 
     user = storage.get_user(user_id)
     if not user:
@@ -583,8 +583,8 @@ def create_week_seed_records(user_id):
 def delete_week_seed_records(user_id):
     require_user_access(user_id)
     source = str(request.args.get("source", "recommend")).strip().lower()
-    if source not in SEED_SOURCES:
-        return jsonify({"error": "source 必須是 recommend 或 curated"}), 400
+    if source not in CLEARABLE_SOURCES:
+        return jsonify({"error": f"source 必須是 {' 或 '.join(CLEARABLE_SOURCES)}"}), 400
     try:
         days = int(request.args.get("days", 7))
     except (TypeError, ValueError):

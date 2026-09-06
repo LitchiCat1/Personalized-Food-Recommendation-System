@@ -302,6 +302,35 @@ class ApiRouteTests(unittest.TestCase):
             )
         self.assertEqual(cleared.get_json()["removed"], 21)
 
+    def test_seeding_again_replaces_the_previous_week_instead_of_skipping(self):
+        """紀錄 id 是推導出來的，不覆蓋的話重按②會整批被當成重複而跳過。"""
+        with self.mock_auth("user-a"):
+            self.client.post(
+                "/user",
+                json={"user_id": "user-a", "name": "Seed User", "height": 170, "weight": 65, "age": 25},
+                headers=self.auth_headers(),
+            )
+            self._index_two_venues()
+            first = self.client.post(
+                "/seed/week-records/user-a",
+                json={"source": "recommend", "days": 7, "budget": 150},
+                headers=self.auth_headers(),
+            ).get_json()
+            second = self.client.post(
+                "/seed/week-records/user-a",
+                json={"source": "recommend", "days": 7, "budget": 150},
+                headers=self.auth_headers(),
+            ).get_json()
+            records = self.client.get(
+                "/records/user-a?limit=500", headers=self.auth_headers()
+            ).get_json()["records"]
+
+        self.assertEqual(first["replaced"], 0)
+        self.assertEqual(second["created"], 21)
+        self.assertEqual(second["replaced"], 21)
+        # 覆蓋而不是疊加
+        self.assertEqual(len(records), 21)
+
     def test_week_seed_route_tells_you_to_index_first(self):
         """沒建檔就灌入，要明確叫使用者先按①，不能塞假資料。"""
         with self.mock_auth("user-a"):

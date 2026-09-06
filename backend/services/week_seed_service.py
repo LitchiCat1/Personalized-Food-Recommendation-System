@@ -12,6 +12,7 @@ Google Places 找出附近真實店家 → 該店菜單（本地已知菜單，�
 import itertools
 import random
 import time
+from collections import Counter
 from datetime import datetime, timedelta
 
 from services.app_time_service import app_now, get_app_timezone
@@ -78,9 +79,26 @@ def _dish_from_item(item: dict, restaurant: dict) -> dict:
     return dish
 
 
-def _passes_filters(item: dict, restaurant: dict, budget: int, conditions, allergens, disease_rules, allergen_taxonomy, user) -> bool:
+_BLOCK_LABELS = {
+    "calories": "單餐熱量超標",
+    "sodium": "單餐鈉超標",
+    "protein": "單餐蛋白質超標",
+    "fat": "單餐脂肪超標",
+    "saturated_fat": "飽和脂肪超標",
+    "trans_fat": "含反式脂肪",
+    "carbs": "單餐碳水超標",
+    "sugar": "精緻糖超標",
+}
+
+
+def _block_reason(item: dict, restaurant: dict, budget: int, conditions, allergens, disease_rules, allergen_taxonomy, user) -> str | None:
+    """回傳擋掉這道菜的原因；通過就回 None。
+
+    只回 True/False 的話，看到「30 道只剩 3 道」也不知道是預算太緊、
+    過敏原、還是疾病規則的單餐上限，沒辦法決定下一步該調什麼。
+    """
     if _number(item.get("price")) > budget:
-        return False
+        return f"超過預算 {budget} 元"
     candidate = {
         "label": item.get("item_id", item.get("name")),
         "name_zh": item.get("name"),
@@ -90,7 +108,18 @@ def _passes_filters(item: dict, restaurant: dict, budget: int, conditions, aller
         **{nutrient: item.get(nutrient) for nutrient in NUTRITION_FIELDS},
     }
     risk = evaluate_medical_risk(candidate, conditions, allergens, disease_rules, allergen_taxonomy, user_profile=user)
-    return not risk.get("block_reasons")
+    blocks = [entry for entry in risk.get("risks", []) if entry.get("severity") == "block"]
+    if not blocks:
+        return None
+    first = blocks[0]
+    if first.get("type") == "allergen":
+        return "過敏原"
+    nutrient = first.get("nutrient")
+    return _BLOCK_LABELS.get(nutrient, first.get("type") or "疾病條件")
+
+
+def _passes_filters(item: dict, restaurant: dict, budget: int, conditions, allergens, disease_rules, allergen_taxonomy, user) -> bool:
+    return _block_reason(item, restaurant, budget, conditions, allergens, disease_rules, allergen_taxonomy, user) is None
 
 
 def collect_recommendation_dishes(
@@ -118,24 +147,37 @@ def collect_recommendation_dishes(
 
     dishes = []
     used_venues = 0
+    considered = 0
+    blocked = Counter()
     for venue in venues:
         items = venue.get("items") or []
         added = 0
         for item in items:
-            if _passes_filters(item, venue, budget, conditions, allergens, disease_rules, allergen_taxonomy, user):
+            considered += 1
+            reason = _block_reason(item, venue, budget, conditions, allergens, disease_rules, allergen_taxonomy, user)
+            if reason is None:
                 dishes.append(_dish_from_item(item, venue))
                 added += 1
+            else:
+                blocked[reason] += 1
         if added:
             used_venues += 1
 
+    top_blocks = "、".join(f"{reason} {count} 道" for reason, count in blocked.most_common(3))
+
     if not dishes:
         raise SeedDataUnavailable(
-            f"已建檔 {len(venues)} 家店，但沒有任何餐點通過篩選——"
-            f"可能是全部超過 {budget} 元，或被目前的疾病條件與過敏原擋掉。"
-            "請調高預算，或先按①建檔更多店家。"
+            f"已建檔 {len(venues)} 家店共 {considered} 道餐點，但沒有一道通過篩選"
+            + (f"（{top_blocks}）。" if top_blocks else "。")
+            + "請調高預算，或先按①建檔更多店家。"
         )
 
-    note = f"取自資料庫裡已建檔的 {len(venues)} 家店，其中 {used_venues} 家有你能吃的餐點。"
+    note = (
+        f"已建檔 {len(venues)} 家店共 {considered} 道餐點，通過篩選 {len(dishes)} 道"
+        f"（來自 {used_venues} 家）。"
+    )
+    if top_blocks:
+        note += f"被擋掉的主因：{top_blocks}。"
     return dishes, "google_places", note
 
 
@@ -425,14 +467,16 @@ def seed_week_records(
 
     records = build_week_records(user_id, dishes, days, source, end_date, user)
 
+    # 灌入是「重跑」而不是「補寫」：紀錄 id 是固定推導出來的，不先刪掉的話
+    # insert_record 會判定重複而整批跳過，建檔了更多店家也看不出差別。
+    replaced = sum(
+        1 for record in records if storage.delete_record(user_id, record["client_record_id"])
+    )
+
     created = 0
-    deduplicated = 0
     for record in records:
-        saved = storage.insert_record(record)
-        if saved.get("_deduplicated"):
-            deduplicated += 1
-        else:
-            created += 1
+        storage.insert_record(record)
+        created += 1
 
     targets = calculate_pdf_daily_targets(user)
     goal_types = build_nutrition_goal_types(user)
@@ -451,7 +495,7 @@ def seed_week_records(
         "fully_compliant_days": fully_compliant,
         "conditions": user.get("health_conditions", []) or [],
         "created": created,
-        "deduplicated": deduplicated,
+        "replaced": replaced,
         "dishes_available": len(dishes),
         "restaurants": len({dish.get("restaurant_name") for dish in dishes}),
         "data_source": data_source,

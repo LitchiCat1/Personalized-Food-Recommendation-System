@@ -496,7 +496,7 @@ export type WeekSeedSummary = {
   days: number;
   records: number;
   created: number;
-  deduplicated: number;
+  replaced: number;
   dishes_available: number;
   restaurants: number;
   fully_compliant_days: number;

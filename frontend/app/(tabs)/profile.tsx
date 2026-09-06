@@ -295,7 +295,7 @@ export default function ProfileScreen() {
       return {
         tone: realData && summary.fully_compliant_days === summary.days ? 'success' : 'error',
         title: `已灌入 ${summary.days} 天資料，${compliant}`,
-        message: `${summary.start_date} ~ ${summary.end_date}，取自 ${summary.restaurants} 家店共 ${summary.dishes_available} 道餐點（新增 ${summary.created} 筆、已存在 ${summary.deduplicated} 筆）。${summary.note}`,
+        message: `${summary.start_date} ~ ${summary.end_date}，取自 ${summary.restaurants} 家店共 ${summary.dishes_available} 道餐點（寫入 ${summary.created} 筆，其中覆蓋舊紀錄 ${summary.replaced} 筆）。${summary.note}`,
       };
     });
 

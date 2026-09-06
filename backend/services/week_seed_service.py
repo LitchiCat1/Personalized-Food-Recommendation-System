@@ -4,8 +4,9 @@
 Google Places 找出附近真實店家 → 該店菜單（本地已知菜單，或用 Gemini 即時估算）
 → 過濾預算與疾病禁忌 → 依 match 順序輪流分攤到七天三餐。
 
-沒有 Google Places 金鑰時會退回本地測試餐廳目錄，並在回傳的 `data_source`
-標明，不會假裝資料是真實店家來的。
+只使用真實店家的資料。本地 `restaurant_catalog.json` 的纖維／糖／飽和脂肪
+是佔位值，灌進去會讓達標判定失真，所以拿不到真實菜單時直接報錯說明原因，
+不會退回本地目錄充數。
 """
 
 import itertools
@@ -20,12 +21,16 @@ from services.nutrient_service import NUTRITION_FIELDS, normalize_nutrition_fiel
 MEAL_ORDER = ("早餐", "午餐", "晚餐")
 MEAL_HOURS = {"早餐": (8, 0), "午餐": (12, 30), "晚餐": (19, 0)}
 
-SEED_SOURCES = ("recommend", "curated")
+SEED_SOURCES = ("recommend",)
 MAX_DAYS = 14
 # 找到的店家沒有菜單時要送去 Gemini 分析，但那是外部呼叫，
 # 用「時間預算」而不是固定次數控制，才不會在 Render 上把整個 request 拖到逾時。
 MENU_ANALYSIS_BUDGET_SECONDS = 75
 MAX_MENU_ANALYSES = 6
+
+
+class SeedDataUnavailable(Exception):
+    """拿不到真實店家菜單。訊息會原樣顯示給使用者，要寫得能照著處理。"""
 
 
 def seed_client_record_id(source: str, day, meal_type: str) -> str:
@@ -81,17 +86,6 @@ def _passes_filters(item: dict, restaurant: dict, budget: int, conditions, aller
     return not risk.get("block_reasons")
 
 
-def collect_catalog_dishes(restaurant_catalog: list, user: dict, disease_rules: dict, allergen_taxonomy: dict, budget: int) -> list[dict]:
-    conditions = user.get("health_conditions", []) or []
-    allergens = user.get("allergens", []) or []
-    dishes = []
-    for restaurant in restaurant_catalog:
-        for item in restaurant.get("items", []):
-            if _passes_filters(item, restaurant, budget, conditions, allergens, disease_rules, allergen_taxonomy, user):
-                dishes.append(_dish_from_item(item, restaurant))
-    return dishes
-
-
 def collect_recommendation_dishes(
     user: dict,
     params: dict,
@@ -111,18 +105,24 @@ def collect_recommendation_dishes(
     try:
         places = fetch_places(lat, lng, radius_km, category, budget, limit=6)
     except Exception as error:  # 金鑰未設定、Billing 未開、配額用盡都走這裡
-        dishes = collect_catalog_dishes(restaurant_catalog, user, disease_rules, allergen_taxonomy, budget)
-        note = f"Google Places 無法使用（{error}），已改用本地測試餐廳目錄，資料不是真實店家。"
-        return dishes, "local_catalog_fallback", note
+        raise SeedDataUnavailable(f"店家搜尋失敗，無法取得真實店家：{error}") from error
 
     if not places:
-        dishes = collect_catalog_dishes(restaurant_catalog, user, disease_rules, allergen_taxonomy, budget)
-        note = "附近沒有搜尋到符合條件的真實店家，已改用本地測試餐廳目錄。"
-        return dishes, "local_catalog_fallback", note
+        raise SeedDataUnavailable(
+            f"半徑 {radius_km} km 內搜尋不到店家，請調整定位或把半徑放大。"
+        )
 
     conditions = user.get("health_conditions", []) or []
     allergens = user.get("allergens", []) or []
-    catalog_by_name = {str(r.get("name", "")).strip().lower(): r for r in restaurant_catalog}
+    # 目錄裡混了兩種東西：內建的 20 家測試店（纖維／糖是佔位值，不能用），
+    # 以及 /restaurant/menu 分析真實店家後寫回來的快取（可以用，還能省一次 Gemini）。
+    # 只認後者，靠 restaurant_id 前綴或 AI 標記分辨。
+    catalog_by_name = {
+        str(r.get("name", "")).strip().lower(): r
+        for r in restaurant_catalog
+        if str(r.get("restaurant_id", "")).startswith(("scraped_", "google_", "places_"))
+        or "AI標記" in (r.get("tags") or [])
+    }
 
     def add_dishes(restaurant, items) -> int:
         added = 0
@@ -179,11 +179,18 @@ def collect_recommendation_dishes(
             resolved_restaurants += 1
 
     if not dishes:
-        dishes = collect_catalog_dishes(restaurant_catalog, user, disease_rules, allergen_taxonomy, budget)
-        note = f"搜尋到 {len(places)} 家真實店家，但都沒有取得可用的菜單營養資料，已改用本地測試餐廳目錄。"
-        return dishes, "local_catalog_fallback", note
+        reason = "菜單分析沒有回傳可用餐點"
+        if enrich_failures:
+            reason = f"{enrich_failures} 家的菜單分析失敗"
+        raise SeedDataUnavailable(
+            f"搜尋到 {len(places)} 家店，但{reason}（常見原因是 Gemini 配額用盡或逾時），"
+            f"也可能是所有餐點都超過 {budget} 元或被健康條件擋掉。請稍後再試或調高預算。"
+        )
 
-    note = f"取自 Google Places 搜尋到的 {resolved_restaurants} 家真實店家，其中 {enrich_calls} 家沒有現成菜單、由 Gemini 分析後估算營養。"
+    note = (
+        f"分析了 {enrich_calls} 家沒有現成菜單的店家，"
+        f"共 {resolved_restaurants} 家有可用餐點（營養由 Gemini 估算）。"
+    )
     if enrich_failures:
         note += f" 另有 {enrich_failures} 家分析失敗略過。"
     return dishes, "google_places", note
@@ -263,23 +270,15 @@ def seed_week_records(
     budget = int(params.get("budget", 150))
     end_date = app_now().date()
 
-    if source == "recommend":
-        dishes, data_source, note = collect_recommendation_dishes(
-            {**user},
-            {**params, "target_dishes": days * len(MEAL_ORDER)},
-            restaurant_catalog,
-            disease_rules,
-            allergen_taxonomy,
-            fetch_places,
-            enrich_restaurant,
-        )
-    else:
-        dishes = collect_catalog_dishes(restaurant_catalog, user, disease_rules, allergen_taxonomy, budget)
-        data_source = "local_catalog"
-        note = "取自本地測試餐廳目錄。"
-
-    if not dishes:
-        raise ValueError("找不到符合預算與健康條件的餐點，請調高預算或放寬搜尋半徑")
+    dishes, data_source, note = collect_recommendation_dishes(
+        {**user},
+        {**params, "target_dishes": days * len(MEAL_ORDER)},
+        restaurant_catalog,
+        disease_rules,
+        allergen_taxonomy,
+        fetch_places,
+        enrich_restaurant,
+    )
 
     records = build_week_records(user_id, dishes, days, source, end_date)
 

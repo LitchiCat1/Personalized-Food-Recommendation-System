@@ -489,7 +489,7 @@ export async function fetchHealthyFoodRecommendations(
   }
 }
 
-export type WeekSeedSource = 'recommend' | 'curated';
+export type WeekSeedSource = 'recommend' | 'curated'; // curated 只保留給清除舊資料用
 
 export type WeekSeedSummary = {
   message: string;

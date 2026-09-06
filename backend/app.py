@@ -44,7 +44,7 @@ from services.vision_food_service import (
 from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini, parse_menu_image_with_gemini
 from services.medical_risk_service import evaluate_medical_risk
 from services.google_places_service import fetch_google_places_restaurants
-from services.week_seed_service import SEED_SOURCES, clear_week_records, seed_week_records
+from services.week_seed_service import SEED_SOURCES, SeedDataUnavailable, clear_week_records, seed_week_records
 
 
 load_local_env()
@@ -570,6 +570,9 @@ def create_week_seed_records(user_id):
             fetch_places=fetch_google_places_restaurants,
             enrich_restaurant=enrich_restaurant_with_gemini,
         )
+    except SeedDataUnavailable as error:
+        # 拿不到真實店家菜單就明講原因，不用本地模擬資料充數
+        return jsonify({"error": str(error)}), 409
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
 

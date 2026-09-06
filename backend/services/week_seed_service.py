@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from services.app_time_service import app_now, get_app_timezone
 from services.medical_risk_service import evaluate_medical_risk
 from services.nutrient_service import NUTRITION_FIELDS, normalize_nutrition_fields
+from services.nutrition_progress_service import build_nutrition_goal_types, calculate_pdf_daily_targets
 
 MEAL_ORDER = ("早餐", "午餐", "晚餐")
 MEAL_HOURS = {"早餐": (8, 0), "午餐": (12, 30), "晚餐": (19, 0)}
@@ -196,37 +197,83 @@ def collect_recommendation_dishes(
     return dishes, "google_places", note
 
 
-def plan_daily_dishes(dish_count: int, days: int, seed: str) -> list[list[int]]:
-    """排出每天三餐要吃哪幾道，盡量讓七天彼此都不一樣。
+def score_day(dishes: list, combo, targets: dict, goal_types: dict) -> tuple[int, float]:
+    """一天三餐加總後，符合幾項每日目標。
 
-    菜色夠多時直接洗牌切段；菜色少於一週的量時改列舉「可重複的三道組合」，
-    優先挑三道都不同的組合，這樣即使只有 3 道菜，七天也不會長得一模一樣。
+    回傳 (符合項數, 違規總幅度)。違規幅度用來在符合項數相同時分高下，
+    例如同樣差一項，鈉超標 50 mg 比超標 800 mg 好。
+    """
+    totals = {nutrient: 0.0 for nutrient in NUTRITION_FIELDS}
+    for index in combo:
+        for nutrient in NUTRITION_FIELDS:
+            totals[nutrient] += _number(dishes[index].get(nutrient))
+
+    passed = 0
+    shortfall = 0.0
+    for nutrient in NUTRITION_FIELDS:
+        target = _number(targets.get(nutrient))
+        actual = totals[nutrient]
+        if goal_types[nutrient] == "upper_limit":
+            if actual <= target:
+                passed += 1
+            else:
+                shortfall += (actual - target) / max(target, 1.0)
+        else:
+            if actual >= target:
+                passed += 1
+            else:
+                shortfall += (target - actual) / max(target, 1.0)
+    return passed, shortfall
+
+
+def plan_daily_dishes(dishes: list, days: int, seed: str, targets: dict, goal_types: dict) -> list[list[int]]:
+    """排出每天三餐，優先讓「整天加總」符合疾病別的每日目標。
+
+    只擋掉違規的單道菜是不夠的：鈉、纖維、糖這些是以「一天」為單位判定的，
+    三道各自合格的菜加起來仍可能超標。這裡列舉三道菜的組合、依符合的目標
+    項數排序，再挑出彼此不同的 N 天。
     """
     meals = len(MEAL_ORDER)
     rng = random.Random(seed)
-
-    if dish_count >= days * meals:
-        order = list(range(dish_count))
-        rng.shuffle(order)
-        return [order[index * meals:(index + 1) * meals] for index in range(days)]
+    dish_count = len(dishes)
+    if dish_count == 0:
+        return []
 
     combos = [list(combo) for combo in itertools.combinations_with_replacement(range(dish_count), meals)]
-    rng.shuffle(combos)
-    combos.sort(key=lambda combo: -len(set(combo)))  # 先用三道都不同的組合
+    rng.shuffle(combos)  # 同分時的順序要穩定但不固定偏向前面的菜
+    scored = []
+    for combo in combos:
+        passed, shortfall = score_day(dishes, combo, targets, goal_types)
+        # 同分時偏好三道都不一樣的組合
+        scored.append((-passed, shortfall, -len(set(combo)), combo))
+    scored.sort(key=lambda item: item[:3])
 
-    plan = [list(combo) for combo in combos[:days]]
-    while len(plan) < days:  # 菜色實在太少（例如只有 1~2 道）才會重複
-        plan.append(list(combos[len(plan) % len(combos)]))
+    plan = []
+    used = set()
+    for _, _, _, combo in scored:
+        key = tuple(sorted(combo))
+        if key in used:
+            continue
+        used.add(key)
+        plan.append(list(combo))
+        if len(plan) == days:
+            break
+
+    while len(plan) < days:  # 菜色太少時只能重複
+        plan.append(list(scored[len(plan) % len(scored)][3]))
+
     for combo in plan:
-        rng.shuffle(combo)  # 早午晚的順序也不要固定
+        rng.shuffle(combo)  # 早午晚順序不要固定
     return plan
 
 
-def build_week_records(user_id: str, dishes: list, days: int, source: str, end_date) -> list[dict]:
-    """把菜色發到每天三餐，七天的組合彼此不重複。"""
+def build_week_records(user_id: str, dishes: list, days: int, source: str, end_date, user: dict) -> list[dict]:
+    """把菜色發到每天三餐，盡量符合疾病別每日目標，且七天彼此不重複。"""
     tzinfo = get_app_timezone()
+    targets = calculate_pdf_daily_targets(user)
+    goal_types = build_nutrition_goal_types(user)
     records = []
-    plan = plan_daily_dishes(len(dishes), days, f"{user_id}:{source}:{end_date.isoformat()}")
+    plan = plan_daily_dishes(dishes, days, f"{user_id}:{source}:{end_date.isoformat()}", targets, goal_types)
     for day_index, dish_indexes in enumerate(plan):
         day = end_date - timedelta(days=days - 1 - day_index)
         for meal_index, dish_index in enumerate(dish_indexes):
@@ -280,7 +327,7 @@ def seed_week_records(
         enrich_restaurant,
     )
 
-    records = build_week_records(user_id, dishes, days, source, end_date)
+    records = build_week_records(user_id, dishes, days, source, end_date, user)
 
     created = 0
     deduplicated = 0
@@ -291,9 +338,21 @@ def seed_week_records(
         else:
             created += 1
 
+    targets = calculate_pdf_daily_targets(user)
+    goal_types = build_nutrition_goal_types(user)
+    fully_compliant = 0
+    for day_index in range(days):
+        day_records = records[day_index * len(MEAL_ORDER):(day_index + 1) * len(MEAL_ORDER)]
+        combo_dishes = [record["foods"][0] for record in day_records]
+        passed, _ = score_day(combo_dishes, range(len(combo_dishes)), targets, goal_types)
+        if passed == len(NUTRITION_FIELDS):
+            fully_compliant += 1
+
     return {
         "days": days,
         "records": len(records),
+        "fully_compliant_days": fully_compliant,
+        "conditions": user.get("health_conditions", []) or [],
         "created": created,
         "deduplicated": deduplicated,
         "dishes_available": len(dishes),

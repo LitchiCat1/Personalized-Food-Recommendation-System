@@ -499,6 +499,8 @@ export type WeekSeedSummary = {
   deduplicated: number;
   dishes_available: number;
   restaurants: number;
+  fully_compliant_days: number;
+  conditions: string[];
   data_source: 'google_places' | 'local_catalog' | 'local_catalog_fallback';
   note: string;
   start_date: string;

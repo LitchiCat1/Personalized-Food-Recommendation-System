@@ -279,10 +279,12 @@ export default function ProfileScreen() {
       const source: WeekSeedSource = 'recommend';
       const summary = await seedWeekRecords(apiBaseUrl, user.userId, { source, days: 7, budget: 150 }, { accessToken });
       const realData = summary.data_source === 'google_places';
+      const conditionText = summary.conditions.length ? summary.conditions.join('、') : '無疾病條件';
+      const compliant = `${summary.fully_compliant_days}/${summary.days} 天完全符合（${conditionText}）`;
       return {
-        tone: realData ? 'success' : 'error',
-        title: `已灌入 ${summary.days} 天資料（新增 ${summary.created} 筆、已存在 ${summary.deduplicated} 筆）`,
-        message: `${summary.start_date} ~ ${summary.end_date}，取自 ${summary.restaurants} 家店共 ${summary.dishes_available} 道餐點。${summary.note}`,
+        tone: realData && summary.fully_compliant_days === summary.days ? 'success' : 'error',
+        title: `已灌入 ${summary.days} 天資料，${compliant}`,
+        message: `${summary.start_date} ~ ${summary.end_date}，取自 ${summary.restaurants} 家店共 ${summary.dishes_available} 道餐點（新增 ${summary.created} 筆、已存在 ${summary.deduplicated} 筆）。${summary.note}`,
       };
     });
 

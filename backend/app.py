@@ -583,7 +583,8 @@ def index_nearby_restaurants(user_id):
 def gemini_model_diagnostics():
     """每把金鑰實際能用哪些模型。設定的清單對不上權限時只會看到一堆 404。"""
     try:
-        return jsonify(probe_gemini_models())
+        generate = request.args.get("generate") in {"1", "true", "yes"}
+        return jsonify(probe_gemini_models(generate=generate))
     except ValueError as error:
         return jsonify({"error": str(error)}), 503
 

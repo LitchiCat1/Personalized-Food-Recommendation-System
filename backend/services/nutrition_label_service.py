@@ -172,7 +172,29 @@ def get_gemini_api_keys(explicit_key: str | None = None) -> list[str]:
     return keys
 
 
-def probe_gemini_models(timeout: float = 10.0) -> dict:
+def _try_generate(key: str, model: str, timeout: float) -> tuple[int, str]:
+    """實際打一次最小的 generateContent，回 (status, 訊息)。"""
+    try:
+        res = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            params={"key": key},
+            json={"contents": [{"parts": [{"text": "ping"}]}],
+                  "generationConfig": {"maxOutputTokens": 1}},
+            timeout=timeout,
+        )
+        if res.status_code == 200:
+            return 200, "ok"
+        detail = ""
+        try:
+            detail = (res.json().get("error") or {}).get("message", "")[:160]
+        except Exception:
+            detail = res.text[:160]
+        return res.status_code, detail
+    except Exception as error:
+        return 0, str(error)[:160]
+
+
+def probe_gemini_models(timeout: float = 10.0, generate: bool = False) -> dict:
     """問 Google 每一把金鑰實際能用哪些模型。
 
     設定裡的模型清單跟金鑰的實際權限對不上時，只會看到一連串 404，
@@ -205,6 +227,18 @@ def probe_gemini_models(timeout: float = 10.0) -> dict:
             found = set(entry["available"])
             usable_everywhere = found if usable_everywhere is None else (usable_everywhere & found)
         entry["configured_and_usable"] = [m for m in configured if m in set(entry["available"])]
+
+        if generate:
+            # ListModels 會列出整個型錄，但免費方案的金鑰對某些模型呼叫
+            # generateContent 仍會回 404。真的打一次才知道哪個能用。
+            entry["generate_results"] = {}
+            for model in entry["configured_and_usable"]:
+                status, detail = _try_generate(key, model, timeout)
+                entry["generate_results"][model] = status if status == 200 else f"{status} {detail}"
+                if status == 200:
+                    entry["first_working_model"] = model
+                    break
+
         report.append(entry)
 
     return {
@@ -216,6 +250,9 @@ def probe_gemini_models(timeout: float = 10.0) -> dict:
             if not any(model in set(entry["available"]) for entry in report if entry["available"])
         ],
         "usable_by_every_key": sorted(usable_everywhere or []),
+        "keys_that_can_generate": [
+            entry["key"] for entry in report if entry.get("first_working_model")
+        ] if generate else None,
     }
 
 

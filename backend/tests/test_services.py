@@ -675,3 +675,62 @@ class MealTimeAwarePlanningTests(unittest.TestCase):
         self.assertEqual(len(plan), 3)
         for day in plan:
             self.assertTrue(all(meal for meal in day), "每一餐都要有東西吃")
+
+
+class GeminiKeyRotationTests(unittest.TestCase):
+    """一把金鑰額度用完或沒權限，不能把後面的金鑰一起拖下水。"""
+
+    def setUp(self):
+        os.environ["GEMINI_API_KEYS"] = "key-a,key-b,key-c"
+        os.environ["GEMINI_MODELS"] = "m-lite,m-flash,m-pro"
+
+    @staticmethod
+    def _reply(status, items=None):
+        class R:
+            status_code = status
+
+            def json(self):
+                return {"candidates": [{"content": {"parts": [{"text": json.dumps({"items": items or []})}]}}]}
+
+        return R()
+
+    def test_a_rate_limited_key_is_abandoned_instead_of_retried_on_every_model(self):
+        from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
+
+        calls = []
+
+        def fake_post(url, **kwargs):
+            key = url.split("key=")[1]
+            calls.append((key, url.split("/models/")[1].split(":")[0]))
+            if key == "key-a":
+                return self._reply(429)
+            return self._reply(200, [{"name": "餐點", "calories": 500, "protein": 20,
+                                      "carbs": 60, "fat": 15, "sodium": 500}])
+
+        with patch("services.robust_restaurant_scraper_service.requests.post", fake_post):
+            result = enrich_restaurant_with_gemini("測試店", "台北")
+
+        self.assertTrue(result["items"])
+        # key-a 只該被試一次就換掉，而不是三個模型全試一遍
+        self.assertEqual([key for key, _ in calls].count("key-a"), 1)
+
+    def test_one_keys_missing_permission_does_not_block_a_later_key(self):
+        """404 是金鑰沒權限，不是模型不存在——先前記成全域，後面的金鑰全被跳過。"""
+        from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
+
+        tried = []
+
+        def fake_post(url, **kwargs):
+            key = url.split("key=")[1]
+            model = url.split("/models/")[1].split(":")[0]
+            tried.append((key, model))
+            if key in {"key-a", "key-b"}:
+                return self._reply(404)
+            return self._reply(200, [{"name": "餐點", "calories": 500, "protein": 20,
+                                      "carbs": 60, "fat": 15, "sodium": 500}])
+
+        with patch("services.robust_restaurant_scraper_service.requests.post", fake_post):
+            result = enrich_restaurant_with_gemini("測試店", "台北")
+
+        self.assertTrue(result["items"])
+        self.assertIn("key-c", [key for key, _ in tried])

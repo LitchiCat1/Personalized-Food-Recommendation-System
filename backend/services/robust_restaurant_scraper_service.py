@@ -248,16 +248,22 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
         return 2
 
     candidate_models = sorted(get_gemini_models(), key=_speed_rank)
-    unavailable_models = set()
+    # 逾時是模型層級的（這個模型就是生不完），換金鑰重試同一個只是再等一次。
     timed_out_models = set()
+    # 404 是「這把金鑰沒有這個模型的權限」，是金鑰層級的。先前記成全域，
+    # 一把權限不足的金鑰就會把所有模型標成不可用，後面的金鑰全部不會被試到。
+    forbidden_by_key = {}
+    out_of_budget = False
     for gemini_key in keys:
+        if out_of_budget:
+            break
+        forbidden = forbidden_by_key.setdefault(gemini_key, set())
         for model_name in candidate_models:
-            # 模型不存在或太慢都是模型層級的事，換一把金鑰重試同一個模型只是浪費時間
-            if model_name in unavailable_models:
+            if model_name in timed_out_models or model_name in forbidden:
                 continue
             if deadline is not None and time.monotonic() >= deadline:
                 print("[!] 菜單分析已超出呼叫端給的時間預算，停止重試")
-                unavailable_models.update(candidate_models)
+                out_of_budget = True
                 break
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
@@ -274,25 +280,26 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
                         print(f"[Scraper] Successfully generated menu using key {gemini_key[:8]}... model: {model_name}")
                         balanced_items = [validate_and_balance_nutrition(item) for item in items]
                         return {"items": balanced_items}
+                elif res.status_code == 429:
+                    # 額度是綁在金鑰上的，這把已經用完，試它的其他模型只是浪費預算
+                    print(f"[!] Key {gemini_key[:8]}... 已達額度上限（429），直接換下一把金鑰")
+                    break
                 else:
                     if res.status_code == 404:
-                        unavailable_models.add(model_name)
+                        forbidden.add(model_name)
                     print(f"[!] Key {gemini_key[:8]}... model {model_name} status {res.status_code}, trying next key/model...")
             except requests.Timeout:
                 # 逾時代表這個模型在預算內生不完，別再拿其他金鑰重試同一個
-                unavailable_models.add(model_name)
                 timed_out_models.add(model_name)
                 print(f"[!] Gemini Model {model_name} 逾時 {MENU_GENERATION_TIMEOUT_SECONDS}s，跳過這個模型")
             except Exception as e:
                 print(f"[!] Gemini Model {model_name} error: {e}")
-        if len(unavailable_models) >= len(candidate_models):
-            break
 
     if timed_out_models:
         print(f"[!] 這些模型在 {MENU_GENERATION_TIMEOUT_SECONDS}s 內生不完：{sorted(timed_out_models)}")
-    not_found = unavailable_models - timed_out_models
-    if not_found:
-        print(f"[!] 這些模型金鑰沒有權限（404）：{sorted(not_found)}。可用 GEMINI_MODELS 指定其他模型。")
+    never_allowed = set.intersection(*forbidden_by_key.values()) if forbidden_by_key else set()
+    if never_allowed:
+        print(f"[!] 沒有任何一把金鑰有權限的模型（404）：{sorted(never_allowed)}。可用 GEMINI_MODELS 指定其他模型。")
     fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
     return {"items": fallback_items}
 

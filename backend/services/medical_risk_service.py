@@ -495,3 +495,48 @@ def evaluate_medical_risk(
 
 def risk_messages(risk_result: dict) -> list[str]:
     return [*risk_result.get("block_reasons", []), *risk_result.get("caution_reasons", [])]
+
+
+# ─── 門檻一致性檢查 ────────────────────────────────────────
+# disease_rules.json 是有引用、有審閱紀錄的治理檔案；上面這些依理想體重推算
+# 的公式是另一套。兩邊對同一個營養素給不同數字時，寬的那條永遠不會生效——
+# 審閱者看檔案簽核的數字，跟系統實際執行的可能不同。臨床門檻不該由程式自行
+# 挑選，所以這裡不改數字，只把分歧列出來讓人去對。
+def derived_meal_limits(user_profile: dict | None = None) -> dict:
+    """依理想體重推算的單餐上限，與 evaluate_medical_risk 內的公式一致。"""
+    height_cm = normalize_number((user_profile or {}).get("height")) or 170.0
+    weight_kg = normalize_number((user_profile or {}).get("weight")) or 65.0
+    W = 22.0 * (height_cm / 100.0) ** 2 or weight_kg
+    E = W * 30
+    return {
+        "gout": {"calories": E / 3, "fat": (E * 0.25) / 9 / 3},
+        "hyperlipidemia": {
+            "calories": E / 3, "fat": (E * 0.25) / 9 / 3,
+            "saturated_fat": (E * 0.07) / 9 / 3,
+        },
+        "hypertension": {"calories": E / 3, "sodium": 2000 / 3},
+        "kidney_disease": {"protein": (W * 0.8) / 3, "sodium": 1500 / 3},
+    }
+
+
+def rule_threshold_conflicts(disease_rules: dict, user_profile: dict | None = None) -> list[dict]:
+    """列出兩套門檻不一致的地方，並指出實際生效的是哪一個。"""
+    derived = derived_meal_limits(user_profile)
+    conflicts = []
+    for condition_id, rule in (disease_rules or {}).items():
+        configured = (rule.get("risk_nutrients") or {})
+        for nutrient, formula_limit in derived.get(condition_id, {}).items():
+            configured_limit = normalize_number((configured.get(nutrient) or {}).get("block"))
+            if not configured_limit or not formula_limit:
+                continue
+            if abs(configured_limit - formula_limit) < 0.5:
+                continue
+            conflicts.append({
+                "condition_id": condition_id,
+                "nutrient": nutrient,
+                "configured_block": round(configured_limit, 1),
+                "derived_block": round(formula_limit, 1),
+                "effective_block": round(min(configured_limit, formula_limit), 1),
+                "ignored_source": "derived" if configured_limit < formula_limit else "configured",
+            })
+    return conflicts

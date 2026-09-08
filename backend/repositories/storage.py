@@ -545,6 +545,29 @@ class StorageRepository:
             None,
         )
 
+    # 店家會改菜單、漲價、換營業時間。快取沒有時效的話，建過一次就永遠
+    # 不會更新，錯的資料會一直被當成真的用下去。
+    MENU_CACHE_MAX_AGE_DAYS = 30
+
+    def restaurant_menu_age_days(self, doc: dict) -> float | None:
+        cached_at = (doc or {}).get("cached_at")
+        if not cached_at:
+            return None
+        try:
+            stamp = datetime.fromisoformat(str(cached_at))
+        except ValueError:
+            return None
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - stamp).total_seconds() / 86400
+
+    def restaurant_menu_is_stale(self, doc: dict, max_age_days: float | None = None) -> bool:
+        """沒有時間戳的舊資料視為過期，重建一次就會補上。"""
+        age = self.restaurant_menu_age_days(doc)
+        if age is None:
+            return True
+        return age > (max_age_days if max_age_days is not None else self.MENU_CACHE_MAX_AGE_DAYS)
+
     def list_restaurant_menus(self, limit: int = 60) -> list[dict]:
         """建檔過的店家全部拿出來。灌入七天時讀這個，不必再打一次 Places。"""
         if self.use_menu_postgres:
@@ -586,7 +609,11 @@ class StorageRepository:
         if not key or not items:
             return
         name_key = self.venue_name_key(name)
-        doc = {"venue_key": key, "name": name, "name_key": name_key, "items": items, **venue}
+        doc = {
+            "venue_key": key, "name": name, "name_key": name_key, "items": items,
+            "cached_at": datetime.now(timezone.utc).isoformat(),
+            **venue,
+        }
         if self.use_menu_postgres:
             with self.menu_pg_conn.cursor() as cursor:
                 cursor.execute(

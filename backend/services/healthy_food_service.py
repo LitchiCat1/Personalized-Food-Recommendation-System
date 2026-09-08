@@ -21,6 +21,16 @@ def load_restaurant_catalog(base_dir: str) -> list[dict]:
         catalog = json.load(f)
     if not isinstance(catalog, list):
         raise ValueError("restaurant catalog must be a JSON array")
+
+    # 這份目錄的 45 道菜裡，糖／飽和脂肪／反式脂肪全部寫 0，纖維也只有四種
+    # 佔位值。Google Places 掛掉時會退回這份目錄推薦，而那三項都是「上限」類
+    # 目標，假的 0 會直接變成假的達標。用跟菜單快取同一套一致性校正補起來，
+    # 並標明是估算值。
+    for restaurant in catalog:
+        restaurant["items"] = [
+            {**validate_and_balance_nutrition(dict(item)), "nutrition_estimated": True}
+            for item in restaurant.get("items", []) or []
+        ]
     return catalog
 
 

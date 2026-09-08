@@ -44,7 +44,7 @@ from services.vision_food_service import (
     call_gemini_food_recognition_with_rotation,
 )
 from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini, parse_menu_image_with_gemini
-from services.medical_risk_service import evaluate_medical_risk
+from services.medical_risk_service import evaluate_medical_risk, rule_threshold_conflicts
 from services.google_places_service import fetch_google_places_restaurants
 from services.week_seed_service import CLEARABLE_SOURCES, SEED_SOURCES, SeedDataUnavailable, clear_week_records, index_nearby_venues, seed_week_records
 
@@ -266,7 +266,18 @@ def disease_rules():
 
 @app.route("/medical-metadata", methods=["GET"])
 def medical_metadata():
-    return jsonify(build_medical_metadata_response(DISEASE_RULES, ALLERGEN_TAXONOMY))
+    # 兩套門檻不一致時要看得見。寬的那條永遠不會生效，審閱者在規則檔上
+    # 簽核的數字可能跟系統實際執行的不同——這種事不該只存在於原始碼裡。
+    conflicts = rule_threshold_conflicts(DISEASE_RULES)
+    return jsonify({
+        **build_medical_metadata_response(DISEASE_RULES, ALLERGEN_TAXONOMY),
+        "threshold_conflicts": conflicts,
+        "threshold_conflict_note": (
+            f"{len(conflicts)} 項營養素在規則檔與程式公式之間數字不一致，"
+            "實際生效的是較嚴的那個。需要臨床人員確認要採用哪一邊。"
+            if conflicts else None
+        ),
+    })
 
 
 # ─── 0. Food Search (TFDA 中文食品搜尋) ──────────────────────

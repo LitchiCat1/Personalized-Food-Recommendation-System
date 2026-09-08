@@ -527,6 +527,7 @@ export type VenueIndexSummary = {
   message: string;
   found: number;
   already_cached: number;
+  refreshed?: number;
   analysed: number;
   failed: number;
   remaining: number;

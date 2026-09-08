@@ -423,6 +423,7 @@ def index_nearby_venues(
 
     deadline = time.monotonic() + budget_seconds
     already_cached = 0
+    refreshed = 0
     analysed = 0
     failed = 0
     remaining = 0
@@ -431,9 +432,13 @@ def index_nearby_venues(
         if not name:
             continue
         place_id = str(place.get("google_place_id") or "").strip()
-        if storage.get_restaurant_menu(name, place_id):
+        cached = storage.get_restaurant_menu(name, place_id)
+        # 太舊的快取要重新分析：店家會改菜單、漲價、換營業時間
+        if cached and not storage.restaurant_menu_is_stale(cached):
             already_cached += 1
             continue
+        if cached:
+            refreshed += 1
         if time.monotonic() >= deadline:
             remaining += 1
             continue
@@ -466,6 +471,7 @@ def index_nearby_venues(
     return {
         "found": len(places),
         "already_cached": already_cached,
+        "refreshed": refreshed,
         "analysed": analysed,
         "failed": failed,
         "remaining": remaining,

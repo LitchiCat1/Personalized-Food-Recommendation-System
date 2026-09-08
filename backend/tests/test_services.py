@@ -1009,3 +1009,34 @@ class RemainingCalorieRecommendationTests(unittest.TestCase):
         self.assertIn("小份沙拉", names)
         self.assertIn("大份炒飯", names)
         self.assertIsNone(result["calorie_note"])
+
+
+class MenuCacheStalenessTests(unittest.TestCase):
+    """店家會改菜單、漲價、換營業時間，快取不能永久有效。"""
+
+    def setUp(self):
+        self.storage = StorageRepository(None, False, {}, [], [])
+
+    def test_a_freshly_saved_menu_is_not_stale(self):
+        self.storage.save_restaurant_menu(
+            "阿美飯館", [{"name": "雞腿飯", "calories": 700}], venue={"google_place_id": "p1"}
+        )
+        doc = self.storage.get_restaurant_menu("阿美飯館", "p1")
+        self.assertFalse(self.storage.restaurant_menu_is_stale(doc))
+
+    def test_an_old_menu_is_stale(self):
+        from datetime import datetime, timedelta, timezone
+
+        doc = {"cached_at": (datetime.now(timezone.utc) - timedelta(days=45)).isoformat()}
+        self.assertTrue(self.storage.restaurant_menu_is_stale(doc))
+
+    def test_a_menu_with_no_timestamp_counts_as_stale(self):
+        """建檔功能加上時間戳之前存的資料，重建一次就會補上。"""
+        self.assertTrue(self.storage.restaurant_menu_is_stale({"items": [{"name": "x"}]}))
+
+    def test_the_age_threshold_is_configurable_per_call(self):
+        from datetime import datetime, timedelta, timezone
+
+        doc = {"cached_at": (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()}
+        self.assertFalse(self.storage.restaurant_menu_is_stale(doc, max_age_days=30))
+        self.assertTrue(self.storage.restaurant_menu_is_stale(doc, max_age_days=1))

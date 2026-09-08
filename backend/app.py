@@ -37,7 +37,7 @@ from services.nutrition_label_service import (
 )
 from services.nutrition_progress_service import build_daily_nutrition_progress, calculate_pdf_daily_targets, round_targets_for_display
 from services.nutrient_service import NUTRITION_FIELDS, get_nutrient_value
-from services.profile_service import build_bmr_response, build_user_profile
+from services.profile_service import ACTIVITY_LEVELS, build_bmr_response, build_user_profile
 from services.restaurant_ai_service import build_restaurant_ai_summary
 from services.vision_food_service import (
     build_vision_food_response,
@@ -271,6 +271,7 @@ def medical_metadata():
     conflicts = rule_threshold_conflicts(DISEASE_RULES)
     return jsonify({
         **build_medical_metadata_response(DISEASE_RULES, ALLERGEN_TAXONOMY),
+        "activity_levels": ACTIVITY_LEVELS,
         "threshold_conflicts": conflicts,
         "threshold_conflict_note": (
             f"{len(conflicts)} 項營養素在規則檔與程式公式之間數字不一致，"

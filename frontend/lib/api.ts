@@ -267,6 +267,8 @@ export type MedicalMetadataResponse = {
     conditions: MedicalConditionRule[];
     medical_disclaimer: string;
   };
+  // 運動係數的選項由後端提供，前端不再自己抄一份
+  activity_levels?: { id: string; label_zh: string; multiplier: number }[];
   allergen_taxonomy: {
     version?: string;
     review_status?: string;

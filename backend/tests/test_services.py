@@ -1113,3 +1113,61 @@ class FailureClassificationTests(unittest.TestCase):
         message = _describe_failure(requests.ConnectionError("boom"), "Gemini")
         self.assertNotIn("[BUG]", message)
         self.assertIn("ConnectionError", message)
+
+
+class ActivityLevelTests(unittest.TestCase):
+    """運動係數先前寫死 1.55，臥床的人和運動員拿到同一個 TDEE。"""
+
+    def test_each_level_maps_to_its_own_multiplier(self):
+        from services.profile_service import ACTIVITY_LEVELS, resolve_activity_multiplier
+
+        multipliers = {
+            resolve_activity_multiplier({"activity_level": level["id"]})
+            for level in ACTIVITY_LEVELS
+        }
+        self.assertEqual(len(multipliers), len(ACTIVITY_LEVELS))
+        self.assertEqual(min(multipliers), 1.2)
+        self.assertEqual(max(multipliers), 1.9)
+
+    def test_a_chinese_label_resolves_too(self):
+        from services.profile_service import resolve_activity_multiplier
+
+        self.assertEqual(resolve_activity_multiplier({"activity_level": "久坐（幾乎不運動）"}), 1.2)
+
+    def test_an_out_of_range_multiplier_is_clamped(self):
+        """這個數字最後會決定推薦哪些餐點，不能讓客戶端隨便送。"""
+        from services.profile_service import resolve_activity_multiplier
+
+        self.assertEqual(resolve_activity_multiplier({"activity_multiplier": 99}), 1.9)
+        self.assertEqual(resolve_activity_multiplier({"activity_multiplier": 0}), 1.2)
+        self.assertEqual(resolve_activity_multiplier({"activity_multiplier": "abc"}), 1.55)
+
+    def test_tdee_actually_changes_with_the_level(self):
+        from services.profile_service import build_user_profile
+
+        base = {"user_id": "u", "gender": "female", "height": 157, "weight": 50, "age": 22}
+        sedentary = build_user_profile({**base, "activity_level": "sedentary"})
+        very_active = build_user_profile({**base, "activity_level": "very_active"})
+        self.assertEqual(sedentary["bmr"], very_active["bmr"])
+        self.assertLess(sedentary["tdee"], very_active["tdee"])
+        self.assertEqual(sedentary["tdee"], round(sedentary["bmr"] * 1.2))
+
+    def test_the_reported_level_matches_the_multiplier_actually_used(self):
+        """先前 activity_level 是照抄輸入的，可能跟生效的係數對不上。"""
+        from services.profile_service import build_user_profile
+
+        profile = build_user_profile({
+            "user_id": "u", "height": 170, "weight": 65, "age": 30,
+            "activity_level": "極高活動（勞力工作或每日訓練）", "activity_multiplier": 1.2,
+        })
+        self.assertEqual(profile["activity_multiplier"], 1.9)
+        self.assertIn("極高活動", profile["activity_level"])
+
+    def test_sex_changes_the_bmr(self):
+        """編輯表單先前沒有性別欄，一律以男性計算，兩者相差 166 kcal。"""
+        from services.profile_service import build_user_profile
+
+        base = {"user_id": "u", "height": 157, "weight": 50, "age": 22}
+        male = build_user_profile({**base, "gender": "male"})
+        female = build_user_profile({**base, "gender": "female"})
+        self.assertEqual(male["bmr"] - female["bmr"], 166)

@@ -48,6 +48,9 @@ export default function ProfileScreen() {
     dailyCalorieTarget: String(user.dailyCalorieTarget),
     targetWeight: String(user.targetWeight || ''),
     dietType: user.dietType,
+    gender: user.gender,
+    activityLevel: user.activityLevel,
+    activityMultiplier: user.activityMultiplier,
   });
 
   useEffect(() => {
@@ -127,8 +130,11 @@ export default function ProfileScreen() {
       dailyCalorieTarget: String(user.dailyCalorieTarget),
       targetWeight: String(user.targetWeight || ''),
       dietType: user.dietType,
+      gender: user.gender,
+      activityLevel: user.activityLevel,
+      activityMultiplier: user.activityMultiplier,
     });
-  }, [user.name, user.height, user.weight, user.age, user.dailyCalorieTarget, user.targetWeight, user.dietType]);
+  }, [user.name, user.height, user.weight, user.age, user.dailyCalorieTarget, user.targetWeight, user.dietType, user.gender, user.activityLevel, user.activityMultiplier]);
 
   const syncProfile = async (nextUser = user) => {
     setSaving(true);
@@ -164,7 +170,7 @@ export default function ProfileScreen() {
     }
   };
 
-  const updateDraft = (key: keyof typeof profileDraft, value: string) => {
+  const updateDraft = <K extends keyof typeof profileDraft>(key: K, value: (typeof profileDraft)[K]) => {
     setProfileDraft((draft) => ({ ...draft, [key]: value }));
   };
 
@@ -210,6 +216,17 @@ export default function ProfileScreen() {
     }));
   }, [medicalMetadata]);
 
+  // 選項由後端提供，前端不再自己抄一份，免得兩邊數字慢慢走鐘
+  const activityLevels = medicalMetadata?.activity_levels?.length
+    ? medicalMetadata.activity_levels
+    : [
+        { id: 'sedentary', label_zh: '久坐（幾乎不運動）', multiplier: 1.2 },
+        { id: 'light', label_zh: '輕度活動（每週 1-3 天）', multiplier: 1.375 },
+        { id: 'moderate', label_zh: '中等活動（每週 3-5 天）', multiplier: 1.55 },
+        { id: 'active', label_zh: '高度活動（每週 6-7 天）', multiplier: 1.725 },
+        { id: 'very_active', label_zh: '極高活動（勞力工作或每日訓練）', multiplier: 1.9 },
+      ];
+
   const allergenCatalog = useMemo(() => {
     if (medicalMetadata?.allergen_taxonomy.groups?.length) return medicalMetadata.allergen_taxonomy.groups;
     return AVAILABLE_ALLERGENS.map((label, index) => ({
@@ -233,6 +250,9 @@ export default function ProfileScreen() {
       dailyCalorieTarget: Math.round(parsePositiveNumber(profileDraft.dailyCalorieTarget, user.dailyCalorieTarget)),
       targetWeight: parsePositiveNumber(profileDraft.targetWeight, user.targetWeight),
       dietType: profileDraft.dietType,
+      gender: profileDraft.gender,
+      activityLevel: profileDraft.activityLevel,
+      activityMultiplier: profileDraft.activityMultiplier,
     };
 
     await syncProfile(nextUser);
@@ -599,24 +619,75 @@ export default function ProfileScreen() {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
               <View style={styles.formGrid}>
                 {[
-                  { key: 'name', label: '姓名', keyboardType: 'default' as const },
-                  { key: 'height', label: '身高 cm', keyboardType: 'numeric' as const },
-                  { key: 'weight', label: '體重 kg', keyboardType: 'numeric' as const },
-                  { key: 'age', label: '年齡', keyboardType: 'numeric' as const },
-                  { key: 'dailyCalorieTarget', label: '每日熱量 kcal', keyboardType: 'numeric' as const },
-                  { key: 'targetWeight', label: '目標體重 kg', keyboardType: 'numeric' as const },
+                  { key: 'name' as const, label: '姓名', keyboardType: 'default' as const },
+                  { key: 'height' as const, label: '身高 cm', keyboardType: 'numeric' as const },
+                  { key: 'weight' as const, label: '體重 kg', keyboardType: 'numeric' as const },
+                  { key: 'age' as const, label: '年齡', keyboardType: 'numeric' as const },
+                  { key: 'dailyCalorieTarget' as const, label: '每日熱量 kcal', keyboardType: 'numeric' as const },
+                  { key: 'targetWeight' as const, label: '目標體重 kg', keyboardType: 'numeric' as const },
                 ].map((field) => (
                   <View key={field.key} style={[styles.inputGroup, { width: gridCol2(Spacing.sm) }]}>
                     <Text style={styles.inputLabel}>{field.label}</Text>
                     <TextInput
-                      value={profileDraft[field.key as keyof typeof profileDraft]}
-                      onChangeText={(value) => updateDraft(field.key as keyof typeof profileDraft, value)}
+                      value={profileDraft[field.key]}
+                      onChangeText={(value) => updateDraft(field.key, value)}
                       keyboardType={field.keyboardType}
                       placeholderTextColor={Palette.text.muted}
                       style={styles.profileInput}
                     />
                   </View>
                 ))}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>生理性別</Text>
+                <Text style={styles.inputHint}>BMR 公式男女相差 166 kcal，先前一律以男性計算。</Text>
+                <View style={styles.dietOptions}>
+                  {([['male', '男性'], ['female', '女性']] as const).map(([value, label]) => {
+                    const active = profileDraft.gender === value;
+                    return (
+                      <Pressable
+                        key={value}
+                        accessibilityRole="radio"
+                        accessibilityLabel={label}
+                        accessibilityState={{ checked: active }}
+                        onPress={() => updateDraft('gender', value)}
+                        style={[styles.dietOption, active && styles.dietOptionActive]}
+                      >
+                        <Ionicons name={active ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={active ? Palette.accent.green : Palette.text.tertiary} />
+                        <Text style={[styles.dietOptionText, active && styles.dietOptionTextActive]}>{label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>運動量</Text>
+                <Text style={styles.inputHint}>決定 TDEE = BMR × 係數。先前寫死中等活動量，所有人都一樣。</Text>
+                <View style={styles.activityOptions}>
+                  {activityLevels.map((level: { id: string; label_zh: string; multiplier: number }) => {
+                    const active = profileDraft.activityMultiplier === level.multiplier;
+                    return (
+                      <Pressable
+                        key={level.id}
+                        accessibilityRole="radio"
+                        accessibilityLabel={level.label_zh}
+                        accessibilityState={{ checked: active }}
+                        onPress={() => {
+                          updateDraft('activityLevel', level.label_zh);
+                          updateDraft('activityMultiplier', level.multiplier);
+                        }}
+                        style={[styles.dietOption, active && styles.dietOptionActive]}
+                      >
+                        <Ionicons name={active ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={active ? Palette.accent.green : Palette.text.tertiary} />
+                        <Text style={[styles.dietOptionText, active && styles.dietOptionTextActive]}>
+                          {level.label_zh}　×{level.multiplier}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
 
               <View style={styles.inputGroup}>
@@ -719,6 +790,8 @@ const styles = StyleSheet.create({
   formGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.lg },
   inputGroup: { gap: Spacing.xs },
   inputLabel: { ...Typography.small, color: Palette.text.tertiary },
+  inputHint: { ...Typography.small, color: Palette.text.tertiary, marginBottom: Spacing.xs },
+  activityOptions: { gap: Spacing.sm },
   profileInput: {
     minHeight: 46,
     color: Palette.text.primary,

@@ -115,9 +115,16 @@ if _allowed_origins:
     CORS(app, origins=_allowed_origins, supports_credentials=True)
     print(f"[OK] CORS restricted to {len(_allowed_origins)} origin(s)")
 else:
-    # 沒設定時只放行本機開發用的來源，不再對全世界開放
-    CORS(app, origins=["http://localhost:8081", "http://localhost:19006", "http://127.0.0.1:8081"])
-    print("[WARN] ALLOWED_ORIGINS 未設定，只放行 localhost。部署時請設成前端網址。")
+    # 沒設定時放行本機開發，外加本專案自己的前端。列成具名清單而不是萬用字元：
+    # 「任何 onrender.com」等於誰都能在 Render 上架個網站來打這個後端。
+    CORS(app, origins=[
+        "http://localhost:8081",
+        "http://localhost:19006",
+        "http://127.0.0.1:8081",
+        "https://nutrilens-frontend-32ob.onrender.com",
+        "https://personalized-food-recommendation-frontend-rt1v.onrender.com",
+    ])
+    print("[WARN] ALLOWED_ORIGINS 未設定，改用內建的前端清單。換網址時請設定它。")
 
 # 會呼叫 Gemini / Google Places 的路由要限流，那些都是按次計費的
 _paid_api_limiter = build_limiter("RATE_LIMIT_PAID_CALLS", 12)

@@ -187,6 +187,42 @@ def _condition_nutrient_hits(nutrients: dict, condition_id: str, rule: dict) -> 
     return hits
 
 
+NUTRIENT_LABELS_ZH = {
+    "calories": "熱量", "protein": "蛋白質", "carbs": "碳水化合物", "sugar": "精緻糖",
+    "fat": "總脂肪", "saturated_fat": "飽和脂肪", "trans_fat": "反式脂肪",
+    "fiber": "膳食纖維", "sodium": "鈉",
+}
+
+
+def resolve_personalized_limit(spec: dict, daily_energy: float, ideal_weight: float):
+    """把 disease_rules.json 宣告的單餐上限算成一個數字。
+
+    只支援三種基準，不做字串求值——規則檔是資料，不該能執行任意運算式。
+      daily_energy      每日熱量的一部分，可再用 kcal_per_gram 換算成公克
+      ideal_body_weight 每公斤理想體重多少公克
+      absolute          直接給每日總量
+    """
+    meals = float(spec.get("meals_per_day") or 3) or 3
+    basis = spec.get("basis")
+
+    if basis == "daily_energy":
+        daily = daily_energy * float(spec.get("share", 1.0))
+        per_gram = spec.get("kcal_per_gram")
+        if per_gram:
+            daily = daily / float(per_gram)
+    elif basis == "ideal_body_weight":
+        daily = ideal_weight * float(spec.get("per_kg", 0))
+    elif basis == "absolute":
+        daily = float(spec.get("daily_amount", 0))
+    else:
+        return None
+
+    cap = spec.get("cap")
+    if cap is not None:
+        daily = min(daily, float(cap))
+    return daily / meals
+
+
 def evaluate_medical_risk(
     candidate: dict,
     user_conditions: list,
@@ -285,200 +321,33 @@ def evaluate_medical_risk(
                 "unit": "g",
             })
 
-        # C. 糖尿病 (Diabetes) 專屬評估 (單餐 = 每日目標 / 3)
-        if condition_id == "diabetes":
-            # 總熱量
-            cal_val = normalize_number(nutrients.get("calories"))
-            cal_limit = E / 3.0
-            if cal_val > cal_limit:
-                risks.append({
-                    "type": "nutrient_limit",
-                    "severity": "block",
-                    "condition_id": condition_id,
-                    "condition_label_zh": condition_label,
-                    "message": f"{condition_label}風險：單餐熱量 {cal_val:.0f} kcal 超過建議 {cal_limit:.0f} kcal (目標 W*30 或 W*25)。",
-                    "nutrient": "calories",
-                    "value": cal_val,
-                    "limit": cal_limit,
-                    "unit": "kcal",
-                })
-            # 總碳水 (比例 45%-50% -> 上限取 50%)
-            carbs_val = normalize_number(nutrients.get("carbs"))
-            carbs_limit = (E * 0.50) / 4.0 / 3.0
-            if carbs_val > carbs_limit:
-                risks.append({
-                    "type": "nutrient_limit",
-                    "severity": "block",
-                    "condition_id": condition_id,
-                    "condition_label_zh": condition_label,
-                    "message": f"{condition_label}風險：單餐碳水化合物 {carbs_val:.1f}g 超過上限 {carbs_limit:.1f}g (限制比例 50%)。",
-                    "nutrient": "carbs",
-                    "value": carbs_val,
-                    "limit": carbs_limit,
-                    "unit": "g",
-                })
-            # 精緻糖 (< 5% 且 < 25g)
-            sugar_val = normalize_number(nutrients.get("sugar"))
-            sugar_limit = min((E * 0.05) / 4.0, 25.0) / 3.0
-            if sugar_val > sugar_limit:
-                risks.append({
-                    "type": "nutrient_limit",
-                    "severity": "block",
-                    "condition_id": condition_id,
-                    "condition_label_zh": condition_label,
-                    "message": f"{condition_label}風險：單餐精緻糖 {sugar_val:.1f}g 超過上限 {sugar_limit:.1f}g (上限 5% 且 < 25g)。",
-                    "nutrient": "sugar",
-                    "value": sugar_val,
-                    "limit": sugar_limit,
-                    "unit": "g",
-                })
-
-        # D. 痛風 (Gout) 專屬評估 (單餐 = 每日目標 / 3)
-        elif condition_id == "gout":
-            # 總熱量
-            cal_val = normalize_number(nutrients.get("calories"))
-            cal_limit = E / 3.0
-            if cal_val > cal_limit:
-                risks.append({
-                    "type": "nutrient_limit",
-                    "severity": "block",
-                    "condition_id": condition_id,
-                    "condition_label_zh": condition_label,
-                    "message": f"{condition_label}風險：單餐熱量 {cal_val:.0f} kcal 超過建議 {cal_limit:.0f} kcal。",
-                    "nutrient": "calories",
-                    "value": cal_val,
-                    "limit": cal_limit,
-                    "unit": "kcal",
-                })
-            # 總脂肪 (< 25%)
-            fat_val = normalize_number(nutrients.get("fat"))
-            fat_limit = (E * 0.25) / 9.0 / 3.0
-            if fat_val > fat_limit:
-                risks.append({
-                    "type": "nutrient_limit",
-                    "severity": "block",
-                    "condition_id": condition_id,
-                    "condition_label_zh": condition_label,
-                    "message": f"{condition_label}風險：單餐總脂肪 {fat_val:.1f}g 超過建議 {fat_limit:.1f}g (高脂影響尿酸排泄)。",
-                    "nutrient": "fat",
-                    "value": fat_val,
-                    "limit": fat_limit,
-                    "unit": "g",
-                })
-
-        # E. 高血脂 (Hyperlipidemia) 專屬評估 (單餐 = 每日目標 / 3)
-        elif condition_id == "hyperlipidemia":
-            # 總熱量
-            cal_val = normalize_number(nutrients.get("calories"))
-            cal_limit = E / 3.0
-            if cal_val > cal_limit:
-                risks.append({
-                    "type": "nutrient_limit",
-                    "severity": "block",
-                    "condition_id": condition_id,
-                    "condition_label_zh": condition_label,
-                    "message": f"{condition_label}風險：單餐熱量 {cal_val:.0f} kcal 超過建議 {cal_limit:.0f} kcal。",
-                    "nutrient": "calories",
-                    "value": cal_val,
-                    "limit": cal_limit,
-                    "unit": "kcal",
-                })
-            # 總脂肪 (< 25% 低脂飲食)
-            fat_val = normalize_number(nutrients.get("fat"))
-            fat_limit = (E * 0.25) / 9.0 / 3.0
-            if fat_val > fat_limit:
-                risks.append({
-                    "type": "nutrient_limit",
-                    "severity": "block",
-                    "condition_id": condition_id,
-                    "condition_label_zh": condition_label,
-                    "message": f"{condition_label}風險：單餐總脂肪 {fat_val:.1f}g 超過低脂上限 {fat_limit:.1f}g。",
-                    "nutrient": "fat",
-                    "value": fat_val,
-                    "limit": fat_limit,
-                    "unit": "g",
-                })
-            # 飽和脂肪 (< 7% 嚴格控管)
-            sat_fat_val = normalize_number(nutrients.get("saturated_fat"))
-            sat_fat_limit = (E * 0.07) / 9.0 / 3.0
-            if sat_fat_val > sat_fat_limit:
-                risks.append({
-                    "type": "nutrient_limit",
-                    "severity": "block",
-                    "condition_id": condition_id,
-                    "condition_label_zh": condition_label,
-                    "message": f"{condition_label}風險：單餐飽和脂肪 {sat_fat_val:.1f}g 超過限額 {sat_fat_limit:.1f}g (嚴格控管 7%)。",
-                    "nutrient": "saturated_fat",
-                    "value": sat_fat_val,
-                    "limit": sat_fat_limit,
-                    "unit": "g",
-                })
-
-        # F. 高血壓 (Hypertension) 專屬評估 (單餐 = 每日目標 / 3)
-        elif condition_id == "hypertension":
-            # 總熱量
-            cal_val = normalize_number(nutrients.get("calories"))
-            cal_limit = E / 3.0
-            if cal_val > cal_limit:
-                risks.append({
-                    "type": "nutrient_limit",
-                    "severity": "block",
-                    "condition_id": condition_id,
-                    "condition_label_zh": condition_label,
-                    "message": f"{condition_label}風險：單餐熱量 {cal_val:.0f} kcal 超過建議 {cal_limit:.0f} kcal。",
-                    "nutrient": "calories",
-                    "value": cal_val,
-                    "limit": cal_limit,
-                    "unit": "kcal",
-                })
-            # 鈉含量 (< 2000mg 得舒飲食)
-            sodium_val = normalize_number(nutrients.get("sodium"))
-            sodium_limit = 2000.0 / 3.0
-            if sodium_val > sodium_limit:
-                risks.append({
-                    "type": "nutrient_limit",
-                    "severity": "block",
-                    "condition_id": condition_id,
-                    "condition_label_zh": condition_label,
-                    "message": f"{condition_label}風險：單餐鈉含量 {sodium_val:.0f} mg 超過限額 {sodium_limit:.0f} mg (得舒飲食核心)。",
-                    "nutrient": "sodium",
-                    "value": sodium_val,
-                    "limit": sodium_limit,
-                    "unit": "mg",
-                })
-
-        # G. 慢性腎臟病 (Kidney Disease, 3-5期) 專屬評估 (單餐 = 每日目標 / 3)
-        elif condition_id == "kidney_disease":
-            # 蛋白質 (W*0.6 ~ W*0.8, 嚴格限量上限為 W*0.8)
-            prot_val = normalize_number(nutrients.get("protein"))
-            prot_limit = (W * 0.8) / 3.0
-            if prot_val > prot_limit:
-                risks.append({
-                    "type": "nutrient_limit",
-                    "severity": "block",
-                    "condition_id": condition_id,
-                    "condition_label_zh": condition_label,
-                    "message": f"{condition_label}風險：單餐蛋白質 {prot_val:.1f}g 超過【嚴格限量】上限 {prot_limit:.1f}g (依體重 W*0.8 計)。",
-                    "nutrient": "protein",
-                    "value": prot_val,
-                    "limit": prot_limit,
-                    "unit": "g",
-                })
-            # 鈉含量 (< 1500mg)
-            sodium_val = normalize_number(nutrients.get("sodium"))
-            sodium_limit = 1500.0 / 3.0
-            if sodium_val > sodium_limit:
-                risks.append({
-                    "type": "nutrient_limit",
-                    "severity": "block",
-                    "condition_id": condition_id,
-                    "condition_label_zh": condition_label,
-                    "message": f"{condition_label}風險：單餐鈉含量 {sodium_val:.0f} mg 超過慢性腎臟病建議上限 {sodium_limit:.0f} mg。",
-                    "nutrient": "sodium",
-                    "value": sodium_val,
-                    "limit": sodium_limit,
-                    "unit": "mg",
-                })
+        # 依個人理想體重推算的單餐上限。公式宣告在 disease_rules.json 的
+        # personalized_limits，這裡只負責求值——先前每個疾病各寫一段 if，
+        # 跟規則檔的 risk_nutrients 形成兩套會各自漂移的數字。
+        for nutrient, spec in (rule.get("personalized_limits") or {}).items():
+            limit = resolve_personalized_limit(spec, E, W)
+            if limit is None:
+                continue
+            value = normalize_number(nutrients.get(nutrient))
+            if value <= limit:
+                continue
+            unit = spec.get("unit", "")
+            note = spec.get("note")
+            label = NUTRIENT_LABELS_ZH.get(nutrient, nutrient)
+            risks.append({
+                "type": "nutrient_limit",
+                "severity": "block",
+                "condition_id": condition_id,
+                "condition_label_zh": condition_label,
+                "message": (
+                    f"{condition_label}風險：單餐{label} {value:.1f}{unit} "
+                    f"超過上限 {limit:.1f}{unit}" + (f"（{note}）。" if note else "。")
+                ),
+                "nutrient": nutrient,
+                "value": value,
+                "limit": limit,
+                "unit": unit,
+            })
 
     block_reasons = [risk["message"] for risk in risks if risk["severity"] == "block"]
     caution_reasons = [risk["message"] for risk in risks if risk["severity"] == "caution"]
@@ -502,26 +371,31 @@ def risk_messages(risk_result: dict) -> list[str]:
 # 的公式是另一套。兩邊對同一個營養素給不同數字時，寬的那條永遠不會生效——
 # 審閱者看檔案簽核的數字，跟系統實際執行的可能不同。臨床門檻不該由程式自行
 # 挑選，所以這裡不改數字，只把分歧列出來讓人去對。
-def derived_meal_limits(user_profile: dict | None = None) -> dict:
-    """依理想體重推算的單餐上限，與 evaluate_medical_risk 內的公式一致。"""
+def derived_meal_limits(disease_rules: dict, user_profile: dict | None = None) -> dict:
+    """把規則檔宣告的個人化上限算成實際數字。
+
+    先前這裡自己抄了一份公式，等於第三套會漂移的數字。現在跟
+    evaluate_medical_risk 讀同一份宣告。
+    """
     height_cm = normalize_number((user_profile or {}).get("height")) or 170.0
     weight_kg = normalize_number((user_profile or {}).get("weight")) or 65.0
     W = 22.0 * (height_cm / 100.0) ** 2 or weight_kg
     E = W * 30
-    return {
-        "gout": {"calories": E / 3, "fat": (E * 0.25) / 9 / 3},
-        "hyperlipidemia": {
-            "calories": E / 3, "fat": (E * 0.25) / 9 / 3,
-            "saturated_fat": (E * 0.07) / 9 / 3,
-        },
-        "hypertension": {"calories": E / 3, "sodium": 2000 / 3},
-        "kidney_disease": {"protein": (W * 0.8) / 3, "sodium": 1500 / 3},
-    }
+    limits = {}
+    for condition_id, rule in (disease_rules or {}).items():
+        resolved = {}
+        for nutrient, spec in (rule.get("personalized_limits") or {}).items():
+            value = resolve_personalized_limit(spec, E, W)
+            if value is not None:
+                resolved[nutrient] = value
+        if resolved:
+            limits[condition_id] = resolved
+    return limits
 
 
 def rule_threshold_conflicts(disease_rules: dict, user_profile: dict | None = None) -> list[dict]:
     """列出兩套門檻不一致的地方，並指出實際生效的是哪一個。"""
-    derived = derived_meal_limits(user_profile)
+    derived = derived_meal_limits(disease_rules, user_profile)
     conflicts = []
     for condition_id, rule in (disease_rules or {}).items():
         configured = (rule.get("risk_nutrients") or {})

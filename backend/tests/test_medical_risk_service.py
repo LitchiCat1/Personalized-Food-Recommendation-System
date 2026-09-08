@@ -262,10 +262,87 @@ class ThresholdConflictReportTests(MedicalRiskTestCase):
     def test_matching_thresholds_are_not_reported_as_conflicts(self):
         from services.medical_risk_service import derived_meal_limits, rule_threshold_conflicts
 
-        derived = derived_meal_limits(PROFILE)
+        # 兩邊都從同一份宣告算出來，數字對齊時就不該報成衝突
         aligned = {
             "hypertension": {
-                "risk_nutrients": {"sodium": {"block": derived["hypertension"]["sodium"]}}
+                "personalized_limits": {
+                    "sodium": {"basis": "absolute", "daily_amount": 1800.0, "meals_per_day": 3}
+                },
+                "risk_nutrients": {"sodium": {"block": 600.0}},
             }
         }
+        self.assertEqual(derived_meal_limits(aligned, PROFILE)["hypertension"]["sodium"], 600.0)
         self.assertEqual(rule_threshold_conflicts(aligned, PROFILE), [])
+
+    def test_the_diabetes_disagreements_are_reported_too(self):
+        """先前的比對清單是手抄的，整組糖尿病都沒被檢查到。"""
+        from services.medical_risk_service import rule_threshold_conflicts
+
+        pairs = {
+            (c["condition_id"], c["nutrient"])
+            for c in rule_threshold_conflicts(self.rules, PROFILE)
+        }
+        self.assertIn(("diabetes", "sugar"), pairs)
+        self.assertIn(("diabetes", "carbs"), pairs)
+
+
+class DeclaredLimitTests(MedicalRiskTestCase):
+    """單餐上限的公式宣告在規則檔，程式只負責求值。"""
+
+    def test_every_condition_declares_its_personalized_limits(self):
+        for condition_id in ("diabetes", "gout", "hyperlipidemia", "hypertension", "kidney_disease"):
+            with self.subTest(condition=condition_id):
+                self.assertTrue(self.rules[condition_id].get("personalized_limits"))
+
+    def test_an_energy_share_converts_to_grams(self):
+        from services.medical_risk_service import resolve_personalized_limit
+
+        # 每日 1800 kcal 的 25% 當脂肪，1g 脂肪 9 kcal，分三餐
+        limit = resolve_personalized_limit(
+            {"basis": "daily_energy", "share": 0.25, "kcal_per_gram": 9.0, "meals_per_day": 3},
+            1800, 60,
+        )
+        self.assertAlmostEqual(limit, (1800 * 0.25) / 9 / 3, places=6)
+
+    def test_a_cap_is_applied_before_dividing_by_meals(self):
+        from services.medical_risk_service import resolve_personalized_limit
+
+        # 5% of 4000 kcal = 50g 糖，但每日上限 25g，所以單餐是 25/3
+        limit = resolve_personalized_limit(
+            {"basis": "daily_energy", "share": 0.05, "kcal_per_gram": 4.0,
+             "cap": 25.0, "meals_per_day": 3},
+            4000, 60,
+        )
+        self.assertAlmostEqual(limit, 25.0 / 3, places=6)
+
+    def test_ideal_body_weight_basis(self):
+        from services.medical_risk_service import resolve_personalized_limit
+
+        limit = resolve_personalized_limit(
+            {"basis": "ideal_body_weight", "per_kg": 0.8, "meals_per_day": 3}, 1800, 60
+        )
+        self.assertAlmostEqual(limit, (60 * 0.8) / 3, places=6)
+
+    def test_an_unknown_basis_is_ignored_rather_than_guessed(self):
+        from services.medical_risk_service import resolve_personalized_limit
+
+        self.assertIsNone(resolve_personalized_limit({"basis": "vibes"}, 1800, 60))
+
+    def test_the_rules_file_is_data_not_code(self):
+        """不支援字串運算式：規則檔不該能執行任意運算。"""
+        from services.medical_risk_service import resolve_personalized_limit
+
+        self.assertIsNone(resolve_personalized_limit({"formula": "E / 3"}, 1800, 60))
+
+    def test_changing_the_declaration_changes_what_gets_blocked(self):
+        """證明程式真的讀了宣告，而不是還在用內建數字。"""
+        import copy
+
+        rules = copy.deepcopy(self.rules)
+        rules["hypertension"]["personalized_limits"]["sodium"] = {
+            "basis": "absolute", "daily_amount": 300.0, "meals_per_day": 3,
+        }
+        result = evaluate_medical_risk(
+            dish(sodium=150), ["hypertension"], [], rules, self.taxonomy, user_profile=PROFILE
+        )
+        self.assertIn("sodium", {r.get("nutrient") for r in result["risks"] if r["severity"] == "block"})

@@ -266,14 +266,6 @@ export const AVAILABLE_ALLERGENS = [
   '花生', '堅果', '蝦蟹', '貝類', '魚', '蛋', '牛奶', '大豆', '麩質', '芝麻',
 ];
 
-export const DIET_GOALS = [
-  { id: '1', icon: '🔥', label: '每日目標熱量', value: '2,100 kcal', color: '#FB923C' },
-  { id: '2', icon: '🎯', label: '目標體重', value: '70 kg', color: '#4ADE80' },
-  { id: '3', icon: '🥗', label: '飲食計畫', value: '均衡飲食', color: '#60A5FA' },
-  { id: '4', icon: '🍽️', label: '用餐頻率', value: '每日 4 餐', color: '#A78BFA' },
-  { id: '5', icon: '💧', label: '每日飲水', value: '2,000 ml', color: '#22D3EE' },
-  { id: '6', icon: '⏰', label: '斷食計畫', value: '16:8 間歇性', color: '#F472B6' },
-];
 
 // ─── History / Trends (NEW — PRD 飲食趨勢回顧) ──────────────
 export type DailyRecord = {

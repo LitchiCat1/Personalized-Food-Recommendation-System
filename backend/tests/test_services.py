@@ -1040,3 +1040,56 @@ class MenuCacheStalenessTests(unittest.TestCase):
         doc = {"cached_at": (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()}
         self.assertFalse(self.storage.restaurant_menu_is_stale(doc, max_age_days=30))
         self.assertTrue(self.storage.restaurant_menu_is_stale(doc, max_age_days=1))
+
+
+class MealCeilingTests(unittest.TestCase):
+    """單餐上限要套在整餐加總，不然配三道就繞過去了。"""
+
+    def _dish(self, name, sodium):
+        return {
+            "name": name, "opening_periods": [],
+            "calories": 300, "protein": 15, "carbs": 40, "sugar": 3,
+            "fat": 8, "saturated_fat": 2, "trans_fat": 0, "fiber": 5, "sodium": sodium,
+        }
+
+    def _ceilings(self, conditions=("hypertension",)):
+        from services.week_seed_service import meal_nutrient_ceilings
+
+        return meal_nutrient_ceilings(
+            {"height": 170, "weight": 65, "health_conditions": list(conditions)},
+            load_disease_rules(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            load_allergen_taxonomy(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        )
+
+    def test_the_ceiling_is_read_back_from_the_rules_not_hardcoded_again(self):
+        ceilings = self._ceilings()
+        self.assertAlmostEqual(ceilings["sodium"], 600, delta=1)
+
+    def test_a_meal_cannot_stack_three_dishes_past_the_single_meal_ceiling(self):
+        from services.week_seed_service import build_nutrition_goal_types, plan_daily_dishes
+
+        # 每道 250mg 各自都遠低於 600mg，三道加起來 750mg 就超過了
+        dishes = [self._dish(f"鹹食{i}", 250) for i in range(8)]
+        targets = {"calories": 1900, "protein": 60, "carbs": 240, "sugar": 24,
+                   "fat": 53, "saturated_fat": 15, "trans_fat": 0, "fiber": 25, "sodium": 2000}
+        plan = plan_daily_dishes(
+            dishes, 3, "ceilings", targets, build_nutrition_goal_types({}),
+            weekdays=[0, 1, 2], ceilings=self._ceilings(),
+        )
+        for day in plan:
+            for meal in day:
+                total = sum(dishes[index]["sodium"] for index in meal)
+                self.assertLessEqual(total, 600, f"整餐鈉 {total} 超過單餐上限")
+
+    def test_without_ceilings_the_planner_still_works(self):
+        """沒有疾病條件時沒有上限，不該因此排不出東西。"""
+        from services.week_seed_service import build_nutrition_goal_types, plan_daily_dishes
+
+        dishes = [self._dish(f"餐點{i}", 250) for i in range(6)]
+        targets = {"calories": 1900, "protein": 60, "carbs": 240, "sugar": 24,
+                   "fat": 53, "saturated_fat": 15, "trans_fat": 0, "fiber": 25, "sodium": 2000}
+        plan = plan_daily_dishes(dishes, 3, "s", targets, build_nutrition_goal_types({}),
+                                 weekdays=[0, 1, 2], ceilings={})
+        self.assertEqual(len(plan), 3)
+        for day in plan:
+            self.assertTrue(all(meal for meal in day))

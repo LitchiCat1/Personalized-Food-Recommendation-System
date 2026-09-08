@@ -284,6 +284,50 @@ def _meal_eligibility(dishes: list, weekday: int) -> list[list[int]]:
     return eligibility
 
 
+def meal_nutrient_ceilings(user: dict, disease_rules: dict, allergen_taxonomy: dict) -> dict:
+    """一餐的營養上限。
+
+    疾病規則是按「單餐」定上限的（例如高血壓 600 mg 鈉），但一餐現在可以配
+    到 MAX_DISHES_PER_MEAL 道菜——只檢查每一道的話，3 x 590 mg 全部過關，
+    加起來 1770 mg 幾乎是一整天，而一個 610 mg 的便當反而被擋。上限要套在
+    整餐加總上，規則才前後一致。
+
+    上限直接用「這道菜剛好被擋住的值」反推，才不會在這裡複製一份門檻，
+    造成第三套會偏移的數字。
+    """
+    ceilings = {}
+    for nutrient in ("sodium", "calories", "fat", "saturated_fat", "protein", "carbs", "sugar"):
+        low, high = 0.0, 20000.0
+        for _ in range(24):  # 二分搜尋到足夠精細
+            mid = (low + high) / 2
+            probe = {"label": "probe", "name_zh": "測試餐點", "allergens": [], "is_fried": False,
+                     **{field: 0 for field in NUTRITION_FIELDS}, nutrient: mid}
+            risk = evaluate_medical_risk(
+                probe, user.get("health_conditions") or [], [],
+                disease_rules, allergen_taxonomy, user_profile=user,
+            )
+            blocked = any(
+                entry.get("nutrient") == nutrient and entry.get("severity") == "block"
+                for entry in risk.get("risks", [])
+            )
+            if blocked:
+                high = mid
+            else:
+                low = mid
+        if high < 19000:  # 真的有上限才記
+            ceilings[nutrient] = high
+    return ceilings
+
+
+def _meal_within_ceilings(dishes: list, meal: list, addition: int, ceilings: dict) -> bool:
+    """加進這道菜之後，整餐是否仍在單餐上限內。"""
+    for nutrient, ceiling in ceilings.items():
+        total = sum(_number(dishes[index].get(nutrient)) for index in [*meal, addition])
+        if total > ceiling:
+            return False
+    return True
+
+
 def _best_addition(dishes: list, combo: list, targets: dict, goal_types: dict, order=None, allowed=None):
     """挑一道加進來後最有幫助、且不會撐破任何上限的菜。
 
@@ -320,7 +364,7 @@ def _least_harmful_addition(dishes: list, combo: list, targets: dict, goal_types
     )
 
 
-def _build_day(dishes: list, targets: dict, goal_types: dict, first_index: int, eligibility: list, order=None) -> list[list[int]]:
+def _build_day(dishes: list, targets: dict, goal_types: dict, first_index: int, eligibility: list, order=None, ceilings: dict | None = None) -> list[list[int]]:
     """逐餐挑菜，每餐只從那個時段有開的店裡選，並讓整天加總逼近每日目標。
 
     先前是「先湊出最佳的一天，再隨機分成三餐」，所以早上八點會排到炸雞。
@@ -329,6 +373,7 @@ def _build_day(dishes: list, targets: dict, goal_types: dict, first_index: int, 
     本來就是一整天的。
     """
     meals = len(MEAL_ORDER)
+    ceilings = ceilings or {}
     plate = [[] for _ in range(meals)]
 
     # 起始那道放進它吃得到的最早一餐，讓每天有不同的起點
@@ -358,7 +403,14 @@ def _build_day(dishes: list, targets: dict, goal_types: dict, first_index: int, 
         for meal_index in range(meals):
             if len(plate[meal_index]) >= MAX_DISHES_PER_MEAL:
                 continue
-            addition = _best_addition(dishes, flat(), targets, goal_types, order, eligibility[meal_index])
+            # 單餐上限要看整餐加總，不是每一道各自過關
+            room = [
+                index for index in eligibility[meal_index]
+                if _meal_within_ceilings(dishes, plate[meal_index], index, ceilings)
+            ]
+            if not room:
+                continue
+            addition = _best_addition(dishes, flat(), targets, goal_types, order, room)
             if addition is None:
                 continue
             score = score_day(dishes, flat() + [addition], targets, goal_types)
@@ -486,6 +538,7 @@ def plan_daily_dishes(
     targets: dict,
     goal_types: dict,
     weekdays: list | None = None,
+    ceilings: dict | None = None,
 ) -> list[list[list[int]]]:
     """排出每天三餐吃哪些菜，優先讓整天加總符合疾病別的每日目標。
 
@@ -519,7 +572,7 @@ def plan_daily_dishes(
         start = starts[offset % dish_count]
         # 每天用不同的候選順序，營養一樣的菜色才不會七天長成同一組
         rotation = starts[offset % dish_count:] + starts[:offset % dish_count]
-        plate = _build_day(dishes, targets, goal_types, start, eligibility, rotation)
+        plate = _build_day(dishes, targets, goal_types, start, eligibility, rotation, ceilings)
         key = _plate_key(plate)
         if key in seen:
             # 菜色營養一樣時貪婪法會收斂成同一組，換掉其中一道湊出不同的一天
@@ -535,7 +588,7 @@ def plan_daily_dishes(
     return plan[:days]
 
 
-def build_week_records(user_id: str, dishes: list, days: int, source: str, end_date, user: dict) -> list[dict]:
+def build_week_records(user_id: str, dishes: list, days: int, source: str, end_date, user: dict, ceilings: dict | None = None) -> list[dict]:
     """把菜色發到每天三餐，盡量符合疾病別每日目標，且七天彼此不重複。"""
     tzinfo = get_app_timezone()
     targets = calculate_pdf_daily_targets(user)
@@ -545,7 +598,7 @@ def build_week_records(user_id: str, dishes: list, days: int, source: str, end_d
     # Google Places 的 day 是 0=週日，Python 的 isoweekday 是 1=週一…7=週日
     weekdays = [day.isoweekday() % 7 for day in day_dates]
     plan = plan_daily_dishes(
-        dishes, days, f"{user_id}:{source}:{end_date.isoformat()}", targets, goal_types, weekdays
+        dishes, days, f"{user_id}:{source}:{end_date.isoformat()}", targets, goal_types, weekdays, ceilings
     )
     for day_index, meal_plan in enumerate(plan):
         day = day_dates[day_index]
@@ -594,7 +647,8 @@ def seed_week_records(
         storage,
     )
 
-    records = build_week_records(user_id, dishes, days, source, end_date, user)
+    ceilings = meal_nutrient_ceilings(user, disease_rules, allergen_taxonomy)
+    records = build_week_records(user_id, dishes, days, source, end_date, user, ceilings)
 
     # 灌入是「重跑」而不是「補寫」：紀錄 id 是固定推導出來的，不先刪掉的話
     # insert_record 會判定重複而整批跳過，建檔了更多店家也看不出差別。
@@ -627,6 +681,7 @@ def seed_week_records(
         "replaced": replaced,
         "dishes_available": len(dishes),
         "restaurants": len({dish.get("restaurant_name") for dish in dishes}),
+        "meal_ceilings": {k: round(v, 1) for k, v in ceilings.items()},
         "data_source": data_source,
         "note": note,
         "start_date": (end_date - timedelta(days=days - 1)).strftime("%Y-%m-%d"),

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, TextInput, Alert, Platform, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
-import { AVAILABLE_CONDITIONS, AVAILABLE_ALLERGENS, DIET_GOALS } from '@/constants/mock-data';
+import { AVAILABLE_CONDITIONS, AVAILABLE_ALLERGENS } from '@/constants/mock-data';
 import { useStore } from '@/store/useStore';
 import { useResponsive } from '@/hooks/useResponsive';
 import AppContainer from '@/components/AppContainer';
@@ -29,7 +29,7 @@ const PROFILE_SECTIONS = [
 
 export default function ProfileScreen() {
   const { gridCol2, isDesktop } = useResponsive();
-  const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser, invalidateDietaryRecords } = useStore();
+  const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser, invalidateDietaryRecords , dailyNutrition } = useStore();
   const initialUserRef = useRef(user);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -275,6 +275,20 @@ export default function ProfileScreen() {
     }
   };
 
+  // 先前這裡讀 constants/mock-data.ts 的 DIET_GOALS，那是一組寫死的假資料：
+  // 不管使用者是誰都顯示「2,100 kcal／目標體重 70kg／每日 4 餐／16:8 間歇性」。
+  // 只留真的存在於使用者檔案裡的欄位，捏造的那幾項直接拿掉。
+  const dietGoals = [
+    {
+      label: '每日目標熱量',
+      value: `${Math.round(dailyNutrition.calories.target).toLocaleString()} kcal`,
+      color: '#FB923C',
+    },
+    { label: '目標體重', value: `${user.targetWeight} kg`, color: '#4ADE80' },
+    { label: '飲食計畫', value: user.dietType || '未設定', color: '#60A5FA' },
+    { label: '目前體重', value: `${user.weight} kg`, color: '#A78BFA' },
+  ];
+
   const handleIndexVenues = () =>
     runSeedAction('index', async () => {
       // 之前沒送座標，後端就用預設的台北 101，建的是那裡的店而不是你附近的
@@ -454,6 +468,13 @@ export default function ProfileScreen() {
                 <View style={styles.conditionInfo}>
                   <Text style={[styles.conditionLabel, isActive && { color: accent }]}>{cond.label_zh}</Text>
                   <Text style={styles.conditionDesc}>{cond.description}</Text>
+                  {/* 規則檔已經標明腎臟病需要依分期與抽血數值個人化，但程式套的是
+                      固定門檻。選了它的人有權知道這件事，不能只寫在 JSON 裡。 */}
+                  {cond.review_status === 'requires_clinical_personalization' ? (
+                    <Text style={styles.conditionCaveat}>
+                      ⚠ 此條件的門檻需由醫療人員依你的分期與抽血數值個人化，App 目前套用的是通用估算值。
+                    </Text>
+                  ) : null}
                 </View>
                 <Ionicons name={isActive ? 'checkmark-circle' : 'add-circle-outline'} size={22} color={isActive ? accent : Palette.text.tertiary} />
               </Pressable>
@@ -493,10 +514,10 @@ export default function ProfileScreen() {
 
       {isDesktop || activeSection === 'goals' ? (
       <View style={isDesktop ? styles.desktopPane : undefined}>
-      <SectionBlock title="飲食目標" subtitle="用於顯示目前設定與提醒。">
+      <SectionBlock title="飲食目標" subtitle="依你的身高體重與疾病條件計算。">
         <View style={styles.goalList}>
-          {DIET_GOALS.map((goal) => (
-            <View key={goal.id} style={styles.goalItem}>
+          {dietGoals.map((goal) => (
+            <View key={goal.label} style={styles.goalItem}>
               <View style={[styles.goalIcon, { backgroundColor: `${goal.color}18` }]}>
                 <Ionicons name="flag-outline" size={18} color={goal.color} />
               </View>
@@ -773,6 +794,7 @@ const styles = StyleSheet.create({
   conditionInfo: { flex: 1 },
   conditionLabel: { ...Typography.bodyBold, color: Palette.text.secondary },
   conditionDesc: { ...Typography.small, color: Palette.text.tertiary },
+  conditionCaveat: { ...Typography.small, color: Palette.status.warning, marginTop: Spacing.xs },
   allergenChipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   allergenChip: {
     minHeight: 44,

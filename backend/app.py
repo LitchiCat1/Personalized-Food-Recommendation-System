@@ -16,6 +16,7 @@ from flask_cors import CORS
 from repositories.storage import StorageRepository
 from services.app_time_service import app_now
 from services.auth_service import AuthError, is_auth_required, is_supabase_auth_configured, verify_supabase_user
+from services.rate_limit_service import RateLimitExceeded, build_limiter
 from services.disease_rule_service import build_disease_rules_response, build_medical_metadata_response, load_allergen_taxonomy, load_disease_rules
 from services.env_service import load_local_env
 from services.history_service import build_history_response
@@ -102,7 +103,52 @@ storage = StorageRepository(
 )
 
 app = Flask(__name__)
-CORS(app)
+
+# CORS 先前是完全開放的：任何網站都能從瀏覽器呼叫這個後端，包括會花錢的
+# 那幾條路由。預設只允許自己的前端，要多開就用 ALLOWED_ORIGINS 明確列出。
+_allowed_origins = [
+    origin.strip()
+    for origin in os.environ.get("ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if _allowed_origins:
+    CORS(app, origins=_allowed_origins, supports_credentials=True)
+    print(f"[OK] CORS restricted to {len(_allowed_origins)} origin(s)")
+else:
+    # 沒設定時只放行本機開發用的來源，不再對全世界開放
+    CORS(app, origins=["http://localhost:8081", "http://localhost:19006", "http://127.0.0.1:8081"])
+    print("[WARN] ALLOWED_ORIGINS 未設定，只放行 localhost。部署時請設成前端網址。")
+
+# 會呼叫 Gemini / Google Places 的路由要限流，那些都是按次計費的
+_paid_api_limiter = build_limiter("RATE_LIMIT_PAID_CALLS", 12)
+_general_limiter = build_limiter("RATE_LIMIT_GENERAL_CALLS", 120)
+
+
+def _client_key() -> str:
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    return (forwarded.split(",")[0].strip() or request.remote_addr or "unknown")
+
+
+def enforce_rate_limit(limiter, bucket: str) -> None:
+    limiter.check(f"{bucket}:{_client_key()}")
+
+
+@app.errorhandler(RateLimitExceeded)
+def handle_rate_limit(error):
+    response = jsonify({"error": str(error)})
+    response.headers["Retry-After"] = str(error.retry_after)
+    return response, error.status_code
+
+
+def require_authenticated_user() -> str | None:
+    """只要求「登入過」，不綁定特定 user_id。
+
+    給不屬於單一使用者、但會花錢的路由用（菜單分析、營養標示辨識、
+    金鑰診斷）。先前這幾條完全不驗證，任何人都能拿它們燒光額度。
+    """
+    if not is_auth_required():
+        return None
+    return get_request_user_id()
 
 
 def get_request_user_id():
@@ -289,6 +335,8 @@ def list_custom_foods():
 
 @app.route("/ocr/nutrition-label", methods=["POST"])
 def ocr_nutrition_label():
+    require_authenticated_user()
+    enforce_rate_limit(_paid_api_limiter, "ocr")
     data = request.get_json(silent=True) or {}
     if "image" not in data:
         return jsonify({"error": "缺少 image 欄位（Base64）"}), 400
@@ -581,6 +629,8 @@ def index_nearby_restaurants(user_id):
 
 @app.route("/health/gemini", methods=["GET"])
 def gemini_model_diagnostics():
+    require_authenticated_user()
+    enforce_rate_limit(_paid_api_limiter, "gemini-probe")
     """每把金鑰實際能用哪些模型。設定的清單對不上權限時只會看到一堆 404。"""
     try:
         generate = request.args.get("generate") in {"1", "true", "yes"}
@@ -690,6 +740,8 @@ def map_food_recommend(user_id):
 
 @app.route("/restaurant/menu", methods=["POST"])
 def get_restaurant_menu():
+    require_authenticated_user()
+    enforce_rate_limit(_paid_api_limiter, "menu")
     """
     動態獲取餐廳詳細菜單。如果本地資料庫不存在，則調用爬蟲與 Gemini 動態分析。
     """
@@ -921,4 +973,16 @@ def calc_bmr():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
-    app.run(debug=debug, host="0.0.0.0", port=port)
+    if debug:
+        app.run(debug=True, host="0.0.0.0", port=port)
+    else:
+        # Flask 內建伺服器是單執行緒的開發用伺服器，它自己也會警告
+        # 「Do not use it in a production deployment」。正式環境用 waitress。
+        try:
+            from waitress import serve
+
+            print(f"[OK] Serving with waitress on port {port}")
+            serve(app, host="0.0.0.0", port=port, threads=8)
+        except ImportError:
+            print("[WARN] waitress 未安裝，退回 Flask 開發伺服器（僅適合本機）")
+            app.run(debug=False, host="0.0.0.0", port=port)

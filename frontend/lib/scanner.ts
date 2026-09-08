@@ -268,10 +268,12 @@ export async function manualSearchFood(params: {
 export async function runNutritionLabelOCR(params: {
   apiBaseUrl: string;
   imageBase64: string;
+  auth?: ApiAuth;
 }): Promise<OCRDraft> {
   const resp = await fetch(`${params.apiBaseUrl}/ocr/nutrition-label`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    // 這條會呼叫 Gemini，後端已經改成要驗證，不帶 token 會被擋
+    headers: buildHeaders(params.auth, 'application/json'),
     body: JSON.stringify({ image: normalizeImageBase64(params.imageBase64) }),
   });
   const data = await resp.json() as NutritionLabelOCRResponse;

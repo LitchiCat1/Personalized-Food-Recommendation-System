@@ -13,10 +13,15 @@ class AuthError(Exception):
 
 
 def is_auth_required() -> bool:
+    """預設就要驗證。
+
+    先前只有偵測到 RENDER 環境變數才驗證，所以本機或任何其他部署方式跑起來
+    都是完全不設防的。安全的預設值應該是「要驗證」，要關掉就明確關掉。
+    """
     configured_value = os.environ.get("SUPABASE_AUTH_REQUIRED")
     if configured_value is not None:
         return configured_value.strip().lower() in TRUTHY_VALUES
-    return os.environ.get("RENDER", "").strip().lower() in TRUTHY_VALUES
+    return True
 
 
 def is_supabase_auth_configured() -> bool:

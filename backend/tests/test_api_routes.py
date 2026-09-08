@@ -816,3 +816,83 @@ class VenueDistanceTests(ApiTestBase):
 
         self.assertEqual(response.status_code, 409)
         self.assertIn("重新建檔", response.get_json()["error"])
+
+
+class PaidRouteProtectionTests(ApiTestBase):
+    """會呼叫 Gemini / Places 的路由不能任人打——那是按次計費的。"""
+
+    def setUp(self):
+        super().setUp()
+        self.app_module._paid_api_limiter.reset()
+        self.app_module._general_limiter.reset()
+
+    def test_the_cost_incurring_routes_reject_anonymous_callers(self):
+        for method, path, payload in (
+            ("post", "/ocr/nutrition-label", {"image": "x"}),
+            ("post", "/restaurant/menu", {"name": "某某小吃"}),
+            ("get", "/health/gemini", None),
+        ):
+            with self.subTest(path=path):
+                response = (
+                    self.client.post(path, json=payload)
+                    if method == "post"
+                    else self.client.get(path)
+                )
+                self.assertEqual(response.status_code, 401, f"{path} 沒有擋下未驗證的呼叫")
+
+    def test_a_signed_in_caller_gets_through(self):
+        with self.mock_auth("user-a"):
+            response = self.client.post(
+                "/restaurant/menu", json={}, headers=self.auth_headers()
+            )
+        # 缺少店名是 400，重點是沒有被 401 擋在門外
+        self.assertEqual(response.status_code, 400)
+
+    def test_repeated_calls_are_throttled(self):
+        with self.mock_auth("user-a"):
+            statuses = [
+                self.client.post(
+                    "/restaurant/menu", json={"name": f"店{index}"}, headers=self.auth_headers()
+                ).status_code
+                for index in range(40)
+            ]
+        self.assertIn(429, statuses, "限流沒有生效")
+
+    def test_the_throttle_response_says_when_to_retry(self):
+        with self.mock_auth("user-a"):
+            last = None
+            for index in range(40):
+                last = self.client.post(
+                    "/restaurant/menu", json={"name": f"店{index}"}, headers=self.auth_headers()
+                )
+                if last.status_code == 429:
+                    break
+        self.assertEqual(last.status_code, 429)
+        self.assertIn("Retry-After", last.headers)
+
+
+class AuthDefaultTests(unittest.TestCase):
+    """預設就要驗證。先前只有偵測到 RENDER 才驗證，其他部署方式全部不設防。"""
+
+    def setUp(self):
+        self.saved = {
+            key: os.environ.pop(key, None) for key in ("SUPABASE_AUTH_REQUIRED", "RENDER")
+        }
+
+    def tearDown(self):
+        for key, value in self.saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+    def test_auth_is_required_when_nothing_is_configured(self):
+        from services.auth_service import is_auth_required
+
+        self.assertTrue(is_auth_required())
+
+    def test_it_can_still_be_turned_off_explicitly_for_local_work(self):
+        from services.auth_service import is_auth_required
+
+        os.environ["SUPABASE_AUTH_REQUIRED"] = "false"
+        self.assertFalse(is_auth_required())

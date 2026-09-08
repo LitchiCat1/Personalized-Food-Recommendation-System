@@ -384,7 +384,7 @@ export default function ScannerScreen() {
 
     setOcrQuerying(true);
     try {
-      const draft = await runNutritionLabelOCR({ apiBaseUrl, imageBase64: asset.base64 });
+      const draft = await runNutritionLabelOCR({ apiBaseUrl, imageBase64: asset.base64, auth: { accessToken } });
       ocrSubmissionKeyRef.current = buildSubmissionKey('nutrition-label');
       setOcrDraft(draft);
       setOcrNameError(null);

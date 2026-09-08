@@ -54,6 +54,9 @@ services:
         sync: false
       - key: FLASK_DEBUG
         value: "false"
+      # 只放行自己的前端。沒設定的話後端只接受 localhost。
+      - key: ALLOWED_ORIGINS
+        sync: false
       - key: SUPABASE_AUTH_REQUIRED
         value: "true"
       - key: APP_UTC_OFFSET_HOURS

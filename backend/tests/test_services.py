@@ -1093,3 +1093,23 @@ class MealCeilingTests(unittest.TestCase):
         self.assertEqual(len(plan), 3)
         for day in plan:
             self.assertTrue(all(meal for meal in day))
+
+
+class FailureClassificationTests(unittest.TestCase):
+    """我們自己的程式錯誤不能偽裝成「模型失敗」。"""
+
+    def test_a_programming_error_is_labelled_as_a_bug(self):
+        from services.robust_restaurant_scraper_service import _describe_failure
+
+        message = _describe_failure(AttributeError("'list' object has no attribute 'get'"), "Gemini")
+        self.assertIn("[BUG]", message)
+        self.assertIn("AttributeError", message)
+
+    def test_a_network_error_is_not_labelled_as_a_bug(self):
+        import requests
+
+        from services.robust_restaurant_scraper_service import _describe_failure
+
+        message = _describe_failure(requests.ConnectionError("boom"), "Gemini")
+        self.assertNotIn("[BUG]", message)
+        self.assertIn("ConnectionError", message)

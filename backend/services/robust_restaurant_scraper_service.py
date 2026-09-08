@@ -147,6 +147,21 @@ def generate_fallback_menu(restaurant_name: str) -> list[dict]:
 
 
 
+# TypeError / AttributeError / NameError 不是「這個模型不行，換下一個」的理由，
+# 那是我們自己的程式壞了。今天的 'list' object has no attribute 'get' 就是被
+# 當成模型失敗重試掉，一路重試到預算用完，看起來像 Gemini 掛了。
+OUR_BUG_TYPES = (TypeError, AttributeError, NameError, IndexError)
+
+
+def _describe_failure(error: Exception, context: str) -> str:
+    kind = "BUG" if isinstance(error, OUR_BUG_TYPES) else "!"
+    if isinstance(error, OUR_BUG_TYPES):
+        import traceback
+
+        traceback.print_exc()
+    return f"[{kind}] {context}: {type(error).__name__}: {error}"
+
+
 def validate_and_balance_nutrition(item: dict) -> dict:
     """
     Validates and balances nutrient numbers so that:
@@ -249,6 +264,7 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
         return 2
 
     candidate_models = sorted(get_gemini_models(), key=_speed_rank)
+    our_bugs = 0
     # 逾時是模型層級的（這個模型就是生不完），換金鑰重試同一個只是再等一次。
     timed_out_models = set()
     # 404 是「這把金鑰沒有這個模型的權限」，是金鑰層級的。先前記成全域，
@@ -294,8 +310,12 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
                 timed_out_models.add(model_name)
                 print(f"[!] Gemini Model {model_name} 逾時 {MENU_GENERATION_TIMEOUT_SECONDS}s，跳過這個模型")
             except Exception as e:
-                print(f"[!] Gemini Model {model_name} error: {e}")
+                print(_describe_failure(e, f"Gemini Model {model_name}"))
+                if isinstance(e, OUR_BUG_TYPES):
+                    our_bugs += 1
 
+    if our_bugs:
+        print(f"[BUG] 有 {our_bugs} 次失敗是我們自己的程式錯誤，不是模型問題——先看上面的 traceback")
     if timed_out_models:
         print(f"[!] 這些模型在 {MENU_GENERATION_TIMEOUT_SECONDS}s 內生不完：{sorted(timed_out_models)}")
     never_allowed = set.intersection(*forbidden_by_key.values()) if forbidden_by_key else set()
@@ -495,7 +515,7 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
                     print(f"[!] Key {gemini_key[:8]}... Vision model {model_name} status {res.status_code}: {api_message[:180]}")
             except Exception as e:
                 last_error = "Gemini Vision 連線失敗，請稍後再試。"
-                print(f"[!] Gemini Vision error with model {model_name}: {type(e).__name__}")
+                print(_describe_failure(e, f"Gemini Vision model {model_name}"))
 
     return {"items": [], "recognition_status": "error", "recognition_error": last_error}
 

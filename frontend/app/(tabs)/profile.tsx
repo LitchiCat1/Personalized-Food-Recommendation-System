@@ -14,7 +14,7 @@ import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
 import FeedbackBanner from '@/components/ui/feedback-banner';
-import { clearNearbyVenueIndex, clearWeekRecords, fetchMedicalMetadata, fetchUserProfile, indexNearbyVenues, saveUserProfile, seedWeekRecords } from '@/lib/api';
+import { clearNearbyVenueIndex, clearWeekRecords, fetchMedicalMetadata, fetchUserProfile, indexNearbyVenues, listNearbyVenueIndex, saveUserProfile, seedWeekRecords } from '@/lib/api';
 import type { WeekSeedSource } from '@/lib/api';
 import { describeLocation, resolveLocation } from '@/lib/location';
 import { isSupabaseAuthConfigured, supabase } from '@/lib/supabase';
@@ -37,7 +37,7 @@ export default function ProfileScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const [profileFeedback, setProfileFeedback] = useState<{ tone: 'success' | 'error'; title: string; message?: string } | null>(null);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
-  const [seedBusy, setSeedBusy] = useState<'index' | 'recommend' | 'clear' | 'rebuild' | null>(null);
+  const [seedBusy, setSeedBusy] = useState<'index' | 'recommend' | 'clear' | 'rebuild' | 'list' | null>(null);
   const [activeSection, setActiveSection] = useState('personal');
   const [medicalMetadata, setMedicalMetadata] = useState<MedicalMetadata | null>(null);
   const [profileDraft, setProfileDraft] = useState({
@@ -260,7 +260,7 @@ export default function ProfileScreen() {
   };
 
   const runSeedAction = async (
-    busyKey: 'index' | 'recommend' | 'clear' | 'rebuild',
+    busyKey: 'index' | 'recommend' | 'clear' | 'rebuild' | 'list',
     action: () => Promise<{ tone: 'success' | 'error'; title: string; message?: string }>
   ) => {
     setSeedBusy(busyKey);
@@ -304,6 +304,22 @@ export default function ProfileScreen() {
         tone: summary.analysed > 0 || summary.already_cached > 0 ? 'success' : 'error',
         title: `附近 ${summary.found} 家店：本次建檔 ${summary.analysed} 家，已建檔過 ${summary.already_cached} 家${rest}`,
         message: `${describeLocation(location)} 資料庫目前累積 ${summary.total_cached} 家店的菜單${summary.failed ? `，${summary.failed} 家分析失敗` : ''}。`,
+      };
+    });
+
+  const handleListIndex = () =>
+    runSeedAction('list', async () => {
+      const result = await listNearbyVenueIndex(apiBaseUrl, user.userId, { accessToken });
+      if (!result.count) {
+        return { tone: 'error', title: '還沒有建檔任何店家', message: '按①開始建檔。' };
+      }
+      const names = result.venues.map((venue) =>
+        `${venue.name}（${venue.items} 道${venue.stale ? '・需更新' : ''}${venue.has_opening_hours ? '' : '・無營業時段'}）`
+      );
+      return {
+        tone: 'success',
+        title: `已建檔 ${result.count} 家店，${result.stale} 家需更新，${result.without_opening_hours} 家沒有營業時段`,
+        message: names.join('、'),
       };
     });
 
@@ -548,6 +564,11 @@ export default function ProfileScreen() {
           <SecondaryButton
             label={seedBusy === 'clear' ? '刪除中…' : '清除測試資料'}
             onPress={handleClearSeed}
+            disabled={seedBusy !== null}
+          />
+          <SecondaryButton
+            label={seedBusy === 'list' ? '讀取中…' : '看已建檔的店家'}
+            onPress={handleListIndex}
             disabled={seedBusy !== null}
           />
           <SecondaryButton

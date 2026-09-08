@@ -534,6 +534,26 @@ export type VenueIndexSummary = {
   total_cached: number;
 };
 
+export type IndexedVenue = {
+  name: string;
+  address: string;
+  items: number;
+  has_opening_hours: boolean;
+  business_status: string;
+  age_days: number | null;
+  stale: boolean;
+};
+
+export async function listNearbyVenueIndex(
+  apiBaseUrl: string,
+  userId: string,
+  auth?: ApiAuth
+): Promise<{ count: number; stale: number; without_opening_hours: number; venues: IndexedVenue[] }> {
+  return fetchJsonWithNetworkMessage(`${apiBaseUrl}/restaurants/index/${encodeURIComponent(userId)}`, {
+    headers: buildHeaders(auth),
+  });
+}
+
 export async function clearNearbyVenueIndex(
   apiBaseUrl: string,
   userId: string,

@@ -657,6 +657,35 @@ def gemini_model_diagnostics():
         return jsonify({"error": str(error)}), 503
 
 
+@app.route("/restaurants/index/<user_id>", methods=["GET"])
+def list_nearby_restaurant_index(user_id):
+    """列出建檔過的店家。
+
+    先前只回得出一個數字，建了哪些店、資料多舊、有沒有營業時段，
+    都只能翻伺服器 log 才看得到。
+    """
+    require_user_access(user_id)
+    venues = []
+    for doc in storage.list_restaurant_menus(limit=200):
+        age = storage.restaurant_menu_age_days(doc)
+        venues.append({
+            "name": doc.get("name", ""),
+            "address": doc.get("address", ""),
+            "items": len(doc.get("items") or []),
+            "has_opening_hours": bool(doc.get("opening_periods")),
+            "business_status": doc.get("business_status", ""),
+            "age_days": round(age, 1) if age is not None else None,
+            "stale": storage.restaurant_menu_is_stale(doc),
+        })
+    venues.sort(key=lambda venue: venue["name"])
+    return jsonify({
+        "count": len(venues),
+        "stale": sum(1 for venue in venues if venue["stale"]),
+        "without_opening_hours": sum(1 for venue in venues if not venue["has_opening_hours"]),
+        "venues": venues,
+    })
+
+
 @app.route("/restaurants/index/<user_id>", methods=["DELETE"])
 def clear_nearby_restaurant_index(user_id):
     """清空店家菜單快取，讓建檔可以用目前的規則重來一次。"""
@@ -778,9 +807,23 @@ def get_restaurant_menu():
     if not name:
         return jsonify({"error": "缺少 restaurant name"}), 400
 
-    # 1. 搜尋本地資料庫是否已有該店
+    # 1. 先看資料庫裡建檔過的菜單，再退回內建目錄
+    cached = storage.get_restaurant_menu(name)
     matched = None
-    for r in RESTAURANT_CATALOG:
+    if cached and cached.get("items") and not storage.restaurant_menu_is_stale(cached):
+        matched = {
+            "restaurant_id": restaurant_id or cached.get("venue_key", name),
+            "name": cached.get("name", name),
+            "lat": cached.get("lat") or 0,
+            "lng": cached.get("lng") or 0,
+            "address": cached.get("address", address),
+            "phone": "",
+            "open_hours": [],
+            "tags": ["已建檔菜單"],
+            "price_level": 2,
+            "items": cached["items"],
+        }
+    for r in [] if matched else RESTAURANT_CATALOG:
         if r.get("restaurant_id") == restaurant_id or r["name"].strip().lower() == name.lower():
             matched = r
             break
@@ -814,7 +857,11 @@ def get_restaurant_menu():
                 "price_level": 2,
                 "items": recognized_items
             }
-            RESTAURANT_CATALOG.append(matched)
+            storage.save_restaurant_menu(name, recognized_items, venue={
+                "address": address or "台灣",
+                "lat": float(data.get("lat") or 25.0338),
+                "lng": float(data.get("lng") or 25.0338),
+            })
     elif not matched:
         # 2. 本地不存在 ➔ 呼叫爬蟲與 Gemini 即時分析
         print(f"[Scraper] 即時線上擷取並生成 {name} 的菜單")
@@ -835,14 +882,14 @@ def get_restaurant_menu():
             "items": enriched.get("items", [])
         }
         
-        # 寫入本地 Catalog 與檔案存檔
-        RESTAURANT_CATALOG.append(matched)
-        catalog_path = os.path.join(BASE_DIR, "data", "restaurant_catalog.json")
-        try:
-            with open(catalog_path, "w", encoding="utf-8") as f:
-                json.dump(RESTAURANT_CATALOG, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            print(f"[!] 無法寫入本地 catalog 檔案: {e}")
+        # 存進資料庫的菜單快取，不要改動載入時的目錄。
+        # 那個目錄是共用的模組層級 list，一邊被請求讀一邊被 append 是資料競爭
+        # （伺服器現在是多執行緒的），而寫回 JSON 檔在 Render 上重啟就沒了。
+        storage.save_restaurant_menu(name, matched["items"], venue={
+            "address": matched["address"],
+            "lat": matched["lat"],
+            "lng": matched["lng"],
+        })
 
     # 3. 對所有菜單項目進行醫學過濾與個人化偏好契合度評分
     user_id = data.get("user_id", "demo_user")

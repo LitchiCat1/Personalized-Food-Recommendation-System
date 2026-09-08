@@ -896,3 +896,45 @@ class AuthDefaultTests(unittest.TestCase):
 
         os.environ["SUPABASE_AUTH_REQUIRED"] = "false"
         self.assertFalse(is_auth_required())
+
+
+class VenueIndexListingTests(ApiTestBase):
+    """建檔完只回一個數字的話，出問題只能翻伺服器 log。"""
+
+    def _index_one(self):
+        places = [{
+            "restaurant_id": "google_p1", "name": "阿美飯館", "lat": 25.0338, "lng": 121.5645,
+            "address": "台北", "tags": ["Google Places"], "google_place_id": "p1",
+            "distance_km": 0.2, "match_score": 70, "is_open": True,
+            "opening_periods": [{"day": 1, "open_minute": 600, "close_minute": 1200}],
+        }]
+        with patch.object(self.app_module, "fetch_google_places_restaurants", lambda *a, **k: places), \
+             patch.object(self.app_module, "enrich_restaurant_with_gemini", self._seed_menu):
+            self.client.post("/restaurants/index/user-a", json={}, headers=self.auth_headers())
+
+    def test_the_indexed_venues_can_be_listed(self):
+        with self.mock_auth("user-a"):
+            self._index_one()
+            data = self.client.get(
+                "/restaurants/index/user-a", headers=self.auth_headers()
+            ).get_json()
+
+        self.assertEqual(data["count"], 1)
+        venue = data["venues"][0]
+        self.assertEqual(venue["name"], "阿美飯館")
+        self.assertGreater(venue["items"], 0)
+        self.assertTrue(venue["has_opening_hours"])
+        self.assertFalse(venue["stale"])
+
+    def test_listing_requires_the_owning_user(self):
+        with self.mock_auth("user-b"):
+            response = self.client.get("/restaurants/index/user-a", headers=self.auth_headers())
+        self.assertEqual(response.status_code, 403)
+
+    def test_an_empty_index_lists_nothing_rather_than_failing(self):
+        with self.mock_auth("user-a"):
+            data = self.client.get(
+                "/restaurants/index/user-a", headers=self.auth_headers()
+            ).get_json()
+        self.assertEqual(data["count"], 0)
+        self.assertEqual(data["venues"], [])

@@ -2,14 +2,14 @@ name: CI
 
 on:
   push:
+    # 先前只列 main 與 v0.0.4，開發分支上的 commit 一次都沒被檢查過。
     branches:
-      - main
-      - v0.0.4
+      - "**"
   pull_request:
 
 jobs:
   backend:
-    name: Backend checks
+    name: Backend tests
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -22,9 +22,17 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
 
-      - name: Check Python syntax
-        run: python -m compileall -q backend
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      # 先前這裡只有 compileall，等於只檢查語法。醫療規則的測試
+      # （例如腎臟病蛋白質的判定方向）壞掉也不會有人知道。
+      - name: Run backend tests
+        working-directory: backend
+        run: python -m unittest discover -s tests -v
 
   frontend:
     name: Frontend typecheck

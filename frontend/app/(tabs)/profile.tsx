@@ -641,7 +641,7 @@ export default function ProfileScreen() {
 
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>生理性別</Text>
-                <Text style={styles.inputHint}>BMR 公式男女相差 166 kcal，先前一律以男性計算。</Text>
+                <Text style={styles.inputHint}>用於計算基礎代謝率。</Text>
                 <View style={styles.dietOptions}>
                   {([['male', '男性'], ['female', '女性']] as const).map(([value, label]) => {
                     const active = profileDraft.gender === value;
@@ -664,7 +664,7 @@ export default function ProfileScreen() {
 
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>運動量</Text>
-                <Text style={styles.inputHint}>決定 TDEE = BMR × 係數。先前寫死中等活動量，所有人都一樣。</Text>
+                <Text style={styles.inputHint}>影響每日建議熱量與餐點推薦。</Text>
                 <View style={styles.activityOptions}>
                   {activityLevels.map((level: { id: string; label_zh: string; multiplier: number }) => {
                     const active = profileDraft.activityMultiplier === level.multiplier;
@@ -682,7 +682,7 @@ export default function ProfileScreen() {
                       >
                         <Ionicons name={active ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={active ? Palette.accent.green : Palette.text.tertiary} />
                         <Text style={[styles.dietOptionText, active && styles.dietOptionTextActive]}>
-                          {level.label_zh}　×{level.multiplier}
+                          {level.label_zh}
                         </Text>
                       </Pressable>
                     );

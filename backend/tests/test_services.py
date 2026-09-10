@@ -1171,3 +1171,47 @@ class ActivityLevelTests(unittest.TestCase):
         male = build_user_profile({**base, "gender": "male"})
         female = build_user_profile({**base, "gender": "female"})
         self.assertEqual(male["bmr"] - female["bmr"], 166)
+
+
+class MealVarietyTests(unittest.TestCase):
+    """餐點池很小時，規劃器排出過「滷豆腐 ＋ 滷豆腐」這樣的一餐。"""
+
+    TARGETS = {
+        "calories": 1900, "protein": 60, "carbs": 240, "sugar": 24,
+        "fat": 53, "saturated_fat": 15, "trans_fat": 0, "fiber": 30, "sodium": 2000,
+    }
+
+    def _dish(self, name, calories=120):
+        return {
+            "name": name, "opening_periods": [],
+            "calories": calories, "protein": 8, "carbs": 12, "sugar": 1,
+            "fat": 4, "saturated_fat": 1, "trans_fat": 0, "fiber": 2, "sodium": 200,
+        }
+
+    def _plan(self, dishes, days=7):
+        from services.week_seed_service import build_nutrition_goal_types, plan_daily_dishes
+
+        return plan_daily_dishes(
+            dishes, days, "variety", self.TARGETS, build_nutrition_goal_types({}),
+            weekdays=list(range(days)),
+        )
+
+    def test_a_meal_never_contains_the_same_dish_twice(self):
+        # 只有三道菜，逼規劃器去補而沒得挑
+        dishes = [self._dish(f"小菜{i}") for i in range(3)]
+        for day in self._plan(dishes):
+            for meal in day:
+                self.assertEqual(len(meal), len(set(meal)), f"同一餐重複了：{meal}")
+
+    def test_it_still_fills_every_meal_when_choices_run_out(self):
+        """不能為了不重複就讓某一餐空著。"""
+        dishes = [self._dish("唯一的菜")]
+        for day in self._plan(dishes, days=3):
+            for meal in day:
+                self.assertTrue(meal)
+
+    def test_a_day_prefers_dishes_it_has_not_used_yet(self):
+        dishes = [self._dish(f"小菜{i}") for i in range(6)]
+        for day in self._plan(dishes, days=3):
+            flat = [index for meal in day for index in meal]
+            self.assertGreaterEqual(len(set(flat)), 3, f"一天內的菜色太集中：{flat}")

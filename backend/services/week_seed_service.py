@@ -386,11 +386,15 @@ def _build_day(dishes: list, targets: dict, goal_types: dict, first_index: int, 
     def flat():
         return [index for meal in plate for index in meal]
 
-    # 每一餐都要有東西吃
+    # 每一餐都要有東西吃。先試當天還沒吃過的，湊不出來才允許跨餐重複——
+    # 通過篩選的菜色很少時，寧可重複也不能讓某一餐空著。
     for meal_index in range(meals):
         if plate[meal_index]:
             continue
-        addition = _best_addition(dishes, flat(), targets, goal_types, order, eligibility[meal_index])
+        fresh = [index for index in eligibility[meal_index] if index not in set(flat())]
+        addition = _best_addition(dishes, flat(), targets, goal_types, order, fresh or eligibility[meal_index])
+        if addition is None:
+            addition = _best_addition(dishes, flat(), targets, goal_types, order, eligibility[meal_index])
         if addition is None:
             addition = _least_harmful_addition(dishes, flat(), targets, goal_types, eligibility[meal_index])
         plate[meal_index].append(addition)
@@ -403,14 +407,22 @@ def _build_day(dishes: list, targets: dict, goal_types: dict, first_index: int, 
         for meal_index in range(meals):
             if len(plate[meal_index]) >= MAX_DISHES_PER_MEAL:
                 continue
-            # 單餐上限要看整餐加總，不是每一道各自過關
+            # 單餐上限要看整餐加總，不是每一道各自過關；
+            # 同一道菜也不該在同一餐裡出現兩次——先前餐點池只剩 6 道時，
+            # 系統真的排出過「滷豆腐 ＋ 滷豆腐」這樣的一餐。
+            already_in_meal = set(plate[meal_index])
             room = [
                 index for index in eligibility[meal_index]
-                if _meal_within_ceilings(dishes, plate[meal_index], index, ceilings)
+                if index not in already_in_meal
+                and _meal_within_ceilings(dishes, plate[meal_index], index, ceilings)
             ]
             if not room:
                 continue
-            addition = _best_addition(dishes, flat(), targets, goal_types, order, room)
+            # 同樣先試當天還沒吃過的
+            fresh = [index for index in room if index not in set(flat())]
+            addition = _best_addition(dishes, flat(), targets, goal_types, order, fresh or room)
+            if addition is None and fresh:
+                addition = _best_addition(dishes, flat(), targets, goal_types, order, room)
             if addition is None:
                 continue
             score = score_day(dishes, flat() + [addition], targets, goal_types)

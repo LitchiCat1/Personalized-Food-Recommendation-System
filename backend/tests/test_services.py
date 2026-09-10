@@ -1215,3 +1215,59 @@ class MealVarietyTests(unittest.TestCase):
         for day in self._plan(dishes, days=3):
             flat = [index for meal in day for index in meal]
             self.assertGreaterEqual(len(set(flat)), 3, f"一天內的菜色太集中：{flat}")
+
+
+class HumanMealTimeTests(unittest.TestCase):
+    """七天每一餐都分秒不差，一看就知道是機器產的。"""
+
+    SEED = "user-a:recommend:2026-09-06"
+
+    def _times(self, days=7):
+        from datetime import date, timedelta
+
+        from services.week_seed_service import MEAL_ORDER, meal_time
+
+        start = date(2026, 8, 31)
+        return [
+            [meal_time(self.SEED, start + timedelta(days=i), meal) for meal in MEAL_ORDER]
+            for i in range(days)
+        ]
+
+    def test_the_same_seed_gives_the_same_times(self):
+        """灌入可以重跑，時間每次都變的話前後就對不起來。"""
+        self.assertEqual(self._times(), self._times())
+
+    def test_meal_times_are_not_identical_across_the_week(self):
+        breakfasts = {day[0] for day in self._times()}
+        self.assertGreater(len(breakfasts), 3, f"七天早餐只有 {len(breakfasts)} 種時間")
+
+    def test_each_meal_stays_inside_its_window(self):
+        from services.week_seed_service import MEAL_ORDER, MEAL_WINDOWS
+
+        for day in self._times():
+            for index, (hour, minute) in enumerate(day):
+                window = MEAL_WINDOWS[MEAL_ORDER[index]]
+                low = window[0][0] * 60 + window[0][1]
+                high = window[1][0] * 60 + window[1][1]
+                self.assertTrue(low <= hour * 60 + minute <= high, f"{MEAL_ORDER[index]} {hour}:{minute}")
+
+    def test_meals_stay_in_order_within_a_day(self):
+        """晚餐不能排在午餐之前。"""
+        for day in self._times():
+            minutes = [hour * 60 + minute for hour, minute in day]
+            self.assertEqual(minutes, sorted(minutes), day)
+
+    def test_times_land_on_five_minute_marks(self):
+        for day in self._times():
+            for _, minute in day:
+                self.assertEqual(minute % 5, 0)
+
+    def test_a_different_user_eats_at_different_times(self):
+        from datetime import date
+
+        from services.week_seed_service import meal_time
+
+        day = date(2026, 9, 1)
+        mine = [meal_time(self.SEED, day, m) for m in ("早餐", "午餐", "晚餐")]
+        theirs = [meal_time("user-b:recommend:2026-09-06", day, m) for m in ("早餐", "午餐", "晚餐")]
+        self.assertNotEqual(mine, theirs)

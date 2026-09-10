@@ -23,7 +23,31 @@ from services.robust_restaurant_scraper_service import validate_and_balance_nutr
 from services.nutrition_progress_service import build_nutrition_goal_types, calculate_pdf_daily_targets
 
 MEAL_ORDER = ("早餐", "午餐", "晚餐")
-MEAL_HOURS = {"早餐": (8, 0), "午餐": (12, 30), "晚餐": (19, 0)}
+# 每一餐合理的用餐時段。先前是寫死的 08:00／12:30／19:00，七天下來
+# 每一筆都分秒不差，一眼就看得出是機器產的。改成在時段內取一個時間。
+MEAL_WINDOWS = {
+    "早餐": ((6, 45), (9, 15)),
+    "午餐": ((11, 30), (13, 45)),
+    "晚餐": ((17, 45), (20, 30)),
+}
+MEAL_HOURS = {meal: window[0] for meal, window in MEAL_WINDOWS.items()}
+
+
+def meal_time(seed: str, day, meal_type: str) -> tuple[int, int]:
+    """這一天這一餐吃飯的時間。
+
+    同樣的 seed 與日期一定得到同樣的時間——灌入是可以重跑的，時間每次都變
+    的話就對不起來了。取 5 分鐘為單位，因為沒有人會在 12:37 準時開動，
+    但也不會天天 12:30 整。
+    """
+    start, end = MEAL_WINDOWS[meal_type]
+    span = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1])
+    rng = random.Random(f"{seed}:{day.isoformat()}:{meal_type}")
+    # 兩次取樣取平均，讓時間往時段中央集中，而不是均勻散開——
+    # 真實的用餐時間也是中間密、兩端疏。
+    offset = (rng.randint(0, span) + rng.randint(0, span)) // 2
+    minute_of_day = start[0] * 60 + start[1] + (offset // 5) * 5
+    return divmod(minute_of_day, 60)
 
 SEED_SOURCES = ("recommend",)
 # 灌入只剩 recommend，但刪除仍要能清掉舊版 curated 灌進去的紀錄
@@ -265,15 +289,20 @@ def score_day(dishes: list, combo, targets: dict, goal_types: dict) -> tuple[int
     return passed, shortfall
 
 
-def _meal_eligibility(dishes: list, weekday: int) -> list[list[int]]:
+def _meal_eligibility(dishes: list, weekday: int, meal_minutes: list | None = None) -> list[list[int]]:
     """每一餐可以選哪些菜——店家在那個時段有開才算數。
 
     營業時間不明的店留在每一餐的候選裡，否則資料一缺就整份計畫排不出來。
     """
     eligibility = []
-    for meal_type in MEAL_ORDER:
-        hour, minute = MEAL_HOURS[meal_type]
-        at_minute = hour * 60 + minute
+    for meal_index, meal_type in enumerate(MEAL_ORDER):
+        # 用實際的用餐時間判斷，不是用時段的起點——不然可能排到
+        # 「那家店 9:00 就關了，但這天的早餐排在 9:10」這種紀錄
+        if meal_minutes:
+            at_minute = meal_minutes[meal_index]
+        else:
+            hour, minute = MEAL_HOURS[meal_type]
+            at_minute = hour * 60 + minute
         allowed = [
             index
             for index, dish in enumerate(dishes)
@@ -551,6 +580,7 @@ def plan_daily_dishes(
     goal_types: dict,
     weekdays: list | None = None,
     ceilings: dict | None = None,
+    meal_minutes: list | None = None,
 ) -> list[list[list[int]]]:
     """排出每天三餐吃哪些菜，優先讓整天加總符合疾病別的每日目標。
 
@@ -576,8 +606,9 @@ def plan_daily_dishes(
             break
         day_index = len(plan)
         weekday = weekdays[day_index] if weekdays and day_index < len(weekdays) else None
+        minutes = meal_minutes[day_index] if meal_minutes and day_index < len(meal_minutes) else None
         eligibility = (
-            _meal_eligibility(dishes, weekday)
+            _meal_eligibility(dishes, weekday, minutes)
             if weekday is not None
             else [list(range(dish_count)) for _ in MEAL_ORDER]
         )
@@ -609,14 +640,22 @@ def build_week_records(user_id: str, dishes: list, days: int, source: str, end_d
     day_dates = [end_date - timedelta(days=days - 1 - index) for index in range(days)]
     # Google Places 的 day 是 0=週日，Python 的 isoweekday 是 1=週一…7=週日
     weekdays = [day.isoweekday() % 7 for day in day_dates]
+    seed = f"{user_id}:{source}:{end_date.isoformat()}"
+    # 先決定幾點吃，再依那個時間挑店家——順序反過來的話，
+    # 會排出「這家店那個時間已經打烊」的紀錄
+    day_times = [
+        [meal_time(seed, day, meal_type) for meal_type in MEAL_ORDER]
+        for day in day_dates
+    ]
+    day_minutes = [[hour * 60 + minute for hour, minute in times] for times in day_times]
     plan = plan_daily_dishes(
-        dishes, days, f"{user_id}:{source}:{end_date.isoformat()}", targets, goal_types, weekdays, ceilings
+        dishes, days, seed, targets, goal_types, weekdays, ceilings, day_minutes
     )
     for day_index, meal_plan in enumerate(plan):
         day = day_dates[day_index]
         for meal_index, dish_indexes in enumerate(meal_plan):
             meal_type = MEAL_ORDER[meal_index]
-            hour, minute = MEAL_HOURS[meal_type]
+            hour, minute = day_times[day_index][meal_index]
             foods = [dict(dishes[dish_index]) for dish_index in dish_indexes]
             totals = {
                 nutrient: round(sum(_number(food.get(nutrient)) for food in foods), 2)

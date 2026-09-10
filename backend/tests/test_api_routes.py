@@ -804,3 +804,43 @@ class AllowedOriginNormalisationTests(unittest.TestCase):
 
     def test_blank_entries_are_dropped(self):
         self.assertEqual(self.normalise("   "), "")
+
+
+class PostgresSslModeTests(unittest.TestCase):
+    """本機 Postgres 預設沒開 SSL；寫死 sslmode=require 就連不上。"""
+
+    def setUp(self):
+        import app as app_module
+
+        self.connect = app_module.connect_postgres
+        self.module = app_module
+
+    def _captured(self, url):
+        seen = {}
+
+        def fake_connect(dsn, **kwargs):
+            seen["dsn"] = dsn
+            seen["kwargs"] = kwargs
+            return object()
+
+        with patch.object(self.module.psycopg2, "connect", fake_connect):
+            self.connect(url)
+        return seen
+
+    def test_a_local_database_does_not_demand_ssl(self):
+        seen = self._captured("postgresql://user:pw@localhost:5432/nutrilens")
+        self.assertEqual(seen["kwargs"].get("sslmode"), "prefer")
+
+    def test_a_remote_database_still_requires_ssl(self):
+        seen = self._captured("postgresql://user:pw@aws-1.pooler.supabase.com:5432/postgres")
+        self.assertEqual(seen["kwargs"].get("sslmode"), "require")
+
+    def test_an_explicit_sslmode_in_the_url_wins(self):
+        seen = self._captured("postgresql://user:pw@example.com/db?sslmode=disable")
+        self.assertNotIn("sslmode", seen["kwargs"])
+
+    def test_docker_compose_hostnames_count_as_local(self):
+        for url in ("postgresql://u:p@db:5432/nutrilens",
+                    "postgresql://u:p@host.docker.internal:5432/nutrilens"):
+            with self.subTest(url=url):
+                self.assertEqual(self._captured(url)["kwargs"].get("sslmode"), "prefer")

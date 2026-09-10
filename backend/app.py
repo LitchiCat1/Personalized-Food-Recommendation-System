@@ -53,11 +53,24 @@ load_local_env()
 
 BASE_DIR = os.path.dirname(__file__)
 
+def connect_postgres(url: str):
+    """連 Postgres，SSL 依主機決定。
+
+    先前寫死 sslmode="require"，所以只連得上 Supabase 這種雲端資料庫；
+    本機的 Postgres 預設沒開 SSL，會直接被拒絕，等於無法在本地端建資料庫。
+    網址自己指定 sslmode 時以它為準。
+    """
+    if "sslmode=" in url:
+        return psycopg2.connect(url)
+    local = any(host in url for host in ("@localhost", "@127.0.0.1", "@host.docker.internal", "@db:"))
+    return psycopg2.connect(url, sslmode="prefer" if local else "require")
+
+
 pg_conn = None
 database_url = os.environ.get("DATABASE_URL")
 if database_url:
     try:
-        pg_conn = psycopg2.connect(database_url, sslmode="require")
+        pg_conn = connect_postgres(database_url)
         pg_conn.autocommit = True
         print("[OK] PostgreSQL connected")
     except Exception as e:
@@ -90,7 +103,7 @@ menu_pg_conn = None
 menu_database_url = os.environ.get("MENU_DATABASE_URL")
 if menu_database_url:
     try:
-        menu_pg_conn = psycopg2.connect(menu_database_url, sslmode="require")
+        menu_pg_conn = connect_postgres(menu_database_url)
         menu_pg_conn.autocommit = True
         print("[OK] Menu cache PostgreSQL connected")
     except Exception as e:

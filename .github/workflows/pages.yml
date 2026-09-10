@@ -1,0 +1,84 @@
+name: Deploy web app to GitHub Pages
+
+# 前端的 JS bundle 約 3 MB，每次有人打開網站就下載一次。放在 Render 的
+# 免費方案上，1,700 次載入就會把 5 GB 頻寬吃完並停掉整個 workspace。
+# GitHub Pages 對公開倉庫的頻寬寬鬆得多，而後端只需要處理 API 流量。
+
+on:
+  push:
+    branches:
+      - v0.0.8f
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同時只跑一個部署，但不取消進行中的那個——半途中斷會留下壞掉的網站
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build static export
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        env:
+          # GitHub Pages 的網址是 https://<帳號>.github.io/<倉庫名>/
+          EXPO_BASE_URL: /${{ github.event.repository.name }}
+          # 這幾個值最後都會出現在公開的 JS bundle 裡，所以用 vars 而不是 secrets——
+          # 標成 secret 只會讓人誤以為它們是機密的。
+          EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_AUTH_REQUIRED: "true"
+          GOOGLE_PLACES_API_KEY: ${{ vars.GOOGLE_MAPS_BROWSER_KEY }}
+        run: npm run build:web
+
+      - name: Add 404 fallback for client-side routes
+        # Pages 對未知路徑回 404.html。複製 index.html 過去，
+        # 直接開 /profile 這種網址才不會壞掉。
+        run: cp dist/index.html dist/404.html
+
+      - name: Disable Jekyll
+        # 沒有這個檔案，Pages 會忽略 _expo 這種底線開頭的目錄，
+        # 整包 JS 就會 404。
+        run: touch dist/.nojekyll
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

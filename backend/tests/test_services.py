@@ -945,3 +945,57 @@ class ActivityLevelTests(unittest.TestCase):
         self.assertEqual(male["bmr"] - female["bmr"], 166)
 
 
+
+
+class RecommendationHonestyTests(unittest.TestCase):
+    """推薦不能謊稱安全，也不能把示範資料排在真實店家前面。"""
+
+    def test_ai_guessed_dishes_carry_no_invented_nutrition(self):
+        """prompt 明寫「不可輸出精準營養數字」，程式卻用菜名關鍵字補一組。"""
+        from services.restaurant_ai_service import normalize_restaurant_summary
+
+        result = normalize_restaurant_summary({
+            "restaurant_type": "早餐店",
+            "likely_foods": ["蛋餅"],
+            "recommended_foods": [{"name": "排骨飯", "reason": "蛋白質足夠"}],
+            "price_range_twd": {"min": 60, "max": 120},
+            "budget_fit": "適合",
+            "health_tips": [],
+            "confidence": "low",
+        }, budget=150)
+
+        dish = result["recommended_foods"][0]
+        self.assertEqual(dish["name"], "排骨飯")
+        for nutrient in ("calories", "protein", "carbs", "fat", "sodium"):
+            self.assertNotIn(nutrient, dish, f"{nutrient} 是編造的，不該回傳")
+        self.assertFalse(dish["nutrition_available"])
+
+    def test_a_dish_the_model_never_named_is_dropped(self):
+        from services.restaurant_ai_service import normalize_restaurant_summary
+
+        result = normalize_restaurant_summary({
+            "recommended_foods": [{"name": "  ", "reason": "x"}, {"name": "滷肉飯", "reason": "y"}],
+            "price_range_twd": {"min": 0, "max": 0},
+        }, budget=150)
+        self.assertEqual([d["name"] for d in result["recommended_foods"]], ["滷肉飯"])
+
+    def test_a_cautioned_dish_does_not_claim_to_be_compliant(self):
+        """糖尿病使用者看到油炸餐點，理由欄先前寫「營養與安全條件相符」。"""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        catalog = load_restaurant_catalog(base)
+        rules = load_disease_rules(base)
+        taxonomy = load_allergen_taxonomy(base)
+
+        storage = StorageRepository(None, False, {}, [], [])
+        storage.upsert_user({
+            "user_id": "u1", "name": "U", "height": 170, "weight": 65, "age": 30,
+            "health_conditions": ["diabetes"],
+        })
+        result = build_healthy_food_recommendations(
+            storage, rules, catalog, "u1", {"budget": 500, "radius_km": 10}, taxonomy
+        )
+        for item in result["recommended"]:
+            cautions = item.get("medical_risk", {}).get("caution_reasons") or []
+            if cautions:
+                self.assertNotIn("營養與安全條件相符", item["reasons"],
+                                 f"{item['item_name']} 有提醒卻聲稱相符")

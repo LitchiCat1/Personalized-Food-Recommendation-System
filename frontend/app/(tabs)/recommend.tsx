@@ -365,6 +365,20 @@ export default function RecommendScreen() {
             ) : null}
           </SectionBlock>
 
+          {healthyData?.data_source_warning ? (
+            <View style={styles.fakeDataWarning}>
+              <Ionicons name="warning-outline" size={16} color={Palette.status.error} />
+              <Text style={styles.fakeDataWarningText}>{healthyData.data_source_warning}</Text>
+            </View>
+          ) : null}
+
+          {healthyData?.nutrition_note ? (
+            <View style={styles.openingNotice}>
+              <Ionicons name="information-circle-outline" size={15} color={Palette.text.secondary} />
+              <Text style={styles.openingNoticeText}>{healthyData.nutrition_note}</Text>
+            </View>
+          ) : null}
+
           {healthyData?.calorie_note ? (
             <View style={styles.openingNotice}>
               <Ionicons name="flame-outline" size={15} color={Palette.text.secondary} />
@@ -667,20 +681,22 @@ function RestaurantCard({
                 <Ionicons name="sparkles-outline" size={16} color={Palette.accent.green} />
                 <Text style={styles.personalizedTitle}>疾病與今日進度提醒</Text>
               </View>
+              {/* 這裡的品項是 Gemini 從店名推測的，這家店沒有建檔菜單。
+                  先前每一項旁邊有「加入今日紀錄」，按下去會用菜名關鍵字
+                  現編一組營養數字（麵/飯/便當 → 550 kcal / 750 mg），
+                  標成 confidence 100、reliability high 存進健康紀錄，
+                  而且整條路徑沒有跑過 evaluate_medical_risk——過敏原、
+                  反式脂肪、單餐鈉上限全部沒有檢查。按鈕已移除。 */}
               {(summary.recommended_foods || []).map((item, itemIndex) => (
-                <View key={`${item.name}_${itemIndex}`} style={[styles.personalizedItem, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-                  <View style={{ flex: 1, paddingRight: Spacing.sm }}>
-                    <Text style={styles.personalizedFood}>{item.name}</Text>
-                    <Text style={styles.restaurantMeta}>{item.reason}</Text>
-                  </View>
-                  <SecondaryButton
-                    disabled={addingFoodName === item.name}
-                    label={addingFoodName === item.name ? '新增中' : '+ 加入今日紀錄'}
-                    onPress={() => onQuickAddRecord(item)}
-                    icon={<Ionicons name="add-circle-outline" size={13} color={Palette.accent.green} />}
-                  />
+                <View key={`${item.name}_${itemIndex}`} style={styles.personalizedItem}>
+                  <Text style={styles.personalizedFood}>{item.name}</Text>
+                  <Text style={styles.restaurantMeta}>{item.reason}</Text>
                 </View>
               ))}
+              <Text style={styles.aiGuessCaveat}>
+                以上是 AI 依店名推測的，這家店還沒有菜單資料，也沒有經過疾病禁忌與過敏原檢查。
+                到店後請用「掃描」記錄實際餐點。
+              </Text>
             </View>
           ) : null}
           <Text style={styles.restaurantMeta}>建議：{summary.health_tips.join('、') || '到店後確認餐點內容'}</Text>
@@ -708,6 +724,13 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.bg.card, borderRadius: Radius.lg, padding: Spacing.md,
   },
   openingNoticeText: { ...Typography.small, color: Palette.text.secondary, flex: 1 },
+  fakeDataWarning: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm,
+    backgroundColor: `${Palette.status.error}14`,
+    borderLeftWidth: 3, borderLeftColor: Palette.status.error,
+    borderRadius: Radius.lg, padding: Spacing.md,
+  },
+  fakeDataWarningText: { ...Typography.small, color: Palette.status.error, flex: 1, fontWeight: '600', lineHeight: 18 },
   mealTop: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
   mealInfo: { flex: 1, gap: Spacing.sm },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
@@ -794,6 +817,7 @@ const styles = StyleSheet.create({
   personalizedTitle: { ...Typography.caption, color: Palette.text.primary, fontWeight: '700' },
   personalizedItem: { gap: 2 },
   personalizedFood: { ...Typography.caption, color: Palette.accent.green, fontWeight: '700' },
+  aiGuessCaveat: { ...Typography.small, color: Palette.status.warning, marginTop: Spacing.sm, lineHeight: 18 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
   photoSourceOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
   photoSourceCard: { width: '100%', maxWidth: 360, backgroundColor: Palette.bg.card, borderRadius: Radius.xl, borderWidth: 1, borderColor: Palette.border.subtle, padding: Spacing.lg, gap: Spacing.sm, ...Shadows.soft },

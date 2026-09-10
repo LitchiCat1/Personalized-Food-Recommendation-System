@@ -162,10 +162,13 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                 "sodium": item["sodium"],
                 "gi": item.get("gi"),
                 "match_score": total_score,
+                # 「營養與安全條件相符」先前是無條件寫死的，即使 medical_risk
+                # 判定「應極力避免」也照樣顯示相符——caution 全被吞掉。
+                # 有提醒就列提醒，沒有才說相符。
                 "reasons": [
                     f"符合預算 {budget} 元",
                     f"距離約 {round(distance_km, 2)} km",
-                    "營養與安全條件相符",
+                    *(medical_risk.get("caution_reasons") or ["營養與安全條件相符"]),
                 ],
                 "medical_risk": medical_risk,
             }
@@ -257,8 +260,18 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                     "fat": item["fat"],
                     "sodium": item["sodium"],
                     "gi": item.get("gi"),
-                    "match_score": 95,
-                    "reasons": ["營養與安全條件相符"],
+                    # 示範資料不該排在真實店家前面。先前寫死 95，是所有
+                    # 來源裡最高分，所以 Places 一失敗，畫面最上方就是
+                    # 五家不存在的店。
+                    "match_score": 40,
+                    "is_demo_data": True,
+                    # 先前寫死「營養與安全條件相符」，而右邊的 medical_risk
+                    # 就算判定「應極力避免」也不會出現在畫面上——糖尿病使用者
+                    # 看到油炸餐點，理由欄寫的是「相符」。
+                    "reasons": (
+                        ["示範資料，非真實店家"]
+                        + (medical_risk.get("caution_reasons") or [])
+                    ) if medical_risk.get("caution_reasons") else ["示範資料，非真實店家"],
                     "medical_risk": medical_risk,
                 }
                 recommendations.append(recommended_item)
@@ -521,6 +534,10 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
             "remaining": remaining,
             "data_source": "google_places_fallback",
             "nutrition_available": True,
+            "data_source_warning": (
+                "找不到真實店家（Google Places 沒有回應），"
+                "以下是內建的示範資料，不是你附近實際存在的店。請勿據此前往或記錄。"
+            ),
             "nutrition_note": f"Google Places API 載入失敗（可能是 Billing 未啟用或金鑰錯誤）：{e}。已自動為您切換至本地模擬店家以利演示功能。",
             "recommended": offline_recommendations.get("recommended", []),
             "restaurants": offline_recommendations.get("restaurants", []),

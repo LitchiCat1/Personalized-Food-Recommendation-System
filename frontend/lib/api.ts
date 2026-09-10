@@ -190,6 +190,8 @@ export type HealthyFoodResponse = {
   data_source?: string;
   nutrition_available?: boolean;
   nutrition_note?: string;
+  // 退回內建示範店家時的警告。先前後端有寫、前端從來沒顯示。
+  data_source_warning?: string;
   // 現在沒開的店不推薦，但要讓使用者知道少掉幾家，不然清單變短會像壞掉
   closed_now?: number;
   opening_note?: string | null;

@@ -39,7 +39,7 @@ const PROFILE_SECTIONS = [
 
 export default function ProfileScreen() {
   const { gridCol2, isDesktop } = useResponsive();
-  const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser, invalidateDietaryRecords , dailyNutrition, nutritionTargetBasis, setActivityStats } = useStore();
+  const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser, invalidateDietaryRecords , dailyNutrition, nutritionTargetBasis, setActivityStats, applyNutritionTargets } = useStore();
   const initialUserRef = useRef(user);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,8 +114,11 @@ export default function ProfileScreen() {
           dailyCalorieTarget: data.daily_calorie_target,
           targetWeight: data.target_weight || seedUser.targetWeight,
           dietType: data.diet_type,
-          streak: seedUser.streak,
-          totalMeals: seedUser.totalMeals,
+          // 這兩個不在 /user 的回應裡，要沿用 store 目前的值。
+          // 用 seedUser（mount 當下的快照）會蓋掉 setActivityStats 剛算好的數字：
+          // 兩個請求誰先回是不一定的，實測就出現過連續天數被打回 0。
+          streak: useStore.getState().user.streak,
+          totalMeals: useStore.getState().user.totalMeals,
         });
         setError(null);
       })
@@ -143,9 +146,12 @@ export default function ProfileScreen() {
     let cancelled = false;
 
     fetchAllRecordsWithTargets(apiBaseUrl, user.userId, { accessToken })
-      .then(({ records }) => {
+      .then(({ records, targets, goalTypes, basis }) => {
         if (cancelled) return;
         setActivityStats(calculateActivityStats(records));
+        // 每日目標先前只有首頁會去同步。直接開「我的」頁（重新整理、外部連結）
+        // 時拿到的是 store 的預設值 2100 kcal，跟首頁顯示的數字對不起來。
+        applyNutritionTargets(targets, goalTypes, basis);
       })
       .catch(() => {
         // 這兩個數字只是輔助資訊，抓不到就維持 0，不要用錯誤蓋掉整頁。
@@ -154,7 +160,7 @@ export default function ProfileScreen() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, apiBaseUrl, setActivityStats, user.userId]);
+  }, [accessToken, apiBaseUrl, applyNutritionTargets, setActivityStats, user.userId]);
 
   useEffect(() => {
     setProfileDraft({

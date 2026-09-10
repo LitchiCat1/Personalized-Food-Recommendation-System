@@ -79,6 +79,17 @@ export interface NutriLensState {
   ) => void;
   /** 由實際紀錄算出的連續天數與累積餐數。 */
   setActivityStats: (stats: { streak: number; totalMeals: number }) => void;
+  /**
+   * 只更新每日目標，不動已攝取量與餐點清單。
+   *
+   * 給「不是首頁、但也需要顯示正確目標」的畫面用——直接開「我的」頁時，
+   * 先前顯示的是 store 的預設 2100 kcal，跟首頁的數字對不起來。
+   */
+  applyNutritionTargets: (
+    targets?: NutritionTargets,
+    goalTypes?: NutritionGoalTypes,
+    basis?: NutritionTargetBasis,
+  ) => void;
   resetDashboard: () => void;
 
   // Scanner
@@ -322,6 +333,30 @@ export const useStore = create<NutriLensState>((set, get) => ({
 
   setActivityStats: ({ streak, totalMeals }) =>
     set((state) => ({ user: { ...state.user, streak, totalMeals } })),
+
+  applyNutritionTargets: (targets, goalTypes, basis) =>
+    set((state) => {
+      if (!targets && !goalTypes && !basis) return state;
+      const withTarget = <T extends { target: number }>(entry: T, next?: number): T =>
+        next === undefined ? entry : { ...entry, target: next };
+      const daily = state.dailyNutrition;
+      return {
+        nutritionGoalTypes: goalTypes ?? state.nutritionGoalTypes,
+        nutritionTargetBasis: basis ?? state.nutritionTargetBasis,
+        dailyNutrition: {
+          ...daily,
+          calories: withTarget(daily.calories, targets?.calories),
+          protein: withTarget(daily.protein, targets?.protein),
+          carbs: withTarget(daily.carbs, targets?.carbs),
+          sugar: withTarget(daily.sugar, targets?.sugar),
+          fat: withTarget(daily.fat, targets?.fat),
+          saturated_fat: withTarget(daily.saturated_fat, targets?.saturated_fat),
+          trans_fat: withTarget(daily.trans_fat, targets?.trans_fat),
+          sodium: withTarget(daily.sodium, targets?.sodium),
+          fiber: withTarget(daily.fiber, targets?.fiber),
+        },
+      };
+    }),
 
   // ── Scanner ──
   scanResult: { isScanning: false, detections: [], timestamp: null },

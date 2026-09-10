@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import DataPill from '@/components/ui/data-pill';
 import PrimaryButton from '@/components/ui/primary-button';
 import type { DetectedFood } from '@/constants/mock-data';
+import { perMealBudget } from '@/lib/meal';
 
 type Props = {
   rs: (value: number) => number;
@@ -14,10 +15,19 @@ type Props = {
   onWeightChange: (foodId: string, nextWeight: number) => void;
   submitting?: boolean;
   disabled?: boolean;
+  /**
+   * 使用者的每日鈉上限（後端已依疾病調整）。之前這裡寫死 800/1200mg，
+   * 跟疾病無關——腎臟病每日上限 1500mg、單餐 500mg，掃到 700mg 的餐點
+   * 會顯示成正常色。
+   */
+  sodiumDailyTarget?: number;
+  /** 這一餐合計超過單餐上限的提醒（每道單獨看都在範圍內）。 */
+  mealWarnings?: string[];
 };
 
-export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightChange, submitting = false, disabled = false }: Props) {
+export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightChange, submitting = false, disabled = false, sodiumDailyTarget, mealWarnings = [] }: Props) {
   const controlsDisabled = submitting || disabled;
+  const sodiumMealBudget = perMealBudget(sodiumDailyTarget, 2000);
 
   if (results.length === 0) {
     return (
@@ -128,7 +138,7 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
               { label: '飽和脂肪', value: food.nutrition.saturated_fat ?? 0, unit: 'g', color: Palette.accent.purple },
               { label: '反式脂肪', value: food.nutrition.trans_fat ?? 0, unit: 'g', color: Palette.accent.purple },
               { label: '膳食纖維', value: food.nutrition.fiber, unit: 'g', color: Palette.accent.cyan },
-              { label: '鈉 (Sodium)', value: food.nutrition.sodium, unit: 'mg', color: food.nutrition.sodium > 800 ? Palette.status.warning : Palette.accent.pink },
+              { label: '鈉 (Sodium)', value: food.nutrition.sodium, unit: 'mg', color: food.nutrition.sodium > sodiumMealBudget ? Palette.status.warning : Palette.accent.pink },
             ].map((item) => (
               <View key={item.label} style={[styles.nutritionItem, { minWidth: wp(26) }]}>
                 <Text style={styles.nutritionLabel}>{item.label}</Text>
@@ -142,10 +152,22 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
         </View>
       ))}
 
+      {mealWarnings.length > 0 ? (
+        <View style={styles.mealWarningCard}>
+          <Ionicons name="alert-circle-outline" size={18} color={Palette.status.warning} />
+          <View style={styles.mealWarningCopy}>
+            <Text style={styles.mealWarningTitle}>這一餐加起來超過單餐上限</Text>
+            {mealWarnings.map((warning) => (
+              <Text key={warning} style={styles.mealWarningText}>{warning}</Text>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
       <View style={styles.totalCard}>
         <View style={styles.totalHeader}>
           <Text style={styles.totalTitle}>合計攝取</Text>
-          <DataPill tone={totalSodium > 1200 ? 'warning' : 'success'}>鈉 {totalSodium}mg</DataPill>
+          <DataPill tone={totalSodium > sodiumMealBudget ? 'warning' : 'success'}>鈉 {totalSodium}mg</DataPill>
         </View>
         <View style={styles.totalRow}>
           <View style={styles.totalItem}>
@@ -243,6 +265,20 @@ const styles = StyleSheet.create({
   resetButtonText: { ...Typography.caption, color: Palette.status.warning },
   controlDisabled: { opacity: 0.48 },
   tagsRow: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' },
+  mealWarningCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    backgroundColor: Palette.accent.orangeDim,
+    borderRadius: Radius.lg,
+    borderLeftWidth: 3,
+    borderLeftColor: Palette.status.warning,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  mealWarningCopy: { flex: 1, gap: 2 },
+  mealWarningTitle: { ...Typography.caption, color: Palette.text.primary, fontWeight: '700' },
+  mealWarningText: { ...Typography.small, color: Palette.text.secondary },
   warningBanner: {
     flexDirection: 'row',
     alignItems: 'center',

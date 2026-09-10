@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from services.app_time_service import app_today
+from services.profile_service import compute_bmr
 
 
 DEFAULT_DAILY_NUTRITION_TARGETS = {
@@ -104,7 +105,41 @@ def round_targets_for_display(targets: dict) -> dict:
     return {key: _display_number(value) for key, value in targets.items()}
 
 
+def _fallback_bmr(user: dict, weight_kg: float, height_cm: float) -> float:
+    """profile 沒帶 bmr 時（舊資料，或測試用的精簡 dict）就地補算一次。"""
+    gender = str(user.get("gender") or "male")
+    age = _number(user.get("age"), 30.0)
+    return _number(compute_bmr(gender, weight_kg, height_cm, age), 0.0)
+
+
+def resolve_energy_factor(activity_multiplier: float) -> int:
+    """每公斤理想體重要給幾大卡，依活動量分級。
+
+    先前不分活動量一律 25 或 30，等於把每個人都當成輕度活動：一位選了
+    「中等活動」的使用者拿到的每日目標會比他的 BMR 還低。臨床營養的熱量
+    需求本來就是依活動量分級開的，這裡照同一組級距對應到 App 既有的
+    五個活動量選項（ACTIVITY_LEVELS 的 multiplier）。
+    """
+    if activity_multiplier <= 1.2:
+        return 25  # 久坐／臥床
+    if activity_multiplier <= 1.375:
+        return 30  # 輕度活動
+    if activity_multiplier <= 1.55:
+        return 35  # 中等活動
+    return 40  # 高度／極高活動
+
+
 def calculate_pdf_daily_targets(user: dict) -> dict:
+    return calculate_daily_targets_with_basis(user)["targets"]
+
+
+def calculate_daily_targets_with_basis(user: dict) -> dict:
+    """算出每日目標，並一併回報「這個數字是怎麼來的」。
+
+    畫面上先前同時存在三個每日熱量（tdee、使用者自填的 daily_calorie_target、
+    這裡算出來的疾病目標），彼此打架又沒有任何說明。basis 就是要讓畫面能講清楚
+    現在生效的是哪一個、為什麼。
+    """
     height_cm = _number(user.get("height"), 170.0)
     weight_kg = _number(user.get("weight"), 65.0)
     if height_cm <= 0:
@@ -115,34 +150,56 @@ def calculate_pdf_daily_targets(user: dict) -> dict:
         user.get("daily_calorie_target") or user.get("dailyCalorieTarget"),
         weight_kg * 30,
     )
-    
+
     height_m = height_cm / 100.0
     W = 22.0 * (height_m ** 2)
     if W <= 0:
         W = weight_kg
-    
+
     bmi = weight_kg / (height_m ** 2) if height_m > 0 else 22.0
     is_overweight = bmi >= 24.0
-    
+
+    activity_multiplier = _number(user.get("activity_multiplier") or user.get("activityMultiplier"), 1.55)
+    energy_factor = resolve_energy_factor(activity_multiplier)
+    # 糖尿病與高血脂的指引本身就含減重目標，過重時往下調一級；
+    # 痛風／高血壓／腎病則不做這個減量（維持原本的行為）。
+    weight_managed_factor = max(energy_factor - 5, 20) if is_overweight else energy_factor
+
+    bmr = _number(user.get("bmr") or user.get("bmr_kcal"), 0.0)
+    if bmr <= 0:
+        bmr = _fallback_bmr(user, weight_kg, height_cm)
+
     # 決定不同疾病下的每日總熱量需求 E
     conditions = normalize_conditions(user)
-    
+
     e_candidates = []
     if "diabetes" in conditions:
-        e_candidates.append(W * 25 if is_overweight else W * 30)
+        e_candidates.append(W * weight_managed_factor)
     if "gout" in conditions:
-        e_candidates.append(W * 30)
+        e_candidates.append(W * energy_factor)
     if "hyperlipidemia" in conditions:
-        e_candidates.append(W * 25 if is_overweight else W * 30)
+        e_candidates.append(W * weight_managed_factor)
     if "hypertension" in conditions:
-        e_candidates.append(W * 30)
+        e_candidates.append(W * energy_factor)
     if "kidney_disease" in conditions:
-        e_candidates.append(W * 30) # 慢性腎臟病取 30
-        
-    E = min(e_candidates) if e_candidates else daily_calorie_target
+        e_candidates.append(W * energy_factor)
+
+    floored_at_bmr = False
+    if e_candidates:
+        E = min(e_candidates)
+        # 疾病目標是 App 幫使用者決定的，不能低到基礎代謝以下；
+        # 使用者自己填的數字則尊重他的選擇，不在這裡改。
+        if bmr > 0 and E < bmr:
+            E = bmr
+            floored_at_bmr = True
+        target_source = "disease"
+    else:
+        E = daily_calorie_target
+        target_source = "user"
+
     if E <= 0:
-        E = W * 30
-        
+        E = W * energy_factor
+
     # Default baseline daily targets:
     targets = {
         "calories": E,
@@ -231,8 +288,20 @@ def calculate_pdf_daily_targets(user: dict) -> dict:
     if "kidney_disease" in conditions:
         sodium_vals.append(1500.0)
     targets["sodium"] = min(sodium_vals)
-    
-    return targets
+
+    basis = {
+        "source": target_source,
+        "conditions": sorted(conditions),
+        "ideal_body_weight": round(W, 1),
+        "kcal_per_kg": weight_managed_factor if target_source == "disease" else None,
+        "activity_multiplier": activity_multiplier,
+        "bmr": round(bmr) if bmr > 0 else None,
+        "floored_at_bmr": floored_at_bmr,
+        "user_target": round(daily_calorie_target) if daily_calorie_target > 0 else None,
+        "is_overweight": is_overweight,
+    }
+
+    return {"targets": targets, "basis": basis}
 
 
 def build_daily_nutrition_progress(storage, user_id: str, user: dict, now: datetime | None = None) -> dict:

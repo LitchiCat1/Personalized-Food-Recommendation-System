@@ -51,7 +51,20 @@ def main():
         cwd=frontend_dir
     )
     
-    # 3. Print Summary Report
+    # 3. Run Frontend Unit Tests
+    #
+    # 這些 node --test 測試一直存在，但 runner 從來沒跑過，所以 CI 接不到
+    # 它們的迴歸——飲食趨勢、紀錄、掃描與安全條件的規則都靠它們釘著。
+    print("=========================================")
+    print("3. Running Frontend Unit Tests...")
+    print("=========================================")
+    frontend_unit_results = []
+    for suite in ("trends", "records", "scanner", "config", "safety"):
+        code, out, err = run_command(f"npm run --silent test:{suite}", cwd=frontend_dir)
+        frontend_unit_results.append((suite, code, out, err))
+        print(f"  test:{suite} {'OK' if code == 0 else 'FAILED'}")
+
+    # 4. Print Summary Report
     print("\n=========================================")
     print("           TEST RUN SUMMARY              ")
     print("=========================================")
@@ -76,6 +89,17 @@ def main():
         print(frontend_stdout)
         print("--- Stderr Output ---")
         print(frontend_stderr)
+        all_passed = False
+
+    failed_suites = [entry for entry in frontend_unit_results if entry[1] != 0]
+    if not failed_suites:
+        print(f"[OK] Frontend Unit Tests: PASSED ({len(frontend_unit_results)} suites)")
+    else:
+        print("[FAIL] Frontend Unit Tests: FAILED")
+        for suite, _code, out, err in failed_suites:
+            print(f"--- test:{suite} ---")
+            print(out)
+            print(err)
         all_passed = False
         
     print("=========================================")

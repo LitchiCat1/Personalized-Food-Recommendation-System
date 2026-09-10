@@ -1,5 +1,49 @@
 # Changelog
 
+## v0.0.9 - 2026-09-10 (每日熱量目標統一、深色模式、無障礙與前端體積)
+
+依線上版（`personalized-food-recommendation-frontend-rt1v`）的一輪實機測試逐項修正。
+測試當下線上跑的前後端都比 repo 舊，其中數項（餐別、英文警告、休息中店家排序、
+手動搜尋加入後的狀態）在 repo 裡本來就已修好，只是還沒部署。
+
+### Fixed
+
+- **每日熱量目標同時存在三個互相矛盾的數字**：`tdee`（2,570，顯示在「我的 → 個人資料」）、使用者自填的 `daily_calorie_target`（存進後端但畫面上完全不顯示）、以及疾病指引算出的臨床目標（1,589.5，顯示在首頁／趨勢／「我的 → 飲食目標」）。同一個 App 裡三個「每日熱量」互相打架，而且沒有任何一處說明差在哪。`/records/<user_id>` 新增 `nutrition_target_basis`，回報現在生效的是哪一個、依據什麼（理想體重、kcal/kg、活動量、BMR、是否被 BMR 抬升、使用者自填值）。「我的」頁的 TDEE 卡改為顯示實際生效的**每日目標**，下方以一句話說明來源；TDEE 移到基本資料列並標注「未計入疾病調整」。
+- **「編輯資料」的「每日熱量」欄位形同虛設**：改成 3000 後 App 回報「已同步到後端」，後端也確實存了 3000，但畫面上沒有任何一處會變——有疾病條件時 `E = min(e_candidates)` 一律覆蓋使用者填的值。欄位改名為「每日熱量**基準** kcal」並加上說明：沒有勾選疾病時才採用這個數字。
+- **疾病調整後的目標低於使用者的基礎代謝率，而且完全不看活動量**：先前不分活動量一律 25 或 30 kcal/kg，等於把每個人都當輕度活動。一位 22 歲男性、170cm/70kg、選了「中等活動」的糖尿病使用者，BMR 是 1,658 kcal，卻拿到 1,589.5 kcal 的每日目標。改為依活動量分級（久坐 25／輕度 30／中等 35／高度以上 40 kcal/kg 理想體重），糖尿病與高血脂在 BMI ≥ 24 時再往下調一級（痛風／高血壓／腎病維持不調，與原行為一致），並以 BMR 作為疾病目標的絕對下限。同一位使用者的目標改為 1,907 kcal。
+- **「連續 14 天」是寫死的假資料**：`constants/mock-data.ts` 的 `streak: 14` 從來沒有被真實資料覆蓋過，今天才註冊、只有一筆紀錄的帳號一樣顯示「連續 14 天」。新增 `calculateActivityStats()` 依實際紀錄算連續天數與累積餐數（今天還沒記錄不算中斷，從昨天起算），mock 常數移除。
+- **掃描頁把疾病與過敏原的英文代碼直接顯示給使用者**：「安全條件已套用」寫的是「疾病：diabetes、hypertension · 過敏原：milk」，其他地方都是中文。新增 `lib/medical-labels.ts` 做代碼→中文對照，對不上的原樣顯示。
+- **店家標籤是 Google Places 的英文類型代碼**：`restaurant`、`food`、`meal_takeaway`、`store`、`meal_delivery` 直接塞進 `tags` 顯示。新增 `readable_place_types()` 轉成中文並丟掉 `point_of_interest`／`establishment`／`food`／`store` 這類每家店都有、講了等於沒講的類型；對不上表的類型直接不顯示，不退回英文。附帶效果是這些 tag 會參與 `_places_risk_candidate` 的過敏原／疾病關鍵字比對，英文代碼在中文關鍵字表裡永遠比不中，換成中文之後「海鮮」「燒烤」這類類型才真的擋得掉衝突的店。
+- **「手動搜尋」分頁點進去沒有任何可操作的元件**：說明卡沒有按鈕（其他模式那裡是「啟動相機」之類的動作），而真正的搜尋框排在「辨識結果」與「安全條件」之後，要捲兩段才看得到，使用者會以為分頁壞了。手動模式時把搜尋工具移到說明卡正下方。
+- **菜單解析等了 38 秒才回「線上查無此店菜單」，全程只有一個轉圈**：加上已等待秒數與預期時間（第一次分析一家店約 20~40 秒）。
+- **推薦分數沒有鑑別度而且名不副實**：`match_score` 是距離、評分與價位算出來的，跟健康完全無關，卻掛著「推薦」兩個字顯示在一個健康管理 App 裡；實測 12 家店有 6 家都是 99。改為顯示 Google 評分（★4.3），沒有評分就不顯示。
+- **菜單彈窗有兩顆功能相同的上傳按鈕**：標題下一顆、空狀態卡片裡一顆，而空狀態的文案還寫著「請直接點擊下方按鈕」。查無菜單時只保留卡片裡那顆。
+- **`document.title` 是空字串**：分頁只顯示網址，加書籤沒有名稱，分享連結也沒有標題。根因是 expo-router 靜態輸出時一定會插一個 `<title data-rh="true">`，而且排在 `+html.tsx` 的內容之前——HTML 規範取第一個 title，那個空的會贏。改用 `expo-router/head` 的 `<Head>` 去填它，輸出現在只有一個非空的 title。
+- **`<html lang="en">` 但內容全是繁體中文**：讀屏軟體會用英文語音朗讀中文。改為 `zh-Hant-TW`，並補上 meta description 與 og 標籤。
+- **`role="radio"` 用 `aria-selected` 而非 `aria-checked`**：初次設定的生理性別、飲食型態、活動量三組。`aria-selected` 在 radio 上不是有效屬性，讀屏軟體讀不到選取狀態。店家類型 chip 掛在 `role="button"` 上的 `aria-selected` 一併改為 `aria-pressed`。
+- **表單驗證只有視覺提示**：身高填 0 只有橘色外框與變灰的儲存鍵，沒有 `aria-invalid`，讀屏或色覺障礙的使用者只會遇到一個按不下去的按鈕。所有欄位補上 `aria-invalid` 與 `aria-label`。
+- **多個輸入框只靠 placeholder 當標籤**：「本餐預算」填值後就完全沒有可見標籤。補上可見標籤與 `aria-label`。
+- **同一個數字兩種寫法**：首頁同時出現「今天還能吃 1,590 kcal」與「目標 1,589.5 kcal」。熱量統一用 `formatCalories()` 取整。
+- **時間格式不一致**：餐卡顯示「下午09:47」（`zh-TW` 的 `toLocaleTimeString` 預設 12 小時制），紀錄編輯顯示「21:47」。統一為 24 小時制。
+- **手動搜尋建立的紀錄被標成 📸**：圖示先前取自食物的 `source`（`TFDA`，那是「營養數據哪裡來的」），改用紀錄的 `source`（「怎麼記錄的」）。
+- **滑鼠停在地圖上時整頁捲不動，手機上像卡住**：`gestureHandling` 從 `greedy` 改為 `cooperative`——滾輪捲頁面（按住 Ctrl 才縮放），單指捲頁面、雙指操作地圖。
+- **地圖徽章在淺色模式下幾乎看不見**：固定深色底卻用會跟著主題走的 `text.primary`，改用固定白色的 `text.inverse`。
+- **輸入框聚焦時單位文字被邊框蓋住**：焦點框先前是瀏覽器預設的 outline，只框住 `flex:1` 的輸入框本身並畫在同一列的「kcal」上面。改為把焦點狀態畫在外殼上。
+- **一餐點兩道菜時單餐鈉上限不會觸發**：`evaluate_medical_risk` 逐道菜比對「每日 ÷ 3」的額度，兩道各 490mg 會全部通過。新增 `evaluate_meal_medical_risk` 檢查一餐合計，`/predict/vision-food` 回傳 `meal_warnings`；因為使用者已經把這些菜放在一起了，這是提醒而不是封鎖。訊息用詞也改成說清楚比的是「單道 vs 一餐額度」。
+- **安全條件勾選會同時留下兩種格式**：舊紀錄存中文標籤（`高血壓`）、新的存 id（`hypertension`），畫面判定「已勾選」時兩種都認，但 store 的 toggle 只比對 id，於是點一下會變成兩個都留著、顯示成已勾選，送去後端的卻是空陣列——少一個病症等於那整組禁忌規則沒有套用。抽出 `lib/safety-selection.ts` 讓兩邊用同一套比對，並加上測試。
+- **每筆紀錄的餐別被寫死成「點心」**：POST `/record` 的 payload 硬寫 `meal_type: '點心'`，畫面卻先用時間判定顯示「晚餐」，同步後跳回「點心」。抽出 `lib/meal.ts`，`saveRecord` 的 `mealType` 改為必填，由呼叫端提供該筆紀錄實際發生的時間（離線佇列補送時要用當初入列的時間，不是送出的時間）。
+
+### Added
+
+- **深色模式（web）**：`constants/theme.ts` 拆成 `lightPalette` / `darkPalette`，web 端的 `Palette.*` 產出 CSS 變數參照（`var(--nl-text-primary)`），由 `app/+html.tsx` 注入的樣式依 `prefers-color-scheme` 決定實際值。這個做法讓既有的 600 多處 `Palette.*` 引用一行都不用改——畫面用的是 `StyleSheet.create`，那是模組載入時就算好的，改成執行期解析會動到整個 codebase。深色盤是重新配的而不是把淺色反轉：強調綠從 #1F9D72 提亮到 #35C08D，對卡片底的對比從約 3.1:1 提到約 7.4:1。原生端沒有 CSS 變數，維持淺色盤，行為不變。`app.json` 的 `userInterfaceStyle` 從 `dark` 改為 `automatic`。
+- **`app/+html.tsx`**：web 靜態輸出的 HTML 外殼，負責 `lang`、meta、theme-color 與主題 CSS 的注入。
+
+### Changed
+
+- **前端 bundle 從 3.01 MB 降到 2.58 MB（brotli 777 KB → 504 KB）**：`import { Ionicons } from '@expo/vector-icons'` 這個 barrel 會把其他圖示家族的 glyphmap 一起打包（bundle 裡找得到 FontAwesome5 的 `accusoft`、Foundation 的 `burst-sale`），全 repo 只用 Ionicons。15 個檔案改為 `import Ionicons from '@expo/vector-icons/Ionicons'`。註：Metro 在 `output: "static"` 下只會產出單一 bundle，`asyncRoutes` 兩種寫法都試過都不會分割，真正的 code splitting 需要改變 export 模式，會影響現有的靜態託管，因此沒有採用。
+- **靜態資源加上長期快取**：`render.yaml` 對 `/_expo/static/*` 與 `/assets/*` 設定 `Cache-Control: public, max-age=31536000, immutable`，`index.html` 維持 `must-revalidate`。檔名本來就帶 content hash，先前卻用預設的 `max-age=0`，每次造訪都要重新驗證並下載整包 bundle。（GitHub Pages 不支援自訂 header，此設定只對 Render 生效。）
+- **Google Maps 標記**：設定 `EXPO_PUBLIC_GOOGLE_MAPS_MAP_ID` 時改用 `AdvancedMarker`（`google.maps.Marker` 自 2024-02-21 起 deprecated），沒設定時沿用舊的 `Marker`——AdvancedMarker 少了 Map ID 會整個不顯示標記，無條件切換等於把地圖弄壞。
+
 ## v0.0.8f - 2026-09-03 (營養指標精簡、時區／單位修正、一鍵測試資料、店家推薦飲食限制與費用)
 
 ### Changed

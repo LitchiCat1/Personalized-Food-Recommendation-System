@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Palette, Radius, Spacing, Typography } from '@/constants/theme';
 
 type FeedbackTone = 'success' | 'error';

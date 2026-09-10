@@ -1,5 +1,6 @@
 import type { DetectedFood } from '@/constants/mock-data';
 import type { ApiAuth } from '@/lib/api';
+import type { MealType } from '@/lib/meal';
 
 
 function buildHeaders(auth?: ApiAuth, contentType?: string): HeadersInit {
@@ -101,7 +102,7 @@ export async function runPrediction(params: {
   allergens: string[];
   userId?: string;
   auth?: ApiAuth;
-}): Promise<{ detections: DetectedFood[]; rejectedDetections: RejectedDetection[] }> {
+}): Promise<{ detections: DetectedFood[]; rejectedDetections: RejectedDetection[]; mealWarnings: string[] }> {
   const body = {
     image: normalizeImageBase64(params.imageBase64),
     health_conditions: params.healthConditions,
@@ -121,6 +122,8 @@ export async function runPrediction(params: {
   return {
     detections: mapApiDetections(data.detections || []),
     rejectedDetections: data.rejected_detections || [],
+    // 每道菜單獨都在額度內、加起來卻超過整餐上限的提醒
+    mealWarnings: data.meal_warnings || [],
   };
 }
 
@@ -131,6 +134,14 @@ type SaveRecordParams = {
   foods: DetectedFood[];
   source: 'camera' | 'manual' | 'nutrition-label';
   auth?: ApiAuth;
+  /**
+   * 這一餐是哪一餐，由呼叫端指定——這裡不自己猜。
+   *
+   * 原本寫死「點心」，畫面上先顯示依時間判定的「早餐」，重新同步後又變回
+   * 「點心」。改成必填是因為正確答案取決於「這筆紀錄何時發生」，只有呼叫端
+   * 知道：離線佇列補送時要用當初入列的時間，不是送出的時間。
+   */
+  mealType: MealType;
 };
 
 const inFlightRecordRequests = new Map<string, Promise<void>>();
@@ -179,7 +190,7 @@ async function performSaveRecord(params: SaveRecordParams): Promise<void> {
     body: JSON.stringify({
       user_id: params.userId,
       client_record_id: params.clientRecordId,
-      meal_type: '點心',
+      meal_type: params.mealType,
       foods: normalizedFoods.map((food) => ({
         name: food.foodName,
         calories: food.nutrition.calories,

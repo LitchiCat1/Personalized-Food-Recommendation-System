@@ -2,11 +2,11 @@
   "expo": {
     "name": "NutriLens",
     "slug": "nutrilens",
-    "version": "0.0.8",
+    "version": "0.0.9",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "nutrilens",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,

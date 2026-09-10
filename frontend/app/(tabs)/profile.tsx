@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, TextInput, Alert, Platform, Modal, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { AVAILABLE_CONDITIONS, AVAILABLE_ALLERGENS } from '@/constants/mock-data';
 import { DIET_TYPES, isKnownDietType } from '@/constants/diet';
@@ -15,11 +15,21 @@ import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
 import FeedbackBanner from '@/components/ui/feedback-banner';
-import { clearNearbyVenueIndex, fetchMedicalMetadata, fetchUserProfile, indexNearbyVenues, listNearbyVenueIndex, saveUserProfile } from '@/lib/api';
+import { clearNearbyVenueIndex, fetchAllRecordsWithTargets, fetchMedicalMetadata, fetchUserProfile, indexNearbyVenues, listNearbyVenueIndex, saveUserProfile } from '@/lib/api';
+import { describeCalorieTarget, describeUserTargetFallback, formatCalories } from '@/lib/calorie-target';
+import { calculateActivityStats } from '@/lib/dietary-trends';
 import { describeLocation, resolveLocation } from '@/lib/location';
 import { isSupabaseAuthConfigured, supabase } from '@/lib/supabase';
+import { isSelected } from '@/lib/safety-selection';
 
 type MedicalMetadata = Awaited<ReturnType<typeof fetchMedicalMetadata>>;
+
+/** 與後端 medical_risk_service.NUTRIENT_LABELS_ZH 對齊。 */
+const NUTRIENT_LABELS: Record<string, string> = {
+  calories: '熱量', protein: '蛋白質', carbs: '碳水化合物', sugar: '精緻糖',
+  fat: '總脂肪', saturated_fat: '飽和脂肪', trans_fat: '反式脂肪',
+  fiber: '膳食纖維', sodium: '鈉',
+};
 
 const PROFILE_SECTIONS = [
   { value: 'personal', label: '個人資料' },
@@ -29,7 +39,7 @@ const PROFILE_SECTIONS = [
 
 export default function ProfileScreen() {
   const { gridCol2, isDesktop } = useResponsive();
-  const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser, invalidateDietaryRecords , dailyNutrition } = useStore();
+  const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser, invalidateDietaryRecords , dailyNutrition, nutritionTargetBasis, setActivityStats } = useStore();
   const initialUserRef = useRef(user);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +131,31 @@ export default function ProfileScreen() {
     };
   }, [accessToken, apiBaseUrl, replaceUser, user.userId]);
 
+  /**
+   * 「連續 N 天」與「累積 N 餐」要從實際紀錄算。
+   *
+   * 先前這兩個數字來自 constants/mock-data.ts 的 `streak: 14` / `totalMeals: 187`，
+   * 而 streak 從來沒有被真實資料覆蓋過——今天才註冊、只有一筆紀錄的帳號
+   * 照樣顯示「連續 14 天」。
+   */
+  useEffect(() => {
+    if (!accessToken) return;
+    let cancelled = false;
+
+    fetchAllRecordsWithTargets(apiBaseUrl, user.userId, { accessToken })
+      .then(({ records }) => {
+        if (cancelled) return;
+        setActivityStats(calculateActivityStats(records));
+      })
+      .catch(() => {
+        // 這兩個數字只是輔助資訊，抓不到就維持 0，不要用錯誤蓋掉整頁。
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, apiBaseUrl, setActivityStats, user.userId]);
+
   useEffect(() => {
     setProfileDraft({
       name: user.name,
@@ -135,6 +170,26 @@ export default function ProfileScreen() {
       activityMultiplier: user.activityMultiplier,
     });
   }, [user.name, user.height, user.weight, user.age, user.dailyCalorieTarget, user.targetWeight, user.dietType, user.gender, user.activityLevel, user.activityMultiplier]);
+
+  /**
+   * 安全條件的儲存必須排隊，而且要送出當下 store 的最新狀態。
+   *
+   * 先前是 `void syncProfile({ ...user, ... })`：連續勾兩個病症會同時發出兩個
+   * 寫入，誰先到後端不一定（Render 冷啟動延遲差到幾秒），晚到的舊 payload 會
+   * 把後來勾的那個蓋掉；而且 payload 是用當次 render 的 user 算的，不是 store
+   * 的最新值。畫面永遠顯示兩個都勾了，後端卻少一個——少一個病症就等於那整組
+   * 禁忌規則沒套用。
+   */
+  const profileSyncChain = useRef<Promise<void>>(Promise.resolve());
+
+  const queueProfileSync = () => {
+    profileSyncChain.current = profileSyncChain.current
+      .catch(() => {})
+      .then(() => syncProfile(useStore.getState().user));
+    return profileSyncChain.current;
+  };
+
+  const thresholdConflicts = medicalMetadata?.threshold_conflicts ?? [];
 
   const syncProfile = async (nextUser = user) => {
     setSaving(true);
@@ -307,10 +362,13 @@ export default function ProfileScreen() {
   // 先前這裡讀 constants/mock-data.ts 的 DIET_GOALS，那是一組寫死的假資料：
   // 不管使用者是誰都顯示「2,100 kcal／目標體重 70kg／每日 4 餐／16:8 間歇性」。
   // 只留真的存在於使用者檔案裡的欄位，捏造的那幾項直接拿掉。
+  const calorieTargetExplanation = describeCalorieTarget(nutritionTargetBasis);
+  const userTargetNote = describeUserTargetFallback(nutritionTargetBasis);
+
   const dietGoals = [
     {
       label: '每日目標熱量',
-      value: `${Math.round(dailyNutrition.calories.target).toLocaleString()} kcal`,
+      value: `${formatCalories(dailyNutrition.calories.target)} kcal`,
       color: '#FB923C',
     },
     { label: '目標體重', value: `${user.targetWeight} kg`, color: '#4ADE80' },
@@ -425,16 +483,32 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/*
+          先前這裡放的是 TDEE，但整個 App 實際採用的是疾病指引算出來的目標，
+          兩個數字不一樣又都沒有說明，使用者看到的就是「我的」頁寫 2570、
+          首頁寫 1590。這裡直接顯示生效的那一個，TDEE 移到下面的基本資料列。
+        */}
         <View style={styles.metricRow}>
           <MetricCard label="BMR" value={user.bmr} unit="kcal" accent={Palette.accent.blue} />
-          <MetricCard label="TDEE" value={user.tdee} unit="kcal" accent={Palette.accent.green} />
+          <MetricCard label="每日目標" value={Math.round(dailyNutrition.calories.target)} unit="kcal" accent={Palette.accent.green} />
           <MetricCard label="BMI" value={user.bmi} accent={Palette.accent.orange} />
         </View>
+
+        {calorieTargetExplanation ? (
+          <View style={styles.targetExplainCard}>
+            <Ionicons name="information-circle-outline" size={16} color={Palette.text.tertiary} />
+            <View style={styles.targetExplainCopy}>
+              <Text style={styles.targetExplainText}>{calorieTargetExplanation}</Text>
+              {userTargetNote ? <Text style={styles.targetExplainMuted}>{userTargetNote}</Text> : null}
+            </View>
+          </View>
+        ) : null}
 
         <View style={styles.profileSetupCard}>
           <View style={styles.profileSetupCopy}>
             <Text style={styles.profileSetupTitle}>個人基本資料</Text>
             <Text style={styles.profileSetupMeta}>{user.height}cm · {user.weight}kg · {user.age} 歲 · {user.dietType}</Text>
+            <Text style={styles.profileSetupMeta}>TDEE {formatCalories(user.tdee)} kcal（未計入疾病調整）</Text>
           </View>
           <SecondaryButton label="編輯資料" onPress={() => setProfileModalVisible(true)} icon={<Ionicons name="create-outline" size={17} color={Palette.accent.green} />} />
         </View>
@@ -452,9 +526,36 @@ export default function ProfileScreen() {
           <Ionicons name="medical-outline" size={16} color={Palette.status.warning} />
           <Text style={styles.medicalDisclaimerText}>{medicalMetadata?.medical_disclaimer || '疾病與營養提醒僅供健康管理參考，不可取代醫療專業建議。'}</Text>
         </View>
+
+        {/* 規則檔簽核的門檻與程式公式算出來的不一致時，實際生效的是較嚴的那個。
+            後端一直有算出這份清單，但從來沒顯示——選了病症的人有權知道系統
+            執行的數字跟審閱過的檔案不同。 */}
+        {thresholdConflicts.length ? (
+          <View style={styles.thresholdConflictBox}>
+            <View style={styles.thresholdConflictHeader}>
+              <Ionicons name="git-compare-outline" size={16} color={Palette.status.warning} />
+              <Text style={styles.thresholdConflictTitle}>
+                {medicalMetadata?.threshold_conflict_note
+                  || `${thresholdConflicts.length} 項門檻在規則檔與程式公式之間不一致，實際生效的是較嚴的那個。`}
+              </Text>
+            </View>
+            {thresholdConflicts.map((conflict) => {
+              const label = conditionCatalog.find((cond) => cond.id === conflict.condition_id)?.label_zh
+                || conflict.condition_id;
+              return (
+                <Text key={`${conflict.condition_id}_${conflict.nutrient}`} style={styles.thresholdConflictRow}>
+                  {label}・{NUTRIENT_LABELS[conflict.nutrient] || conflict.nutrient}：
+                  實際生效 {conflict.effective_block}
+                  （規則檔 {conflict.configured_block} / 公式 {conflict.derived_block}）
+                </Text>
+              );
+            })}
+            <Text style={styles.thresholdConflictFoot}>需要臨床人員確認要採用哪一邊。</Text>
+          </View>
+        ) : null}
         <View style={styles.conditionsGrid}>
           {conditionCatalog.map((cond) => {
-            const isActive = user.healthConditions.includes(cond.id) || user.healthConditions.includes(cond.label_zh);
+            const isActive = isSelected(user.healthConditions, cond.id, [cond.label_zh]);
             const fallback = AVAILABLE_CONDITIONS.find((item) => item.id === cond.id);
             const accent = fallback?.color || Palette.accent.green;
             return (
@@ -464,11 +565,8 @@ export default function ProfileScreen() {
                 accessibilityLabel={cond.label_zh}
                 aria-checked={isActive}
                 onPress={() => {
-                  const nextConditions = isActive
-                    ? user.healthConditions.filter((c) => c !== cond.id && c !== cond.label_zh)
-                    : [...user.healthConditions.filter((c) => c !== cond.label_zh), cond.id];
-                  toggleCondition(cond.id);
-                  void syncProfile({ ...user, healthConditions: nextConditions });
+                  toggleCondition(cond.id, [cond.label_zh]);
+                  void queueProfileSync();
                 }}
                 style={[styles.conditionChip, isActive && styles.conditionChipActive]}
               >
@@ -496,7 +594,7 @@ export default function ProfileScreen() {
       <SectionBlock title="過敏原設定" subtitle="選取後會套用於掃描風險提示與店家篩選。">
         <View style={styles.allergenChipsWrap}>
           {allergenCatalog.map((allergen) => {
-            const isActive = user.allergens.includes(allergen.id) || user.allergens.includes(allergen.label_zh);
+            const isActive = isSelected(user.allergens, allergen.id, [allergen.label_zh]);
             return (
               <Pressable
                 key={allergen.id}
@@ -504,11 +602,8 @@ export default function ProfileScreen() {
                 accessibilityLabel={allergen.label_zh}
                 aria-checked={isActive}
                 onPress={() => {
-                  const nextAllergens = isActive
-                    ? user.allergens.filter((a) => a !== allergen.id && a !== allergen.label_zh)
-                    : [...user.allergens.filter((a) => a !== allergen.label_zh), allergen.id];
-                  toggleAllergen(allergen.id);
-                  void syncProfile({ ...user, allergens: nextAllergens });
+                  toggleAllergen(allergen.id, [allergen.label_zh]);
+                  void queueProfileSync();
                 }}
                 style={[styles.allergenChip, isActive && styles.allergenChipActive]}
               >
@@ -538,6 +633,15 @@ export default function ProfileScreen() {
             </View>
           ))}
         </View>
+        {calorieTargetExplanation ? (
+          <View style={styles.targetExplainCard}>
+            <Ionicons name="information-circle-outline" size={16} color={Palette.text.tertiary} />
+            <View style={styles.targetExplainCopy}>
+              <Text style={styles.targetExplainText}>{calorieTargetExplanation}</Text>
+              {userTargetNote ? <Text style={styles.targetExplainMuted}>{userTargetNote}</Text> : null}
+            </View>
+          </View>
+        ) : null}
       </SectionBlock>
       </View>
       ) : null}
@@ -583,24 +687,41 @@ Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini �
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
               <View style={styles.formGrid}>
                 {[
-                  { key: 'name' as const, label: '姓名', keyboardType: 'default' as const },
-                  { key: 'height' as const, label: '身高 cm', keyboardType: 'numeric' as const },
-                  { key: 'weight' as const, label: '體重 kg', keyboardType: 'numeric' as const },
-                  { key: 'age' as const, label: '年齡', keyboardType: 'numeric' as const },
-                  { key: 'dailyCalorieTarget' as const, label: '每日熱量 kcal', keyboardType: 'numeric' as const },
-                  { key: 'targetWeight' as const, label: '目標體重 kg', keyboardType: 'numeric' as const },
-                ].map((field) => (
-                  <View key={field.key} style={[styles.inputGroup, { width: gridCol2(Spacing.sm) }]}>
-                    <Text style={styles.inputLabel}>{field.label}</Text>
-                    <TextInput
-                      value={profileDraft[field.key]}
-                      onChangeText={(value) => updateDraft(field.key, value)}
-                      keyboardType={field.keyboardType}
-                      placeholderTextColor={Palette.text.muted}
-                      style={styles.profileInput}
-                    />
-                  </View>
-                ))}
+                  { key: 'name' as const, label: '姓名', keyboardType: 'default' as const, hint: undefined as string | undefined },
+                  { key: 'height' as const, label: '身高 cm', keyboardType: 'numeric' as const, hint: undefined as string | undefined },
+                  { key: 'weight' as const, label: '體重 kg', keyboardType: 'numeric' as const, hint: undefined as string | undefined },
+                  { key: 'age' as const, label: '年齡', keyboardType: 'numeric' as const, hint: undefined as string | undefined },
+                  {
+                    key: 'dailyCalorieTarget' as const,
+                    label: '每日熱量基準 kcal',
+                    keyboardType: 'numeric' as const,
+                    // 這個欄位先前叫「每日熱量」，改了會顯示儲存成功，但畫面上沒有一處會變──
+                    // 有疾病條件時一律以臨床指引的目標為準。講清楚它什麼時候才生效。
+                    hint: '沒有勾選疾病時採用這個數字；有疾病條件時以臨床指引的每日目標為準。',
+                  },
+                  { key: 'targetWeight' as const, label: '目標體重 kg', keyboardType: 'numeric' as const, hint: undefined as string | undefined },
+                ].map((field) => {
+                  const invalid = field.key === 'name'
+                    ? profileDraft.name.trim().length === 0
+                    : !isPositiveDraftNumber(profileDraft[field.key] as string);
+                  return (
+                    <View key={field.key} style={[styles.inputGroup, { width: gridCol2(Spacing.sm) }]}>
+                      <Text style={styles.inputLabel}>{field.label}</Text>
+                      <TextInput
+                        value={profileDraft[field.key]}
+                        onChangeText={(value) => updateDraft(field.key, value)}
+                        keyboardType={field.keyboardType}
+                        placeholderTextColor={Palette.text.muted}
+                        accessibilityLabel={field.label}
+                        // 先前無效值只有橘色外框，讀屏軟體與色覺障礙的使用者
+                        // 只會遇到一個按不下去的儲存鍵，不知道是哪一格有問題。
+                        aria-invalid={invalid}
+                        style={[styles.profileInput, invalid && styles.profileInputInvalid]}
+                      />
+                      {field.hint ? <Text style={styles.inputHint}>{field.hint}</Text> : null}
+                    </View>
+                  );
+                })}
               </View>
 
               <View style={styles.inputGroup}>
@@ -742,7 +863,19 @@ const styles = StyleSheet.create({
   mobileSectionContent: { marginTop: Spacing.xl },
   desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.lg },
   desktopPane: { flex: 1, minWidth: 0 },
-  metricRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl },
+  metricRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
+  targetExplainCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    backgroundColor: Palette.bg.mint,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.xl,
+  },
+  targetExplainCopy: { flex: 1, gap: 2 },
+  targetExplainText: { ...Typography.small, color: Palette.text.secondary, lineHeight: 17 },
+  targetExplainMuted: { ...Typography.small, color: Palette.text.tertiary, lineHeight: 17 },
   profileSetupCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -774,6 +907,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     ...Typography.caption,
   },
+  profileInputInvalid: { borderColor: Palette.status.warning },
   dietOptions: { flexDirection: 'row', gap: Spacing.sm },
   dietOption: {
     flex: 1,
@@ -831,6 +965,19 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.bg.elevated,
   },
   modalScrollContent: { gap: Spacing.lg, paddingBottom: Spacing.xs },
+  thresholdConflictBox: {
+    backgroundColor: Palette.accent.orangeDim,
+    borderRadius: Radius.lg,
+    borderLeftWidth: 3,
+    borderLeftColor: Palette.status.warning,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    gap: Spacing.xs,
+  },
+  thresholdConflictHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xs },
+  thresholdConflictTitle: { ...Typography.caption, color: Palette.text.primary, fontWeight: '700', flex: 1 },
+  thresholdConflictRow: { ...Typography.small, color: Palette.text.secondary },
+  thresholdConflictFoot: { ...Typography.small, color: Palette.status.warning },
   medicalDisclaimer: {
     flexDirection: 'row',
     alignItems: 'flex-start',

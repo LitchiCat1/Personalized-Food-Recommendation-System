@@ -248,8 +248,6 @@ export const USER_PROFILE = {
     dietType: '葷食',
     mealPlan: '每日三餐 + 一次點心',
   },
-  streak: 14,
-  totalMeals: 187,
 };
 
 // PRD: 可選的疾病標籤列表

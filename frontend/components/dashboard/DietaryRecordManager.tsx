@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Palette, Radius, Shadows, Spacing, Typography } from '@/constants/theme';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useStore } from '@/store/useStore';

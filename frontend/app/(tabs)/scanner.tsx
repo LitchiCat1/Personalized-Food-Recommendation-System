@@ -2,11 +2,12 @@ import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, Keyboard, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import type { DetectedFood } from '@/constants/mock-data';
+import { allergenLabels, conditionLabels } from '@/lib/medical-labels';
 import { useStore } from '@/store/useStore';
 import { useResponsive } from '@/hooks/useResponsive';
 import AppContainer from '@/components/AppContainer';
@@ -32,6 +33,7 @@ import {
   type OCRDraft,
   type RejectedDetection,
 } from '@/lib/scanner';
+import { getAutoMealType } from '@/lib/meal';
 import {
   canRetryPendingRecordSync,
   enqueuePendingRecordSync,
@@ -217,6 +219,7 @@ export default function ScannerScreen() {
     isCameraActive,
     setCameraActive,
     user,
+    dailyNutrition,
     invalidateDietaryRecords,
   } = useStore();
   const [permission, requestPermission] = useCameraPermissions();
@@ -225,6 +228,8 @@ export default function ScannerScreen() {
   const [manualResults, setManualResults] = useState<DetectedFood[]>([]);
   const [manualSearching, setManualSearching] = useState(false);
   const [rejectedDetections, setRejectedDetections] = useState<RejectedDetection[]>([]);
+  // 每道菜單獨都在額度內、加起來卻超過整餐上限——逐道的 warnings 看不出這件事
+  const [mealWarnings, setMealWarnings] = useState<string[]>([]);
   const [ocrQuerying, setOcrQuerying] = useState(false);
   const [ocrDraft, setOcrDraft] = useState<OCRDraft | null>(null);
   const [ocrNameError, setOcrNameError] = useState<string | null>(null);
@@ -299,6 +304,7 @@ export default function ScannerScreen() {
       auth: { accessToken },
     });
     setRejectedDetections(response.rejectedDetections);
+    setMealWarnings(response.mealWarnings);
     if (response.detections.length > 0) {
       setScanResult(response.detections);
       setManualResults([]);
@@ -450,7 +456,7 @@ export default function ScannerScreen() {
     let recordSaved = false;
 
     try {
-      await saveRecord({ apiBaseUrl, userId: user.userId, clientRecordId, foods, source, auth: { accessToken } });
+      await saveRecord({ apiBaseUrl, userId: user.userId, clientRecordId, foods, source, auth: { accessToken }, mealType: getAutoMealType() });
       recordSaved = true;
       invalidateDietaryRecords();
 
@@ -516,7 +522,17 @@ export default function ScannerScreen() {
     try {
       for (const item of retryableQueue) {
         try {
-          await saveRecord({ apiBaseUrl, userId: item.userId, clientRecordId: item.clientRecordId, foods: item.foods, source: item.source, auth: { accessToken } });
+          // 餐別要用當初入列的時間，不是補送的時間：早上排隊的早餐
+          // 如果晚上才連上線，用「現在」判會變成晚餐。
+          await saveRecord({
+            apiBaseUrl,
+            userId: item.userId,
+            clientRecordId: item.clientRecordId,
+            foods: item.foods,
+            source: item.source,
+            auth: { accessToken },
+            mealType: getAutoMealType(new Date(item.createdAt)),
+          });
           invalidateDietaryRecords();
           const nextQueue = await removePendingRecordSync(item.id);
           setPendingRecordQueue(nextQueue);
@@ -735,6 +751,8 @@ export default function ScannerScreen() {
         onWeightChange={updateScanFoodWeight}
         submitting={cameraRecordSubmitting}
         disabled={recordActionsDisabled}
+        sodiumDailyTarget={dailyNutrition.sodium.target}
+        mealWarnings={mealWarnings}
       />
       {ocrDraft ? (
         <OCRDraftCard
@@ -757,20 +775,24 @@ export default function ScannerScreen() {
     </View>
   );
 
-  const safetyAndManual = (
-    <>
-      <View style={styles.conditionSummary}>
-        <Ionicons name="shield-checkmark-outline" size={18} color={Palette.accent.green} />
-        <View style={styles.conditionCopy}>
-          <Text style={styles.conditionTitle}>安全條件已套用</Text>
-          <Text style={styles.conditionText} numberOfLines={2}>疾病：{user.healthConditions.length ? user.healthConditions.join('、') : '未設定'} · 過敏原：{user.allergens.length ? user.allergens.join('、') : '未設定'}</Text>
-        </View>
+  const conditionSummary = (
+    <View style={styles.conditionSummary}>
+      <Ionicons name="shield-checkmark-outline" size={18} color={Palette.accent.green} />
+      <View style={styles.conditionCopy}>
+        <Text style={styles.conditionTitle}>安全條件已套用</Text>
+        <Text style={styles.conditionText} numberOfLines={2}>疾病：{conditionLabels(user.healthConditions)} · 過敏原：{allergenLabels(user.allergens)}</Text>
       </View>
-      {scanMode === 'manual' ? (
-        <ScannerManualTools rs={rs} manualQuery={manualQuery} onManualQueryChange={setManualQuery} manualSearching={manualSearching} onManualSearch={handleManualSearch} ocrQuerying={ocrQuerying} onOCRSearch={handleLabelOCRFromGallery} rejectedDetections={rejectedDetections} />
-      ) : null}
-    </>
+    </View>
   );
+
+  /**
+   * 「手動搜尋」分頁的說明卡沒有按鈕（其他模式那裡是「啟動相機」之類的動作），
+   * 而搜尋框先前排在「辨識結果」與「安全條件」之後，要捲兩段才看得到，
+   * 使用者會以為這個分頁壞了。改成緊接在說明卡下面。
+   */
+  const manualTools = scanMode === 'manual' ? (
+    <ScannerManualTools rs={rs} manualQuery={manualQuery} onManualQueryChange={setManualQuery} manualSearching={manualSearching} onManualSearch={handleManualSearch} ocrQuerying={ocrQuerying} onOCRSearch={handleLabelOCRFromGallery} rejectedDetections={rejectedDetections} />
+  ) : null;
 
   return (
     <AppContainer keyboardShouldPersistTaps="handled">
@@ -822,11 +844,11 @@ export default function ScannerScreen() {
 
       {isDesktop ? (
         <View style={styles.desktopColumns}>
-          <View style={styles.desktopCapture}>{captureWorkspace}{safetyAndManual}</View>
+          <View style={styles.desktopCapture}>{captureWorkspace}{manualTools}{conditionSummary}</View>
           <View style={styles.desktopResults}>{resultWorkspace}</View>
         </View>
       ) : (
-        <>{captureWorkspace}{resultWorkspace}{safetyAndManual}</>
+        <>{captureWorkspace}{manualTools}{resultWorkspace}{conditionSummary}</>
       )}
     </AppContainer>
   );

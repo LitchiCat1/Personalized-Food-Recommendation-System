@@ -4,6 +4,8 @@
  */
 
 import { create } from 'zustand';
+import { getAutoMealType, normalizeMealType } from '@/lib/meal';
+import { toggleSelection } from '@/lib/safety-selection';
 import type { DetectedFood, MealEntry, HealthAlert } from '@/constants/mock-data';
 import {
   DAILY_NUTRITION,
@@ -12,7 +14,7 @@ import {
   USER_PROFILE,
 } from '@/constants/mock-data';
 import { resolveApiBaseUrl } from '@/lib/network';
-import type { DietaryRecord, NutritionTargets } from '@/lib/api';
+import type { DietaryRecord, NutritionGoalTypes, NutritionTargetBasis, NutritionTargets } from '@/lib/api';
 
 // ─── Types ──────────────────────────────────────────────────
 export interface UserProfile {
@@ -53,8 +55,9 @@ export interface NutriLensState {
   setAuthReady: (ready: boolean) => void;
   updateUserField: <K extends keyof UserProfile>(key: K, value: UserProfile[K]) => void;
   replaceUser: (user: UserProfile) => void;
-  toggleCondition: (condition: string) => void;
-  toggleAllergen: (allergen: string) => void;
+  /** aliases 傳入該項目的中文標籤，才能一併清掉舊格式的資料。 */
+  toggleCondition: (condition: string, aliases?: string[]) => void;
+  toggleAllergen: (allergen: string, aliases?: string[]) => void;
   recalculateBMR: () => void;
 
   // Dashboard
@@ -62,9 +65,20 @@ export interface NutriLensState {
   todayMeals: MealEntry[];
   healthAlerts: HealthAlert[];
   dietaryRecordsRevision: number;
+  /** 每個營養素的目標是上限還是下限，由後端依疾病決定。 */
+  nutritionGoalTypes: NutritionGoalTypes;
+  /** 目前生效的每日熱量目標是怎麼來的，用來在畫面上解釋為什麼不是使用者填的那個數字。 */
+  nutritionTargetBasis: NutritionTargetBasis | null;
   invalidateDietaryRecords: () => void;
   addMealFromScan: (detections: DetectedFood[]) => void;
-  replaceDashboardFromRecords: (records: DietaryRecord[], targets?: NutritionTargets) => void;
+  replaceDashboardFromRecords: (
+    records: DietaryRecord[],
+    targets?: NutritionTargets,
+    goalTypes?: NutritionGoalTypes,
+    basis?: NutritionTargetBasis,
+  ) => void;
+  /** 由實際紀錄算出的連續天數與累積餐數。 */
+  setActivityStats: (stats: { streak: number; totalMeals: number }) => void;
   resetDashboard: () => void;
 
   // Scanner
@@ -107,8 +121,9 @@ export const useStore = create<NutriLensState>((set, get) => ({
     tdee: USER_PROFILE.computed.tdee,
     healthConditions: [...USER_PROFILE.healthConditions],
     allergens: [...USER_PROFILE.allergens],
-    streak: USER_PROFILE.streak,
-    totalMeals: USER_PROFILE.totalMeals,
+    // 真實數字由 setActivityStats 依實際紀錄算出來；在那之前是 0，不是假的 14 天。
+    streak: 0,
+    totalMeals: 0,
     dailyCalorieTarget: USER_PROFILE.goals.dailyCalories,
     targetWeight: USER_PROFILE.goals.targetWeight,
     dietType: USER_PROFILE.goals.dietType,
@@ -141,21 +156,15 @@ export const useStore = create<NutriLensState>((set, get) => ({
 
   replaceUser: (user) => set({ user }),
 
-  toggleCondition: (condition) =>
-    set((state) => {
-      const conditions = state.user.healthConditions.includes(condition)
-        ? state.user.healthConditions.filter((c) => c !== condition)
-        : [...state.user.healthConditions.filter((c) => c !== condition), condition];
-      return { user: { ...state.user, healthConditions: conditions } };
-    }),
+  toggleCondition: (condition, aliases) =>
+    set((state) => ({
+      user: { ...state.user, healthConditions: toggleSelection(state.user.healthConditions, condition, aliases) },
+    })),
 
-  toggleAllergen: (allergen) =>
-    set((state) => {
-      const allergens = state.user.allergens.includes(allergen)
-        ? state.user.allergens.filter((a) => a !== allergen)
-        : [...state.user.allergens.filter((a) => a !== allergen), allergen];
-      return { user: { ...state.user, allergens } };
-    }),
+  toggleAllergen: (allergen, aliases) =>
+    set((state) => ({
+      user: { ...state.user, allergens: toggleSelection(state.user.allergens, allergen, aliases) },
+    })),
 
   recalculateBMR: () =>
     set((state) => {
@@ -171,6 +180,8 @@ export const useStore = create<NutriLensState>((set, get) => ({
   todayMeals: [...TODAY_MEALS],
   healthAlerts: [...HEALTH_ALERTS],
   dietaryRecordsRevision: 0,
+  nutritionGoalTypes: {},
+  nutritionTargetBasis: null,
   invalidateDietaryRecords: () => set((state) => ({ dietaryRecordsRevision: state.dietaryRecordsRevision + 1 })),
 
   resetDashboard: () =>
@@ -242,7 +253,7 @@ export const useStore = create<NutriLensState>((set, get) => ({
       };
     }),
 
-  replaceDashboardFromRecords: (records, targets) =>
+  replaceDashboardFromRecords: (records, targets, goalTypes, basis) =>
     set((state) => {
       const todayMeals = records.flatMap((record, recordIndex) => {
         const foods = record.foods && record.foods.length > 0
@@ -268,7 +279,7 @@ export const useStore = create<NutriLensState>((set, get) => ({
           calories: Number(food.calories || 0),
           time: formatRecordTime(record.timestamp),
           mealType: normalizeMealType(record.meal_type),
-          emoji: getSourceEmoji(food.source || record.source),
+          emoji: getSourceEmoji(record.source || food.source),
           protein: Number(food.protein || 0),
           carbs: Number(food.carbs || 0),
           fat: Number(food.fat || 0),
@@ -292,6 +303,8 @@ export const useStore = create<NutriLensState>((set, get) => ({
       return {
         todayMeals,
         healthAlerts,
+        nutritionGoalTypes: goalTypes ?? state.nutritionGoalTypes,
+        nutritionTargetBasis: basis ?? state.nutritionTargetBasis,
         dailyNutrition: {
           ...state.dailyNutrition,
           calories: { ...state.dailyNutrition.calories, current: totals.calories, target: targets?.calories ?? state.user.dailyCalorieTarget },
@@ -304,9 +317,11 @@ export const useStore = create<NutriLensState>((set, get) => ({
           sodium: { ...state.dailyNutrition.sodium, current: totals.sodium, target: sodiumTarget },
           fiber: { ...state.dailyNutrition.fiber, current: totals.fiber, target: targets?.fiber ?? state.dailyNutrition.fiber.target },
         },
-        user: { ...state.user, totalMeals: Math.max(state.user.totalMeals, todayMeals.length) },
       };
     }),
+
+  setActivityStats: ({ streak, totalMeals }) =>
+    set((state) => ({ user: { ...state.user, streak, totalMeals } })),
 
   // ── Scanner ──
   scanResult: { isScanning: false, detections: [], timestamp: null },
@@ -359,14 +374,6 @@ export const useStore = create<NutriLensState>((set, get) => ({
 }));
 
 // ─── Helpers ────────────────────────────────────────────────
-function getAutoMealType(): '早餐' | '午餐' | '晚餐' | '點心' {
-  const h = new Date().getHours();
-  if (h < 10) return '早餐';
-  if (h < 14) return '午餐';
-  if (h < 17) return '點心';
-  return '晚餐';
-}
-
 function ensureOriginalPortion(food: DetectedFood): DetectedFood {
   return {
     ...food,
@@ -390,13 +397,6 @@ function scaleNutrition(nutrition: DetectedFood['nutrition'], scale: number): De
   };
 }
 
-function normalizeMealType(mealType?: string): '早餐' | '午餐' | '晚餐' | '點心' {
-  if (mealType === '早餐' || mealType === '午餐' || mealType === '晚餐' || mealType === '點心') {
-    return mealType;
-  }
-  return '點心';
-}
-
 function formatRecordTime(timestamp?: string): string {
   if (!timestamp) return '--:--';
   const date = new Date(timestamp);
@@ -404,12 +404,14 @@ function formatRecordTime(timestamp?: string): string {
     const match = timestamp.match(/T(\d{2}:\d{2})/);
     return match?.[1] || '--:--';
   }
-  return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function getSourceEmoji(source?: string): string {
-  if (source === 'manual') return '🔎';
-  if (source === 'nutrition-label') return '🏷️';
+  const key = String(source || '').toLowerCase();
+  if (key === 'nutrition-label') return '🏷️';
+  // 手動搜尋，以及資料直接來自食品資料庫的紀錄，都不是拍照來的
+  if (key === 'manual' || key === 'tfda' || key === 'custom') return '🔎';
   return '📸';
 }
 

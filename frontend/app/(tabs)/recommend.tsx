@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TextInput, Pressable, Linking, Modal, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
@@ -15,6 +15,7 @@ import SegmentedControl from '@/components/ui/segmented-control';
 import FeedbackBanner from '@/components/ui/feedback-banner';
 import FoodMap from '@/components/maps/FoodMap';
 import { saveRecord } from '@/lib/scanner';
+import { getAutoMealType } from '@/lib/meal';
 import { resolveImageBase64 } from '@/lib/image';
 import { describeLocation, resolveLocation } from '@/lib/location';
 import {
@@ -62,6 +63,7 @@ export default function RecommendScreen() {
   const [locationLabel, setLocationLabel] = useState('尚未取得定位');
   const [viewingMenuRest, setViewingMenuRest] = useState<HealthyFoodRestaurant | null>(null);
   const [menuLoading, setMenuLoading] = useState(false);
+  const [menuElapsedSeconds, setMenuElapsedSeconds] = useState(0);
   const [addingFoodName, setAddingFoodName] = useState<string | null>(null);
   const [uploadingMenu, setUploadingMenu] = useState(false);
   const [photoSourceTarget, setPhotoSourceTarget] = useState<HealthyFoodRestaurant | null>(null);
@@ -117,6 +119,7 @@ export default function RecommendScreen() {
           user_id: user.userId,
           lat: restaurant.lat,
           lng: restaurant.lng,
+          distance_km: restaurant.distance_km,
           menu_image: base64,
         },
         { accessToken }
@@ -210,6 +213,7 @@ export default function RecommendScreen() {
         foods: [detectedFoodItem],
         source: 'manual',
         auth: { accessToken },
+        mealType: getAutoMealType(),
       });
       invalidateDietaryRecords();
       addMealFromScan([detectedFoodItem]);
@@ -243,6 +247,27 @@ export default function RecommendScreen() {
       setHealthyLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!menuLoading) {
+      setMenuElapsedSeconds(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      setMenuElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [menuLoading]);
+
+  /** 這家店有沒有可顯示的菜單資料——標題列的上傳鍵與空狀態卡片要用同一個判斷。 */
+  const menuRecommendedItems = useMemo(
+    () => (viewingMenuRest?.recommended_items || []).filter(
+      (item) => item.nutrition_available !== false && !item.item_name.includes('到店後選擇')
+    ),
+    [viewingMenuRest]
+  );
+  const menuHasItems = menuRecommendedItems.length > 0 || (viewingMenuRest?.filtered_items || []).length > 0;
 
   const handleLoadRestaurantSummary = async (restaurant: HealthyFoodRestaurant) => {
     setSummaryLoadingKey(restaurant.restaurant_id);
@@ -280,6 +305,7 @@ export default function RecommendScreen() {
             user_id: user.userId,
             lat: restaurant.lat,
             lng: restaurant.lng,
+            distance_km: restaurant.distance_km,
           },
           { accessToken }
         );
@@ -363,13 +389,15 @@ export default function RecommendScreen() {
       ) : null}
 
       <SectionBlock title="附近店家推薦" subtitle="Google Places 只提供真實店家位置；實際餐點營養仍建議用掃描確認。">
+            <Text style={styles.optionLabel}>本餐預算</Text>
             <View style={styles.budgetRow}>
               <TextInput
                 value={budget}
                 onChangeText={setBudget}
                 keyboardType="numeric"
-                placeholder="本餐預算"
+                placeholder="例如：150"
                 placeholderTextColor={Palette.text.muted}
+                accessibilityLabel="本餐預算（元）"
                 style={styles.budgetInput}
               />
               <PrimaryButton
@@ -384,7 +412,7 @@ export default function RecommendScreen() {
             <Text style={styles.optionLabel}>店家類型</Text>
             <View style={styles.categoryWrap}>
               {CATEGORY_OPTIONS.map((option) => (
-                <Pressable key={option.value} accessibilityRole="button" aria-selected={category === option.value} onPress={() => setCategory(option.value)} style={[styles.categoryChip, category === option.value && styles.categoryChipActive]}>
+                <Pressable key={option.value} accessibilityRole="button" aria-pressed={category === option.value} onPress={() => setCategory(option.value)} style={[styles.categoryChip, category === option.value && styles.categoryChipActive]}>
                   <Text style={[styles.categoryText, category === option.value && styles.categoryTextActive]}>{option.label}</Text>
                 </Pressable>
               ))}
@@ -463,7 +491,7 @@ export default function RecommendScreen() {
                   <View style={styles.selectedMapInfo}>
                     <View style={styles.mapTitleRow}>
                       <Text style={styles.restaurantName}>{selectedRestaurant.name}</Text>
-                      <DataPill tone="info">推薦 {selectedRestaurant.match_score}</DataPill>
+                      {selectedRestaurant.rating ? <DataPill tone="info">★ {selectedRestaurant.rating.toFixed(1)}</DataPill> : null}
                     </View>
                     <Text style={styles.restaurantMeta}>{selectedRestaurant.address || '尚無地址'} · {selectedRestaurant.distance_km} km</Text>
                     <SecondaryButton label="開啟 Google Maps 導航" onPress={() => handleOpenNavigation(selectedRestaurant)} icon={<Ionicons name="navigate-outline" size={15} color={Palette.accent.green} />} />
@@ -510,14 +538,16 @@ export default function RecommendScreen() {
               </Pressable>
             </View>
 
-            <View style={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm, alignItems: 'flex-start' }}>
-              <SecondaryButton
-                disabled={uploadingMenu}
-                icon={<Ionicons name="camera-outline" size={14} color={Palette.accent.green} />}
-                label={uploadingMenu ? "正在用 AI 辨識菜單..." : "📷 上傳 / 更新實體菜單照片"}
-                onPress={() => viewingMenuRest && handleUploadMenuPhoto(viewingMenuRest)}
-              />
-            </View>
+            {menuHasItems ? (
+              <View style={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm, alignItems: 'flex-start' }}>
+                <SecondaryButton
+                  disabled={uploadingMenu}
+                  icon={<Ionicons name="camera-outline" size={14} color={Palette.accent.green} />}
+                  label={uploadingMenu ? '正在用 AI 辨識菜單…' : '更新實體菜單照片'}
+                  onPress={() => viewingMenuRest && handleUploadMenuPhoto(viewingMenuRest)}
+                />
+              </View>
+            ) : null}
 
             {menuUploadFeedback ? (
               <View style={{ paddingHorizontal: Spacing.lg }}>
@@ -531,31 +561,32 @@ export default function RecommendScreen() {
             ) : null}
 
             {menuLoading ? (
-              <View style={{ justifyContent: 'center', alignItems: 'center', paddingVertical: Spacing.xl }}>
+              <View style={{ justifyContent: 'center', alignItems: 'center', paddingVertical: Spacing.xl, paddingHorizontal: Spacing.lg, gap: Spacing.xs }}>
                 <ActivityIndicator size="large" color={Palette.accent.green} />
-                <Text style={[styles.emptyText, { marginTop: Spacing.md }]}>正在讀取或使用 AI 即時解析菜單...</Text>
+                <Text style={[styles.emptyText, { marginTop: Spacing.md }]}>正在讀取或使用 AI 即時解析菜單…</Text>
+                <Text style={[styles.restaurantMeta, { textAlign: 'center' }]}>
+                  已等待 {menuElapsedSeconds} 秒。第一次分析一家店大約需要 20~40 秒，之後會直接使用建檔結果。
+                </Text>
               </View>
             ) : (
               <ScrollView contentContainerStyle={styles.modalScroll}>
                 <Text style={styles.modalSectionTitle}>餐點安全分析</Text>
                 {(() => {
-                  const validRecItems = (viewingMenuRest?.recommended_items || []).filter(
-                    (item) => item.nutrition_available !== false && !item.item_name.includes('到店後選擇')
-                  );
+                  const validRecItems = menuRecommendedItems;
                   const validFilteredItems = viewingMenuRest?.filtered_items || [];
 
-                  if (validRecItems.length === 0 && validFilteredItems.length === 0) {
+                  if (!menuHasItems) {
                     return (
                       <View style={{ padding: Spacing.lg, alignItems: 'center', backgroundColor: Palette.bg.wash, borderRadius: Radius.lg, borderWidth: 1, borderColor: Palette.border.subtle, marginVertical: Spacing.md, gap: Spacing.sm }}>
                         <Ionicons name="document-text-outline" size={32} color={Palette.text.tertiary} />
                         <Text style={[styles.itemName, { textAlign: 'center', marginBottom: 2 }]}>線上查無此店菜單</Text>
                         <Text style={[styles.restaurantMeta, { textAlign: 'center', marginBottom: Spacing.xs }]}>
-                          此為 Google Places 真實店家。請直接點擊下方按鈕上傳該店的「實體菜單照片」，Gemini Vision AI 將自動辨識菜單並給予 3~5 項個人化推薦！
+                          此為 Google Places 真實店家，線上找不到菜單。拍一張店內菜單上傳，Gemini Vision 會辨識菜色並依你的疾病與過敏原給出 3~5 項推薦。
                         </Text>
                         <SecondaryButton
                           disabled={uploadingMenu}
                           icon={<Ionicons name="camera-outline" size={16} color={Palette.accent.green} />}
-                          label={uploadingMenu ? "正在用 AI 辨識菜單..." : "📷 拍照 / 📁 上傳實體菜單"}
+                          label={uploadingMenu ? '正在用 AI 辨識菜單…' : '拍照或上傳實體菜單'}
                           onPress={() => viewingMenuRest && handleUploadMenuPhoto(viewingMenuRest)}
                         />
                       </View>
@@ -688,7 +719,7 @@ function RestaurantCard({
           <Text style={styles.restaurantName}>{restaurant.name}</Text>
           <Text style={styles.restaurantMeta}>{restaurant.tags.slice(0, 2).join('、')} · {restaurant.distance_km} km · {restaurant.is_open === null || restaurant.is_open === undefined ? '營業時間未知' : restaurant.is_open ? '營業中' : '休息中'}</Text>
         </View>
-        <DataPill tone="info">{restaurant.match_score}</DataPill>
+        {restaurant.rating ? <DataPill tone="info">★ {restaurant.rating.toFixed(1)}</DataPill> : null}
       </View>
       <View style={styles.pillRow}>
         {restaurant.tags.slice(0, 4).map((tag) => <DataPill key={tag} tone="success">{tag}</DataPill>)}

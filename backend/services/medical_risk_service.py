@@ -2,6 +2,10 @@ from services.disease_rule_service import normalize_allergen_ids, normalize_cond
 from services.nutrient_service import get_nutrient_value, is_fried_food_name
 
 
+# 一天切成幾餐。disease_rules.json 的 personalized_limits 用它把每日總量
+# 換算成單餐上限，前端 lib/meal.ts 的 MEALS_PER_DAY 是同一個數字。
+MEALS_PER_DAY = 3
+
 NUTRIENT_FIELDS = {
     "calories": ("calories", "kcal"),
     "sodium": ("sodium", "mg"),
@@ -202,7 +206,7 @@ def resolve_personalized_limit(spec: dict, daily_energy: float, ideal_weight: fl
       ideal_body_weight 每公斤理想體重多少公克
       absolute          直接給每日總量
     """
-    meals = float(spec.get("meals_per_day") or 3) or 3
+    meals = float(spec.get("meals_per_day") or MEALS_PER_DAY) or MEALS_PER_DAY
     basis = spec.get("basis")
 
     if basis == "daily_energy":
@@ -339,10 +343,14 @@ def evaluate_medical_risk(
                 "severity": "block",
                 "condition_id": condition_id,
                 "condition_label_zh": condition_label,
+                # 這裡評的是「一道菜」，但門檻是整餐的額度（每日 ÷ 3）。
+                # 先前訊息寫「單餐」，讓人以為整餐都算過了，其實一餐點兩道
+                # 各 490mg 會全部通過。用詞要說清楚在比什麼。
                 "message": (
-                    f"{condition_label}風險：單餐{label} {value:.1f}{unit} "
-                    f"超過上限 {limit:.1f}{unit}" + (f"（{note}）。" if note else "。")
+                    f"{condition_label}風險：這一道{label} {value:.1f}{unit}，"
+                    f"已超過整餐上限 {limit:.1f}{unit}" + (f"（{note}）。" if note else "。")
                 ),
+                "scope": "item",
                 "nutrient": nutrient,
                 "value": value,
                 "limit": limit,
@@ -359,6 +367,122 @@ def evaluate_medical_risk(
         "caution_reasons": caution_reasons,
         "normalized_conditions": conditions,
         "normalized_allergens": allergens,
+    }
+
+
+def resolve_user_energy_and_weight(conditions: list, user_profile: dict | None) -> tuple[float, float]:
+    """算出這個人的每日熱量需求 E 與理想體重 W。
+
+    evaluate_medical_risk 內部一直有這段，抽出來讓一餐合計的檢查用同一套，
+    否則兩邊會各自漂移——這個檔案已經因為「同一個數字兩套算法」出過事。
+    """
+    height_cm = 170.0
+    weight_kg = 65.0
+    daily_calorie_target = 1950.0
+
+    if user_profile:
+        height_cm = normalize_number(user_profile.get("height")) or 170.0
+        weight_kg = normalize_number(user_profile.get("weight")) or 65.0
+        daily_calorie_target = normalize_number(
+            user_profile.get("daily_calorie_target") or user_profile.get("dailyCalorieTarget")
+        ) or (weight_kg * 30)
+
+    height_m = height_cm / 100.0
+    W = 22.0 * (height_m ** 2)
+    if W <= 0:
+        W = weight_kg
+
+    bmi = weight_kg / (height_m ** 2) if height_m > 0 else 22.0
+    is_overweight = bmi >= 24.0
+
+    e_candidates = []
+    if "diabetes" in conditions:
+        e_candidates.append(W * 25 if is_overweight else W * 30)
+    if "gout" in conditions:
+        e_candidates.append(W * 30)
+    if "hyperlipidemia" in conditions:
+        e_candidates.append(W * 25 if is_overweight else W * 30)
+    if "hypertension" in conditions:
+        e_candidates.append(W * 30)
+    if "kidney_disease" in conditions:
+        e_candidates.append(W * 30)
+
+    E = min(e_candidates) if e_candidates else daily_calorie_target
+    if E <= 0:
+        E = W * 30
+    return E, W
+
+
+def evaluate_meal_medical_risk(
+    items: list[dict],
+    user_conditions: list,
+    user_allergens: list,
+    disease_rules: dict,
+    allergen_taxonomy: dict,
+    user_profile: dict | None = None,
+) -> dict:
+    """檢查「一餐合計」有沒有超過單餐上限。
+
+    personalized_limits 是每日總量 ÷ 3，也就是**一餐**的額度，但
+    evaluate_medical_risk 是逐道菜呼叫的。結果是：一餐點兩道各 490mg 的菜
+    全部通過（合計 980mg，遠超 667mg 的上限），單獨一道 510mg 的反而被擋。
+    逐道檢查抓的是「單一道菜就爆掉」，抓不到「加起來爆掉」——這裡補上後者。
+
+    items 每個元素是 {"nutrients": {...}, "portion_g": 份量或 None}。
+    """
+    conditions = normalize_condition_ids(user_conditions, disease_rules)
+    if not conditions or not items:
+        return {"is_safe": True, "has_caution": False, "risks": [], "block_reasons": [], "caution_reasons": []}
+
+    totals = {key: 0.0 for key in NUTRIENT_FIELDS}
+    for item in items:
+        scaled = scale_nutrients(item.get("nutrients") or {}, item.get("portion_g"))
+        for key, value in scaled.items():
+            totals[key] += normalize_number(value)
+
+    E, W = resolve_user_energy_and_weight(conditions, user_profile)
+
+    risks = []
+    for condition_id in conditions:
+        rule = disease_rules.get(condition_id)
+        if not rule:
+            continue
+        condition_label = rule.get("label_zh", condition_id)
+        for nutrient, spec in (rule.get("personalized_limits") or {}).items():
+            limit = resolve_personalized_limit(spec, E, W)
+            if limit is None:
+                continue
+            value = totals.get(nutrient, 0.0)
+            if value <= limit:
+                continue
+            unit = spec.get("unit", "")
+            label = NUTRIENT_LABELS_ZH.get(nutrient, nutrient)
+            risks.append({
+                "type": "meal_nutrient_limit",
+                # 每一道都在額度內、加起來才超過，是提醒而不是封鎖：
+                # 使用者已經把這些菜放在一起了，該做的是告訴他總量超了。
+                "severity": "caution",
+                "scope": "meal",
+                "condition_id": condition_id,
+                "condition_label_zh": condition_label,
+                "message": (
+                    f"{condition_label}提醒：這一餐合計{label} {value:.1f}{unit}，"
+                    f"超過單餐上限 {limit:.1f}{unit}（每道菜單獨看都在範圍內）。"
+                ),
+                "nutrient": nutrient,
+                "value": round(value, 1),
+                "limit": round(limit, 1),
+                "unit": unit,
+                "item_count": len(items),
+            })
+
+    caution_reasons = [risk["message"] for risk in risks]
+    return {
+        "is_safe": True,
+        "has_caution": bool(caution_reasons),
+        "risks": risks,
+        "block_reasons": [],
+        "caution_reasons": caution_reasons,
     }
 
 

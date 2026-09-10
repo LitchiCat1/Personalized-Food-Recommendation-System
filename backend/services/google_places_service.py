@@ -22,6 +22,77 @@ PLACE_CATEGORY_KEYWORDS = {
     "沙拉": "沙拉 健康餐",
 }
 
+# Google Places 的 types 是英文代碼。先前直接把前兩個塞進 tags 顯示，
+# 使用者在全中文的畫面上看到的是 restaurant、meal_takeaway、store。
+#
+# 順帶一提，這些 tag 不只是拿來看的：`_places_risk_candidate` 會把店名和
+# tags 串起來做過敏原／疾病的關鍵字比對，英文代碼在中文關鍵字表裡永遠比不中，
+# 換成中文之後「海鮮」「燒烤」這類類型才真的能擋掉衝突的店。
+PLACE_TYPE_LABELS = {
+    "restaurant": "餐廳",
+    "cafe": "咖啡廳",
+    "bakery": "烘焙坊",
+    "bar": "酒吧",
+    "meal_takeaway": "外帶",
+    "meal_delivery": "外送",
+    "convenience_store": "便利商店",
+    "supermarket": "超市",
+    "grocery_or_supermarket": "超市",
+    "department_store": "百貨",
+    "shopping_mall": "購物中心",
+    "night_club": "夜店",
+    "lodging": "住宿",
+    "cafeteria": "自助餐",
+    "ice_cream_shop": "冰品",
+    "sandwich_shop": "三明治",
+    "coffee_shop": "咖啡廳",
+    "fast_food_restaurant": "速食",
+    "japanese_restaurant": "日式料理",
+    "chinese_restaurant": "中式料理",
+    "korean_restaurant": "韓式料理",
+    "italian_restaurant": "義式料理",
+    "thai_restaurant": "泰式料理",
+    "vietnamese_restaurant": "越南料理",
+    "indian_restaurant": "印度料理",
+    "seafood_restaurant": "海鮮",
+    "sushi_restaurant": "壽司",
+    "ramen_restaurant": "拉麵",
+    "steak_house": "牛排",
+    "barbecue_restaurant": "燒烤",
+    "pizza_restaurant": "披薩",
+    "hamburger_restaurant": "漢堡",
+    "breakfast_restaurant": "早餐",
+    "brunch_restaurant": "早午餐",
+    "vegetarian_restaurant": "素食",
+    "vegan_restaurant": "全素",
+    "juice_shop": "果汁",
+    "tea_house": "茶飲",
+    "dessert_shop": "甜點",
+    "bubble_tea_store": "手搖飲",
+}
+
+# 這些類型每家店都有，講了等於沒講，不值得佔一個標籤的位置。
+GENERIC_PLACE_TYPES = {"point_of_interest", "establishment", "food", "store"}
+
+
+def readable_place_types(types, limit: int = 2) -> list[str]:
+    """把 Places 的英文 types 轉成可以直接顯示的中文標籤。
+
+    對不上表的類型直接丟掉，不要退回顯示英文代碼——寧可少一個標籤，
+    也不要在中文介面裡冒出 `plumber` 這種東西。
+    """
+    labels = []
+    for place_type in types or []:
+        key = str(place_type).strip().lower()
+        if not key or key in GENERIC_PLACE_TYPES:
+            continue
+        label = PLACE_TYPE_LABELS.get(key)
+        if label and label not in labels:
+            labels.append(label)
+        if len(labels) >= limit:
+            break
+    return labels
+
 
 class GooglePlacesConfigError(Exception):
     pass
@@ -427,7 +498,7 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
             "phone": "",
             "google_place_id": place_id,
             "distance_km": round(distance_km, 2),
-            "tags": ["Google Places", "真實店家", *(place.get("types") or [])[:2]],
+            "tags": ["Google Places", "真實店家", *readable_place_types(place.get("types"))],
             "price_level": price_level,
             "is_open": is_open,
             "opening_periods": periods,

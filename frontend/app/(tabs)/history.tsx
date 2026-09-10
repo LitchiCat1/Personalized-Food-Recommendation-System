@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link, useFocusEffect } from 'expo-router';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
@@ -12,22 +12,22 @@ import MetricCard from '@/components/ui/metric-card';
 import DataPill from '@/components/ui/data-pill';
 import ProgressBar from '@/components/ui/progress-bar';
 import PrimaryButton from '@/components/ui/primary-button';
-import { fetchAllRecordsWithTargets, type HistoryDay, type HistoryResponse, type NutritionTargets } from '@/lib/api';
+import { DEFAULT_NUTRITION_GOAL_TYPES, fetchAllRecordsWithTargets, type HistoryDay, type HistoryResponse, type NutritionGoalTypes, type NutritionTargets } from '@/lib/api';
 import { buildDietaryTrend, type DietaryTrendData } from '@/lib/dietary-trends';
 
-function buildInsights(summary: HistoryResponse['summary'], daily: HistoryDay[], target: number) {
+function buildInsights(summary: HistoryResponse['summary'], daily: HistoryDay[], target: number, sodiumTarget: number) {
   if (daily.length === 0) {
     return ['尚無歷史紀錄，先從掃描或手動加入餐點開始建立趨勢。'];
   }
 
-  const overSodiumDay = daily.find((day) => day.sodium > 2000);
+  const overSodiumDay = daily.find((day) => day.sodium > sodiumTarget);
   const avgCalories = summary.avg_calories || 0;
   const latest = daily[daily.length - 1];
 
   return [
     `近 ${daily.length} 天平均熱量 ${avgCalories} kcal/日。`,
     overSodiumDay
-      ? `${overSodiumDay.date} 的鈉攝取超過 2,000mg，建議檢查加工食品與外食比例。`
+      ? `${overSodiumDay.date} 的鈉攝取超過每日上限 ${sodiumTarget.toLocaleString()}mg，建議檢查加工食品與外食比例。`
       : '近期鈉攝取沒有明顯超標日，維持目前記錄習慣。',
     latest.calories < target * 0.75
       ? `最近一天熱量偏低，距離目標仍差 ${Math.max(0, target - latest.calories)} kcal。`
@@ -42,7 +42,11 @@ export default function HistoryScreen() {
   // 目標要跟首頁同一份：後端依疾病條件調整過的值。之前這頁用使用者自填的
   // 熱量目標和一組寫死的通用成人數值，同一筆紀錄在兩頁會得到相反的結論。
   const [targets, setTargets] = useState<NutritionTargets | null>(null);
+  const [goalTypes, setGoalTypes] = useState<NutritionGoalTypes>({});
   const target = Math.round(targets?.calories ?? user.dailyCalorieTarget);
+  // 鈉也要跟熱量一樣用後端依疾病調整過的目標。寫死 2000 會讓腎臟病患者
+  // （每日上限 1500mg）在首頁看到「超標」、在這頁看到「沒有明顯超標日」。
+  const sodiumTarget = Math.round(targets?.sodium ?? 2000);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -56,9 +60,10 @@ export default function HistoryScreen() {
       setError(null);
 
       fetchAllRecordsWithTargets(apiBaseUrl, user.userId, { accessToken })
-        .then(({ records, targets: nextTargets }) => {
+        .then(({ records, targets: nextTargets, goalTypes: nextGoalTypes }) => {
           if (!cancelled && requestRevision === useStore.getState().dietaryRecordsRevision) {
             setTargets(nextTargets ?? null);
+            setGoalTypes(nextGoalTypes ?? {});
             setTrend(buildDietaryTrend(records, { maxDays: 7, userId: user.userId }));
           }
         })
@@ -81,8 +86,8 @@ export default function HistoryScreen() {
   const summary = useMemo(() => trend?.summary || {}, [trend]);
   const maxCal = Math.max(target, ...daily.map((d) => d.calories), 1);
   const calorieGoalHitDays = daily.filter((d) => d.calories >= target * 0.85 && d.calories <= target * 1.15).length;
-  const sodiumOverDays = daily.filter((d) => d.sodium > 2000).length;
-  const insights = useMemo(() => buildInsights(summary, daily, target), [summary, daily, target]);
+  const sodiumOverDays = daily.filter((d) => d.sodium > sodiumTarget).length;
+  const insights = useMemo(() => buildInsights(summary, daily, target, sodiumTarget), [summary, daily, target, sodiumTarget]);
   const totalRecords = summary.total_records || daily.reduce((sum, day) => sum + (day.record_count || 0), 0);
   const recordedDays = summary.recorded_days || daily.length;
 
@@ -157,20 +162,20 @@ export default function HistoryScreen() {
           <SectionBlock title="營養素區段均值" subtitle="比對連續紀錄均值與建議目標，找出長期偏差。">
             <View style={styles.progressStack}>
               <ProgressBar label="蛋白質" current={summary.avg_protein || 0} target={targets?.protein ?? 130} unit="g" color={Palette.accent.blue} />
-              <ProgressBar label="總碳水化合物" current={summary.avg_carbs || 0} target={targets?.carbs ?? 250} unit="g" color={Palette.accent.orange} />
-              <ProgressBar label="精緻糖" current={summary.avg_sugar || 0} target={targets?.sugar ?? 25} unit="g" color={Palette.accent.orange} />
-              <ProgressBar label="總脂肪" current={summary.avg_fat || 0} target={targets?.fat ?? 70} unit="g" color={Palette.accent.purple} />
-              <ProgressBar label="飽和脂肪" current={summary.avg_saturated_fat || 0} target={targets?.saturated_fat ?? 20} unit="g" color={Palette.accent.purple} />
-              <ProgressBar label="反式脂肪" current={summary.avg_trans_fat || 0} target={0} unit="g" color={Palette.status.error} />
-              <ProgressBar label="膳食纖維" current={summary.avg_fiber || 0} target={targets?.fiber ?? 25} unit="g" color={Palette.accent.green} />
-              <ProgressBar label="鈉 (Sodium)" current={summary.avg_sodium || 0} target={targets?.sodium ?? 2000} unit="mg" color={(summary.avg_sodium || 0) > 1800 ? Palette.status.warning : Palette.accent.pink} />
+              <ProgressBar label="總碳水化合物" current={summary.avg_carbs || 0} target={targets?.carbs ?? 250} unit="g" color={Palette.accent.orange} goalType={goalTypes['carbs'] ?? DEFAULT_NUTRITION_GOAL_TYPES['carbs']} />
+              <ProgressBar label="精緻糖" current={summary.avg_sugar || 0} target={targets?.sugar ?? 25} unit="g" color={Palette.accent.orange} goalType={goalTypes['sugar'] ?? DEFAULT_NUTRITION_GOAL_TYPES['sugar']} />
+              <ProgressBar label="總脂肪" current={summary.avg_fat || 0} target={targets?.fat ?? 70} unit="g" color={Palette.accent.purple} goalType={goalTypes['fat'] ?? DEFAULT_NUTRITION_GOAL_TYPES['fat']} />
+              <ProgressBar label="飽和脂肪" current={summary.avg_saturated_fat || 0} target={targets?.saturated_fat ?? 20} unit="g" color={Palette.accent.purple} goalType={goalTypes['saturated_fat'] ?? DEFAULT_NUTRITION_GOAL_TYPES['saturated_fat']} />
+              <ProgressBar label="反式脂肪" current={summary.avg_trans_fat || 0} target={0} unit="g" color={Palette.status.error} goalType={goalTypes['trans_fat'] ?? DEFAULT_NUTRITION_GOAL_TYPES['trans_fat']} />
+              <ProgressBar label="膳食纖維" current={summary.avg_fiber || 0} target={targets?.fiber ?? 25} unit="g" color={Palette.accent.green} goalType={goalTypes['fiber'] ?? DEFAULT_NUTRITION_GOAL_TYPES['fiber']} />
+              <ProgressBar label="鈉 (Sodium)" current={summary.avg_sodium || 0} target={sodiumTarget} unit="mg" color={(summary.avg_sodium || 0) > sodiumTarget * 0.9 ? Palette.status.warning : Palette.accent.pink} goalType={goalTypes['sodium'] ?? DEFAULT_NUTRITION_GOAL_TYPES['sodium']} />
             </View>
           </SectionBlock>
 
-          <SectionBlock title="鈉攝取風險" subtitle="以 2,000mg 作為健康管理提醒上限。" numericSubtitle>
+          <SectionBlock title="鈉攝取風險" subtitle={`以每日 ${sodiumTarget.toLocaleString()}mg 作為健康管理提醒上限。`} numericSubtitle>
             <View style={styles.sodiumBars}>
               {daily.map((day) => {
-                const ratio = day.sodium / 2000;
+                const ratio = day.sodium / Math.max(sodiumTarget, 1);
                 const isOver = ratio > 1;
                 return (
                   <View key={day.date} style={styles.sodiumBarCol}>

@@ -55,6 +55,54 @@ export function selectLatestContinuousDays(daily: HistoryDay[], maxDays = 7): Hi
   return selected.reverse();
 }
 
+export type ActivityStats = {
+  /** 連續有紀錄的天數。 */
+  streak: number;
+  /** 總共記錄過幾餐。 */
+  totalMeals: number;
+};
+
+/**
+ * 從實際紀錄算出「連續 N 天」與「累積 N 餐」。
+ *
+ * 這兩個數字先前是 mock-data 裡的 `streak: 14` / `totalMeals: 187`，
+ * 而且 streak 從來沒有被真實資料覆蓋過——今天才註冊、只有一筆紀錄的帳號
+ * 一樣顯示「連續 14 天」。在一個健康管理 App 裡顯示假的達成數字，
+ * 比不顯示還糟。
+ *
+ * 今天還沒記錄不算中斷（那只是還沒吃／還沒記），所以從昨天起算；
+ * 昨天也沒有才歸零。
+ */
+export function calculateActivityStats(
+  records: DietaryRecord[],
+  options: { now?: Date; timezoneOffsetMinutes?: number } = {}
+): ActivityStats {
+  const now = options.now ?? new Date();
+  const loggedDays = new Set<string>();
+  for (const record of records) {
+    const dateKey = normalizeRecordDate(record.timestamp, options.timezoneOffsetMinutes);
+    if (dateKey) loggedDays.add(dateKey);
+  }
+
+  const totalMeals = records.length;
+  if (loggedDays.size === 0) return { streak: 0, totalMeals };
+
+  const cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const keyOf = (date: Date) => formatDateKey(date.getFullYear(), date.getMonth() + 1, date.getDate());
+
+  if (!loggedDays.has(keyOf(cursor))) {
+    cursor.setDate(cursor.getDate() - 1);
+    if (!loggedDays.has(keyOf(cursor))) return { streak: 0, totalMeals };
+  }
+
+  let streak = 0;
+  while (loggedDays.has(keyOf(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return { streak, totalMeals };
+}
+
 export function buildDietaryTrend(records: DietaryRecord[], options: DietaryTrendOptions = {}): DietaryTrendData {
   const grouped = new Map<string, DailyTotals>();
 

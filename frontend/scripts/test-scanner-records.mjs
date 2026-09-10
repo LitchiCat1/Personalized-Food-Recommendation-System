@@ -6,6 +6,7 @@ import {
   normalizeFoodName,
   saveRecord,
 } from '../lib/scanner.ts';
+import { getAutoMealType, normalizeMealType, perMealBudget } from '../lib/meal.ts';
 
 function detectedFood(name = '原始名稱') {
   return {
@@ -109,4 +110,56 @@ test('deduplicates rapid matching saves and releases the lock after failure for 
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('sends the meal type the record actually belongs to, not a fixed 點心', async () => {
+  const originalFetch = globalThis.fetch;
+  const captured = [];
+  globalThis.fetch = async (_url, init) => {
+    captured.push(JSON.parse(init.body));
+    return { ok: true, json: async () => ({}) };
+  };
+  try {
+    // 早餐時段掃描 → 早餐，而不是寫死的「點心」
+    await saveRecord({
+      apiBaseUrl: 'https://api.example.test',
+      userId: 'user-a',
+      clientRecordId: 'breakfast-record',
+      foods: [detectedFood('燕麥粥')],
+      source: 'camera',
+      mealType: getAutoMealType(new Date('2026-09-10T08:30:00')),
+    });
+    assert.equal(captured[0].meal_type, '早餐');
+
+    // 離線佇列晚上才補送早上那筆，餐別仍要跟著「當初入列的時間」
+    await saveRecord({
+      apiBaseUrl: 'https://api.example.test',
+      userId: 'user-a',
+      clientRecordId: 'replayed-breakfast',
+      foods: [detectedFood('燕麥粥')],
+      source: 'camera',
+      mealType: getAutoMealType(new Date('2026-09-10T08:30:00')),
+    });
+    assert.equal(captured[1].meal_type, '早餐');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('splits the day into meals the same way the dashboard does', () => {
+  assert.equal(getAutoMealType(new Date('2026-09-10T08:30:00')), '早餐');
+  assert.equal(getAutoMealType(new Date('2026-09-10T12:15:00')), '午餐');
+  assert.equal(getAutoMealType(new Date('2026-09-10T15:40:00')), '點心');
+  assert.equal(getAutoMealType(new Date('2026-09-10T19:05:00')), '晚餐');
+  assert.equal(normalizeMealType('午餐'), '午餐');
+  assert.equal(normalizeMealType('brunch'), '點心');
+});
+
+test('per-meal budget follows the users disease-adjusted daily sodium limit', () => {
+  // 一般人每日 2000mg → 單餐 ~667mg；腎臟病每日 1500mg → 單餐 500mg。
+  // 寫死 800mg 會讓腎臟病患者的 700mg 餐點顯示成正常。
+  assert.equal(Math.round(perMealBudget(2000, 2000)), 667);
+  assert.equal(perMealBudget(1500, 2000), 500);
+  assert.equal(Math.round(perMealBudget(undefined, 2000)), 667);
+  assert.equal(Math.round(perMealBudget(0, 2000)), 667);
 });

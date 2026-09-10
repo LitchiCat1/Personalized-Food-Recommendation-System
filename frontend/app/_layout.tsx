@@ -1,5 +1,6 @@
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
+import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
@@ -26,11 +27,18 @@ export const unstable_settings = {
 export default function RootLayout() {
   return (
     <ThemeProvider value={NutriLensTheme}>
+      {/*
+        web 的分頁標題。expo-router 一定會輸出一個 title 元素，沒人填就是空的，
+        瀏覽器分頁因此只顯示網址、加書籤也沒有名稱。
+      */}
+      <Head>
+        <title>NutriLens 個人化飲食推薦</title>
+      </Head>
       <AuthGate>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         </Stack>
-        <StatusBar style="dark" />
+        <StatusBar style="auto" />
       </AuthGate>
     </ThemeProvider>
   );

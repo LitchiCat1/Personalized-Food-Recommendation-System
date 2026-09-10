@@ -3,6 +3,7 @@ import os
 import requests
 
 from services.food_service import search_foods
+from services.medical_risk_service import evaluate_meal_medical_risk
 from services.food_analysis_service import build_detection_reliability, build_portion_range, check_food_safety
 from services.nutrition_label_service import extract_json_block, extract_number, get_gemini_models
 from services.nutrient_service import is_fried_food_name
@@ -92,6 +93,9 @@ def build_vision_food_response(
     allergen_taxonomy = allergen_taxonomy or {"groups": []}
     user = storage.get_user(user_id) if user_id else None
     detections = []
+    # 一餐合計的檢查需要所有道菜——逐道檢查抓不到「每道都在額度內、
+    # 加起來卻超過整餐上限」的情況。
+    meal_items = []
     rejected_detections = []
     total_calories = 0
     total_sodium = 0
@@ -168,6 +172,7 @@ def build_vision_food_response(
         }
         total_calories += scaled_nutrition["calories"]
         total_sodium += scaled_nutrition["sodium"]
+        meal_items.append({"nutrients": nutrients, "portion_g": estimated_weight})
 
         warnings = []
         if needs_confirmation:
@@ -210,8 +215,14 @@ def build_vision_food_response(
             }
         )
 
+    meal_risk = evaluate_meal_medical_risk(
+        meal_items, user_conditions, user_allergens, disease_rules, allergen_taxonomy, user_profile=user
+    )
+
     return {
         "engine": "gemini-vision-db-lookup",
+        # 這一餐加起來超過單餐上限的提醒。逐道 warnings 看不出來這件事。
+        "meal_warnings": meal_risk["caution_reasons"],
         "nutrition_grounding": "database_only",
         "database_sources": ["user_custom_foods", "TFDA"],
         "meal_guess": parsed.get("meal_guess") or "",

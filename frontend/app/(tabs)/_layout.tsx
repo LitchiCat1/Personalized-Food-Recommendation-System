@@ -3,7 +3,7 @@ import React, { useEffect } from 'react';
 import { StyleSheet, View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { HapticTab } from '@/components/haptic-tab';
 import { Palette, Spacing } from '@/constants/theme';
 import { useStore } from '@/store/useStore';

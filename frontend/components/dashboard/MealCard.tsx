@@ -1,17 +1,21 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import DataPill from '@/components/ui/data-pill';
 import type { MealEntry } from '@/constants/mock-data';
+import { perMealBudget } from '@/lib/meal';
 
 type Props = {
   meal: MealEntry;
+  /** 使用者的每日鈉上限（後端已依疾病調整）。同 ScannerResults，不再寫死 800mg。 */
+  sodiumDailyTarget?: number;
 };
 
-export default function MealCard({ meal }: Props) {
+export default function MealCard({ meal, sodiumDailyTarget }: Props) {
   const warnings = meal.warnings ?? [];
   const hasWarnings = warnings.length > 0;
+  const sodiumMealBudget = perMealBudget(sodiumDailyTarget, 2000);
 
   return (
     <Pressable style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
@@ -38,7 +42,7 @@ export default function MealCard({ meal }: Props) {
           <Text style={styles.macro}>P {meal.protein}g</Text>
           <Text style={styles.macro}>C {meal.carbs}g</Text>
           <Text style={styles.macro}>F {meal.fat}g</Text>
-          <Text style={[styles.macro, meal.sodium > 800 && styles.sodiumWarning]}>Na {meal.sodium}mg</Text>
+          <Text style={[styles.macro, meal.sodium > sodiumMealBudget && styles.sodiumWarning]}>Na {meal.sodium}mg</Text>
         </View>
 
         {hasWarnings ? (

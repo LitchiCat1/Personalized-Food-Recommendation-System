@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Link, useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import CalorieRing from '@/components/dashboard/CalorieRing';
 import NutrientBar from '@/components/dashboard/NutrientBar';
 import MealCard from '@/components/dashboard/MealCard';
@@ -13,8 +13,9 @@ import DataPill from '@/components/ui/data-pill';
 import PrimaryButton from '@/components/ui/primary-button';
 import DietaryRecordManager from '@/components/dashboard/DietaryRecordManager';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
+import { formatCalories } from '@/lib/calorie-target';
 import { useStore } from '@/store/useStore';
-import { fetchMedicalMetadata, fetchRecords, type MedicalConditionRule } from '@/lib/api';
+import { DEFAULT_NUTRITION_GOAL_TYPES, fetchMedicalMetadata, fetchRecords, type MedicalConditionRule } from '@/lib/api';
 import { buildNutrientSensitivityMap, type TrackedNutrientKey } from '@/lib/nutrient-sensitivity';
 import { useResponsive } from '@/hooks/useResponsive';
 
@@ -37,7 +38,7 @@ function getLocalDateString(): string {
 
 export default function DashboardScreen() {
   const { isDesktop } = useResponsive();
-  const { dailyNutrition, todayMeals, healthAlerts, apiBaseUrl, accessToken, dietaryRecordsRevision, replaceDashboardFromRecords, user } = useStore();
+  const { dailyNutrition, todayMeals, healthAlerts, apiBaseUrl, accessToken, dietaryRecordsRevision, replaceDashboardFromRecords, nutritionGoalTypes, user } = useStore();
   const [syncing, setSyncing] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [conditionRules, setConditionRules] = useState<MedicalConditionRule[]>([]);
@@ -59,6 +60,12 @@ export default function DashboardScreen() {
     return conditions.length ? `${conditions.join('、')}需留意` : undefined;
   };
 
+  // 目標方向由後端依疾病決定（腎臟病的蛋白質是上限，不是下限）。
+  // 之前只有鈉在這裡自己判斷要不要變色，其他營養素超標時進度條滿了
+  // 但顏色不變，使用者看不出來。
+  const goalTypeOf = (nutrient: keyof typeof DEFAULT_NUTRITION_GOAL_TYPES) =>
+    nutritionGoalTypes[nutrient] ?? DEFAULT_NUTRITION_GOAL_TYPES[nutrient];
+
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
@@ -69,7 +76,7 @@ export default function DashboardScreen() {
       fetchRecords(apiBaseUrl, user.userId, getLocalDateString(), { accessToken })
         .then((data) => {
           if (cancelled || requestRevision !== useStore.getState().dietaryRecordsRevision) return;
-          replaceDashboardFromRecords(data.records || [], data.nutrition_targets);
+          replaceDashboardFromRecords(data.records || [], data.nutrition_targets, data.nutrition_goal_types, data.nutrition_target_basis);
         })
         .catch((err: Error) => {
           if (!cancelled) setSyncError(err.message);
@@ -128,7 +135,7 @@ export default function DashboardScreen() {
         </View>
         <DataPill tone="info">{todayMeals.length} 筆</DataPill>
       </View>
-      {todayMeals.map((meal) => <MealCard key={meal.id} meal={meal} />)}
+      {todayMeals.map((meal) => <MealCard key={meal.id} meal={meal} sodiumDailyTarget={sodium.target} />)}
       {!syncing && !syncError && todayMeals.length === 0 ? (
         <View style={styles.emptyMealsCard}>
           <Ionicons name="restaurant-outline" size={26} color={Palette.text.tertiary} />
@@ -154,14 +161,14 @@ export default function DashboardScreen() {
         </View>
       ) : null}
       <View style={styles.nutrientStack}>
-        <NutrientBar label={protein.label} current={protein.current} target={protein.target} unit={protein.unit} color={protein.color} attentionLabel={getAttentionLabel('protein')} />
-        <NutrientBar label={carbs.label} current={carbs.current} target={carbs.target} unit={carbs.unit} color={carbs.color} attentionLabel={getAttentionLabel('carbs')} />
-        <NutrientBar label={sugar.label} current={sugar.current} target={sugar.target} unit={sugar.unit} color={sugar.color} attentionLabel={getAttentionLabel('sugar')} />
-        <NutrientBar label={fat.label} current={fat.current} target={fat.target} unit={fat.unit} color={fat.color} attentionLabel={getAttentionLabel('fat')} />
-        <NutrientBar label={saturated_fat.label} current={saturated_fat.current} target={saturated_fat.target} unit={saturated_fat.unit} color={saturated_fat.color} attentionLabel={getAttentionLabel('saturated_fat')} />
-        <NutrientBar label={trans_fat.label} current={trans_fat.current} target={trans_fat.target} unit={trans_fat.unit} color={trans_fat.color} attentionLabel={getAttentionLabel('trans_fat')} />
-        <NutrientBar label={sodium.label} current={sodium.current} target={sodium.target} unit={sodium.unit} color={sodium.current >= sodium.target * 0.8 ? Palette.status.warning : sodium.color} attentionLabel={getAttentionLabel('sodium')} />
-        <NutrientBar label={fiber.label} current={fiber.current} target={fiber.target} unit={fiber.unit} color={fiber.color} attentionLabel={getAttentionLabel('fiber')} />
+        <NutrientBar label={protein.label} current={protein.current} target={protein.target} unit={protein.unit} color={protein.color} goalType={goalTypeOf('protein')} attentionLabel={getAttentionLabel('protein')} />
+        <NutrientBar label={carbs.label} current={carbs.current} target={carbs.target} unit={carbs.unit} color={carbs.color} goalType={goalTypeOf('carbs')} attentionLabel={getAttentionLabel('carbs')} />
+        <NutrientBar label={sugar.label} current={sugar.current} target={sugar.target} unit={sugar.unit} color={sugar.color} goalType={goalTypeOf('sugar')} attentionLabel={getAttentionLabel('sugar')} />
+        <NutrientBar label={fat.label} current={fat.current} target={fat.target} unit={fat.unit} color={fat.color} goalType={goalTypeOf('fat')} attentionLabel={getAttentionLabel('fat')} />
+        <NutrientBar label={saturated_fat.label} current={saturated_fat.current} target={saturated_fat.target} unit={saturated_fat.unit} color={saturated_fat.color} goalType={goalTypeOf('saturated_fat')} attentionLabel={getAttentionLabel('saturated_fat')} />
+        <NutrientBar label={trans_fat.label} current={trans_fat.current} target={trans_fat.target} unit={trans_fat.unit} color={trans_fat.color} goalType={goalTypeOf('trans_fat')} attentionLabel={getAttentionLabel('trans_fat')} />
+        <NutrientBar label={sodium.label} current={sodium.current} target={sodium.target} unit={sodium.unit} color={sodium.color} goalType={goalTypeOf('sodium')} attentionLabel={getAttentionLabel('sodium')} />
+        <NutrientBar label={fiber.label} current={fiber.current} target={fiber.target} unit={fiber.unit} color={fiber.color} goalType={goalTypeOf('fiber')} attentionLabel={getAttentionLabel('fiber')} />
       </View>
     </SectionBlock>
   );
@@ -190,8 +197,8 @@ export default function DashboardScreen() {
         <View style={styles.heroTop}>
           <View style={styles.heroCopy}>
             <DataPill tone={sodiumRisk === '正常' ? 'success' : 'warning'}>鈉風險：{sodiumRisk}</DataPill>
-            <Text style={styles.heroTitle}>今天還能吃 {remaining.toLocaleString()} kcal</Text>
-            <Text style={styles.heroSubtitle}>目標 {calories.target.toLocaleString()} kcal，目前已紀錄 {todayMeals.length} 筆餐點。</Text>
+            <Text style={styles.heroTitle}>今天還能吃 {formatCalories(remaining)} kcal</Text>
+            <Text style={styles.heroSubtitle}>目標 {formatCalories(calories.target)} kcal，目前已紀錄 {todayMeals.length} 筆餐點。</Text>
           </View>
           <CalorieRing current={Math.round(calories.current)} target={calories.target} />
         </View>

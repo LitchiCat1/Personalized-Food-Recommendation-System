@@ -81,10 +81,50 @@ export type NutritionTargets = {
   sodium: number;
 };
 
+/** 每個營養素的目標是「上限」還是「至少要吃到」。同一個數字方向相反，結論就相反。 */
+export type NutritionGoalTypes = Partial<Record<keyof NutritionTargets, 'upper_limit' | 'minimum_target'>>;
+
+/** 後端還沒回時的預設方向，與 nutrition_progress_service.NUTRITION_GOAL_TYPES 一致。 */
+export const DEFAULT_NUTRITION_GOAL_TYPES = {
+  calories: 'upper_limit',
+  protein: 'minimum_target',
+  carbs: 'upper_limit',
+  sugar: 'upper_limit',
+  fat: 'upper_limit',
+  saturated_fat: 'upper_limit',
+  trans_fat: 'upper_limit',
+  fiber: 'minimum_target',
+  sodium: 'upper_limit',
+} as const;
+
+/**
+ * 每日熱量目標是怎麼來的。
+ *
+ * App 裡同時存在三個數字：後端算的 TDEE、使用者自己填的 daily_calorie_target、
+ * 以及疾病指引算出的臨床目標。畫面上先前三個混著出現又互相矛盾，
+ * 有了 basis 才能只顯示一個生效值，並說明另外兩個為什麼沒被採用。
+ */
+export type NutritionTargetBasis = {
+  /** disease = 疾病指引算出來的；user = 直接採用使用者填的數字。 */
+  source: 'disease' | 'user';
+  conditions: string[];
+  ideal_body_weight: number;
+  /** 每公斤理想體重給幾大卡，依活動量分級；source 為 user 時是 null。 */
+  kcal_per_kg: number | null;
+  activity_multiplier: number;
+  bmr: number | null;
+  /** 疾病目標算出來低於 BMR，已被抬到 BMR。 */
+  floored_at_bmr: boolean;
+  user_target: number | null;
+  is_overweight: boolean;
+};
+
 export type RecordsResponse = {
   records: DietaryRecord[];
   count: number;
   nutrition_targets?: NutritionTargets;
+  nutrition_goal_types?: NutritionGoalTypes;
+  nutrition_target_basis?: NutritionTargetBasis;
 };
 
 export type RecordMutationResponse = {
@@ -119,7 +159,8 @@ export type HealthyFoodRecommendation = {
   restaurant_lat?: number;
   restaurant_lng?: number;
   address?: string;
-  distance_km: number;
+  // 選填：/restaurant/menu 只收到店家座標，算不出使用者到店距離，不會回這個欄位
+  distance_km?: number;
   tags: string[];
   item_id?: string;
   item_name: string;
@@ -282,6 +323,20 @@ export type MedicalMetadataResponse = {
   };
   medical_disclaimer: string;
   data_sources: { name: string; role: string }[];
+  /**
+   * 規則檔簽核的數字與程式公式算出來的數字不一致的地方。實際生效的是較嚴的
+   * 那個，所以審閱者在 disease_rules.json 上看到的門檻，可能不是系統執行的。
+   * 後端一直有算，但前端從來沒顯示——這種事不該只存在於 API 回應裡。
+   */
+  threshold_conflicts?: {
+    condition_id: string;
+    nutrient: string;
+    configured_block: number;
+    derived_block: number;
+    effective_block: number;
+    ignored_source: 'configured' | 'derived';
+  }[];
+  threshold_conflict_note?: string | null;
 };
 
 export type ApiAuth = {
@@ -390,21 +445,30 @@ export async function fetchAllRecordsWithTargets(
   apiBaseUrl: string,
   userId: string,
   auth?: ApiAuth
-): Promise<{ records: DietaryRecord[]; targets?: NutritionTargets }> {
+): Promise<{
+  records: DietaryRecord[];
+  targets?: NutritionTargets;
+  goalTypes?: NutritionGoalTypes;
+  basis?: NutritionTargetBasis;
+}> {
   const pageSize = 250;
   const records: DietaryRecord[] = [];
   let offset = 0;
   let targets: NutritionTargets | undefined;
+  let goalTypes: NutritionGoalTypes | undefined;
+  let basis: NutritionTargetBasis | undefined;
 
   while (true) {
     const page = await fetchRecords(apiBaseUrl, userId, undefined, auth, { limit: pageSize, offset });
     targets = targets ?? page.nutrition_targets;
+    goalTypes = goalTypes ?? page.nutrition_goal_types;
+    basis = basis ?? page.nutrition_target_basis;
     records.push(...(page.records || []));
     if ((page.records || []).length < pageSize) break;
     offset += pageSize;
   }
 
-  return { records, targets };
+  return { records, targets, goalTypes, basis };
 }
 
 export async function fetchAllRecords(apiBaseUrl: string, userId: string, auth?: ApiAuth): Promise<DietaryRecord[]> {
@@ -591,7 +655,7 @@ export async function fetchRestaurantAiSummary(
 
 export async function fetchRestaurantDetailedMenu(
   apiBaseUrl: string,
-  params: { restaurant_id: string; name: string; address?: string; budget?: number; user_id?: string; lat?: number; lng?: number; menu_image?: string },
+  params: { restaurant_id: string; name: string; address?: string; budget?: number; user_id?: string; lat?: number; lng?: number; distance_km?: number; menu_image?: string },
   auth?: ApiAuth
 ): Promise<{
   restaurant_id: string;

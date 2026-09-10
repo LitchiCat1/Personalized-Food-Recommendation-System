@@ -16,6 +16,7 @@ from services.app_time_service import app_today
 from services.nutrition_progress_service import (
     build_daily_nutrition_progress,
     build_nutrition_goal_types,
+    calculate_daily_targets_with_basis,
     calculate_pdf_daily_targets,
 )
 from services.profile_service import build_bmr_response, build_user_profile
@@ -65,7 +66,9 @@ class ServiceSmokeTests(unittest.TestCase):
             "health_conditions": ["糖尿病"],
         })
         ideal_weight = 22 * (1.7 ** 2)
-        energy = ideal_weight * 25
+        # 沒帶 activity_multiplier 時預設中等活動（1.55）＝ 35 kcal/kg，
+        # BMI 27.7 屬過重，糖尿病再往下調一級 -> 30。
+        energy = ideal_weight * 30
         self.assertAlmostEqual(diabetes["calories"], energy)
         self.assertAlmostEqual(diabetes["protein"], ideal_weight)
         self.assertAlmostEqual(diabetes["carbs"], energy * 0.475 / 4)
@@ -80,6 +83,49 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertAlmostEqual(kidney["protein"], ideal_weight * 0.6)
         self.assertEqual(kidney["fiber"], 17.5)
         self.assertEqual(kidney["sodium"], 1500)
+
+    def test_energy_target_follows_activity_level(self):
+        """先前不分活動量一律 25/30 kcal/kg，等於把每個人都當輕度活動。"""
+        base = {"height": 170, "weight": 60, "age": 22, "gender": "male", "health_conditions": ["高血壓"]}
+        ideal_weight = 22 * (1.7 ** 2)
+
+        sedentary = calculate_pdf_daily_targets({**base, "activity_multiplier": 1.2})
+        moderate = calculate_pdf_daily_targets({**base, "activity_multiplier": 1.55})
+        very_active = calculate_pdf_daily_targets({**base, "activity_multiplier": 1.9})
+
+        self.assertAlmostEqual(sedentary["calories"], ideal_weight * 25)
+        self.assertAlmostEqual(moderate["calories"], ideal_weight * 35)
+        self.assertAlmostEqual(very_active["calories"], ideal_weight * 40)
+        self.assertLess(sedentary["calories"], moderate["calories"])
+
+    def test_disease_target_never_drops_below_bmr(self):
+        """疾病目標是 App 幫使用者決定的，不能開出低於基礎代謝的熱量。"""
+        result = calculate_daily_targets_with_basis({
+            "height": 170,
+            "weight": 80,
+            "age": 25,
+            "gender": "male",
+            "activity_multiplier": 1.2,
+            "health_conditions": ["糖尿病"],
+        })
+        bmr = round(10 * 80 + 6.25 * 170 - 5 * 25 + 5)  # compute_bmr 會四捨五入
+        # 久坐(25) 過重再降一級(20) -> 63.58 * 20 = 1271.6，低於 BMR 1742.5
+        self.assertAlmostEqual(result["targets"]["calories"], bmr)
+        self.assertTrue(result["basis"]["floored_at_bmr"])
+        self.assertEqual(result["basis"]["source"], "disease")
+
+    def test_target_basis_reports_user_value_when_no_condition(self):
+        result = calculate_daily_targets_with_basis({
+            "height": 170,
+            "weight": 70,
+            "age": 22,
+            "gender": "male",
+            "daily_calorie_target": 2570,
+            "health_conditions": [],
+        })
+        self.assertEqual(result["targets"]["calories"], 2570)
+        self.assertEqual(result["basis"]["source"], "user")
+        self.assertFalse(result["basis"]["floored_at_bmr"])
 
     def test_disease_rules_load(self):
         rules = load_disease_rules(os.path.dirname(os.path.dirname(__file__)))

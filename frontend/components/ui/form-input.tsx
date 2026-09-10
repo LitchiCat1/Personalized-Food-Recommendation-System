@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import React, { useState } from 'react';
+import { Platform, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { Palette, Radius, Spacing, Typography } from '@/constants/theme';
 
 type Props = TextInputProps & {
@@ -8,16 +8,34 @@ type Props = TextInputProps & {
   unit?: string;
 };
 
-export default function FormInput({ label, error, unit, style, ...inputProps }: Props) {
+export default function FormInput({ label, error, unit, style, onFocus, onBlur, ...inputProps }: Props) {
+  const [focused, setFocused] = useState(false);
+
   return (
     <View style={styles.group}>
       <Text style={styles.label}>{label}</Text>
-      <View style={[styles.inputShell, error ? styles.inputShellError : undefined]}>
+      <View
+        style={[
+          styles.inputShell,
+          focused ? styles.inputShellFocused : undefined,
+          error ? styles.inputShellError : undefined,
+        ]}
+      >
         <TextInput
           {...inputProps}
           accessibilityLabel={inputProps.accessibilityLabel || label}
+          // 讀屏軟體要知道這一格是不是有問題，不能只靠邊框變色。
+          aria-invalid={Boolean(error)}
           placeholderTextColor={Palette.text.muted}
           selectionColor={Palette.accent.green}
+          onFocus={(event) => {
+            setFocused(true);
+            onFocus?.(event);
+          }}
+          onBlur={(event) => {
+            setFocused(false);
+            onBlur?.(event);
+          }}
           style={[styles.input, style]}
         />
         {unit ? <Text style={styles.unit}>{unit}</Text> : null}
@@ -40,7 +58,14 @@ const styles = StyleSheet.create({
     borderColor: Palette.border.subtle,
     borderRadius: Radius.lg,
   },
-  inputShellError: { borderColor: Palette.status.error, backgroundColor: 'rgba(226,85,85,0.06)' },
+  /**
+   * 焦點框畫在外殼上，不是畫在 TextInput 上。
+   *
+   * 先前用的是瀏覽器預設的 outline，它只框住 flex:1 的輸入框本身，
+   * 而且會畫在同一列的單位文字上面——輸入熱量時「kcal」被邊框蓋掉一半。
+   */
+  inputShellFocused: { borderColor: Palette.accent.green },
+  inputShellError: { borderColor: Palette.status.error, backgroundColor: Palette.status.errorDim },
   input: {
     minWidth: 0,
     minHeight: 46,
@@ -49,6 +74,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     ...Typography.body,
+    ...Platform.select({ web: { outlineStyle: 'none' as any }, default: {} }),
   },
   unit: { ...Typography.caption, ...Typography.number, color: Palette.text.tertiary, paddingRight: Spacing.md },
   error: { ...Typography.small, color: Palette.status.error },

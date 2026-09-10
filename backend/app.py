@@ -35,7 +35,7 @@ from services.nutrition_label_service import (
     probe_gemini_models,
     scale_nutrition_per_100g,
 )
-from services.nutrition_progress_service import build_daily_nutrition_progress, calculate_pdf_daily_targets, round_targets_for_display
+from services.nutrition_progress_service import build_daily_nutrition_progress, build_nutrition_goal_types, calculate_daily_targets_with_basis, round_targets_for_display
 from services.nutrient_service import NUTRITION_FIELDS, get_nutrient_value
 from services.profile_service import ACTIVITY_LEVELS, build_bmr_response, build_user_profile
 from services.restaurant_ai_service import build_restaurant_ai_summary
@@ -44,7 +44,7 @@ from services.vision_food_service import (
     call_gemini_food_recognition_with_rotation,
 )
 from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini, parse_menu_image_with_gemini
-from services.medical_risk_service import evaluate_medical_risk, rule_threshold_conflicts
+from services.medical_risk_service import MEALS_PER_DAY, evaluate_medical_risk, normalize_number, rule_threshold_conflicts
 from services.google_places_service import fetch_google_places_restaurants
 from services.venue_index_service import VenueIndexUnavailable, index_nearby_venues
 
@@ -245,7 +245,7 @@ print(f"[OK] Restaurant catalog loaded: {len(RESTAURANT_CATALOG)} restaurants")
 # ═══════════════════════════════════════════════════════════════
 
 
-APP_VERSION = "v0.0.8f"
+APP_VERSION = "v0.0.9"
 STARTED_AT = app_now().isoformat()
 
 
@@ -605,10 +605,17 @@ def get_records(user_id):
         return jsonify({"error": "limit 與 offset 必須是有效數字"}), 400
     records = storage.get_records(user_id, date_str, limit=limit, offset=offset)
     user = storage.get_user(user_id) or {}
+    daily = calculate_daily_targets_with_basis(user)
     return jsonify({
         "records": records,
         "count": len(records),
-        "nutrition_targets": round_targets_for_display(calculate_pdf_daily_targets(user)),
+        "nutrition_targets": round_targets_for_display(daily["targets"]),
+        # 每日熱量先前在畫面上有三個版本（tdee、使用者自填、疾病目標）互相打架，
+        # 而且沒有任何說明。basis 說明現在生效的是哪一個、依據是什麼。
+        "nutrition_target_basis": daily["basis"],
+        # 目標值本身看不出方向。蛋白質對一般人是「至少吃到」，對慢性腎臟病
+        # 是「不可超過」，前端沒有這個就只能猜，超標也標不出來。
+        "nutrition_goal_types": build_nutrition_goal_types(user),
     })
 
 
@@ -773,15 +780,29 @@ def map_food_recommend(user_id):
 
 @app.route("/restaurant/menu", methods=["POST"])
 def get_restaurant_menu():
-    require_authenticated_user()
-    enforce_rate_limit(_paid_api_limiter, "menu")
     """
     動態獲取餐廳詳細菜單。如果本地資料庫不存在，則調用爬蟲與 Gemini 動態分析。
     """
     data = request.get_json(silent=True) or {}
+    # 先擋未登入（401），再限流（429），最後才檢查身分歸屬——順序反了會讓
+    # 匿名呼叫拿到 400、限流也永遠輪不到。
+    require_authenticated_user()
+    enforce_rate_limit(_paid_api_limiter, "menu")
+    # 這條路徑會用 user_id 載入對方的疾病與過敏原來篩菜單，所以有帶 user_id
+    # 就必須是本人：否則任何登入者都能填別人的 id，再從推薦／排除清單的差異
+    # 反推出對方有哪些疾病。沒帶就用登入者自己，不再退回共用的 demo_user。
+    if data.get("user_id"):
+        require_user_access(data["user_id"])
     restaurant_id = data.get("restaurant_id", "")
     name = data.get("name", "").strip()
     address = data.get("address", "").strip()
+    # 這條路徑收到的 lat/lng 是「店家」的座標，不是使用者的，算不出距離。
+    # 之前寫死 0.1 km，等於對每一家店都謊報「就在附近」。呼叫端已經從
+    # 推薦清單拿到真實距離，有帶就照實回傳，沒帶就不給這個欄位。
+    try:
+        client_distance_km = float(data["distance_km"])
+    except (KeyError, TypeError, ValueError):
+        client_distance_km = None
     raw_menu_image = data.get("menu_image", "")
     if raw_menu_image is None:
         menu_image = ""
@@ -878,12 +899,18 @@ def get_restaurant_menu():
         })
 
     # 3. 對所有菜單項目進行醫學過濾與個人化偏好契合度評分
-    user_id = data.get("user_id", "demo_user")
+    #
+    # 沒有 profile 就不能篩。先前這裡退回共用的 "demo_user"（storage 還會在
+    # 正式資料庫自動建一個 0 疾病 0 過敏的帳號），等於把安全過濾靜默關掉，
+    # 而畫面上看起來一切正常。寧可回錯誤，也不要回一份沒篩過的推薦。
+    user_id = data.get("user_id") or get_request_user_id() or ""
     user = storage.get_user(user_id)
-    conditions = user.get("health_conditions", []) if user else []
-    allergens = user.get("allergens", []) if user else []
+    if not user:
+        return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
+    conditions = user.get("health_conditions", []) or []
+    allergens = user.get("allergens", []) or []
     budget = int(data.get("budget", 150))
-    target_calories = (user.get("daily_calorie_target", 2100) / 3) if user else 650
+    target_calories = (normalize_number(user.get("daily_calorie_target")) or 2100) / MEALS_PER_DAY
     
     recommended_items = []
     filtered_items = []
@@ -960,7 +987,7 @@ def get_restaurant_menu():
                 "restaurant_lat": matched["lat"],
                 "restaurant_lng": matched["lng"],
                 "address": matched.get("address", ""),
-                "distance_km": 0.1,
+                **({"distance_km": client_distance_km} if client_distance_km is not None else {}),
                 "tags": matched["tags"],
                 "item_id": item.get("item_id", item["name"]),
                 "item_name": item["name"],

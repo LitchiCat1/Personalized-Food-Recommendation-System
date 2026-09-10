@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, { Easing, useAnimatedProps, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Palette, Typography, Spacing } from '@/constants/theme';
+import { formatCalories } from '@/lib/calorie-target';
 import { useResponsive } from '@/hooks/useResponsive';
 
 type Props = {
@@ -53,9 +54,9 @@ export default function CalorieRing({ current, target, size: sizeProp, strokeWid
         />
       </Svg>
       <View style={[styles.centerText, { width: size, height: size }]}>
-        <Text style={[styles.currentValue, { fontSize: rs(26) }]}>{current.toLocaleString()}</Text>
+        <Text style={[styles.currentValue, { fontSize: rs(26) }]}>{formatCalories(current)}</Text>
         <Text style={[styles.unit, { fontSize: rs(11) }]}>kcal eaten</Text>
-        <Text style={[styles.remaining, { fontSize: rs(11) }]}>剩餘 {remaining.toLocaleString()}</Text>
+        <Text style={[styles.remaining, { fontSize: rs(11) }]}>剩餘 {formatCalories(remaining)}</Text>
       </View>
     </View>
   );

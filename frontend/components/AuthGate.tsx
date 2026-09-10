@@ -364,7 +364,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 key={gender}
                 accessibilityRole="radio"
                 accessibilityLabel={gender === 'male' ? '男性' : '女性'}
-                aria-selected={profileDraft.gender === gender}
+                aria-checked={profileDraft.gender === gender}
                 onPress={() => updateProfileDraft('gender', gender)}
                 style={[styles.genderButton, profileDraft.gender === gender && styles.genderButtonActive]}
               >
@@ -399,7 +399,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 key={option}
                 accessibilityRole="radio"
                 accessibilityLabel={option}
-                aria-selected={profileDraft.dietType === option}
+                aria-checked={profileDraft.dietType === option}
                 onPress={() => updateProfileDraft('dietType', option)}
                 style={[styles.genderButton, profileDraft.dietType === option && styles.genderButtonActive]}
               >
@@ -415,7 +415,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 key={level.id}
                 accessibilityRole="radio"
                 accessibilityLabel={level.label_zh}
-                aria-selected={profileDraft.activityLevel === level.id}
+                aria-checked={profileDraft.activityLevel === level.id}
                 onPress={() => updateProfileDraft('activityLevel', level.id)}
                 style={[styles.optionRow, profileDraft.activityLevel === level.id && styles.optionRowActive]}
               >

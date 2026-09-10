@@ -346,3 +346,68 @@ class DeclaredLimitTests(MedicalRiskTestCase):
             dish(sodium=150), ["hypertension"], [], rules, self.taxonomy, user_profile=PROFILE
         )
         self.assertIn("sodium", {r.get("nutrient") for r in result["risks"] if r["severity"] == "block"})
+
+
+class MealLevelLimitTests(MedicalRiskTestCase):
+    """單餐上限要對「一餐」生效，不能只對「一道菜」生效。
+
+    personalized_limits 是每日總量 ÷ 3，也就是一餐的額度，但
+    evaluate_medical_risk 是逐道菜呼叫的。結果是一餐點兩道各 490mg 的菜全部
+    通過（合計 980mg），單獨一道 510mg 的反而被擋——同一個上限，兩種結論。
+    """
+
+    def test_two_dishes_each_under_the_limit_still_pass_individually(self):
+        for _ in range(2):
+            result = evaluate_medical_risk(
+                dish(sodium=490), ["hypertension"], [], self.rules, self.taxonomy, user_profile=PROFILE
+            )
+            self.assertTrue(result["is_safe"])
+
+    def test_the_meal_total_of_those_same_dishes_is_flagged(self):
+        from services.medical_risk_service import evaluate_meal_medical_risk
+
+        result = evaluate_meal_medical_risk(
+            [{"nutrients": dish(sodium=490)}, {"nutrients": dish(sodium=490)}],
+            ["hypertension"], [], self.rules, self.taxonomy, user_profile=PROFILE,
+        )
+        self.assertTrue(result["has_caution"])
+        sodium_risks = [r for r in result["risks"] if r["nutrient"] == "sodium"]
+        self.assertEqual(len(sodium_risks), 1)
+        self.assertEqual(sodium_risks[0]["value"], 980.0)
+        self.assertEqual(sodium_risks[0]["scope"], "meal")
+
+    def test_a_meal_within_the_limit_is_not_flagged(self):
+        from services.medical_risk_service import evaluate_meal_medical_risk
+
+        result = evaluate_meal_medical_risk(
+            [{"nutrients": dish(sodium=300)}, {"nutrients": dish(sodium=300)}],
+            ["hypertension"], [], self.rules, self.taxonomy, user_profile=PROFILE,
+        )
+        self.assertFalse(result["has_caution"])
+
+    def test_a_user_without_conditions_gets_no_meal_warnings(self):
+        from services.medical_risk_service import evaluate_meal_medical_risk
+
+        result = evaluate_meal_medical_risk(
+            [{"nutrients": dish(sodium=5000)}], [], [], self.rules, self.taxonomy, user_profile=PROFILE,
+        )
+        self.assertEqual(result["caution_reasons"], [])
+
+    def test_the_meal_check_scales_by_portion_like_the_per_dish_check(self):
+        from services.medical_risk_service import evaluate_meal_medical_risk
+
+        # 每 100g 400mg 的菜，吃 200g 就是 800mg，已超過 666.7mg 的單餐上限
+        result = evaluate_meal_medical_risk(
+            [{"nutrients": dish(sodium=400), "portion_g": 200}],
+            ["hypertension"], [], self.rules, self.taxonomy, user_profile=PROFILE,
+        )
+        self.assertTrue(result["has_caution"])
+
+    def test_the_per_dish_message_says_it_is_one_dish_not_the_meal(self):
+        """訊息寫「單餐」會讓人以為整餐都算過了。"""
+        result = evaluate_medical_risk(
+            dish(sodium=900), ["hypertension"], [], self.rules, self.taxonomy, user_profile=PROFILE
+        )
+        message = " ".join(result["block_reasons"])
+        self.assertIn("這一道", message)
+        self.assertNotIn("單餐鈉", message)

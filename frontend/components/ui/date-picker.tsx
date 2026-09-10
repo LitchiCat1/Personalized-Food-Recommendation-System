@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { Palette, Radius, Shadows, Spacing, Typography } from '@/constants/theme';
 import { formatDateInput, formatLocalDateKey, parseDateInput } from '@/lib/dietary-records';

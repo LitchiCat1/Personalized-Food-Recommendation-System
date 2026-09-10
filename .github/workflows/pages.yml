@@ -41,8 +41,9 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Enable GitHub Pages
-        # 沒有這步就得有人先到 Settings → Pages 手動把來源設成 GitHub Actions，
-        # 否則 build 成功、deploy 卻找不到網站可以部署。
+        # 試著自動啟用。GITHUB_TOKEN 通常沒有這個權限（需要倉庫管理權），
+        # 失敗也不該讓建置一起掛掉——啟用是一次性的設定，建置每次都要跑。
+        continue-on-error: true
         uses: actions/configure-pages@v5
         with:
           enablement: true

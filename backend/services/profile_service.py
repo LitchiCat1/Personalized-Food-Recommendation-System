@@ -5,6 +5,8 @@ from services.disease_rule_service import normalize_allergen_ids, normalize_cond
 
 # 運動係數先前寫死 1.55（中等活動量），而編輯表單根本沒有這一欄，
 # 所以每個人的 TDEE 都是 BMR x 1.55——臥床的人和運動員拿到同一個數字。
+DEFAULT_DIET_TYPE = "葷食"
+
 ACTIVITY_LEVELS = [
     {"id": "sedentary", "label_zh": "久坐（幾乎不運動）", "multiplier": 1.2},
     {"id": "light", "label_zh": "輕度活動（每週 1-3 天）", "multiplier": 1.375},
@@ -86,7 +88,9 @@ def build_user_profile(data: dict, disease_rules: dict | None = None, allergen_t
         "health_conditions": health_conditions,
         "allergens": allergens,
         "target_weight": data.get("target_weight"),
-        "diet_type": data.get("diet_type", "均衡飲食"),
+        # 前端的選項只有葷食／素食（frontend/constants/diet.ts）。
+        # 先前這裡預設「均衡飲食」，新帳號一建好就是「我的」頁不認得的值。
+        "diet_type": data.get("diet_type") or DEFAULT_DIET_TYPE,
         "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     }
 

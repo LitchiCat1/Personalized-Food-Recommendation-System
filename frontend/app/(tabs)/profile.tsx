@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, ActivityIndicator, TextInput, Alert,
 import { Ionicons } from '@expo/vector-icons';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { AVAILABLE_CONDITIONS, AVAILABLE_ALLERGENS } from '@/constants/mock-data';
+import { DIET_TYPES, isKnownDietType } from '@/constants/diet';
 import { useStore } from '@/store/useStore';
 import { useResponsive } from '@/hooks/useResponsive';
 import AppContainer from '@/components/AppContainer';
@@ -190,7 +191,16 @@ export default function ProfileScreen() {
     isPositiveDraftNumber(profileDraft.age) &&
     isPositiveDraftNumber(profileDraft.dailyCalorieTarget) &&
     isPositiveDraftNumber(profileDraft.targetWeight) &&
-    (profileDraft.dietType === '葷食' || profileDraft.dietType === '素食');
+    isKnownDietType(profileDraft.dietType);
+
+  // 儲存鈕先前只是變灰，畫面上沒有任何一句話說為什麼。
+  const profileDraftProblem = isProfileDraftValid
+    ? null
+    : !profileDraft.name.trim()
+      ? '請填寫姓名或暱稱。'
+      : !isKnownDietType(profileDraft.dietType)
+        ? '請在下方選一個飲食型態。'
+        : '身高、體重、年齡、每日目標熱量與目標體重都要是大於 0 的數字。';
 
   const conditionCatalog = useMemo(() => {
     if (medicalMetadata?.disease_rules.conditions?.length) return medicalMetadata.disease_rules.conditions;
@@ -647,7 +657,7 @@ Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini �
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>飲食類型</Text>
                 <View style={styles.dietOptions}>
-                  {(['葷食', '素食'] as const).map((option) => {
+                  {DIET_TYPES.map((option) => {
                     const active = profileDraft.dietType === option;
                     return (
                       <Pressable
@@ -666,6 +676,8 @@ Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini �
                 </View>
               </View>
 
+              {profileDraftProblem ? <Text style={styles.draftProblem}>{profileDraftProblem}</Text> : null}
+
               <PrimaryButton
                 label={saving ? '儲存中' : '儲存健康檔案'}
                 onPress={handleSaveProfileFields}
@@ -681,6 +693,12 @@ Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini �
 }
 
 const styles = StyleSheet.create({
+  draftProblem: {
+    color: Palette.status.error,
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: Spacing.sm,
+  },
   syncBanner: {
     flexDirection: 'row',
     alignItems: 'center',

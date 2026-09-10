@@ -154,7 +154,7 @@ class StorageRepository:
                 "health_conditions": [],
                 "allergens": [],
                 "target_weight": 65.0,
-                "diet_type": "均衡飲食",
+                "diet_type": "葷食",
                 "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             }
             self.upsert_user(user_doc)

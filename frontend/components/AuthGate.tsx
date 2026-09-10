@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 
+import { DEFAULT_DIET_TYPE, DIET_TYPES } from '@/constants/diet';
 import { Palette, Radius, Shadows, Spacing, Typography } from '@/constants/theme';
 import { fetchMedicalMetadata, fetchUserProfile, saveUserProfile, type MedicalMetadataResponse, type UserProfileResponse } from '@/lib/api';
 import { isSupabaseAuthRequired, supabase, supabaseConfigurationError } from '@/lib/supabase';
@@ -93,7 +94,7 @@ function buildInitialDraft(email?: string | null) {
     // 改成挑活動量，係數與每日熱量都交給後端算。
     activityLevel: 'moderate',
     targetWeight: '70',
-    dietType: '均衡飲食',
+    dietType: DEFAULT_DIET_TYPE as string,
   };
 }
 
@@ -253,7 +254,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         health_conditions: selectedConditions,
         allergens: selectedAllergens,
         target_weight: Number.isFinite(targetWeight) && targetWeight > 0 ? targetWeight : weight,
-        diet_type: profileDraft.dietType.trim() || '均衡飲食',
+        diet_type: profileDraft.dietType.trim() || DEFAULT_DIET_TYPE,
       }, { accessToken });
       replaceUser(mapProfileResponse(response.user, useStore.getState().user));
       resetDashboard();
@@ -377,7 +378,6 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             ['weight', '體重 kg'],
             ['age', '年齡'],
             ['targetWeight', '目標體重 kg'],
-            ['dietType', '飲食型態'],
           ].map(([key, label]) => (
             <View key={key}>
               <Text style={styles.inputLabel}>{label}</Text>
@@ -385,12 +385,28 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 accessibilityLabel={label}
                 value={profileDraft[key as keyof typeof profileDraft]}
                 onChangeText={(value) => updateProfileDraft(key as keyof typeof profileDraft, value)}
-                keyboardType={key === 'dietType' ? 'default' : 'decimal-pad'}
+                keyboardType="decimal-pad"
                 placeholderTextColor={Palette.text.tertiary}
                 style={styles.input}
               />
             </View>
           ))}
+
+          <Text style={styles.inputLabel}>飲食型態</Text>
+          <View style={styles.genderRow}>
+            {DIET_TYPES.map((option) => (
+              <Pressable
+                key={option}
+                accessibilityRole="radio"
+                accessibilityLabel={option}
+                aria-selected={profileDraft.dietType === option}
+                onPress={() => updateProfileDraft('dietType', option)}
+                style={[styles.genderButton, profileDraft.dietType === option && styles.genderButtonActive]}
+              >
+                <Text style={[styles.genderText, profileDraft.dietType === option && styles.genderTextActive]}>{option}</Text>
+              </Pressable>
+            ))}
+          </View>
 
           <Text style={styles.inputLabel}>平常的活動量</Text>
           <View style={styles.optionColumn}>

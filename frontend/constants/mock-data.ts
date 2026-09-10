@@ -245,7 +245,7 @@ export const USER_PROFILE = {
   goals: {
     dailyCalories: 2100,
     targetWeight: 70,
-    dietType: '均衡飲食',
+    dietType: '葷食',
     mealPlan: '每日三餐 + 一次點心',
   },
   streak: 14,

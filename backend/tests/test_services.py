@@ -924,6 +924,24 @@ class ActivityLevelTests(unittest.TestCase):
         self.assertLess(sedentary["tdee"], very_active["tdee"])
         self.assertEqual(sedentary["tdee"], round(sedentary["bmr"] * 1.2))
 
+    def test_the_default_diet_type_is_one_the_app_offers(self):
+        """後端預設值必須是前端選單裡有的選項。
+
+        先前後端給「均衡飲食」，但「我的」頁只接受「葷食」或「素食」，
+        於是新帳號一建好，儲存鈕就是灰的，而且不說為什麼。
+        清單在 frontend/constants/diet.ts。
+        """
+        import re
+        from pathlib import Path
+        from services.profile_service import build_user_profile
+
+        source = (Path(__file__).resolve().parents[2] / "frontend" / "constants" / "diet.ts").read_text(encoding="utf-8")
+        offered = set(re.findall(r"'([^']+)'", source.split("DIET_TYPES = [", 1)[1].split("]", 1)[0]))
+        self.assertTrue(offered, "沒有從 diet.ts 讀到任何選項")
+
+        profile = build_user_profile({"user_id": "u", "height": 170, "weight": 65, "age": 30})
+        self.assertIn(profile["diet_type"], offered)
+
     def test_onboarding_may_omit_the_calorie_target(self):
         """初次設定不再問「每日目標熱量」，改由 BMR × 活動係數 算出來。
 

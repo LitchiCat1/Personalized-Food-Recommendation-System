@@ -46,7 +46,7 @@ from services.vision_food_service import (
 from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini, parse_menu_image_with_gemini
 from services.medical_risk_service import evaluate_medical_risk, rule_threshold_conflicts
 from services.google_places_service import fetch_google_places_restaurants
-from services.week_seed_service import CLEARABLE_SOURCES, SEED_SOURCES, SeedDataUnavailable, clear_week_records, index_nearby_venues, seed_week_records
+from services.venue_index_service import VenueIndexUnavailable, index_nearby_venues
 
 
 load_local_env()
@@ -638,7 +638,7 @@ def delete_record(user_id, client_record_id):
 
 
 # ─── 3.5 一週測試資料（我的 → 開發者工具） ──────────────────
-def _seed_request_params(data: dict) -> dict:
+def _venue_search_params(data: dict) -> dict:
     return {
         "budget": data.get("budget", 150),
         "lat": data.get("lat", 25.0338),
@@ -650,17 +650,17 @@ def _seed_request_params(data: dict) -> dict:
 
 @app.route("/restaurants/index/<user_id>", methods=["POST"])
 def index_nearby_restaurants(user_id):
-    """把附近店家的菜單建檔，之後灌入七天資料就不必等 Gemini。"""
+    """把附近店家的菜單建檔，推薦才能逐道菜比對疾病禁忌與過敏原。"""
     require_user_access(user_id)
     data = request.get_json(silent=True) or {}
     try:
         summary = index_nearby_venues(
             storage,
-            {**_seed_request_params(data), "limit": data.get("limit", 20)},
+            {**_venue_search_params(data), "limit": data.get("limit", 20)},
             fetch_google_places_restaurants,
             enrich_restaurant_with_gemini,
         )
-    except SeedDataUnavailable as error:
+    except VenueIndexUnavailable as error:
         return jsonify({"error": str(error)}), 409
     return jsonify({"message": f"已建檔 {summary['analysed']} 家店", **summary})
 
@@ -714,53 +714,6 @@ def clear_nearby_restaurant_index(user_id):
     return jsonify({"message": f"已清除 {removed} 家店的菜單檔案", "removed": removed})
 
 
-@app.route("/seed/week-records/<user_id>", methods=["POST"])
-def create_week_seed_records(user_id):
-    require_user_access(user_id)
-    data = request.get_json(silent=True) or {}
-    source = str(data.get("source", "recommend")).strip().lower()
-    if source not in SEED_SOURCES:
-        return jsonify({"error": f"source 必須是 {' 或 '.join(SEED_SOURCES)}"}), 400
-
-    user = storage.get_user(user_id)
-    if not user:
-        return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
-
-    try:
-        summary = seed_week_records(
-            storage,
-            user_id,
-            user,
-            source,
-            data.get("days", 7),
-            _seed_request_params(data),
-            DISEASE_RULES,
-            ALLERGEN_TAXONOMY,
-        )
-    except SeedDataUnavailable as error:
-        # 拿不到真實店家菜單就明講原因，不用本地模擬資料充數
-        return jsonify({"error": str(error)}), 409
-    except ValueError as error:
-        return jsonify({"error": str(error)}), 400
-
-    return jsonify({"message": f"已灌入 {summary['days']} 天測試資料", **summary}), 201
-
-
-@app.route("/seed/week-records/<user_id>", methods=["DELETE"])
-def delete_week_seed_records(user_id):
-    require_user_access(user_id)
-    source = str(request.args.get("source", "recommend")).strip().lower()
-    if source not in CLEARABLE_SOURCES:
-        return jsonify({"error": f"source 必須是 {' 或 '.join(CLEARABLE_SOURCES)}"}), 400
-    try:
-        days = int(request.args.get("days", 7))
-    except (TypeError, ValueError):
-        return jsonify({"error": "days 必須是有效數字"}), 400
-    summary = clear_week_records(storage, user_id, days, source)
-    return jsonify({"message": f"已刪除 {summary['removed']} 筆測試紀錄", **summary})
-
-
-# ─── 4. History & Trends (PRD: 飲食趨勢回顧) ─────────────────
 @app.route("/history/<user_id>", methods=["GET"])
 def get_history(user_id):
     require_user_access(user_id)

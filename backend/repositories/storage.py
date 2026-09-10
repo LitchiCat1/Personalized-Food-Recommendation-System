@@ -569,7 +569,7 @@ class StorageRepository:
         return age > (max_age_days if max_age_days is not None else self.MENU_CACHE_MAX_AGE_DAYS)
 
     def list_restaurant_menus(self, limit: int = 60) -> list[dict]:
-        """建檔過的店家全部拿出來。灌入七天時讀這個，不必再打一次 Places。"""
+        """建檔過的店家全部拿出來。推薦讀這個來取得菜色營養。"""
         if self.use_menu_postgres:
             with self.menu_pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute(

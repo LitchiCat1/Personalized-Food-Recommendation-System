@@ -271,88 +271,6 @@ class ApiRouteTests(ApiTestBase):
         ), patch.object(self.app_module, "enrich_restaurant_with_gemini", self._seed_menu):
             return self.client.post("/restaurants/index/user-a", json={}, headers=self.auth_headers())
 
-    def test_week_seed_route_uses_indexed_venues_and_clears(self):
-        with self.mock_auth("user-a"):
-            self.client.post(
-                "/user",
-                json={"user_id": "user-a", "name": "Seed User", "height": 170, "weight": 65, "age": 25},
-                headers=self.auth_headers(),
-            )
-            self._index_two_venues()
-            # 灌入不該再打 Places：把它換成會爆炸的函式來證明沒被呼叫
-            def explode(*args, **kwargs):
-                raise AssertionError("灌入七天不應該再搜尋 Places")
-
-            with patch.object(self.app_module, "fetch_google_places_restaurants", explode):
-                response = self.client.post(
-                    "/seed/week-records/user-a",
-                    json={"source": "recommend", "days": 7, "budget": 150},
-                    headers=self.auth_headers(),
-                )
-
-        self.assertEqual(response.status_code, 201)
-        summary = response.get_json()
-        self.assertEqual(summary["records"], 21)
-        self.assertEqual(summary["data_source"], "google_places")
-
-        with self.mock_auth("user-a"):
-            records = self.client.get("/records/user-a?limit=500", headers=self.auth_headers()).get_json()["records"]
-        by_day = {}
-        for record in records:
-            by_day.setdefault(record["timestamp"][:10], []).extend(f["name"] for f in record["foods"])
-        self.assertEqual(len(by_day), 7)
-        self.assertEqual(len({tuple(sorted(v)) for v in by_day.values()}), 7)
-        self.assertGreater(records[0]["foods"][0]["fiber"], 0)
-
-        with self.mock_auth("user-a"):
-            cleared = self.client.delete(
-                "/seed/week-records/user-a?source=recommend&days=7", headers=self.auth_headers()
-            )
-        self.assertEqual(cleared.get_json()["removed"], 21)
-
-    def test_seeding_again_replaces_the_previous_week_instead_of_skipping(self):
-        """紀錄 id 是推導出來的，不覆蓋的話重按②會整批被當成重複而跳過。"""
-        with self.mock_auth("user-a"):
-            self.client.post(
-                "/user",
-                json={"user_id": "user-a", "name": "Seed User", "height": 170, "weight": 65, "age": 25},
-                headers=self.auth_headers(),
-            )
-            self._index_two_venues()
-            first = self.client.post(
-                "/seed/week-records/user-a",
-                json={"source": "recommend", "days": 7, "budget": 150},
-                headers=self.auth_headers(),
-            ).get_json()
-            second = self.client.post(
-                "/seed/week-records/user-a",
-                json={"source": "recommend", "days": 7, "budget": 150},
-                headers=self.auth_headers(),
-            ).get_json()
-            records = self.client.get(
-                "/records/user-a?limit=500", headers=self.auth_headers()
-            ).get_json()["records"]
-
-        self.assertEqual(first["replaced"], 0)
-        self.assertEqual(second["created"], 21)
-        self.assertEqual(second["replaced"], 21)
-        # 覆蓋而不是疊加
-        self.assertEqual(len(records), 21)
-
-    def test_week_seed_route_tells_you_to_index_first(self):
-        """沒建檔就灌入，要明確叫使用者先按①，不能塞假資料。"""
-        with self.mock_auth("user-a"):
-            self.client.post(
-                "/user",
-                json={"user_id": "user-a", "name": "Seed User", "height": 170, "weight": 65, "age": 25},
-                headers=self.auth_headers(),
-            )
-            response = self.client.post(
-                "/seed/week-records/user-a", json={"source": "recommend"}, headers=self.auth_headers()
-            )
-        self.assertEqual(response.status_code, 409)
-        self.assertIn("建立附近店家菜單檔案", response.get_json()["error"])
-
     def test_menu_cache_is_keyed_on_place_id_not_the_venue_name(self):
         """Places 新舊版 API 回的店名可能不同，用店名當 key 會重複分析。"""
         storage = self.app_module.storage
@@ -407,21 +325,6 @@ class ApiRouteTests(ApiTestBase):
                 )
         self.assertEqual(response.status_code, 409)
         self.assertIn("搜尋不到店家", response.get_json()["error"])
-
-    def test_week_seed_route_rejects_unknown_source(self):
-        with self.mock_auth("user-a"):
-            response = self.client.post(
-                "/seed/week-records/user-a", json={"source": "curated"}, headers=self.auth_headers()
-            )
-        self.assertEqual(response.status_code, 400)
-
-    def test_week_seed_delete_still_accepts_the_retired_curated_source(self):
-        """灌入只剩 recommend，但清除按鈕仍要能刪掉舊版 curated 留下的紀錄。"""
-        with self.mock_auth("user-a"):
-            response = self.client.delete(
-                "/seed/week-records/user-a?source=curated&days=7", headers=self.auth_headers()
-            )
-        self.assertEqual(response.status_code, 200)
 
     def test_record_route_recalculates_totals_instead_of_trusting_payload(self):
         payload = {
@@ -753,69 +656,6 @@ class ApiRouteTests(ApiTestBase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-class VenueDistanceTests(ApiTestBase):
-    """快取是跨地點累積的，灌入不能排到幾十公里外的店。"""
-
-    def _index_at(self, name, lat, lng):
-        places = [{
-            "restaurant_id": f"google_{name}", "name": name, "lat": lat, "lng": lng,
-            "address": "台灣", "tags": ["Google Places"], "google_place_id": f"p_{name}",
-            "distance_km": 0.2, "match_score": 70, "is_open": True,
-        }]
-        with patch.object(self.app_module, "fetch_google_places_restaurants", lambda *a, **k: places), \
-             patch.object(self.app_module, "enrich_restaurant_with_gemini", self._seed_menu):
-            return self.client.post(
-                "/restaurants/index/user-a",
-                json={"lat": lat, "lng": lng},
-                headers=self.auth_headers(),
-            )
-
-    def test_venues_indexed_somewhere_else_are_not_used(self):
-        with self.mock_auth("user-a"):
-            self.client.post(
-                "/user",
-                json={"user_id": "user-a", "name": "Seed User", "height": 170, "weight": 65, "age": 25},
-                headers=self.auth_headers(),
-            )
-            self._index_at("台北的店", 25.0338, 121.5645)
-            self._index_at("高雄的店", 22.6273, 120.3014)
-
-            response = self.client.post(
-                "/seed/week-records/user-a",
-                json={"source": "recommend", "days": 7, "budget": 150,
-                      "lat": 25.0338, "lng": 121.5645, "radius_km": 3},
-                headers=self.auth_headers(),
-            )
-            records = self.client.get(
-                "/records/user-a?limit=500", headers=self.auth_headers()
-            ).get_json()["records"]
-
-        self.assertEqual(response.status_code, 201)
-        eaten = {food["name"] for record in records for food in record["foods"]}
-        self.assertTrue(any("台北的店" in name for name in eaten), eaten)
-        self.assertFalse(any("高雄的店" in name for name in eaten), eaten)
-        self.assertIn("1 家在 3 km 外", response.get_json()["note"])
-
-    def test_seeding_far_from_everything_says_so_instead_of_seeding_nonsense(self):
-        with self.mock_auth("user-a"):
-            self.client.post(
-                "/user",
-                json={"user_id": "user-a", "name": "Seed User", "height": 170, "weight": 65, "age": 25},
-                headers=self.auth_headers(),
-            )
-            self._index_at("台北的店", 25.0338, 121.5645)
-
-            response = self.client.post(
-                "/seed/week-records/user-a",
-                json={"source": "recommend", "days": 7, "budget": 150,
-                      "lat": 22.6273, "lng": 120.3014, "radius_km": 3},
-                headers=self.auth_headers(),
-            )
-
-        self.assertEqual(response.status_code, 409)
-        self.assertIn("重新建檔", response.get_json()["error"])
 
 
 class PaidRouteProtectionTests(ApiTestBase):

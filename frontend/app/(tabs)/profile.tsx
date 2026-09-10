@@ -14,8 +14,7 @@ import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
 import FeedbackBanner from '@/components/ui/feedback-banner';
-import { clearNearbyVenueIndex, clearWeekRecords, fetchMedicalMetadata, fetchUserProfile, indexNearbyVenues, listNearbyVenueIndex, saveUserProfile, seedWeekRecords } from '@/lib/api';
-import type { WeekSeedSource } from '@/lib/api';
+import { clearNearbyVenueIndex, fetchMedicalMetadata, fetchUserProfile, indexNearbyVenues, listNearbyVenueIndex, saveUserProfile } from '@/lib/api';
 import { describeLocation, resolveLocation } from '@/lib/location';
 import { isSupabaseAuthConfigured, supabase } from '@/lib/supabase';
 
@@ -37,7 +36,7 @@ export default function ProfileScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const [profileFeedback, setProfileFeedback] = useState<{ tone: 'success' | 'error'; title: string; message?: string } | null>(null);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
-  const [seedBusy, setSeedBusy] = useState<'index' | 'recommend' | 'clear' | 'rebuild' | 'list' | null>(null);
+  const [seedBusy, setSeedBusy] = useState<'index' | 'rebuild' | 'list' | null>(null);
   const [activeSection, setActiveSection] = useState('personal');
   const [medicalMetadata, setMedicalMetadata] = useState<MedicalMetadata | null>(null);
   const [profileDraft, setProfileDraft] = useState({
@@ -280,7 +279,7 @@ export default function ProfileScreen() {
   };
 
   const runSeedAction = async (
-    busyKey: 'index' | 'recommend' | 'clear' | 'rebuild' | 'list',
+    busyKey: 'index' | 'rebuild' | 'list',
     action: () => Promise<{ tone: 'success' | 'error'; title: string; message?: string }>
   ) => {
     setSeedBusy(busyKey);
@@ -350,41 +349,6 @@ export default function ProfileScreen() {
         tone: 'success',
         title: result.removed > 0 ? `已清除 ${result.removed} 家店的菜單檔案` : '菜單檔案本來就是空的',
         message: '按①重新建檔，這次會照現在的規則來：已歇業的店不收，並記下每家店的營業時段。',
-      };
-    });
-
-  const handleSeedWeek = () =>
-    runSeedAction('recommend', async () => {
-      const source: WeekSeedSource = 'recommend';
-      // 灌入讀的是資料庫，但仍要送座標，才能把別的地點建的店排除掉
-      const location = await resolveLocation();
-      const summary = await seedWeekRecords(
-        apiBaseUrl,
-        user.userId,
-        { source, days: 7, budget: 150, lat: location.lat, lng: location.lng },
-        { accessToken }
-      );
-      const realData = summary.data_source === 'google_places';
-      const conditionText = summary.conditions.length ? summary.conditions.join('、') : '無疾病條件';
-      const compliant = `${summary.fully_compliant_days}/${summary.days} 天完全符合（${conditionText}）`;
-      return {
-        tone: realData && summary.fully_compliant_days === summary.days ? 'success' : 'error',
-        title: `已灌入 ${summary.days} 天資料，${compliant}`,
-        message: `${summary.start_date} ~ ${summary.end_date}，取自 ${summary.restaurants} 家店共 ${summary.dishes_available} 道餐點（寫入 ${summary.created} 筆，其中覆蓋舊紀錄 ${summary.replaced} 筆）。${summary.note}`,
-      };
-    });
-
-  const handleClearSeed = () =>
-    runSeedAction('clear', async () => {
-      const [recommendResult, curatedResult] = await Promise.all([
-        clearWeekRecords(apiBaseUrl, user.userId, { source: 'recommend', days: 7 }, { accessToken }),
-        clearWeekRecords(apiBaseUrl, user.userId, { source: 'curated', days: 7 }, { accessToken }),
-      ]);
-      const removed = recommendResult.removed + curatedResult.removed;
-      return {
-        tone: 'success',
-        title: removed > 0 ? `已刪除 ${removed} 筆測試紀錄` : '沒有找到可刪除的測試紀錄',
-        message: '只會刪掉這個按鈕灌進去的資料，手動或掃描新增的紀錄不受影響。',
       };
     });
 
@@ -569,21 +533,11 @@ export default function ProfileScreen() {
       ) : null}
       </View>
 
-      <SectionBlock title="測試資料" subtitle="一鍵灌入 7 天飲食紀錄，用來驗證趨勢與達標判定。">
+      <SectionBlock title="附近店家菜單" subtitle="建檔後，推薦才能逐道菜比對疾病禁忌與過敏原。">
         <View style={styles.seedActions}>
-          <SecondaryButton
-            label={seedBusy === 'index' ? '建檔中…' : '① 建立附近店家菜單檔案'}
-            onPress={handleIndexVenues}
-            disabled={seedBusy !== null}
-          />
           <PrimaryButton
-            label={seedBusy === 'recommend' ? '規劃七天菜單中…' : '② 灌入 7 天（附近真實店家）'}
-            onPress={handleSeedWeek}
-            disabled={seedBusy !== null}
-          />
-          <SecondaryButton
-            label={seedBusy === 'clear' ? '刪除中…' : '清除測試資料'}
-            onPress={handleClearSeed}
+            label={seedBusy === 'index' ? '建檔中…' : '建立附近店家菜單檔案'}
+            onPress={handleIndexVenues}
             disabled={seedBusy !== null}
           />
           <SecondaryButton
@@ -592,13 +546,13 @@ export default function ProfileScreen() {
             disabled={seedBusy !== null}
           />
           <SecondaryButton
-            label={seedBusy === 'rebuild' ? '清除中…' : '清除店家菜單檔案（重建用）'}
+            label={seedBusy === 'rebuild' ? '清除中…' : '清除菜單檔案（重建用）'}
             onPress={handleRebuildIndex}
             disabled={seedBusy !== null}
           />
         </View>
         <Text style={styles.seedHint}>
-先按①把附近店家的菜單建檔進資料庫（一家要 20~30 秒，可以重複按累積），再按②灌入七天。已建檔的店家不會重複分析，所以②會很快。三餐會按店家營業時段挑，早餐不會排到只做晚餐的店。拿不到真實菜單時會直接說明原因，不會用模擬資料充數。
+Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini 讀出菜單並估算營養，一家約 20~30 秒，可以重複按累積。已建檔且未過期的店家不會重複分析。沒有建檔的店家，推薦只能用店名比對，無法逐道菜篩選。
         </Text>
       </SectionBlock>
 

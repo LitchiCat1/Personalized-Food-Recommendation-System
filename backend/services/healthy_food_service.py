@@ -381,7 +381,7 @@ def _items_from_indexed_menu(
 
     allowed, blocked = [], []
     for raw in items:
-        # 快取存的是模型原始輸出，這裡補上留白的飽和脂肪與糖，跟灌入同一套
+        # 快取存的是模型原始輸出，這裡補上模型留白的飽和脂肪與糖
         menu_item = validate_and_balance_nutrition(dict(raw))
         name = str(menu_item.get("name") or "餐點")
         price = int(_number(menu_item.get("price")))

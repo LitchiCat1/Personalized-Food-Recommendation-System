@@ -13,7 +13,6 @@ from services.healthy_food_service import build_google_places_food_recommendatio
 from services.history_service import build_history_response
 from services.open_food_facts_service import build_open_food_facts_product
 from services.app_time_service import app_today
-from services.week_seed_service import plan_daily_dishes, score_day
 from services.nutrition_progress_service import (
     build_daily_nutrition_progress,
     build_nutrition_goal_types,
@@ -402,78 +401,6 @@ class ServiceSmokeTests(unittest.TestCase):
             for index in range(count)
         ]
 
-    def test_week_seed_plan_gives_every_day_a_different_menu(self):
-        """菜色少於一週的量時，輪流發牌會讓好幾天長得一模一樣。"""
-        user = {"height": 170, "weight": 65, "health_conditions": []}
-        targets = calculate_pdf_daily_targets(user)
-        goal_types = build_nutrition_goal_types(user)
-
-        for dish_count in (4, 6, 12, 21):
-            plan = plan_daily_dishes(
-                self._seed_dishes(dish_count), 7, "user-a:recommend:2026-09-02", targets, goal_types
-            )
-            self.assertEqual(len(plan), 7)
-            day_sets = [tuple(sorted(index for meal in day for index in meal)) for day in plan]
-            self.assertEqual(len(set(day_sets)), 7, f"{dish_count} 道菜時有重複的天：{day_sets}")
-            for day in plan:
-                self.assertEqual(len(day), 3, "一天要有三餐")
-                for meal in day:
-                    self.assertTrue(meal, "每餐至少要有一道菜")
-                    self.assertTrue(all(0 <= index < dish_count for index in meal))
-
-    def test_week_seed_plan_is_deterministic_for_the_same_seed(self):
-        user = {"height": 170, "weight": 65, "health_conditions": []}
-        targets = calculate_pdf_daily_targets(user)
-        goal_types = build_nutrition_goal_types(user)
-        dishes = self._seed_dishes(12)
-        self.assertEqual(
-            plan_daily_dishes(dishes, 7, "same", targets, goal_types),
-            plan_daily_dishes(dishes, 7, "same", targets, goal_types),
-        )
-
-    def test_week_seed_plan_adds_side_dishes_to_reach_the_minimums(self):
-        """一餐只放一道單品時纖維永遠補不起來，規劃器要會配菜。"""
-        user = {"height": 170, "weight": 65, "health_conditions": []}
-        targets = calculate_pdf_daily_targets(user)
-        goal_types = build_nutrition_goal_types(user)
-
-        mains = [
-            {"name": f"便當-{index}", "calories": 650, "protein": 30, "carbs": 75, "sugar": 3,
-             "fat": 22, "saturated_fat": 6, "trans_fat": 0, "fiber": 4, "sodium": 700}
-            for index in range(3)
-        ]
-        sides = [
-            {"name": f"青菜-{index}", "calories": 60, "protein": 3, "carbs": 7, "sugar": 1,
-             "fat": 2, "saturated_fat": 0.3, "trans_fat": 0, "fiber": 6, "sodium": 120}
-            for index in range(3)
-        ]
-        plan = plan_daily_dishes(mains + sides, 7, "seed", targets, goal_types)
-
-        dishes = mains + sides
-        multi_dish_meals = sum(1 for day in plan for meal in day if len(meal) > 1)
-        self.assertGreater(multi_dish_meals, 0, "沒有任何一餐配到第二道菜")
-
-        # 有配菜之後纖維應該明顯高於「三道主餐」的 12g
-        fibre_by_day = [
-            sum(dishes[index]["fiber"] for meal in day for index in meal) for day in plan
-        ]
-        self.assertGreater(max(fibre_by_day), 12, f"配菜沒有把纖維拉起來：{fibre_by_day}")
-
-    def test_week_seed_plan_keeps_days_inside_the_sodium_ceiling(self):
-        """高血壓的鈉上限是每日 2000mg，規劃時要避開會讓整天超標的組合。"""
-        user = {"height": 170, "weight": 65, "health_conditions": ["hypertension"]}
-        targets = calculate_pdf_daily_targets(user)
-        goal_types = build_nutrition_goal_types(user)
-
-        dishes = self._seed_dishes(6, sodium=300, fiber=11) + self._seed_dishes(6, sodium=900, fiber=1)
-        plan = plan_daily_dishes(dishes, 7, "seed", targets, goal_types)
-        sodium_by_day = [
-            sum(dishes[index]["sodium"] for meal in day for index in meal) for day in plan
-        ]
-        self.assertLessEqual(
-            min(sodium_by_day), targets["sodium"], f"連最低的一天都超過鈉上限：{sodium_by_day}"
-        )
-
     def test_kidney_disease_treats_protein_as_upper_limit(self):
         """CKD 的蛋白質目標是 W x 0.6 的嚴格限量，超過要判成 over 而不是達標。"""
         class HighProteinStorage:
@@ -617,70 +544,6 @@ class NutritionZeroFallbackTests(unittest.TestCase):
         self.assertGreater(drink["sugar"], rice_box["sugar"])
 
 
-class MealTimeAwarePlanningTests(unittest.TestCase):
-    """一天三餐要挑那個時段真的有開的店，不能早上八點排炸雞。"""
-
-    TARGETS = {
-        "calories": 1600, "protein": 50, "carbs": 200, "sugar": 20,
-        "fat": 45, "saturated_fat": 13, "trans_fat": 0, "fiber": 25, "sodium": 2000,
-    }
-
-    @staticmethod
-    def _periods(open_hour, close_hour):
-        return [
-            {"day": day, "open_minute": open_hour * 60, "close_minute": close_hour * 60}
-            for day in range(7)
-        ]
-
-    def _dish(self, name, periods):
-        return {
-            "name": name, "opening_periods": periods,
-            "calories": 400, "protein": 18, "carbs": 50, "sugar": 4,
-            "fat": 12, "saturated_fat": 3, "trans_fat": 0, "fiber": 6, "sodium": 500,
-        }
-
-    def test_a_dinner_only_venue_never_lands_on_breakfast(self):
-        from services.week_seed_service import build_nutrition_goal_types
-
-        breakfast = [self._dish(f"早餐店餐點{i}", self._periods(6, 11)) for i in range(4)]
-        dinner = [self._dish(f"晚餐店餐點{i}", self._periods(17, 22)) for i in range(4)]
-        dishes = breakfast + dinner
-        goal_types = build_nutrition_goal_types({})
-
-        plan = plan_daily_dishes(dishes, 7, "meal-time", self.TARGETS, goal_types, weekdays=[0, 1, 2, 3, 4, 5, 6])
-
-        self.assertEqual(len(plan), 7)
-        for day in plan:
-            breakfast_names = [dishes[index]["name"] for index in day[0]]
-            dinner_names = [dishes[index]["name"] for index in day[2]]
-            self.assertTrue(breakfast_names, "早餐不能空著")
-            self.assertTrue(all(name.startswith("早餐店") for name in breakfast_names), breakfast_names)
-            self.assertTrue(all(name.startswith("晚餐店") for name in dinner_names), dinner_names)
-
-    def test_a_venue_closed_on_that_weekday_is_skipped_only_on_that_day(self):
-        from services.week_seed_service import build_nutrition_goal_types
-
-        # 只有週日（Places day 0）營業的店
-        sunday_only = self._dish("週日限定", [{"day": 0, "open_minute": 0, "close_minute": 24 * 60}])
-        everyday = [self._dish(f"天天開{i}", self._periods(0, 24)) for i in range(4)]
-        dishes = [sunday_only] + everyday
-        goal_types = build_nutrition_goal_types({})
-
-        monday_plan = plan_daily_dishes(dishes, 1, "s", self.TARGETS, goal_types, weekdays=[1])
-        picked = [dishes[index]["name"] for meal in monday_plan[0] for index in meal]
-        self.assertNotIn("週日限定", picked)
-
-    def test_venues_without_opening_hours_stay_available_for_every_meal(self):
-        """營業時間不明就排除的話，資料一缺整份計畫就排不出來。"""
-        from services.week_seed_service import build_nutrition_goal_types
-
-        dishes = [self._dish(f"時間未知{i}", []) for i in range(4)]
-        plan = plan_daily_dishes(dishes, 3, "s", self.TARGETS, build_nutrition_goal_types({}), weekdays=[0, 1, 2])
-        self.assertEqual(len(plan), 3)
-        for day in plan:
-            self.assertTrue(all(meal for meal in day), "每一餐都要有東西吃")
-
-
 class GeminiKeyRotationTests(unittest.TestCase):
     """一把金鑰額度用完或沒權限，不能把後面的金鑰一起拖下水。"""
 
@@ -786,44 +649,6 @@ class GeminiJsonShapeTests(unittest.TestCase):
         from services.nutrition_label_service import extract_json_items
 
         self.assertEqual(extract_json_items('{"error": "no menu"}'), [])
-
-
-class CalorieBandScoringTests(unittest.TestCase):
-    """吃得太少不是達標。只當上限的話，規劃器會靠少吃來過關。"""
-
-    TARGETS = {
-        "calories": 1600, "protein": 50, "carbs": 200, "sugar": 20,
-        "fat": 45, "saturated_fat": 13, "trans_fat": 0, "fiber": 25, "sodium": 2000,
-    }
-
-    @staticmethod
-    def _dish(calories):
-        return {"name": f"{calories}kcal", "calories": calories, "protein": 60, "carbs": 100,
-                "sugar": 5, "fat": 30, "saturated_fat": 8, "trans_fat": 0, "fiber": 30, "sodium": 900}
-
-    def test_a_starvation_day_does_not_count_as_meeting_the_calorie_target(self):
-        from services.week_seed_service import build_nutrition_goal_types
-
-        goal_types = build_nutrition_goal_types({})
-        starved = score_day([self._dish(400)], [0], self.TARGETS, goal_types)
-        self.assertLess(starved[0], len(self.TARGETS))
-
-    def test_a_day_inside_the_band_scores_better_than_one_far_below_it(self):
-        from services.week_seed_service import build_nutrition_goal_types
-
-        goal_types = build_nutrition_goal_types({})
-        dishes = [self._dish(1500), self._dish(400)]
-        in_band = score_day(dishes, [0], self.TARGETS, goal_types)
-        far_below = score_day(dishes, [1], self.TARGETS, goal_types)
-        self.assertGreater(in_band[0], far_below[0])
-
-    def test_going_over_the_ceiling_is_still_a_miss(self):
-        from services.week_seed_service import build_nutrition_goal_types
-
-        goal_types = build_nutrition_goal_types({})
-        over = score_day([self._dish(2400)], [0], self.TARGETS, goal_types)
-        inside = score_day([self._dish(1500)], [0], self.TARGETS, goal_types)
-        self.assertGreater(inside[0], over[0])
 
 
 class OpenNowRecommendationTests(unittest.TestCase):
@@ -1042,59 +867,6 @@ class MenuCacheStalenessTests(unittest.TestCase):
         self.assertTrue(self.storage.restaurant_menu_is_stale(doc, max_age_days=1))
 
 
-class MealCeilingTests(unittest.TestCase):
-    """單餐上限要套在整餐加總，不然配三道就繞過去了。"""
-
-    def _dish(self, name, sodium):
-        return {
-            "name": name, "opening_periods": [],
-            "calories": 300, "protein": 15, "carbs": 40, "sugar": 3,
-            "fat": 8, "saturated_fat": 2, "trans_fat": 0, "fiber": 5, "sodium": sodium,
-        }
-
-    def _ceilings(self, conditions=("hypertension",)):
-        from services.week_seed_service import meal_nutrient_ceilings
-
-        return meal_nutrient_ceilings(
-            {"height": 170, "weight": 65, "health_conditions": list(conditions)},
-            load_disease_rules(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-            load_allergen_taxonomy(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        )
-
-    def test_the_ceiling_is_read_back_from_the_rules_not_hardcoded_again(self):
-        ceilings = self._ceilings()
-        self.assertAlmostEqual(ceilings["sodium"], 600, delta=1)
-
-    def test_a_meal_cannot_stack_three_dishes_past_the_single_meal_ceiling(self):
-        from services.week_seed_service import build_nutrition_goal_types, plan_daily_dishes
-
-        # 每道 250mg 各自都遠低於 600mg，三道加起來 750mg 就超過了
-        dishes = [self._dish(f"鹹食{i}", 250) for i in range(8)]
-        targets = {"calories": 1900, "protein": 60, "carbs": 240, "sugar": 24,
-                   "fat": 53, "saturated_fat": 15, "trans_fat": 0, "fiber": 25, "sodium": 2000}
-        plan = plan_daily_dishes(
-            dishes, 3, "ceilings", targets, build_nutrition_goal_types({}),
-            weekdays=[0, 1, 2], ceilings=self._ceilings(),
-        )
-        for day in plan:
-            for meal in day:
-                total = sum(dishes[index]["sodium"] for index in meal)
-                self.assertLessEqual(total, 600, f"整餐鈉 {total} 超過單餐上限")
-
-    def test_without_ceilings_the_planner_still_works(self):
-        """沒有疾病條件時沒有上限，不該因此排不出東西。"""
-        from services.week_seed_service import build_nutrition_goal_types, plan_daily_dishes
-
-        dishes = [self._dish(f"餐點{i}", 250) for i in range(6)]
-        targets = {"calories": 1900, "protein": 60, "carbs": 240, "sugar": 24,
-                   "fat": 53, "saturated_fat": 15, "trans_fat": 0, "fiber": 25, "sodium": 2000}
-        plan = plan_daily_dishes(dishes, 3, "s", targets, build_nutrition_goal_types({}),
-                                 weekdays=[0, 1, 2], ceilings={})
-        self.assertEqual(len(plan), 3)
-        for day in plan:
-            self.assertTrue(all(meal for meal in day))
-
-
 class FailureClassificationTests(unittest.TestCase):
     """我們自己的程式錯誤不能偽裝成「模型失敗」。"""
 
@@ -1173,101 +945,3 @@ class ActivityLevelTests(unittest.TestCase):
         self.assertEqual(male["bmr"] - female["bmr"], 166)
 
 
-class MealVarietyTests(unittest.TestCase):
-    """餐點池很小時，規劃器排出過「滷豆腐 ＋ 滷豆腐」這樣的一餐。"""
-
-    TARGETS = {
-        "calories": 1900, "protein": 60, "carbs": 240, "sugar": 24,
-        "fat": 53, "saturated_fat": 15, "trans_fat": 0, "fiber": 30, "sodium": 2000,
-    }
-
-    def _dish(self, name, calories=120):
-        return {
-            "name": name, "opening_periods": [],
-            "calories": calories, "protein": 8, "carbs": 12, "sugar": 1,
-            "fat": 4, "saturated_fat": 1, "trans_fat": 0, "fiber": 2, "sodium": 200,
-        }
-
-    def _plan(self, dishes, days=7):
-        from services.week_seed_service import build_nutrition_goal_types, plan_daily_dishes
-
-        return plan_daily_dishes(
-            dishes, days, "variety", self.TARGETS, build_nutrition_goal_types({}),
-            weekdays=list(range(days)),
-        )
-
-    def test_a_meal_never_contains_the_same_dish_twice(self):
-        # 只有三道菜，逼規劃器去補而沒得挑
-        dishes = [self._dish(f"小菜{i}") for i in range(3)]
-        for day in self._plan(dishes):
-            for meal in day:
-                self.assertEqual(len(meal), len(set(meal)), f"同一餐重複了：{meal}")
-
-    def test_it_still_fills_every_meal_when_choices_run_out(self):
-        """不能為了不重複就讓某一餐空著。"""
-        dishes = [self._dish("唯一的菜")]
-        for day in self._plan(dishes, days=3):
-            for meal in day:
-                self.assertTrue(meal)
-
-    def test_a_day_prefers_dishes_it_has_not_used_yet(self):
-        dishes = [self._dish(f"小菜{i}") for i in range(6)]
-        for day in self._plan(dishes, days=3):
-            flat = [index for meal in day for index in meal]
-            self.assertGreaterEqual(len(set(flat)), 3, f"一天內的菜色太集中：{flat}")
-
-
-class HumanMealTimeTests(unittest.TestCase):
-    """七天每一餐都分秒不差，一看就知道是機器產的。"""
-
-    SEED = "user-a:recommend:2026-09-06"
-
-    def _times(self, days=7):
-        from datetime import date, timedelta
-
-        from services.week_seed_service import MEAL_ORDER, meal_time
-
-        start = date(2026, 8, 31)
-        return [
-            [meal_time(self.SEED, start + timedelta(days=i), meal) for meal in MEAL_ORDER]
-            for i in range(days)
-        ]
-
-    def test_the_same_seed_gives_the_same_times(self):
-        """灌入可以重跑，時間每次都變的話前後就對不起來。"""
-        self.assertEqual(self._times(), self._times())
-
-    def test_meal_times_are_not_identical_across_the_week(self):
-        breakfasts = {day[0] for day in self._times()}
-        self.assertGreater(len(breakfasts), 3, f"七天早餐只有 {len(breakfasts)} 種時間")
-
-    def test_each_meal_stays_inside_its_window(self):
-        from services.week_seed_service import MEAL_ORDER, MEAL_WINDOWS
-
-        for day in self._times():
-            for index, (hour, minute) in enumerate(day):
-                window = MEAL_WINDOWS[MEAL_ORDER[index]]
-                low = window[0][0] * 60 + window[0][1]
-                high = window[1][0] * 60 + window[1][1]
-                self.assertTrue(low <= hour * 60 + minute <= high, f"{MEAL_ORDER[index]} {hour}:{minute}")
-
-    def test_meals_stay_in_order_within_a_day(self):
-        """晚餐不能排在午餐之前。"""
-        for day in self._times():
-            minutes = [hour * 60 + minute for hour, minute in day]
-            self.assertEqual(minutes, sorted(minutes), day)
-
-    def test_times_land_on_five_minute_marks(self):
-        for day in self._times():
-            for _, minute in day:
-                self.assertEqual(minute % 5, 0)
-
-    def test_a_different_user_eats_at_different_times(self):
-        from datetime import date
-
-        from services.week_seed_service import meal_time
-
-        day = date(2026, 9, 1)
-        mine = [meal_time(self.SEED, day, m) for m in ("早餐", "午餐", "晚餐")]
-        theirs = [meal_time("user-b:recommend:2026-09-06", day, m) for m in ("早餐", "午餐", "晚餐")]
-        self.assertNotEqual(mine, theirs)

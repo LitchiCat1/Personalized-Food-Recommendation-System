@@ -507,24 +507,6 @@ export async function fetchHealthyFoodRecommendations(
   }
 }
 
-export type WeekSeedSource = 'recommend' | 'curated'; // curated 只保留給清除舊資料用
-
-export type WeekSeedSummary = {
-  message: string;
-  days: number;
-  records: number;
-  created: number;
-  replaced: number;
-  dishes_available: number;
-  restaurants: number;
-  fully_compliant_days: number;
-  conditions: string[];
-  data_source: 'google_places' | 'local_catalog' | 'local_catalog_fallback';
-  note: string;
-  start_date: string;
-  end_date: string;
-};
-
 export type VenueIndexSummary = {
   message: string;
   found: number;
@@ -586,40 +568,6 @@ export async function indexNearbyVenues(
       limit: params.limit ?? 20,
     }),
   });
-}
-
-export async function seedWeekRecords(
-  apiBaseUrl: string,
-  userId: string,
-  params: { source: WeekSeedSource; days?: number; budget?: number; lat?: number; lng?: number; radiusKm?: number; category?: string },
-  auth?: ApiAuth
-): Promise<WeekSeedSummary> {
-  return fetchJsonWithNetworkMessage<WeekSeedSummary>(`${apiBaseUrl}/seed/week-records/${encodeURIComponent(userId)}`, {
-    method: 'POST',
-    headers: buildHeaders(auth, 'application/json'),
-    body: JSON.stringify({
-      source: params.source,
-      days: params.days ?? 7,
-      budget: params.budget ?? 150,
-      lat: params.lat,
-      lng: params.lng,
-      radius_km: params.radiusKm,
-      category: params.category,
-    }),
-  });
-}
-
-export async function clearWeekRecords(
-  apiBaseUrl: string,
-  userId: string,
-  params: { source: WeekSeedSource; days?: number },
-  auth?: ApiAuth
-): Promise<{ message: string; removed: number; source: WeekSeedSource }> {
-  const query = new URLSearchParams({ source: params.source, days: String(params.days ?? 7) });
-  return fetchJsonWithNetworkMessage<{ message: string; removed: number; source: WeekSeedSource }>(
-    `${apiBaseUrl}/seed/week-records/${encodeURIComponent(userId)}?${query.toString()}`,
-    { method: 'DELETE', headers: buildHeaders(auth) }
-  );
 }
 
 export async function fetchRestaurantAiSummary(

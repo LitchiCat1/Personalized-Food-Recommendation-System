@@ -300,7 +300,7 @@ def _fetch_new_places_api(lat: float, lng: float, radius_m: float, key: str, max
                     # 連已歇業的店也是，而且還白拿排序的營業加分。沒拿到資料就留空。
                     "opening_hours": p.get("currentOpeningHours") or {},
                     "business_status": p.get("businessStatus", ""),
-                    # 每週固定營業時段。灌入七天要按用餐時間挑店，
+                    # 每週固定營業時段。推薦要判斷店家現在有沒有開，
                     # currentOpeningHours 只說「現在」開不開，撐不起這件事。
                     "regular_opening_hours": p.get("regularOpeningHours") or {},
                     "types": p.get("types", []),

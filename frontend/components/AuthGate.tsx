@@ -52,6 +52,35 @@ const FALLBACK_ACTIVITY_LEVELS = [
   { id: 'very_active', label_zh: '極高活動（勞力工作或每日訓練）', multiplier: 1.9 },
 ];
 
+// Supabase 回的是英文，而且斷網時只會給 "Failed to fetch"。
+// 直接照抄到畫面上，使用者不知道自己該做什麼。
+function describeAuthError(error: any, fallback: string) {
+  const raw = String(error?.message || '').toLowerCase();
+  if (!raw) return fallback;
+  if (raw.includes('failed to fetch') || raw.includes('network')) {
+    return '連不到伺服器，請確認網路連線後再試一次。';
+  }
+  if (raw.includes('invalid login credentials')) {
+    return 'Email 或密碼不對。忘記密碼的話可以按下面的「忘記密碼？」。';
+  }
+  if (raw.includes('email not confirmed')) {
+    return '這個 Email 還沒完成驗證，請先到信箱點開驗證信。';
+  }
+  if (raw.includes('user already registered') || raw.includes('already been registered')) {
+    return '這個 Email 已經註冊過了，請直接登入。';
+  }
+  if (raw.includes('password should be at least')) {
+    return '密碼太短了，請至少 6 個字元。';
+  }
+  if (raw.includes('unable to validate email') || raw.includes('invalid email')) {
+    return 'Email 格式不對，請再確認一次。';
+  }
+  if (raw.includes('rate limit') || raw.includes('too many')) {
+    return '嘗試次數太多，請等幾分鐘後再試。';
+  }
+  return fallback;
+}
+
 function buildInitialDraft(email?: string | null) {
   const fallbackName = email?.split('@')[0] || '';
   return {
@@ -253,7 +282,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       if (error) throw error;
       setMessage(`重設密碼的連結已寄到 ${address}，請到信箱點開連結。`);
     } catch (error: any) {
-      setMessage(error?.message || '寄送重設信失敗，請稍後再試。');
+      setMessage(describeAuthError(error, '寄送重設信失敗，請稍後再試。'));
     } finally {
       setBusy(false);
     }
@@ -275,7 +304,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         setMessage('請到信箱完成驗證後再登入。');
       }
     } catch (error: any) {
-      setMessage(error?.message || '驗證失敗，請稍後再試。');
+      setMessage(describeAuthError(error, mode === 'login' ? '登入失敗，請稍後再試。' : '註冊失敗，請稍後再試。'));
     } finally {
       setBusy(false);
     }

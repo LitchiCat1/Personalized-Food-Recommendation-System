@@ -938,3 +938,29 @@ class VenueIndexListingTests(ApiTestBase):
             ).get_json()
         self.assertEqual(data["count"], 0)
         self.assertEqual(data["venues"], [])
+
+
+class AllowedOriginNormalisationTests(unittest.TestCase):
+    """Render 給的是不帶協定的主機名，CORS 比對的是完整 origin。"""
+
+    def setUp(self):
+        import app as app_module
+
+        self.normalise = app_module._normalise_origin
+
+    def test_a_bare_hostname_becomes_an_https_origin(self):
+        self.assertEqual(self.normalise("nutrilens-web.onrender.com"), "https://nutrilens-web.onrender.com")
+
+    def test_an_explicit_scheme_is_left_alone(self):
+        self.assertEqual(self.normalise("https://example.com"), "https://example.com")
+        self.assertEqual(self.normalise("http://example.com"), "http://example.com")
+
+    def test_localhost_stays_on_http(self):
+        self.assertEqual(self.normalise("localhost:8081"), "http://localhost:8081")
+
+    def test_a_trailing_slash_is_dropped(self):
+        """origin 比對不含結尾斜線，多一個就永遠對不上。"""
+        self.assertEqual(self.normalise("https://example.com/"), "https://example.com")
+
+    def test_blank_entries_are_dropped(self):
+        self.assertEqual(self.normalise("   "), "")

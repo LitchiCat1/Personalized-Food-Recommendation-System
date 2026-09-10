@@ -106,14 +106,29 @@ app = Flask(__name__)
 
 # CORS 先前是完全開放的：任何網站都能從瀏覽器呼叫這個後端，包括會花錢的
 # 那幾條路由。預設只允許自己的前端，要多開就用 ALLOWED_ORIGINS 明確列出。
+def _normalise_origin(value: str) -> str:
+    """接受 `example.com` 或 `https://example.com` 都算數。
+
+    Render 的 RENDER_EXTERNAL_HOSTNAME 給的是不帶協定的主機名，而 CORS 比對的
+    是完整 origin。不補協定的話，貼上主機名看起來設定好了，實際仍會被擋。
+    """
+    value = value.strip().rstrip("/")
+    if not value:
+        return ""
+    if value.startswith(("http://", "https://")):
+        return value
+    local = value.startswith(("localhost", "127.0.0.1"))
+    return f"{'http' if local else 'https'}://{value}"
+
+
 _allowed_origins = [
-    origin.strip()
+    normalised
     for origin in os.environ.get("ALLOWED_ORIGINS", "").split(",")
-    if origin.strip()
+    if (normalised := _normalise_origin(origin))
 ]
 if _allowed_origins:
     CORS(app, origins=_allowed_origins, supports_credentials=True)
-    print(f"[OK] CORS restricted to {len(_allowed_origins)} origin(s)")
+    print(f"[OK] CORS 只放行：{', '.join(_allowed_origins)}")
 else:
     # 沒設定時放行本機開發，外加本專案自己的前端。列成具名清單而不是萬用字元：
     # 「任何 onrender.com」等於誰都能在 Render 上架個網站來打這個後端。
@@ -124,7 +139,11 @@ else:
         "https://nutrilens-frontend-32ob.onrender.com",
         "https://personalized-food-recommendation-frontend-rt1v.onrender.com",
     ])
-    print("[WARN] ALLOWED_ORIGINS 未設定，改用內建的前端清單。換網址時請設定它。")
+    print(
+        "[WARN] ALLOWED_ORIGINS 未設定，改用內建的前端清單。"
+        "新部署的前端會拿到新網址，不在清單內就會被 CORS 擋掉——"
+        "請把前端網址設進 ALLOWED_ORIGINS。"
+    )
 
 # 會呼叫 Gemini / Google Places 的路由要限流，那些都是按次計費的
 _paid_api_limiter = build_limiter("RATE_LIMIT_PAID_CALLS", 12)

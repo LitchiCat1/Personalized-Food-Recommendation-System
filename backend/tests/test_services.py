@@ -924,6 +924,21 @@ class ActivityLevelTests(unittest.TestCase):
         self.assertLess(sedentary["tdee"], very_active["tdee"])
         self.assertEqual(sedentary["tdee"], round(sedentary["bmr"] * 1.2))
 
+    def test_onboarding_may_omit_the_calorie_target(self):
+        """初次設定不再問「每日目標熱量」，改由 BMR × 活動係數 算出來。
+
+        表單少一個欄位是因為這個預設值成立；如果哪天不成立了，
+        新帳號會拿到寫死的 2100 kcal，這條測試要先爆掉。
+        """
+        from services.profile_service import build_user_profile
+
+        profile = build_user_profile({
+            "user_id": "u", "gender": "female", "height": 157, "weight": 50,
+            "age": 22, "activity_level": "moderate",
+        })
+        self.assertEqual(profile["daily_calorie_target"], profile["tdee"])
+        self.assertNotEqual(profile["daily_calorie_target"], 2100)
+
     def test_the_reported_level_matches_the_multiplier_actually_used(self):
         """先前 activity_level 是照抄輸入的，可能跟生效的係數對不上。"""
         from services.profile_service import build_user_profile

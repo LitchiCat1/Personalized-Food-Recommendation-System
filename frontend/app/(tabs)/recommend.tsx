@@ -21,6 +21,7 @@ import {
   fetchHealthyFoodRecommendations,
   fetchRestaurantAiSummary,
   fetchRestaurantDetailedMenu,
+  indexNearbyVenues,
   type HealthyFoodRestaurant,
   type RestaurantAiSummary,
   type HealthyFoodResponse,
@@ -66,6 +67,7 @@ export default function RecommendScreen() {
   const [photoSourceTarget, setPhotoSourceTarget] = useState<HealthyFoodRestaurant | null>(null);
   const [menuUploadFeedback, setMenuUploadFeedback] = useState<{ tone: 'success' | 'error'; title: string; message?: string } | null>(null);
   const [pageFeedback, setPageFeedback] = useState<{ tone: 'success' | 'error'; title: string; message?: string } | null>(null);
+  const [indexingVenues, setIndexingVenues] = useState(false);
 
   const captureMenuPhoto = async (source: 'camera' | 'library'): Promise<string | null> => {
     if (source === 'camera') {
@@ -284,11 +286,43 @@ export default function RecommendScreen() {
         setViewingMenuRest((prev: HealthyFoodRestaurant | null) =>
           prev ? { ...prev, recommended_items: response.recommended_items, filtered_items: response.filtered_items } : null
         );
-      } catch (err) {
-        console.log('Failed to fetch detailed menu:', err);
+      } catch (err: any) {
+        // 先前這裡只有 console.log，使用者看到的是一個永遠空白的菜單視窗。
+        setMenuUploadFeedback({
+          tone: 'error',
+          title: '這家店還沒有可比對的菜單',
+          message: err?.message || '可以直接拍一張菜單照片上傳，之後就能逐道菜過濾。',
+        });
       } finally {
         setMenuLoading(false);
       }
+    }
+  };
+
+  // 沒建檔就只能用店名比對疾病禁忌，這是整個推薦最大的落差。
+  // 原本建檔入口埋在「我的」分頁，這裡直接做，做完重跑一次搜尋。
+  const handleIndexNearby = async () => {
+    setIndexingVenues(true);
+    setPageFeedback(null);
+    try {
+      const location = await resolveLocation();
+      const summary = await indexNearbyVenues(
+        apiBaseUrl,
+        user.userId,
+        { budget: Number(budget) || 150, lat: location.lat, lng: location.lng, radiusKm, category },
+        { accessToken }
+      );
+      const rest = summary.remaining ? `，還有 ${summary.remaining} 家沒建，可以再按一次` : '';
+      setPageFeedback({
+        tone: summary.analysed > 0 || summary.already_cached > 0 ? 'success' : 'error',
+        title: `本次建檔 ${summary.analysed} 家，先前已建檔 ${summary.already_cached} 家${rest}`,
+        message: summary.failed ? `${summary.failed} 家菜單分析失敗，稍後可以再試。` : undefined,
+      });
+      await handleHealthyFoodSearch();
+    } catch (err: any) {
+      setPageFeedback({ tone: 'error', title: '建立菜單檔案失敗', message: err?.message });
+    } finally {
+      setIndexingVenues(false);
     }
   };
 
@@ -359,8 +393,11 @@ export default function RecommendScreen() {
             {healthyError ? (
               <View style={styles.apiErrorBox}>
                 <Text style={styles.errorText}>{healthyError}</Text>
-                <Text style={styles.errorMeta}>API：{apiBaseUrl}</Text>
-                <Text style={styles.errorMeta}>登入狀態：{accessToken ? 'Bearer token 已載入' : '尚未載入 Bearer token'}</Text>
+                {/* 先前這裡直接印出後端網址與 Bearer token 狀態，
+                    對使用者沒有意義，也把伺服器位址攤在畫面上。 */}
+                <Text style={styles.errorMeta}>
+                  {accessToken ? '請確認網路連線後再按一次「更新地圖」。' : '你的登入可能已過期，請重新登入後再試。'}
+                </Text>
               </View>
             ) : null}
           </SectionBlock>
@@ -373,9 +410,18 @@ export default function RecommendScreen() {
           ) : null}
 
           {healthyData?.nutrition_note ? (
-            <View style={styles.openingNotice}>
-              <Ionicons name="information-circle-outline" size={15} color={Palette.text.secondary} />
-              <Text style={styles.openingNoticeText}>{healthyData.nutrition_note}</Text>
+            <View style={styles.nutritionNotice}>
+              <View style={styles.openingNotice}>
+                <Ionicons name="information-circle-outline" size={15} color={Palette.text.secondary} />
+                <Text style={styles.openingNoticeText}>{healthyData.nutrition_note}</Text>
+              </View>
+              {healthyData.nutrition_available ? null : (
+                <SecondaryButton
+                  label={indexingVenues ? '建檔中…' : '建立附近店家菜單檔案'}
+                  onPress={handleIndexNearby}
+                  disabled={indexingVenues}
+                />
+              )}
             </View>
           ) : null}
 
@@ -719,6 +765,10 @@ function NutritionMini({ label, value, color }: { label: string; value: string; 
 
 const styles = StyleSheet.create({
   emptyText: { ...Typography.body, color: Palette.text.tertiary, textAlign: 'center' },
+  nutritionNotice: {
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
   openingNotice: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
     backgroundColor: Palette.bg.card, borderRadius: Radius.lg, padding: Spacing.md,

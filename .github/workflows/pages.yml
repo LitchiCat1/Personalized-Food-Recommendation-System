@@ -40,6 +40,13 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Enable GitHub Pages
+        # 沒有這步就得有人先到 Settings → Pages 手動把來源設成 GitHub Actions，
+        # 否則 build 成功、deploy 卻找不到網站可以部署。
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       - name: Install dependencies
         run: npm ci
 

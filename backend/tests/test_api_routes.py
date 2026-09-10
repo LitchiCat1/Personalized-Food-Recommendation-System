@@ -139,6 +139,83 @@ class ApiRouteTests(ApiTestBase):
         self.assertEqual(data["menu_recognition"]["recognition_status"], "error")
         self.assertIn("429", data["menu_recognition"]["recognition_error"])
 
+    def test_menu_route_blocks_a_dish_the_disease_rules_reject(self):
+        """/restaurant/menu 必須真的擋掉疾病禁忌，不是只擋超出預算的。
+
+        先前這裡判斷的是 medical_risk.get("action") == "BLOCK"，
+        但 evaluate_medical_risk 沒有 action 這個鍵，所以恆為 False：
+        一份 1500mg 鈉的炸雞排會被放進推薦區，旁邊還寫「判定依據：
+        符合單餐預算」，而算好的 block_reasons 整個被丟掉。
+        user-a 在 setUp 裡就有高血壓。
+        """
+        parsed = {
+            "items": [
+                {
+                    "item_id": "salty",
+                    "name": "炸雞排便當",
+                    "price": 100,          # 預算內，所以只有疾病規則能擋它
+                    "calories": 700,
+                    "protein": 30,
+                    "carbs": 60,
+                    "fat": 30,
+                    "sugar": 3,
+                    "saturated_fat": 8,
+                    "trans_fat": 2.0,
+                    "fiber": 3,
+                    "sodium": 1500,
+                    "is_fried": True,
+                },
+                {
+                    "item_id": "mild",
+                    "name": "清蒸雞肉飯",
+                    "price": 100,
+                    "calories": 500,
+                    "protein": 25,
+                    "carbs": 55,
+                    "fat": 10,
+                    "sugar": 2,
+                    "saturated_fat": 3,
+                    "trans_fat": 0,
+                    "fiber": 5,
+                    "sodium": 400,
+                    "is_fried": False,
+                },
+            ],
+        }
+
+        # 先建檔進菜單快取，路由就會直接讀它，不會去呼叫 Gemini。
+        self.app_module.storage.save_restaurant_menu(
+            "重鹹便當店", parsed["items"], venue={"address": "台北市", "lat": 25.03, "lng": 121.56}
+        )
+
+        with self.mock_auth("user-a"):
+            response = self.client.post(
+                "/restaurant/menu",
+                json={
+                    "restaurant_id": "sodium-test",
+                    "name": "重鹹便當店",
+                    "user_id": "user-a",
+                    "budget": 150,
+                },
+                headers=self.auth_headers(),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        recommended = [item["item_name"] for item in data["recommended_items"]]
+        filtered = [item["item_name"] for item in data["filtered_items"]]
+
+        self.assertNotIn("炸雞排便當", recommended)
+        self.assertIn("炸雞排便當", filtered)
+        self.assertIn("清蒸雞肉飯", recommended)
+
+        blocked = next(item for item in data["filtered_items"] if item["item_name"] == "炸雞排便當")
+        self.assertTrue(blocked["reasons"], "被擋下來卻沒有給任何理由")
+        self.assertTrue(
+            any("鈉" in reason for reason in blocked["reasons"]),
+            f"理由裡沒有提到鈉：{blocked['reasons']}",
+        )
+
     def test_record_route_deduplicates_client_record_id(self):
         payload = {
             "user_id": "user-a",

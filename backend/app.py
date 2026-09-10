@@ -906,12 +906,17 @@ def get_restaurant_menu():
         }
         medical_risk = evaluate_medical_risk(candidate, conditions, allergens, DISEASE_RULES, ALLERGEN_TAXONOMY, user_profile=user)
         is_over_budget = item.get("price", 0) > budget
-        is_blocked = medical_risk.get("action") == "BLOCK" or is_over_budget
-        
+
         block_reasons = []
         if is_over_budget:
             block_reasons.append(f"超出預算 {budget} 元")
         block_reasons.extend(medical_risk.get("block_reasons", []))
+
+        # 先前這裡是 medical_risk.get("action") == "BLOCK"，但 evaluate_medical_risk
+        # 從來沒有回傳過 action 這個鍵，所以整條疾病過濾在這個路徑上是死的：
+        # 只有超出預算會被擋，算好的 block_reasons 接著被丟掉。
+        # healthy_food_service 一直都是用 block_reasons 判斷的。
+        is_blocked = bool(block_reasons)
         
         if is_blocked:
             filtered_items.append({
@@ -924,7 +929,8 @@ def get_restaurant_menu():
             })
         else:
             # 計算個人化契合度分數
-            base_score = 92 if medical_risk.get("action") == "ALLOW" else 78
+            # 同一個不存在的鍵，這裡讓分數永遠是 78。
+            base_score = 92 if medical_risk["is_safe"] and not medical_risk["has_caution"] else 78
             item_cal = float(item.get("calories", 0) or 0)
             cal_diff = abs(target_calories - item_cal)
             cal_score = max(0, 10 - int(cal_diff / 40))

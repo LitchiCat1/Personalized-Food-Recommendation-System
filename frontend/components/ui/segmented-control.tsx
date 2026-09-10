@@ -46,7 +46,7 @@ function Segment({ label, active, onPress }: { label: string; active: boolean; o
       onPress={onPress}
       accessibilityRole="tab"
       accessibilityLabel={label}
-      accessibilityState={{ selected: active }}
+      aria-selected={active}
       style={styles.segment}
     >
       <Animated.View style={[styles.segmentInner, active && styles.active, animatedStyle]}>

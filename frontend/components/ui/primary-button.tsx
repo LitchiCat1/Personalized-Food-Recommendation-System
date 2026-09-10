@@ -45,7 +45,7 @@ export default function PrimaryButton({ label, onPress, tone = 'green', icon, di
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={label}
-        accessibilityState={{ disabled: Boolean(disabled) }}
+        aria-disabled={Boolean(disabled)}
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
         disabled={disabled}

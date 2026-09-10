@@ -65,7 +65,7 @@ export default function DatePicker({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`選擇${label}，目前為 ${selectedDateKey ? formatAccessibleDate(selectedDateKey) : '尚未選擇'}`}
-        accessibilityState={{ disabled: Boolean(disabled), expanded: visible }}
+        aria-disabled={Boolean(disabled)} aria-expanded={visible}
         disabled={disabled}
         onPress={openCalendar}
         style={({ pressed }) => [
@@ -90,7 +90,7 @@ export default function DatePicker({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="上一個月"
-                accessibilityState={{ disabled: previousMonthDisabled }}
+                aria-disabled={previousMonthDisabled}
                 disabled={previousMonthDisabled}
                 onPress={() => changeMonth(-1)}
                 style={({ pressed }) => [styles.navigationButton, pressed && styles.pressed, previousMonthDisabled && styles.disabled]}
@@ -101,7 +101,7 @@ export default function DatePicker({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="下一個月"
-                accessibilityState={{ disabled: nextMonthDisabled }}
+                aria-disabled={nextMonthDisabled}
                 disabled={nextMonthDisabled}
                 onPress={() => changeMonth(1)}
                 style={({ pressed }) => [styles.navigationButton, pressed && styles.pressed, nextMonthDisabled && styles.disabled]}
@@ -132,7 +132,7 @@ export default function DatePicker({
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={`選擇 ${formatAccessibleDate(dateKey)}`}
-                      accessibilityState={{ disabled: dayDisabled, selected }}
+                      aria-disabled={dayDisabled} aria-selected={selected}
                       disabled={dayDisabled}
                       onPress={() => selectDate(dateKey)}
                       style={({ pressed }) => [

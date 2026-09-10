@@ -59,7 +59,7 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
                 disabled={controlsDisabled}
                 accessibilityRole="button"
                 accessibilityLabel={`${food.foodName} 減少 10 克`}
-                accessibilityState={{ disabled: controlsDisabled }}
+                aria-disabled={controlsDisabled}
                 style={[styles.portionButton, controlsDisabled && styles.controlDisabled]}
               >
                 <Text style={styles.portionButtonText}>-10g</Text>
@@ -81,7 +81,7 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
                 disabled={controlsDisabled}
                 accessibilityRole="button"
                 accessibilityLabel={`${food.foodName} 增加 10 克`}
-                accessibilityState={{ disabled: controlsDisabled }}
+                aria-disabled={controlsDisabled}
                 style={[styles.portionButton, controlsDisabled && styles.controlDisabled]}
               >
                 <Text style={styles.portionButtonText}>+10g</Text>
@@ -92,7 +92,7 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
                   disabled={controlsDisabled}
                   accessibilityRole="button"
                   accessibilityLabel={`${food.foodName} 還原估算份量`}
-                  accessibilityState={{ disabled: controlsDisabled }}
+                  aria-disabled={controlsDisabled}
                   style={[styles.resetButton, controlsDisabled && styles.controlDisabled]}
                 >
                   <Text style={styles.resetButtonText}>還原</Text>

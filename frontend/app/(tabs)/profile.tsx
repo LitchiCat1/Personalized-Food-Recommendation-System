@@ -452,7 +452,7 @@ export default function ProfileScreen() {
                 key={cond.id}
                 accessibilityRole="checkbox"
                 accessibilityLabel={cond.label_zh}
-                accessibilityState={{ checked: isActive }}
+                aria-checked={isActive}
                 onPress={() => {
                   const nextConditions = isActive
                     ? user.healthConditions.filter((c) => c !== cond.id && c !== cond.label_zh)
@@ -492,7 +492,7 @@ export default function ProfileScreen() {
                 key={allergen.id}
                 accessibilityRole="checkbox"
                 accessibilityLabel={allergen.label_zh}
-                accessibilityState={{ checked: isActive }}
+                aria-checked={isActive}
                 onPress={() => {
                   const nextAllergens = isActive
                     ? user.allergens.filter((a) => a !== allergen.id && a !== allergen.label_zh)
@@ -604,7 +604,7 @@ Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini �
                         key={value}
                         accessibilityRole="radio"
                         accessibilityLabel={label}
-                        accessibilityState={{ checked: active }}
+                        aria-checked={active}
                         onPress={() => updateDraft('gender', value)}
                         style={[styles.dietOption, active && styles.dietOptionActive]}
                       >
@@ -627,7 +627,7 @@ Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini �
                         key={level.id}
                         accessibilityRole="radio"
                         accessibilityLabel={level.label_zh}
-                        accessibilityState={{ checked: active }}
+                        aria-checked={active}
                         onPress={() => {
                           updateDraft('activityLevel', level.label_zh);
                           updateDraft('activityMultiplier', level.multiplier);
@@ -654,7 +654,7 @@ Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini �
                         key={option}
                         accessibilityRole="radio"
                         accessibilityLabel={option}
-                        accessibilityState={{ checked: active }}
+                        aria-checked={active}
                         onPress={() => updateDraft('dietType', option)}
                         style={[styles.dietOption, active && styles.dietOptionActive]}
                       >

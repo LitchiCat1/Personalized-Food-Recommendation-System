@@ -35,7 +35,7 @@ export default function DesktopSidebar() {
               <Pressable
                 accessibilityRole="tab"
                 accessibilityLabel={`前往${item.label}`}
-                accessibilityState={{ selected: active }}
+                aria-selected={active}
                 style={({ pressed }) => [styles.navItem, active && styles.navItemActive, pressed && styles.navItemPressed]}
               >
                 <Text style={[styles.navIndex, active && styles.navActiveText]}>{String(index + 1).padStart(2, '0')}</Text>

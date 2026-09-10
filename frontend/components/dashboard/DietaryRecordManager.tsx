@@ -558,7 +558,7 @@ function RecordCard({ record, deleting, onEdit, onDelete }: {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`刪除 ${getRecordFoodNames(record)}`}
-          accessibilityState={{ disabled: deleting }}
+          aria-disabled={deleting}
           disabled={deleting}
           onPress={onDelete}
           style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed, deleting && styles.disabled]}
@@ -697,7 +697,7 @@ function RecordFoodFields({ title, draft, errors, foodIndex, disabled, isNarrow,
       <Pressable
         accessibilityRole="checkbox"
         accessibilityLabel="油炸食物"
-        accessibilityState={{ checked: draft.is_fried === 'true', disabled }}
+        aria-checked={draft.is_fried === 'true'} aria-disabled={disabled}
         disabled={disabled}
         onPress={() => onChange('is_fried', draft.is_fried === 'true' ? 'false' : 'true')}
         style={({ pressed }) => [
@@ -760,7 +760,7 @@ function DeleteConfirmation({ record, deleting, error, onCancel, onConfirm }: {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="確認刪除飲食紀錄"
-              accessibilityState={{ disabled: deleting }}
+              aria-disabled={deleting}
               disabled={deleting}
               onPress={onConfirm}
               style={({ pressed }) => [styles.confirmDeleteButton, pressed && styles.pressed, deleting && styles.disabled]}

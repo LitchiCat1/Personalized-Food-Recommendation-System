@@ -384,7 +384,7 @@ export default function RecommendScreen() {
             <Text style={styles.optionLabel}>店家類型</Text>
             <View style={styles.categoryWrap}>
               {CATEGORY_OPTIONS.map((option) => (
-                <Pressable key={option.value} accessibilityRole="button" accessibilityState={{ selected: category === option.value }} onPress={() => setCategory(option.value)} style={[styles.categoryChip, category === option.value && styles.categoryChipActive]}>
+                <Pressable key={option.value} accessibilityRole="button" aria-selected={category === option.value} onPress={() => setCategory(option.value)} style={[styles.categoryChip, category === option.value && styles.categoryChipActive]}>
                   <Text style={[styles.categoryText, category === option.value && styles.categoryTextActive]}>{option.label}</Text>
                 </Pressable>
               ))}

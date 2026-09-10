@@ -363,7 +363,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 key={gender}
                 accessibilityRole="radio"
                 accessibilityLabel={gender === 'male' ? '男性' : '女性'}
-                accessibilityState={{ selected: profileDraft.gender === gender }}
+                aria-selected={profileDraft.gender === gender}
                 onPress={() => updateProfileDraft('gender', gender)}
                 style={[styles.genderButton, profileDraft.gender === gender && styles.genderButtonActive]}
               >
@@ -399,7 +399,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 key={level.id}
                 accessibilityRole="radio"
                 accessibilityLabel={level.label_zh}
-                accessibilityState={{ selected: profileDraft.activityLevel === level.id }}
+                aria-selected={profileDraft.activityLevel === level.id}
                 onPress={() => updateProfileDraft('activityLevel', level.id)}
                 style={[styles.optionRow, profileDraft.activityLevel === level.id && styles.optionRowActive]}
               >
@@ -418,7 +418,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                     key={condition.id}
                     accessibilityRole="checkbox"
                     accessibilityLabel={condition.label_zh || condition.id}
-                    accessibilityState={{ checked: picked }}
+                    aria-checked={picked}
                     onPress={() => setSelectedConditions((current) => toggleFrom(current, condition.id))}
                     style={[styles.chip, picked && styles.chipActive]}
                   >
@@ -441,7 +441,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                     key={allergen.id}
                     accessibilityRole="checkbox"
                     accessibilityLabel={allergen.label_zh || allergen.id}
-                    accessibilityState={{ checked: picked }}
+                    aria-checked={picked}
                     onPress={() => setSelectedAllergens((current) => toggleFrom(current, allergen.id))}
                     style={[styles.chip, picked && styles.chipActive]}
                   >
@@ -463,7 +463,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="完成並進入 App"
-            accessibilityState={{ disabled: savingProfile, busy: savingProfile }}
+            aria-disabled={savingProfile} aria-busy={savingProfile}
             disabled={savingProfile}
             onPress={submitInitialProfile}
             style={[styles.primaryButton, savingProfile && styles.disabledButton]}
@@ -537,7 +537,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={mode === 'login' ? '登入' : '註冊'}
-          accessibilityState={{ disabled: busy, busy }}
+          aria-disabled={busy} aria-busy={busy}
           disabled={busy}
           onPress={submit}
           style={[styles.primaryButton, busy && styles.disabledButton]}

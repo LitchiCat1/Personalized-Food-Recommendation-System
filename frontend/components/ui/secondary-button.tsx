@@ -30,7 +30,7 @@ export default function SecondaryButton({ label, onPress, icon, active, disabled
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={label}
-        accessibilityState={{ selected: Boolean(active), disabled: Boolean(disabled) }}
+        aria-selected={Boolean(active)} aria-disabled={Boolean(disabled)}
         disabled={disabled}
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}

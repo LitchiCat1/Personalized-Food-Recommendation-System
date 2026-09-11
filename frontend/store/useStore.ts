@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import { getAutoMealType, normalizeMealType } from '@/lib/meal';
+import { MEALS_PER_DAY, getAutoMealType, normalizeMealType } from '@/lib/meal';
 import { toggleSelection } from '@/lib/safety-selection';
 import type { DetectedFood, MealEntry, HealthAlert } from '@/constants/mock-data';
 import {
@@ -309,7 +309,8 @@ export const useStore = create<NutriLensState>((set, get) => ({
       const totals = sumMeals(todayMeals);
       const sodiumTarget = targets?.sodium ?? state.dailyNutrition.sodium.target;
       const proteinTarget = targets?.protein ?? state.dailyNutrition.protein.target;
-      const healthAlerts = buildHealthAlerts(totals, sodiumTarget, proteinTarget);
+      const calorieTarget = targets?.calories ?? state.user.dailyCalorieTarget;
+      const healthAlerts = buildHealthAlerts(totals, sodiumTarget, proteinTarget, calorieTarget, todayMeals.length);
 
       return {
         todayMeals,
@@ -464,8 +465,28 @@ function sumMeals(meals: MealEntry[]) {
   };
 }
 
-function buildHealthAlerts(totals: ReturnType<typeof sumMeals>, sodiumTarget: number, proteinTarget: number): HealthAlert[] {
+function buildHealthAlerts(
+  totals: ReturnType<typeof sumMeals>,
+  sodiumTarget: number,
+  proteinTarget: number,
+  calorieTarget: number,
+  mealCount: number,
+): HealthAlert[] {
   const alerts: HealthAlert[] = [];
+
+  // 吃太少一樣是風險。先前這裡只檢查「有沒有超過」，所以整天只吃到目標的
+  // 六成也會顯示「目前沒有需要優先處理的飲食警示」。等三餐都記錄完才提醒，
+  // 免得早餐剛記完就跳「熱量不足」。
+  if (mealCount >= MEALS_PER_DAY && calorieTarget > 0 && totals.calories < calorieTarget * 0.8) {
+    alerts.push({
+      id: 'calories-short',
+      type: 'warning',
+      title: '今天熱量可能不夠',
+      message: `三餐合計 ${Math.round(totals.calories)} kcal，離每日目標 ${Math.round(calorieTarget)} kcal 還差 ${Math.round(calorieTarget - totals.calories)} kcal。`,
+      icon: '🍚',
+    });
+  }
+
   if (totals.sodium >= sodiumTarget) {
     alerts.push({
       id: 'sodium-over',

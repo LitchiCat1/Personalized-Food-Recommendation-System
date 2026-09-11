@@ -197,8 +197,13 @@ def validate_and_balance_nutrition(item: dict) -> dict:
         
     name = item.get("name", "")
 
+    # 哪幾項是推估出來的，要能往上傳到畫面：這些是「上限」類目標，
+    # 使用者有權知道擋他或放行他的那個數字不是量出來的。
+    estimated: list[str] = []
+
     fiber = float(item.get("fiber", 0) or 0)
     if fiber == 0:
+        estimated.append("fiber")
         if any(k in name for k in ["蔬菜", "青菜", "沙拉", "菇", "海帶"]):
             fiber = 3.5
         elif any(k in name for k in ["飯", "麵", "吐司", "漢堡", "燕麥", "水果"]):
@@ -213,6 +218,7 @@ def validate_and_balance_nutrition(item: dict) -> dict:
     if saturated_fat == 0 and fat > 0:
         is_fried_name = any(k in name for k in ["炸", "脆", "酥", "排骨", "雞腿", "培根", "香腸"])
         saturated_fat = round(fat * (0.35 if is_fried_name else 0.25), 1)
+        estimated.append("saturated_fat")
 
     if sugar == 0 and carbs > 0:
         if any(k in name for k in ["奶茶", "紅茶", "綠茶", "可樂", "汽水", "果汁", "冰沙", "蛋糕", "甜", "布丁", "拿鐵"]):
@@ -221,6 +227,7 @@ def validate_and_balance_nutrition(item: dict) -> dict:
             sugar = round(carbs * 0.15, 1)
         else:
             sugar = round(carbs * 0.05, 1)
+        estimated.append("sugar")
 
     item["calories"] = round(calories)
     item["protein"] = round(protein, 1)
@@ -232,6 +239,8 @@ def validate_and_balance_nutrition(item: dict) -> dict:
     item["fiber"] = round(fiber, 1)
     item["sodium"] = round(float(item.get("sodium", 0) or 0))
     item["is_fried"] = item.get("is_fried", False) or any(k in item.get("name", "") for k in ["炸", "脆", "酥"])
+    if estimated:
+        item["estimated_nutrients"] = sorted(set(estimated) | set(item.get("estimated_nutrients") or []))
     return item
 
 
@@ -248,8 +257,11 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
     prompt = f"""
     台灣餐廳「{restaurant_name}」（{address}）最常見的 3 道餐點，估算營養。
     只輸出 JSON，不要 markdown、不要說明。數值概略即可，後端會校正熱量一致性。
+    餐點必須是這家店真的會賣的；店名看不出賣什麼就回 {{"items":[]}}，不要填通用菜單。
+    sugar 指添加糖，saturated_fat 指飽和脂肪——糖尿病與高血脂的判斷靠這兩項，
+    留白的話後端只能用品名猜，所以請一併估。
     只需要這幾個欄位，其餘不要輸出：
-    {{"items":[{{"name":"餐點名稱","price":120,"calories":480,"protein":32,"carbs":45,"fat":14,"fiber":3,"sodium":420,"is_fried":false}}]}}
+    {{"items":[{{"name":"餐點名稱","price":120,"calories":480,"protein":32,"carbs":45,"fat":14,"sugar":6,"saturated_fat":4,"fiber":3,"sodium":420,"is_fried":false}}]}}
     """
     # 全 repo 其他 Gemini 呼叫都用 get_gemini_models()（可由 GEMINI_MODELS 覆寫）。
     # 這裡原本寫死 2.5-flash / 2.5-pro，金鑰沒有這兩個模型權限時整串 404，

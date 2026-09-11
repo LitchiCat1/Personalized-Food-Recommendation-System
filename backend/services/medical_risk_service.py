@@ -1,5 +1,6 @@
 from services.disease_rule_service import normalize_allergen_ids, normalize_condition_ids
 from services.nutrient_service import get_nutrient_value, is_fried_food_name
+from services.profile_service import compute_bmr, resolve_energy_factor
 
 
 # 一天切成幾餐。disease_rules.json 的 personalized_limits 用它把每日總量
@@ -240,42 +241,10 @@ def evaluate_medical_risk(
     allergens = normalize_allergen_ids(user_allergens, allergen_taxonomy)
     nutrients = scale_nutrients(candidate, portion_g)
 
-    # 1. 取得使用者身高體重計算理想體重 (W) 與每日熱量 (E)
-    height_cm = 170.0
-    weight_kg = 65.0
-    daily_calorie_target = 1950.0
-    
-    if user_profile:
-        height_cm = normalize_number(user_profile.get("height")) or 170.0
-        weight_kg = normalize_number(user_profile.get("weight")) or 65.0
-        daily_calorie_target = normalize_number(
-            user_profile.get("daily_calorie_target") or user_profile.get("dailyCalorieTarget")
-        ) or (weight_kg * 30)
-        
-    height_m = height_cm / 100.0
-    W = 22.0 * (height_m ** 2)
-    if W <= 0:
-        W = weight_kg
-    
-    bmi = weight_kg / (height_m ** 2) if height_m > 0 else 22.0
-    is_overweight = bmi >= 24.0
-    
-    # 決定不同疾病下的每日總熱量需求 E (取各匹配疾病最嚴格值)
-    e_candidates = []
-    if "diabetes" in conditions:
-        e_candidates.append(W * 25 if is_overweight else W * 30)
-    if "gout" in conditions:
-        e_candidates.append(W * 30)
-    if "hyperlipidemia" in conditions:
-        e_candidates.append(W * 25 if is_overweight else W * 30)
-    if "hypertension" in conditions:
-        e_candidates.append(W * 30)
-    if "kidney_disease" in conditions:
-        e_candidates.append(W * 30) # 慢性腎臟病取 30 (熱量需足夠防肌肉流失)
-        
-    E = min(e_candidates) if e_candidates else daily_calorie_target
-    if E <= 0:
-        E = W * 30
+    # 理想體重 W 與每日熱量 E。先前這裡自己抄了一份公式，跟下面的
+    # resolve_user_energy_and_weight 是兩套會各自漂移的數字——這個檔案已經
+    # 因為「同一個數字兩套算法」出過事，所以只留一份。
+    E, W = resolve_user_energy_and_weight(conditions, user_profile)
 
     risks = []
     risks.extend(detect_allergen_hits(candidate, allergens, allergen_taxonomy))
@@ -373,19 +342,26 @@ def evaluate_medical_risk(
 def resolve_user_energy_and_weight(conditions: list, user_profile: dict | None) -> tuple[float, float]:
     """算出這個人的每日熱量需求 E 與理想體重 W。
 
-    evaluate_medical_risk 內部一直有這段，抽出來讓一餐合計的檢查用同一套，
-    否則兩邊會各自漂移——這個檔案已經因為「同一個數字兩套算法」出過事。
+    單餐上限（disease_rules.json 的 personalized_limits）都是從 E 換算出來的，
+    所以這裡的 E 必須跟「我的」頁面顯示的每日目標是同一個數字——那邊走的是
+    nutrition_progress_service.calculate_daily_targets_with_basis()。先前這裡
+    寫死每公斤 25／30 大卡、不看活動量也不設下限，於是選「中等活動」的人，
+    單餐額度是用一個比他 BMR 還低的每日熱量推出來的，跟畫面上的目標對不起來。
     """
     height_cm = 170.0
     weight_kg = 65.0
-    daily_calorie_target = 1950.0
+    daily_calorie_target = 0.0
+    activity_multiplier = 1.55
 
     if user_profile:
         height_cm = normalize_number(user_profile.get("height")) or 170.0
         weight_kg = normalize_number(user_profile.get("weight")) or 65.0
         daily_calorie_target = normalize_number(
             user_profile.get("daily_calorie_target") or user_profile.get("dailyCalorieTarget")
-        ) or (weight_kg * 30)
+        )
+        activity_multiplier = normalize_number(
+            user_profile.get("activity_multiplier") or user_profile.get("activityMultiplier")
+        ) or 1.55
 
     height_m = height_cm / 100.0
     W = 22.0 * (height_m ** 2)
@@ -395,22 +371,47 @@ def resolve_user_energy_and_weight(conditions: list, user_profile: dict | None) 
     bmi = weight_kg / (height_m ** 2) if height_m > 0 else 22.0
     is_overweight = bmi >= 24.0
 
+    energy_factor = resolve_energy_factor(activity_multiplier)
+    # 糖尿病與高血脂的指引本身就含減重目標，過重時往下調一級；
+    # 痛風／高血壓／腎病不做這個減量。
+    weight_managed_factor = max(energy_factor - 5, 20) if is_overweight else energy_factor
+
     e_candidates = []
     if "diabetes" in conditions:
-        e_candidates.append(W * 25 if is_overweight else W * 30)
+        e_candidates.append(W * weight_managed_factor)
     if "gout" in conditions:
-        e_candidates.append(W * 30)
+        e_candidates.append(W * energy_factor)
     if "hyperlipidemia" in conditions:
-        e_candidates.append(W * 25 if is_overweight else W * 30)
+        e_candidates.append(W * weight_managed_factor)
     if "hypertension" in conditions:
-        e_candidates.append(W * 30)
+        e_candidates.append(W * energy_factor)
     if "kidney_disease" in conditions:
-        e_candidates.append(W * 30)
+        e_candidates.append(W * energy_factor)  # 熱量需足夠防肌肉流失
 
-    E = min(e_candidates) if e_candidates else daily_calorie_target
+    if e_candidates:
+        E = min(e_candidates)
+        # 疾病目標是 App 幫使用者決定的，不能低到基礎代謝以下；
+        # 使用者自己填的數字則尊重他的選擇。
+        bmr = _profile_bmr(user_profile, weight_kg, height_cm)
+        if bmr > 0 and E < bmr:
+            E = bmr
+    else:
+        E = daily_calorie_target
+
     if E <= 0:
-        E = W * 30
+        E = W * energy_factor
     return E, W
+
+
+def _profile_bmr(user_profile: dict | None, weight_kg: float, height_cm: float) -> float:
+    """拿 profile 存好的 BMR，沒有就用同一條公式現算。"""
+    profile = user_profile or {}
+    stored = normalize_number(profile.get("bmr") or profile.get("bmr_kcal"))
+    if stored > 0:
+        return stored
+    gender = normalize_text(profile.get("gender")) or "male"
+    age = normalize_number(profile.get("age")) or 30.0
+    return float(compute_bmr(gender, weight_kg, height_cm, int(age)))
 
 
 def evaluate_meal_medical_risk(
@@ -498,15 +499,15 @@ def risk_messages(risk_result: dict) -> list[str]:
 def derived_meal_limits(disease_rules: dict, user_profile: dict | None = None) -> dict:
     """把規則檔宣告的個人化上限算成實際數字。
 
-    先前這裡自己抄了一份公式，等於第三套會漂移的數字。現在跟
-    evaluate_medical_risk 讀同一份宣告。
+    先前這裡自己抄了一份公式（固定 W×30、不看活動量），等於第三套會漂移的
+    數字。現在跟 evaluate_medical_risk 走同一支 resolve_user_energy_and_weight。
+
+    這支是給「門檻一致性檢查」用的，要列出每個疾病各自的上限，所以逐一
+    帶入單一疾病去算，而不是取所有疾病的最嚴格值。
     """
-    height_cm = normalize_number((user_profile or {}).get("height")) or 170.0
-    weight_kg = normalize_number((user_profile or {}).get("weight")) or 65.0
-    W = 22.0 * (height_cm / 100.0) ** 2 or weight_kg
-    E = W * 30
     limits = {}
     for condition_id, rule in (disease_rules or {}).items():
+        E, W = resolve_user_energy_and_weight([condition_id], user_profile)
         resolved = {}
         for nutrient, spec in (rule.get("personalized_limits") or {}).items():
             value = resolve_personalized_limit(spec, E, W)

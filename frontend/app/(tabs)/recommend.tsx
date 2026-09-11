@@ -533,7 +533,15 @@ export default function RecommendScreen() {
                 <Text style={styles.modalTitle}>{viewingMenuRest?.name}</Text>
                 <Text style={styles.restaurantMeta}>{viewingMenuRest?.address}</Text>
               </View>
-              <Pressable onPress={() => setViewingMenuRest(null)}>
+              {/* 圖示本身沒有文字，不給 label 的話輔助技術只會念到一個空按鈕，
+                  而 24px 的圖示也不到 44px 的最小點擊範圍。 */}
+              <Pressable
+                onPress={() => setViewingMenuRest(null)}
+                accessibilityRole="button"
+                accessibilityLabel="關閉菜單"
+                hitSlop={10}
+                style={styles.modalCloseButton}
+              >
                 <Ionicons name="close" size={24} color={Palette.text.primary} />
               </Pressable>
             </View>
@@ -904,6 +912,7 @@ const styles = StyleSheet.create({
   photoSourceCard: { width: '100%', maxWidth: 360, backgroundColor: Palette.bg.card, borderRadius: Radius.xl, borderWidth: 1, borderColor: Palette.border.subtle, padding: Spacing.lg, gap: Spacing.sm, ...Shadows.soft },
   modalContent: { width: '100%', maxWidth: 500, maxHeight: '80%', backgroundColor: Palette.bg.card, borderRadius: Radius.xl, borderWidth: 1, borderColor: Palette.border.subtle, padding: Spacing.lg, ...Shadows.soft },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+  modalCloseButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   modalTitle: { ...Typography.bodyBold, color: Palette.text.primary },
   modalScroll: { gap: Spacing.md },
   modalSectionTitle: { ...Typography.bodyBold, color: Palette.text.primary, marginTop: Spacing.sm },

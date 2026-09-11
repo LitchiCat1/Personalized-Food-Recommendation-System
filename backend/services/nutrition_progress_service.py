@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from services.app_time_service import app_today
-from services.profile_service import compute_bmr
+from services.profile_service import compute_bmr, resolve_energy_factor
 
 
 DEFAULT_DAILY_NUTRITION_TARGETS = {
@@ -110,23 +110,6 @@ def _fallback_bmr(user: dict, weight_kg: float, height_cm: float) -> float:
     gender = str(user.get("gender") or "male")
     age = _number(user.get("age"), 30.0)
     return _number(compute_bmr(gender, weight_kg, height_cm, age), 0.0)
-
-
-def resolve_energy_factor(activity_multiplier: float) -> int:
-    """每公斤理想體重要給幾大卡，依活動量分級。
-
-    先前不分活動量一律 25 或 30，等於把每個人都當成輕度活動：一位選了
-    「中等活動」的使用者拿到的每日目標會比他的 BMR 還低。臨床營養的熱量
-    需求本來就是依活動量分級開的，這裡照同一組級距對應到 App 既有的
-    五個活動量選項（ACTIVITY_LEVELS 的 multiplier）。
-    """
-    if activity_multiplier <= 1.2:
-        return 25  # 久坐／臥床
-    if activity_multiplier <= 1.375:
-        return 30  # 輕度活動
-    if activity_multiplier <= 1.55:
-        return 35  # 中等活動
-    return 40  # 高度／極高活動
 
 
 def calculate_pdf_daily_targets(user: dict) -> dict:
@@ -304,6 +287,47 @@ def calculate_daily_targets_with_basis(user: dict) -> dict:
     return {"targets": targets, "basis": basis}
 
 
+# 吃不夠一樣要提醒。這些項目只把關「不要超過」的話，畫面會把「今天只吃了
+# 900 kcal」顯示成一切正常——實測跟著 App 的推薦吃兩週，每天平均只有
+# 1076~1160 kcal，低於使用者的基礎代謝，而 App 從頭到尾沒有出過一次警示。
+SHORTFALL_NUTRIENTS = {
+    "calories": ("熱量", "kcal"),
+    "protein": ("蛋白質", "g"),
+    "fiber": ("膳食纖維", "g"),
+}
+SHORTFALL_RATIO = 0.8
+
+
+def build_shortfalls(consumed: dict, targets: dict, records: list) -> list[dict]:
+    """列出明顯沒吃夠的項目。
+
+    只在當天已經有紀錄時才提醒：一天還沒開始當然什麼都沒吃到，
+    那時候跳「熱量不足」只是雜訊。
+    """
+    if not records:
+        return []
+
+    shortfalls = []
+    for nutrient, (label_zh, unit) in SHORTFALL_NUTRIENTS.items():
+        target = _number(targets.get(nutrient))
+        if target <= 0:
+            continue
+        eaten = _number(consumed.get(nutrient))
+        if eaten >= target * SHORTFALL_RATIO:
+            continue
+        shortfalls.append({
+            "nutrient": nutrient,
+            "label_zh": label_zh,
+            "unit": unit,
+            "consumed": _display_number(eaten),
+            "target": _display_number(target),
+            "short_by": _display_number(target - eaten),
+            "percent": round(eaten / target * 100, 1),
+            "message": f"今天{label_zh}只吃到 {_display_number(eaten)}{unit}，目標 {_display_number(target)}{unit}",
+        })
+    return shortfalls
+
+
 def build_daily_nutrition_progress(storage, user_id: str, user: dict, now: datetime | None = None) -> dict:
     today = app_today(now)
     records = storage.get_records(user_id, today, limit=500)
@@ -324,6 +348,10 @@ def build_daily_nutrition_progress(storage, user_id: str, user: dict, now: datet
         nutrient: max(0.0, consumed[nutrient] - targets[nutrient])
         for nutrient in targets
     }
+    under_by = {
+        nutrient: max(0.0, targets[nutrient] - consumed[nutrient])
+        for nutrient in targets
+    }
 
     return {
         "date": today,
@@ -332,6 +360,8 @@ def build_daily_nutrition_progress(storage, user_id: str, user: dict, now: datet
         "consumed": {key: _display_number(value) for key, value in consumed.items()},
         "remaining": {key: _display_number(value) for key, value in remaining.items()},
         "over_by": {key: _display_number(value) for key, value in over_by.items()},
+        "under_by": {key: _display_number(value) for key, value in under_by.items()},
+        "shortfalls": build_shortfalls(consumed, targets, records),
         "progress_percent": {
             nutrient: round(consumed[nutrient] / max(0.1, targets[nutrient]) * 100, 1)
             for nutrient in targets

@@ -352,6 +352,57 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertEqual(progress["status"]["sodium"], "over")
         self.assertEqual(progress["status"]["protein"], "within_target")
         self.assertGreater(progress["progress_percent"]["calories"], 100)
+        # 熱量已經超標，就不該同時被說成熱量不夠
+        # （蛋白質與纖維在這份紀錄裡確實沒吃夠，那兩項出現是對的）
+        self.assertNotIn("calories", [s["nutrient"] for s in progress["shortfalls"]])
+
+    def test_eating_well_under_the_target_is_reported_as_a_shortfall(self):
+        """只把關「不要超過」的話，整天只吃到目標六成也會顯示一切正常。
+
+        跟著 App 的推薦吃，每天合計常常落在 1100 kcal 上下，低於使用者的
+        基礎代謝，而畫面上從頭到尾沒有任何提示。
+        """
+        class UnderTargetStorage:
+            def get_records(self, user_id, date, limit=500):
+                return [
+                    {
+                        "total_calories": 900,
+                        "total_protein": 20,
+                        "total_carbs": 90,
+                        "total_fat": 25,
+                        "total_sodium": 700,
+                        "total_fiber": 6,
+                    }
+                ]
+
+        progress = build_daily_nutrition_progress(
+            UnderTargetStorage(),
+            "user-a",
+            {"height": 170, "weight": 65, "age": 30, "gender": "male",
+             "activity_multiplier": 1.55, "health_conditions": ["hypertension"]},
+            datetime(2026, 7, 18, tzinfo=timezone.utc),
+        )
+
+        shortfalls = {s["nutrient"]: s for s in progress["shortfalls"]}
+        self.assertIn("calories", shortfalls)
+        self.assertIn("protein", shortfalls)
+        self.assertGreater(shortfalls["calories"]["short_by"], 0)
+        self.assertLess(shortfalls["calories"]["percent"], 80)
+        self.assertGreater(progress["under_by"]["calories"], 0)
+
+    def test_a_day_with_no_records_yet_is_not_a_shortfall(self):
+        """一天還沒開始當然什麼都沒吃到，那時候跳「熱量不足」只是雜訊。"""
+        class EmptyStorage:
+            def get_records(self, user_id, date, limit=500):
+                return []
+
+        progress = build_daily_nutrition_progress(
+            EmptyStorage(),
+            "user-a",
+            {"height": 170, "weight": 65, "age": 30, "gender": "male"},
+            datetime(2026, 7, 18, tzinfo=timezone.utc),
+        )
+        self.assertEqual(progress["shortfalls"], [])
 
     def test_google_places_recommendations_apply_conditions_and_allergens(self):
         """Places 路徑之前完全沒套疾病與過敏原規則，等於沒有依「不能吃的食物」推薦。"""

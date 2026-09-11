@@ -44,7 +44,13 @@ from services.vision_food_service import (
     call_gemini_food_recognition_with_rotation,
 )
 from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini, parse_menu_image_with_gemini
-from services.medical_risk_service import MEALS_PER_DAY, evaluate_medical_risk, normalize_number, rule_threshold_conflicts
+from services.medical_risk_service import (
+    MEALS_PER_DAY,
+    evaluate_medical_risk,
+    normalize_number,
+    resolve_user_energy_and_weight,
+    rule_threshold_conflicts,
+)
 from services.google_places_service import fetch_google_places_restaurants
 from services.venue_index_service import VenueIndexUnavailable, index_nearby_venues
 
@@ -910,7 +916,12 @@ def get_restaurant_menu():
     conditions = user.get("health_conditions", []) or []
     allergens = user.get("allergens", []) or []
     budget = int(data.get("budget", 150))
-    target_calories = (normalize_number(user.get("daily_calorie_target")) or 2100) / MEALS_PER_DAY
+    # 先前這裡直接讀 profile 存的 daily_calorie_target，沒有就退回寫死的 2100。
+    # 但「我的」頁面顯示的每日目標是依疾病與活動量重算過的，兩個數字對不起來：
+    # 畫面說每天 1900 kcal，這條路徑卻拿 2100÷3=700 kcal 當單餐目標。
+    # 改成跟單餐上限同源，整個後端只有一個每日熱量。
+    daily_energy, _ideal_weight = resolve_user_energy_and_weight(conditions, user)
+    target_calories = daily_energy / MEALS_PER_DAY
     
     recommended_items = []
     filtered_items = []
@@ -921,6 +932,9 @@ def get_restaurant_menu():
             "name_zh": item["name"],
             "gi": item.get("gi"),
             "allergens": item.get("allergens", []),
+            # 少了 calories 這個鍵，scale_nutrients 就把熱量讀成 0，
+            # 於是每個疾病宣告的單餐熱量上限（每日 E ÷ 3）永遠不會觸發。
+            "calories": item.get("calories"),
             "sodium": item.get("sodium"),
             "carbs": item.get("carbs"),
             "protein": item.get("protein"),

@@ -51,6 +51,26 @@ def compute_tdee(bmr: float, activity_multiplier: float) -> float:
     return round(bmr * activity_multiplier)
 
 
+def resolve_energy_factor(activity_multiplier: float) -> int:
+    """每公斤理想體重要給幾大卡，依活動量分級。
+
+    先前不分活動量一律 25 或 30，等於把每個人都當成輕度活動：一位選了
+    「中等活動」的使用者拿到的每日目標會比他的 BMR 還低。臨床營養的熱量
+    需求本來就是依活動量分級開的，這裡照同一組級距對應到 App 既有的
+    五個活動量選項（ACTIVITY_LEVELS 的 multiplier）。
+
+    放在這裡是因為每日目標（nutrition_progress_service）與單餐上限
+    （medical_risk_service）都要用同一個級距；分成兩份就會各自漂移。
+    """
+    if activity_multiplier <= 1.2:
+        return 25  # 久坐／臥床
+    if activity_multiplier <= 1.375:
+        return 30  # 輕度活動
+    if activity_multiplier <= 1.55:
+        return 35  # 中等活動
+    return 40  # 高度／極高活動
+
+
 def build_user_profile(data: dict, disease_rules: dict | None = None, allergen_taxonomy: dict | None = None) -> dict:
     user_id = data["user_id"]
     gender = data.get("gender", "male")

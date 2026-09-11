@@ -13,9 +13,12 @@ from services.medical_risk_service import evaluate_medical_risk
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# 身高 170cm → 理想體重 W = 22 * 1.7^2 = 63.58 kg，E = W * 30 = 1907 kcal
-# 單餐上限一律取每日的 1/3
-PROFILE = {"height": 170, "weight": 65, "age": 30}
+# 身高 170cm → 理想體重 W = 22 * 1.7^2 = 63.58 kg。
+# 每公斤要給幾大卡依活動量分級（profile_service.resolve_energy_factor），
+# 這裡固定用「輕度活動」= 30 kcal/kg，讓 E = W * 30 = 1907 kcal，
+# 下面每一條門檻的數字才有一個講得出來的來源。活動量本身的影響另外測
+# （EnergyFactorTests）。
+PROFILE = {"height": 170, "weight": 65, "age": 30, "gender": "male", "activity_multiplier": 1.375}
 W = 22.0 * 1.7 ** 2
 E = W * 30
 
@@ -218,17 +221,64 @@ class EffectiveLimitTests(MedicalRiskTestCase):
             self.evaluate(dish(fat=20), conditions=["hyperlipidemia"])))
 
 
+class EnergyFactorTests(MedicalRiskTestCase):
+    """單餐額度要跟著活動量走，而且不能低到基礎代謝以下。
+
+    先前每公斤一律 25／30 大卡、完全不看活動量：一位選「中等活動」的使用者
+    拿到的每日目標會比他的 BMR 還低，單餐額度也跟著被壓到不合理的低點，
+    而「我的」頁面顯示的目標卻是另一個數字。
+    """
+
+    def _ceiling(self, profile, condition="hypertension"):
+        from services.medical_risk_service import resolve_user_energy_and_weight
+        return resolve_user_energy_and_weight([condition], profile)[0]
+
+    def test_a_more_active_person_gets_a_higher_daily_energy(self):
+        sedentary = self._ceiling({**PROFILE, "activity_multiplier": 1.2})
+        light = self._ceiling({**PROFILE, "activity_multiplier": 1.375})
+        moderate = self._ceiling({**PROFILE, "activity_multiplier": 1.55})
+        active = self._ceiling({**PROFILE, "activity_multiplier": 1.9})
+        self.assertLess(sedentary, light)
+        self.assertLess(light, moderate)
+        self.assertLess(moderate, active)
+
+    def test_the_target_never_drops_below_basal_metabolic_rate(self):
+        # 久坐 + 矮小：W * 25 會低於 BMR，這時要被 BMR 接住。
+        profile = {"height": 150, "weight": 46, "age": 25, "gender": "male",
+                   "activity_multiplier": 1.2}
+        bmr = 10 * 46 + 6.25 * 150 - 5 * 25 + 5
+        self.assertGreaterEqual(self._ceiling(profile), bmr)
+
+    def test_overweight_reduction_applies_only_to_weight_managed_conditions(self):
+        overweight = {"height": 170, "weight": 90, "age": 40, "gender": "male",
+                      "activity_multiplier": 1.375}
+        # 糖尿病與高血脂的指引含減重目標，過重時往下調一級；痛風／高血壓不調。
+        self.assertLess(self._ceiling(overweight, "diabetes"),
+                        self._ceiling(overweight, "gout"))
+        self.assertEqual(self._ceiling(overweight, "hyperlipidemia"),
+                         self._ceiling(overweight, "diabetes"))
+        self.assertEqual(self._ceiling(overweight, "hypertension"),
+                         self._ceiling(overweight, "gout"))
+
+    def test_a_normal_bmi_person_gets_no_weight_loss_reduction(self):
+        lean = {**PROFILE, "weight": 60}
+        self.assertEqual(self._ceiling(lean, "diabetes"), self._ceiling(lean, "gout"))
+
+
 class ProfileSensitivityTests(MedicalRiskTestCase):
     def test_a_shorter_person_gets_a_lower_ceiling(self):
         """門檻依理想體重換算，不是固定值。"""
+        # 兩邊都固定同一個活動量，差異才單純來自身高換算的理想體重。
         meal = dish(calories=560)
         tall = evaluate_medical_risk(
             meal, ["hypertension"], [], self.rules, self.taxonomy,
-            user_profile={"height": 180, "weight": 75},
+            user_profile={"height": 180, "weight": 75, "age": 30, "gender": "male",
+                          "activity_multiplier": 1.375},
         )
         short = evaluate_medical_risk(
             meal, ["hypertension"], [], self.rules, self.taxonomy,
-            user_profile={"height": 155, "weight": 48},
+            user_profile={"height": 155, "weight": 48, "age": 30, "gender": "male",
+                          "activity_multiplier": 1.375},
         )
         self.assertTrue(tall["is_safe"])
         self.assertFalse(short["is_safe"])

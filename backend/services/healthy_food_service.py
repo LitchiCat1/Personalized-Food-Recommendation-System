@@ -58,6 +58,17 @@ def _normalize_category(value):
     return str(value).strip().lower()
 
 
+TRUTHY_VALUES = {"1", "true", "yes", "on"}
+
+
+def _dev_catalog_fallback_enabled() -> bool:
+    """要不要啟用「把內建目錄平移到使用者座標」的本機退路。
+
+    預設關閉：那條退路會產生看起來像真的、實際上不存在於當地的店家。
+    """
+    return (os.environ.get("HEALTHY_FOOD_DEV_CATALOG_FALLBACK") or "").strip().lower() in TRUTHY_VALUES
+
+
 def _restaurant_matches_category(restaurant: dict, category: str) -> bool:
     if not category or category == "all":
         return True
@@ -110,6 +121,9 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                 "name_zh": item["name"],
                 "gi": item.get("gi"),
                 "allergens": item.get("allergens", []),
+                # 少了 calories 這個鍵，scale_nutrients 就把熱量讀成 0，
+                # 於是每個疾病宣告的單餐熱量上限（每日 E ÷ 3）永遠不會觸發。
+                "calories": item.get("calories"),
                 "sodium": item.get("sodium"),
                 "carbs": item.get("carbs"),
                 "protein": item.get("protein"),
@@ -195,9 +209,17 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                 "filtered_items": restaurant_filtered_items[:4],
             })
 
-    # Developer convenience fallback: if no restaurants are nearby in local dev catalog,
-    # temporarily shift them around the user's location so they can see results.
-    if not restaurants:
+    # 本機開發用的退路：內建目錄裡沒有店家落在半徑內時，把整份目錄平移到
+    # 使用者座標周圍，好讓畫面有東西可看。
+    #
+    # 這段不能在正式環境跑。它會回報一家不存在於當地的店家、標上一個編造的
+    # 距離（±0.003° ≈ 300 公尺），還把 is_open 直接設成 True 跳過營業時間檢查。
+    # 實測時台北車站、北投、木柵（相距約 20 公里）因此回傳一模一樣的 8 家店，
+    # 而畫面上完全看不出來那不是真的附近店家。
+    # 要在本機看到假資料，設 HEALTHY_FOOD_DEV_CATALOG_FALLBACK=1。
+    catalog_fallback_used = False
+    if not restaurants and _dev_catalog_fallback_enabled():
+        catalog_fallback_used = True
         for idx, restaurant in enumerate(restaurant_catalog):
             if not _restaurant_matches_category(restaurant, category):
                 continue
@@ -309,6 +331,14 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
         "recommended": recommendations[:12],
         "restaurants": restaurants[:12],
         "filtered_out": filtered_out[:12],
+        # 呼叫端要能分辨「這附近真的沒有已建檔的店家」與「有結果」，
+        # 空清單才不會被當成載入失敗。
+        "catalog_fallback_used": catalog_fallback_used,
+        "empty_reason": (
+            f"這個位置 {radius_km} 公里內沒有已建檔菜單的店家。"
+            "請用「附近店家」搜尋真實店家並建檔，或放大搜尋半徑。"
+            if not restaurants else ""
+        ),
     }
 
 

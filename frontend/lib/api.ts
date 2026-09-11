@@ -272,6 +272,8 @@ export type UserProfileResponse = {
   allergens: string[];
   target_weight?: number;
   diet_type: string;
+  /** 使用者是否自己填過這份檔案；新帳號的空白檔案是 false。 */
+  profile_complete?: boolean;
 };
 
 export type MedicalConditionRule = {
@@ -336,7 +338,13 @@ export type MedicalMetadataResponse = {
     effective_block: number;
     ignored_source: 'configured' | 'derived';
   }[];
+  /** 給使用者看的一句話。逐項數字與「需要臨床人員確認」那句留在下面兩個欄位。 */
   threshold_conflict_note?: string | null;
+  /** 給審閱流程看的全文，不放進 App 畫面。 */
+  threshold_conflict_review_note?: string | null;
+  /** 表單的選項與合理範圍，前端不再自己抄一份。 */
+  diet_types?: string[];
+  profile_limits?: Record<string, { min: number; max: number; unit: string; label_zh: string }>;
 };
 
 export type ApiAuth = {

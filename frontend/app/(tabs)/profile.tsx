@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, TextInput, Alert, Platform, Modal, ScrollView } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { AVAILABLE_CONDITIONS, AVAILABLE_ALLERGENS } from '@/constants/mock-data';
-import { DIET_TYPES, isKnownDietType } from '@/constants/diet';
+import { DEFAULT_DIET_TYPE, DIET_TYPES, isKnownDietType } from '@/constants/diet';
+import { NEW_USER_PROFILE, PROFILE_LIMITS, describeLimit, isWithinLimit, type ProfileLimit } from '@/constants/profile-defaults';
 import { useStore } from '@/store/useStore';
 import { useResponsive } from '@/hooks/useResponsive';
 import AppContainer from '@/components/AppContainer';
@@ -16,6 +17,7 @@ import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
 import FeedbackBanner from '@/components/ui/feedback-banner';
 import { clearNearbyVenueIndex, fetchAllRecordsWithTargets, fetchMedicalMetadata, fetchUserProfile, indexNearbyVenues, listNearbyVenueIndex, saveUserProfile } from '@/lib/api';
+import { bmiCategory, readWeightGoal } from '@/lib/body-metrics';
 import { describeCalorieTarget, describeUserTargetFallback, formatCalories } from '@/lib/calorie-target';
 import { calculateActivityStats } from '@/lib/dietary-trends';
 import { describeLocation, resolveLocation } from '@/lib/location';
@@ -23,13 +25,6 @@ import { isSupabaseAuthConfigured, supabase } from '@/lib/supabase';
 import { isSelected } from '@/lib/safety-selection';
 
 type MedicalMetadata = Awaited<ReturnType<typeof fetchMedicalMetadata>>;
-
-/** 與後端 medical_risk_service.NUTRIENT_LABELS_ZH 對齊。 */
-const NUTRIENT_LABELS: Record<string, string> = {
-  calories: '熱量', protein: '蛋白質', carbs: '碳水化合物', sugar: '精緻糖',
-  fat: '總脂肪', saturated_fat: '飽和脂肪', trans_fat: '反式脂肪',
-  fiber: '膳食纖維', sodium: '鈉',
-};
 
 const PROFILE_SECTIONS = [
   { value: 'personal', label: '個人資料' },
@@ -57,11 +52,16 @@ export default function ProfileScreen() {
     age: String(user.age),
     dailyCalorieTarget: String(user.dailyCalorieTarget),
     targetWeight: String(user.targetWeight || ''),
-    dietType: user.dietType,
+    // 存在後端的值可能已經不在選單裡（舊帳號的「均衡飲食」）。照抄的話，
+    // 表單一打開就是無效狀態，儲存鈕是灰的，而使用者什麼都還沒碰。
+    dietType: isKnownDietType(user.dietType) ? user.dietType : DEFAULT_DIET_TYPE,
     gender: user.gender,
     activityLevel: user.activityLevel,
     activityMultiplier: user.activityMultiplier,
   });
+  /** 開啟表單時，後端存的飲食型態已經不在選單裡——要講清楚我們替他換了什麼。 */
+  const [replacedDietType, setReplacedDietType] = useState<string | null>(null);
+  const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,20 +78,29 @@ export default function ProfileScreen() {
     fetchUserProfile(apiBaseUrl, user.userId, { accessToken })
       .catch((err: Error) => {
         if (!err.message.includes('使用者不存在')) throw err;
+        // 帳號還沒有檔案時要先建一份，否則其他 API 全部 404。
+        //
+        // 先前這裡送的是 seedUser——也就是 store 的預設值，而那組預設值是
+        // constants/mock-data.ts 的示範人物「王小明」：175cm / 72kg / 高血壓 /
+        // 對花生與蝦蟹過敏。結果每個新帳號一開好就帶著一個沒人說過的診斷，
+        // 而每日熱量目標、單餐鈉上限、店家排序全部吃那一欄。
+        //
+        // 現在建的是一份明確空白的檔案：疾病與過敏原一定是空陣列，身體數值
+        // 用中性起始值，並標記 profile_complete: false 讓畫面去要求使用者確認。
         return saveUserProfile(apiBaseUrl, {
           user_id: seedUser.userId,
-          name: seedUser.name,
-          gender: seedUser.gender,
-          weight: seedUser.weight,
-          height: seedUser.height,
-          age: seedUser.age,
-          activity_level: seedUser.activityLevel,
-          activity_multiplier: seedUser.activityMultiplier,
-          daily_calorie_target: seedUser.dailyCalorieTarget,
-          health_conditions: seedUser.healthConditions,
-          allergens: seedUser.allergens,
-          target_weight: seedUser.targetWeight,
-          diet_type: seedUser.dietType,
+          name: seedUser.name || (seedUser.email || '').split('@')[0] || '新使用者',
+          gender: NEW_USER_PROFILE.gender,
+          weight: NEW_USER_PROFILE.weight,
+          height: NEW_USER_PROFILE.height,
+          age: NEW_USER_PROFILE.age,
+          activity_level: NEW_USER_PROFILE.activityLevel,
+          activity_multiplier: NEW_USER_PROFILE.activityMultiplier,
+          health_conditions: [],
+          allergens: [],
+          target_weight: null,
+          diet_type: NEW_USER_PROFILE.dietType,
+          profile_complete: false,
         }, { accessToken }).then((response) => response.user);
       })
       .then((data) => {
@@ -112,8 +121,9 @@ export default function ProfileScreen() {
           healthConditions: data.health_conditions,
           allergens: data.allergens,
           dailyCalorieTarget: data.daily_calorie_target,
-          targetWeight: data.target_weight || seedUser.targetWeight,
+          targetWeight: data.target_weight || 0,
           dietType: data.diet_type,
+          profileComplete: Boolean(data.profile_complete),
           // 這兩個不在 /user 的回應裡，要沿用 store 目前的值。
           // 用 seedUser（mount 當下的快照）會蓋掉 setActivityStats 剛算好的數字：
           // 兩個請求誰先回是不一定的，實測就出現過連續天數被打回 0。
@@ -141,28 +151,34 @@ export default function ProfileScreen() {
    * 而 streak 從來沒有被真實資料覆蓋過——今天才註冊、只有一筆紀錄的帳號
    * 照樣顯示「連續 14 天」。
    */
-  useEffect(() => {
-    if (!accessToken) return;
-    let cancelled = false;
-
-    fetchAllRecordsWithTargets(apiBaseUrl, user.userId, { accessToken })
-      .then(({ records, targets, goalTypes, basis }) => {
-        if (cancelled) return;
-        setActivityStats(calculateActivityStats(records));
-        // 每日目標先前只有首頁會去同步。直接開「我的」頁（重新整理、外部連結）
-        // 時拿到的是 store 的預設值 2100 kcal，跟首頁顯示的數字對不起來。
-        applyNutritionTargets(targets, goalTypes, basis);
-      })
-      .catch(() => {
-        // 這兩個數字只是輔助資訊，抓不到就維持 0，不要用錯誤蓋掉整頁。
-      });
-
-    return () => {
-      cancelled = true;
-    };
+  /**
+   * 重新向後端要每日目標與活動統計。
+   *
+   * 存完健康檔案之後也要跑一次：每日熱量基準、身高體重、疾病條件都會改變
+   * 生效的目標，而畫面上的「每日目標」與「飲食目標」分頁的一致性檢查都讀
+   * 這個數字。先前只在 mount 時抓一次——改完體重存檔，卡片上還是舊的目標，
+   * 而那個舊目標正好是用來判斷「跟目標體重方向一致嗎」的輸入。
+   */
+  const refreshTargets = useCallback(async () => {
+    // 沒有 accessToken 也要問。首頁（app/(tabs)/index.tsx）就是無條件抓的，
+    // 先前這裡多一道 `if (!accessToken) return`，於是本機／Demo 模式下首頁
+    // 顯示後端算的目標、「我的」頁顯示 store 的預設值，同一個數字兩個答案。
+    try {
+      const { records, targets, goalTypes, basis } =
+        await fetchAllRecordsWithTargets(apiBaseUrl, user.userId, { accessToken });
+      setActivityStats(calculateActivityStats(records));
+      applyNutritionTargets(targets, goalTypes, basis);
+    } catch {
+      // 這些數字只是輔助資訊，抓不到就維持現狀，不要用錯誤蓋掉整頁。
+    }
   }, [accessToken, apiBaseUrl, applyNutritionTargets, setActivityStats, user.userId]);
 
   useEffect(() => {
+    void refreshTargets();
+  }, [refreshTargets]);
+
+  useEffect(() => {
+    const knownDiet = isKnownDietType(user.dietType);
     setProfileDraft({
       name: user.name,
       height: String(user.height),
@@ -170,12 +186,41 @@ export default function ProfileScreen() {
       age: String(user.age),
       dailyCalorieTarget: String(user.dailyCalorieTarget),
       targetWeight: String(user.targetWeight || ''),
-      dietType: user.dietType,
+      dietType: isKnownDietType(user.dietType) ? user.dietType : DEFAULT_DIET_TYPE,
       gender: user.gender,
       activityLevel: user.activityLevel,
       activityMultiplier: user.activityMultiplier,
     });
+    setReplacedDietType(knownDiet ? null : user.dietType || null);
   }, [user.name, user.height, user.weight, user.age, user.dailyCalorieTarget, user.targetWeight, user.dietType, user.gender, user.activityLevel, user.activityMultiplier]);
+
+  /**
+   * 還沒填過的檔案要主動把表單打開。
+   *
+   * 不這樣做的話，畫面上那組起始預設值看起來就跟使用者自己填的一樣，
+   * 而它會一路變成每日目標與單餐上限。
+   */
+  useEffect(() => {
+    if (!loading && !user.profileComplete) setProfileModalVisible(true);
+  }, [loading, user.profileComplete]);
+
+  /**
+   * Esc 關閉編輯視窗。
+   *
+   * RN 的 Modal 有 onRequestClose，但在 react-native-web 上它只對 Android 的
+   * 返回鍵有反應——網頁上按 Esc 是沒有用的，只能用滑鼠點那個小叉叉。
+   */
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    if (!profileModalVisible && !signOutConfirmVisible) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setSignOutConfirmVisible(false);
+      setProfileModalVisible(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [profileModalVisible, signOutConfirmVisible]);
 
   /**
    * 安全條件的儲存必須排隊，而且要送出當下 store 的最新狀態。
@@ -212,8 +257,9 @@ export default function ProfileScreen() {
         daily_calorie_target: nextUser.dailyCalorieTarget,
         health_conditions: nextUser.healthConditions,
         allergens: nextUser.allergens,
-        target_weight: nextUser.targetWeight,
+        target_weight: nextUser.targetWeight || null,
         diet_type: nextUser.dietType,
+        profile_complete: nextUser.profileComplete,
       }, { accessToken });
 
       replaceUser({
@@ -222,8 +268,11 @@ export default function ProfileScreen() {
         bmr: response.user.bmr,
         tdee: response.user.tdee,
         dailyCalorieTarget: response.user.daily_calorie_target,
+        dietType: response.user.diet_type,
+        profileComplete: Boolean(response.user.profile_complete),
       });
       setError(null);
+      await refreshTargets();
     } catch (err: any) {
       setError(err?.message || '儲存失敗');
     } finally {
@@ -240,28 +289,47 @@ export default function ProfileScreen() {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   };
 
-  const isPositiveDraftNumber = (value: string) => {
-    const parsed = Number(value);
-    return value.trim().length > 0 && Number.isFinite(parsed) && parsed > 0;
+  /**
+   * 合理範圍由後端提供（/medical-metadata 的 profile_limits），拿不到才用本地退路。
+   *
+   * 先前前後端都只檢查「大於 0」：身高 1cm、體重 1kg、年齡 1 歲全部存得進去，
+   * 而這些值會直接餵進 BMR/TDEE/BMI，再變成每日目標與單餐上限。
+   */
+  const profileLimits: Record<string, ProfileLimit> = medicalMetadata?.profile_limits || PROFILE_LIMITS;
+
+  /** 表單欄位 → 後端 profile_limits 的鍵。 */
+  const LIMIT_KEY_BY_FIELD: Record<string, string> = {
+    height: 'height',
+    weight: 'weight',
+    age: 'age',
+    targetWeight: 'target_weight',
+    dailyCalorieTarget: 'daily_calorie_target',
   };
+
+  const isDraftFieldValid = (field: string) => {
+    if (field === 'name') return profileDraft.name.trim().length > 0;
+    const limitKey = LIMIT_KEY_BY_FIELD[field];
+    return isWithinLimit(profileLimits[limitKey], profileDraft[field as keyof typeof profileDraft] as string);
+  };
+
+  const invalidNumericField = Object.keys(LIMIT_KEY_BY_FIELD).find((field) => !isDraftFieldValid(field));
 
   const isProfileDraftValid =
     profileDraft.name.trim().length > 0 &&
-    isPositiveDraftNumber(profileDraft.height) &&
-    isPositiveDraftNumber(profileDraft.weight) &&
-    isPositiveDraftNumber(profileDraft.age) &&
-    isPositiveDraftNumber(profileDraft.dailyCalorieTarget) &&
-    isPositiveDraftNumber(profileDraft.targetWeight) &&
+    !invalidNumericField &&
     isKnownDietType(profileDraft.dietType);
 
-  // 儲存鈕先前只是變灰，畫面上沒有任何一句話說為什麼。
+  // 儲存鈕先前只是變灰，畫面上沒有任何一句話說為什麼；就算有，那句話也只說
+  // 「都要大於 0」，不會告訴你是哪一格、範圍是多少。
   const profileDraftProblem = isProfileDraftValid
     ? null
     : !profileDraft.name.trim()
       ? '請填寫姓名或暱稱。'
       : !isKnownDietType(profileDraft.dietType)
         ? '請在下方選一個飲食型態。'
-        : '身高、體重、年齡、每日目標熱量與目標體重都要是大於 0 的數字。';
+        : invalidNumericField
+          ? `${describeLimit(profileLimits[LIMIT_KEY_BY_FIELD[invalidNumericField]] || PROFILE_LIMITS[LIMIT_KEY_BY_FIELD[invalidNumericField]])}。`
+          : null;
 
   const conditionCatalog = useMemo(() => {
     if (medicalMetadata?.disease_rules.conditions?.length) return medicalMetadata.disease_rules.conditions;
@@ -323,9 +391,12 @@ export default function ProfileScreen() {
       gender: profileDraft.gender,
       activityLevel: profileDraft.activityLevel,
       activityMultiplier: profileDraft.activityMultiplier,
+      // 這一刻起這份檔案才是使用者自己填的。
+      profileComplete: true,
     };
 
     await syncProfile(nextUser);
+    setReplacedDietType(null);
     setProfileModalVisible(false);
     setProfileFeedback({ tone: 'success', title: '健康檔案已更新', message: '個人資料已同步到後端。' });
   };
@@ -371,13 +442,33 @@ export default function ProfileScreen() {
   const calorieTargetExplanation = describeCalorieTarget(nutritionTargetBasis);
   const userTargetNote = describeUserTargetFallback(nutritionTargetBasis);
 
+  // BMI 那張卡片先前的顏色是寫死的橘色：20.3（標準）跟 35 長得一模一樣，
+  // 而且只有一個數字，分級要讀者自己查表。
+  const bmi = bmiCategory(user.bmi);
+  const bmiAccent = bmi.tone === 'normal'
+    ? Palette.accent.green
+    : bmi.tone === 'alert' ? Palette.status.error : Palette.accent.orange;
+
+  // 目標體重先前只是顯示出來而已——後端也只是存進去再讀出來，沒有任何
+  // 計算用到它，所以「增重 20kg」配上一個赤字目標也不會有人說話。
+  const weightGoal = readWeightGoal(
+    user.weight,
+    user.targetWeight,
+    dailyNutrition.calories.target,
+    user.tdee,
+  );
+
   const dietGoals = [
     {
       label: '每日目標熱量',
       value: `${formatCalories(dailyNutrition.calories.target)} kcal`,
       color: '#FB923C',
     },
-    { label: '目標體重', value: `${user.targetWeight} kg`, color: '#4ADE80' },
+    {
+      label: '目標體重',
+      value: user.targetWeight ? `${user.targetWeight} kg` : '未設定',
+      color: '#4ADE80',
+    },
     { label: '飲食計畫', value: user.dietType || '未設定', color: '#60A5FA' },
     { label: '目前體重', value: `${user.weight} kg`, color: '#A78BFA' },
   ];
@@ -433,9 +524,11 @@ export default function ProfileScreen() {
       return;
     }
 
+    // 網頁先前用的是 window.confirm——一個跟整個 App 完全脫節的系統對話框，
+    // 而且在 iframe、內嵌瀏覽器與部分隱私設定下會被直接擋掉（回傳 false），
+    // 使用者按了登出卻什麼事都不會發生。改用 App 自己的對話框。
     if (Platform.OS === 'web') {
-      const confirmed = typeof window === 'undefined' ? true : window.confirm('確定要登出嗎？');
-      if (confirmed) void performSignOut();
+      setSignOutConfirmVisible(true);
       return;
     }
 
@@ -445,11 +538,18 @@ export default function ProfileScreen() {
     ]);
   };
 
+  /**
+   * 只在真的有事發生時才出現。
+   *
+   * 先前閒置時常駐一句「健康條件與過敏原會同步到後端」——那是講給開發者
+   * 聽的，使用者不需要知道資料存在哪裡，而一條永遠在的橫幅會讓真正該被
+   * 看見的「同步失敗」看起來跟平常一樣。
+   */
   const savingMessage = useMemo(() => {
     if (loading) return '載入健康檔案中';
     if (saving) return '同步中';
     if (error) return `同步失敗：${error}`;
-    return '健康條件與過敏原會同步到後端';
+    return null;
   }, [error, loading, saving]);
 
   return (
@@ -465,10 +565,12 @@ export default function ProfileScreen() {
         />
       ) : null}
 
-      <View style={[styles.syncBanner, error && styles.syncWarning]}>
-        {loading || saving ? <ActivityIndicator size="small" color={Palette.accent.green} /> : <Ionicons name={error ? 'cloud-offline-outline' : 'cloud-done-outline'} size={16} color={error ? Palette.status.warning : Palette.accent.green} />}
-        <Text style={[styles.syncText, error && styles.syncWarningText]}>{savingMessage}</Text>
-      </View>
+      {savingMessage ? (
+        <View style={[styles.syncBanner, error && styles.syncWarning]}>
+          {loading || saving ? <ActivityIndicator size="small" color={Palette.accent.green} /> : <Ionicons name="cloud-offline-outline" size={16} color={Palette.status.warning} />}
+          <Text style={[styles.syncText, error && styles.syncWarningText]}>{savingMessage}</Text>
+        </View>
+      ) : null}
 
       {!isDesktop ? <SegmentedControl options={PROFILE_SECTIONS} value={activeSection} onChange={setActiveSection} /> : null}
 
@@ -497,7 +599,7 @@ export default function ProfileScreen() {
         <View style={styles.metricRow}>
           <MetricCard label="BMR" value={user.bmr} unit="kcal" accent={Palette.accent.blue} />
           <MetricCard label="每日目標" value={Math.round(dailyNutrition.calories.target)} unit="kcal" accent={Palette.accent.green} />
-          <MetricCard label="BMI" value={user.bmi} accent={Palette.accent.orange} />
+          <MetricCard label="BMI" value={user.bmi} accent={bmiAccent} caption={bmi.label} />
         </View>
 
         {calorieTargetExplanation ? (
@@ -510,11 +612,32 @@ export default function ProfileScreen() {
           </View>
         ) : null}
 
+        {/* 還沒填過的檔案裡，上面那些數字都是起始預設值，不是任何人填的。
+            不講清楚的話，使用者會以為 App 已經知道他的身體狀況。 */}
+        {!loading && !user.profileComplete ? (
+          <View style={styles.onboardingCard}>
+            <Ionicons name="alert-circle-outline" size={18} color={Palette.status.warning} />
+            <View style={styles.onboardingCopy}>
+              <Text style={styles.onboardingTitle}>還沒填寫你的基本資料</Text>
+              <Text style={styles.onboardingText}>
+                上面的身高、體重、年齡與 BMR 目前是起始預設值，不是你的資料。
+                填完之後每日熱量目標與餐點篩選才會照你的身體狀況算。
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.profileSetupCard}>
           <View style={styles.profileSetupCopy}>
             <Text style={styles.profileSetupTitle}>個人基本資料</Text>
-            <Text style={styles.profileSetupMeta}>{user.height}cm · {user.weight}kg · {user.age} 歲 · {user.dietType}</Text>
-            <Text style={styles.profileSetupMeta}>TDEE {formatCalories(user.tdee)} kcal（未計入疾病調整）</Text>
+            {/* 生理性別先前沒有出現在這一行，但它決定 BMR 用哪一條公式——
+                同樣的身高體重，男女差 166 kcal，而畫面上看不出來套的是哪個。 */}
+            <Text style={styles.profileSetupMeta}>
+              {user.height}cm · {user.weight}kg · {user.age} 歲 · {user.gender === 'male' ? '男性' : '女性'} · {user.dietType}
+            </Text>
+            <Text style={styles.profileSetupMeta}>
+              目標體重 {user.targetWeight ? `${user.targetWeight} kg` : '未設定'} · TDEE {formatCalories(user.tdee)} kcal（未計入疾病調整）
+            </Text>
           </View>
           <SecondaryButton label="編輯資料" onPress={() => setProfileModalVisible(true)} icon={<Ionicons name="create-outline" size={17} color={Palette.accent.green} />} />
         </View>
@@ -539,24 +662,12 @@ export default function ProfileScreen() {
         {thresholdConflicts.length ? (
           <View style={styles.thresholdConflictBox}>
             <View style={styles.thresholdConflictHeader}>
-              <Ionicons name="git-compare-outline" size={16} color={Palette.status.warning} />
+              <Ionicons name="shield-checkmark-outline" size={16} color={Palette.text.secondary} />
               <Text style={styles.thresholdConflictTitle}>
                 {medicalMetadata?.threshold_conflict_note
-                  || `${thresholdConflicts.length} 項門檻在規則檔與程式公式之間不一致，實際生效的是較嚴的那個。`}
+                  || '疾病門檻採用規則檔與臨床公式中較嚴格的一組。'}
               </Text>
             </View>
-            {thresholdConflicts.map((conflict) => {
-              const label = conditionCatalog.find((cond) => cond.id === conflict.condition_id)?.label_zh
-                || conflict.condition_id;
-              return (
-                <Text key={`${conflict.condition_id}_${conflict.nutrient}`} style={styles.thresholdConflictRow}>
-                  {label}・{NUTRIENT_LABELS[conflict.nutrient] || conflict.nutrient}：
-                  實際生效 {conflict.effective_block}
-                  （規則檔 {conflict.configured_block} / 公式 {conflict.derived_block}）
-                </Text>
-              );
-            })}
-            <Text style={styles.thresholdConflictFoot}>需要臨床人員確認要採用哪一邊。</Text>
           </View>
         ) : null}
         <View style={styles.conditionsGrid}>
@@ -639,6 +750,36 @@ export default function ProfileScreen() {
             </View>
           ))}
         </View>
+
+        {/* 目標體重先前只是被顯示出來。「目標 70kg／目前 50kg」配上一個比
+            TDEE 少 235 kcal 的每日目標，畫面上一個字都沒提。 */}
+        {weightGoal ? (
+          <View style={[styles.targetExplainCard, weightGoal.conflict && styles.goalConflictCard]}>
+            <Ionicons
+              name={weightGoal.conflict ? 'warning-outline' : 'information-circle-outline'}
+              size={16}
+              color={weightGoal.conflict ? Palette.status.warning : Palette.text.tertiary}
+            />
+            <View style={styles.targetExplainCopy}>
+              <Text style={[styles.targetExplainText, weightGoal.conflict && styles.goalConflictText]}>
+                {weightGoal.summary}
+              </Text>
+              {weightGoal.conflict ? (
+                <Text style={styles.goalConflictText}>{weightGoal.conflict}</Text>
+              ) : null}
+            </View>
+          </View>
+        ) : (
+          <View style={styles.targetExplainCard}>
+            <Ionicons name="information-circle-outline" size={16} color={Palette.text.tertiary} />
+            <View style={styles.targetExplainCopy}>
+              <Text style={styles.targetExplainMuted}>
+                還沒設定目標體重。填了之後這裡會對照每日熱量目標，告訴你兩者方向是不是一致。
+              </Text>
+            </View>
+          </View>
+        )}
+
         {calorieTargetExplanation ? (
           <View style={styles.targetExplainCard}>
             <Ionicons name="information-circle-outline" size={16} color={Palette.text.tertiary} />
@@ -676,9 +817,17 @@ Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini �
         </Text>
       </SectionBlock>
 
-      <Modal visible={profileModalVisible} transparent animationType="fade" onRequestClose={() => setProfileModalVisible(false)}>
+      {/* aria-label 要放在 Modal 上：react-native-web 會把多出來的 props 展開到
+          那個帶著 role="dialog" 的節點，放在裡面的 View 上讀屏軟體讀不到。 */}
+      <Modal
+        visible={profileModalVisible}
+        transparent
+        animationType="fade"
+        aria-label="編輯基本資料"
+        onRequestClose={() => setProfileModalVisible(false)}
+      >
         <View style={styles.modalLayer}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setProfileModalVisible(false)} />
+          <Pressable style={styles.modalBackdrop} accessibilityLabel="關閉編輯視窗" onPress={() => setProfileModalVisible(false)} />
           <View style={styles.profileModal}>
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleWrap}>
@@ -705,11 +854,17 @@ Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini �
                     // 有疾病條件時一律以臨床指引的目標為準。講清楚它什麼時候才生效。
                     hint: '沒有勾選疾病時採用這個數字；有疾病條件時以臨床指引的每日目標為準。',
                   },
-                  { key: 'targetWeight' as const, label: '目標體重 kg', keyboardType: 'numeric' as const, hint: undefined as string | undefined },
+                  {
+                    key: 'targetWeight' as const,
+                    label: '目標體重 kg',
+                    keyboardType: 'numeric' as const,
+                    hint: '「飲食目標」會拿它跟每日熱量目標對照，方向不一致時會提醒你。',
+                  },
                 ].map((field) => {
-                  const invalid = field.key === 'name'
-                    ? profileDraft.name.trim().length === 0
-                    : !isPositiveDraftNumber(profileDraft[field.key] as string);
+                  const invalid = !isDraftFieldValid(field.key);
+                  // 無效時把合理範圍講出來，而不是只留一個紅框跟一顆灰掉的儲存鈕。
+                  const limit = profileLimits[LIMIT_KEY_BY_FIELD[field.key]];
+                  const hint = invalid && limit ? `${describeLimit(limit)}。` : field.hint;
                   return (
                     <View key={field.key} style={[styles.inputGroup, { width: gridCol2(Spacing.sm) }]}>
                       <Text style={styles.inputLabel}>{field.label}</Text>
@@ -724,7 +879,7 @@ Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini �
                         aria-invalid={invalid}
                         style={[styles.profileInput, invalid && styles.profileInputInvalid]}
                       />
-                      {field.hint ? <Text style={styles.inputHint}>{field.hint}</Text> : null}
+                      {hint ? <Text style={[styles.inputHint, invalid && styles.inputHintInvalid]}>{hint}</Text> : null}
                     </View>
                   );
                 })}
@@ -803,6 +958,14 @@ Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini �
                 </View>
               </View>
 
+              {/* 舊帳號存的飲食型態已經不在選單裡時，不能默默換掉就算了。 */}
+              {replacedDietType ? (
+                <Text style={styles.inputHint}>
+                  你先前存的「{replacedDietType}」已經不在選項裡，這裡先幫你選成「{DEFAULT_DIET_TYPE}」，
+                  存檔前可以改。
+                </Text>
+              ) : null}
+
               {profileDraftProblem ? <Text style={styles.draftProblem}>{profileDraftProblem}</Text> : null}
 
               <PrimaryButton
@@ -815,11 +978,73 @@ Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini �
           </View>
         </View>
       </Modal>
+
+      {/* 網頁版的登出確認。先前用 window.confirm，在 iframe 與部分隱私設定下
+          會被瀏覽器直接擋掉並回傳 false——按了登出，什麼都不會發生。 */}
+      <Modal
+        visible={signOutConfirmVisible}
+        transparent
+        animationType="fade"
+        aria-label="登出 NutriLens"
+        onRequestClose={() => setSignOutConfirmVisible(false)}
+      >
+        <View style={styles.modalLayer}>
+          <Pressable style={styles.modalBackdrop} accessibilityLabel="取消登出" onPress={() => setSignOutConfirmVisible(false)} />
+          <View style={styles.confirmModal}>
+            <Text style={styles.modalTitle}>登出 NutriLens</Text>
+            <Text style={styles.modalSubtitle}>確定要登出嗎？健康檔案已經存在後端，下次登入還在。</Text>
+            {/* 兩顆按鈕都是 width:'100%'，直接放進 row 會撐出卡片外面。 */}
+            <View style={styles.confirmActions}>
+              <View style={styles.confirmAction}>
+                <SecondaryButton label="取消" onPress={() => setSignOutConfirmVisible(false)} />
+              </View>
+              <View style={styles.confirmAction}>
+                <PrimaryButton
+                  label={signingOut ? '登出中' : '登出'}
+                  disabled={signingOut}
+                  onPress={() => {
+                    setSignOutConfirmVisible(false);
+                    void performSignOut();
+                  }}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </AppContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  onboardingCard: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    alignItems: 'flex-start',
+    backgroundColor: Palette.accent.orangeDim,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.28)',
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
+  },
+  onboardingCopy: { flex: 1, gap: 2 },
+  onboardingTitle: { ...Typography.caption, color: Palette.status.warning, fontWeight: '700' },
+  onboardingText: { ...Typography.small, color: Palette.text.secondary, lineHeight: 18 },
+  goalConflictCard: { backgroundColor: Palette.accent.orangeDim, borderColor: 'rgba(245,158,11,0.28)' },
+  goalConflictText: { ...Typography.small, color: Palette.status.warning, lineHeight: 18 },
+  confirmModal: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius['2xl'],
+    padding: Spacing.xl,
+    gap: Spacing.sm,
+    ...Shadows.card,
+  },
+  confirmActions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
+  confirmAction: { flex: 1, minWidth: 0 },
+  inputHintInvalid: { color: Palette.status.error },
   draftProblem: {
     color: Palette.status.error,
     fontSize: 13,

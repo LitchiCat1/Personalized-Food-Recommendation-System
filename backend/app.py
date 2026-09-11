@@ -37,7 +37,14 @@ from services.nutrition_label_service import (
 )
 from services.nutrition_progress_service import build_daily_nutrition_progress, build_nutrition_goal_types, calculate_daily_targets_with_basis, round_targets_for_display
 from services.nutrient_service import NUTRITION_FIELDS, get_nutrient_value
-from services.profile_service import ACTIVITY_LEVELS, build_bmr_response, build_user_profile
+from services.profile_service import (
+    ACTIVITY_LEVELS,
+    DIET_TYPES,
+    PROFILE_LIMITS,
+    build_bmr_response,
+    build_user_profile,
+    normalize_stored_user,
+)
 from services.restaurant_ai_service import build_restaurant_ai_summary
 from services.vision_food_service import (
     build_vision_food_response,
@@ -310,8 +317,22 @@ def medical_metadata():
     return jsonify({
         **build_medical_metadata_response(DISEASE_RULES, ALLERGEN_TAXONOMY),
         "activity_levels": ACTIVITY_LEVELS,
+        # 表單的選項與合理範圍只能有一份定義，前端不再自己抄。
+        "diet_types": list(DIET_TYPES),
+        "profile_limits": PROFILE_LIMITS,
         "threshold_conflicts": conflicts,
+        # 兩種讀者，兩句話。
+        #
+        # threshold_conflict_note 是要放進 App 畫面的：使用者需要知道的是
+        # 「門檻取比較嚴的那一組」，不是每一項營養素的兩個候選數字，更不是
+        # 「需要臨床人員確認要採用哪一邊」——那句話對使用者的意思是這個 App
+        # 自己也不知道該用哪個數字。
+        #
+        # review_note 與上面的 threshold_conflicts 給審閱流程用，資料照樣完整。
         "threshold_conflict_note": (
+            "疾病門檻採用規則檔與臨床公式中較嚴格的一組。" if conflicts else None
+        ),
+        "threshold_conflict_review_note": (
             f"{len(conflicts)} 項營養素在規則檔與程式公式之間數字不一致，"
             "實際生效的是較嚴的那個。需要臨床人員確認要採用哪一邊。"
             if conflicts else None
@@ -483,6 +504,13 @@ def get_user(user_id):
 
     if not user:
         return jsonify({"error": "使用者不存在"}), 404
+
+    # 舊帳號存的欄位可能已經不在目前的選單裡（例如 diet_type 的「均衡飲食」）。
+    # 只修寫入路徑救不到他們——那些帳號會被鎖在一個存不了檔的表單裡，
+    # 所以讀到就地補正並寫回去，一次就好。
+    user, changed = normalize_stored_user(user)
+    if changed:
+        storage.upsert_user(user)
     return jsonify(user)
 
 
@@ -494,7 +522,12 @@ def create_or_update_user():
     if is_auth_required():
         data["user_id"] = require_user_access(data.get("user_id"))
 
-    user_doc = build_user_profile(data, DISEASE_RULES, ALLERGEN_TAXONOMY)
+    try:
+        user_doc = build_user_profile(data, DISEASE_RULES, ALLERGEN_TAXONOMY)
+    except ValueError as e:
+        # 身高 1cm、體重 1kg 這種值會一路變成每日目標與單餐上限，
+        # 不能只靠前端的表單擋。
+        return jsonify({"error": str(e)}), 400
 
     storage.upsert_user(user_doc)
 

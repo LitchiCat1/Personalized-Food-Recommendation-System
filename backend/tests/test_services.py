@@ -1054,6 +1054,60 @@ class ActivityLevelTests(unittest.TestCase):
         self.assertEqual(profile["daily_calorie_target"], profile["tdee"])
         self.assertNotEqual(profile["daily_calorie_target"], 2100)
 
+    def test_a_legacy_diet_type_does_not_survive_a_save(self):
+        """舊帳號存的「均衡飲食」要被換掉，不是原樣留著。
+
+        先前是 `data.get("diet_type") or DEFAULT`：預設值修好了，但舊值是
+        truthy，永遠不會被換掉。前端的 isKnownDietType 不認得它，於是
+        「編輯資料」一打開、什麼都還沒改，儲存鈕就已經是灰的——舊帳號
+        再也存不了檔。
+        """
+        from services.profile_service import DIET_TYPES, build_user_profile
+
+        profile = build_user_profile({
+            "user_id": "u", "height": 157, "weight": 50, "age": 22,
+            "diet_type": "均衡飲食",
+        })
+        self.assertIn(profile["diet_type"], DIET_TYPES)
+
+    def test_reading_an_old_profile_repairs_the_diet_type(self):
+        """只修寫入路徑救不到已經存在的帳號，讀取時要就地補正。"""
+        from services.profile_service import DIET_TYPES, normalize_stored_user
+
+        fixed, changed = normalize_stored_user({"user_id": "u", "diet_type": "均衡飲食"})
+        self.assertTrue(changed)
+        self.assertIn(fixed["diet_type"], DIET_TYPES)
+
+        untouched, changed_again = normalize_stored_user({"user_id": "u", "diet_type": "素食"})
+        self.assertFalse(changed_again)
+        self.assertEqual(untouched["diet_type"], "素食")
+
+    def test_absurd_body_numbers_are_rejected(self):
+        """先前前後端都只檢查「大於 0」。
+
+        身高 1cm 會算出一個 BMI 五位數的檔案，而這個檔案會一路變成每日
+        熱量目標與單餐上限，最後決定推薦哪些餐點。
+        """
+        from services.profile_service import build_user_profile
+
+        base = {"user_id": "u", "height": 170, "weight": 65, "age": 30}
+        for bad in (
+            {"height": 1},
+            {"height": 400},
+            {"weight": 1},
+            {"age": 2},
+            {"target_weight": 5},
+            {"daily_calorie_target": 50},
+        ):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    build_user_profile({**base, **bad})
+
+        # 合理的值不能被誤擋。
+        ok = build_user_profile({**base, "target_weight": 60, "daily_calorie_target": 1800})
+        self.assertEqual(ok["target_weight"], 60)
+        self.assertEqual(ok["daily_calorie_target"], 1800)
+
     def test_the_reported_level_matches_the_multiplier_actually_used(self):
         """先前 activity_level 是照抄輸入的，可能跟生效的係數對不上。"""
         from services.profile_service import build_user_profile

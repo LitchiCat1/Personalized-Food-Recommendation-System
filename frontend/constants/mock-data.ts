@@ -218,37 +218,10 @@ export const SCANNER_DEMO_RESULTS: DetectedFood[] = [
 ];
 
 // ─── Profile ────────────────────────────────────────────────
-// PRD: 性別欄位 (BMR 計算需要)、疾病標籤、過敏原
-export const USER_PROFILE = {
-  name: '王小明',
-  avatar: null,
-  email: 'xiaoming@example.com',
-  joinDate: '2026-01-15',
-  gender: 'male' as 'male' | 'female',
-  stats: {
-    height: 175,
-    weight: 72,
-    bmi: 23.5,
-    age: 28,
-    activityLevel: '中等活動量',
-    activityMultiplier: 1.55,
-  },
-  // PRD: BMR/TDEE 動態計算
-  computed: {
-    bmr: 1737, // Mifflin-St Jeor: 10*72 + 6.25*175 - 5*28 - 5
-    tdee: 2692, // BMR * 1.55
-  },
-  // PRD: 疾病標籤 — 硬性排除規則基準
-  healthConditions: ['高血壓'] as string[],
-  // PRD: 過敏原管理
-  allergens: ['花生', '蝦蟹'] as string[],
-  goals: {
-    dailyCalories: 2100,
-    targetWeight: 70,
-    dietType: '葷食',
-    mealPlan: '每日三餐 + 一次點心',
-  },
-};
+// 這裡先前有一份 USER_PROFILE（示範用的「王小明」：175cm / 72kg / 高血壓 /
+// 對花生與蝦蟹過敏）。它不只是 store 的預設值——「我的」頁在後端回 404 時
+// 會把整份 POST 上去，於是每個新帳號都帶著一個沒人說過的高血壓診斷。
+// 起始檔案改放 constants/profile-defaults.ts，疾病與過敏原一律留空。
 
 // PRD: 可選的疾病標籤列表
 export const AVAILABLE_CONDITIONS = [

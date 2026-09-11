@@ -7,6 +7,73 @@ from services.disease_rule_service import normalize_allergen_ids, normalize_cond
 # 所以每個人的 TDEE 都是 BMR x 1.55——臥床的人和運動員拿到同一個數字。
 DEFAULT_DIET_TYPE = "葷食"
 
+# 前端「我的」頁的選單只有這兩個（frontend/constants/diet.ts）。
+DIET_TYPES = ("葷食", "素食")
+
+# 身體數值的合理範圍。
+#
+# 先前前後端都只檢查「大於 0」：身高 1cm、體重 1kg、年齡 1 歲存得進去，
+# 而這些值會直接餵進 BMR/TDEE/BMI，再變成每日目標與單餐上限。醫療情境下
+# 一個離譜的身高不該安靜地變成一份餐點建議。
+#
+# 上下界取的是「人類可能的極端值」而不是「健康範圍」——這裡要擋的是
+# 打錯字與單位搞錯（170 公尺、50 公克），不是替使用者判斷胖瘦。
+PROFILE_LIMITS = {
+    "height": {"min": 80, "max": 250, "unit": "cm", "label_zh": "身高"},
+    "weight": {"min": 20, "max": 400, "unit": "kg", "label_zh": "體重"},
+    "age": {"min": 13, "max": 120, "unit": "歲", "label_zh": "年齡"},
+    "target_weight": {"min": 20, "max": 400, "unit": "kg", "label_zh": "目標體重"},
+    "daily_calorie_target": {"min": 800, "max": 6000, "unit": "kcal", "label_zh": "每日熱量基準"},
+}
+
+
+def normalize_diet_type(value) -> str:
+    """把不在選單裡的飲食型態換成預設值。
+
+    先前這裡是 `data.get("diet_type") or DEFAULT_DIET_TYPE`：預設值修好了，
+    但舊帳號存的「均衡飲食」是 truthy，永遠不會被換掉。而前端的
+    isKnownDietType 不認得它——結果是「編輯資料」一打開，什麼都還沒改，
+    儲存鈕就已經是灰的，訊息還叫你「在下方選一個」，畫面上卻顯示你已經
+    選了「均衡飲食」。舊帳號等於再也存不了檔。
+    """
+    if isinstance(value, str) and value.strip() in DIET_TYPES:
+        return value.strip()
+    return DEFAULT_DIET_TYPE
+
+
+def _validate_range(field: str, value) -> float:
+    limit = PROFILE_LIMITS[field]
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{limit['label_zh']}要填數字。")
+    if not (limit["min"] <= number <= limit["max"]):
+        raise ValueError(
+            f"{limit['label_zh']}要在 {limit['min']}~{limit['max']} {limit['unit']} 之間，"
+            f"目前填的是 {number:g}。"
+        )
+    return number
+
+
+def normalize_stored_user(user: dict) -> tuple[dict, bool]:
+    """讀取舊資料時把已經不合法的欄位補正，回傳 (資料, 有沒有被改過)。
+
+    寫入路徑修好不會救到已經存在的那些帳號，而這個 App 的帳號是長期的：
+    沒有這一段，任何一次選項收斂都會把既有使用者鎖在一個存不了檔的表單裡。
+    """
+    if not user:
+        return user, False
+
+    fixed = dict(user)
+    changed = False
+
+    diet_type = normalize_diet_type(fixed.get("diet_type"))
+    if diet_type != fixed.get("diet_type"):
+        fixed["diet_type"] = diet_type
+        changed = True
+
+    return fixed, changed
+
 ACTIVITY_LEVELS = [
     {"id": "sedentary", "label_zh": "久坐（幾乎不運動）", "multiplier": 1.2},
     {"id": "light", "label_zh": "輕度活動（每週 1-3 天）", "multiplier": 1.375},
@@ -74,9 +141,13 @@ def resolve_energy_factor(activity_multiplier: float) -> int:
 def build_user_profile(data: dict, disease_rules: dict | None = None, allergen_taxonomy: dict | None = None) -> dict:
     user_id = data["user_id"]
     gender = data.get("gender", "male")
-    weight = data.get("weight", 70)
-    height = data.get("height", 170)
-    age = data.get("age", 25)
+    # 範圍檢查放在這裡而不是路由層，是因為每一條寫入路徑都會經過這個函式。
+    weight = _validate_range("weight", data.get("weight", 70))
+    height = _validate_range("height", data.get("height", 170))
+    age = int(_validate_range("age", data.get("age", 25)))
+    target_weight = data.get("target_weight")
+    if target_weight is not None:
+        target_weight = _validate_range("target_weight", target_weight)
     activity_multiplier = resolve_activity_multiplier(data)
 
     bmr = compute_bmr(gender, weight, height, age)
@@ -104,13 +175,25 @@ def build_user_profile(data: dict, disease_rules: dict | None = None, allergen_t
         "bmi": round(weight / ((height / 100) ** 2), 1),
         "bmr": bmr,
         "tdee": tdee,
-        "daily_calorie_target": data.get("daily_calorie_target", tdee),
+        "daily_calorie_target": (
+            int(_validate_range("daily_calorie_target", data["daily_calorie_target"]))
+            if data.get("daily_calorie_target") is not None
+            else tdee
+        ),
         "health_conditions": health_conditions,
         "allergens": allergens,
-        "target_weight": data.get("target_weight"),
+        "target_weight": target_weight,
+        # 「這份檔案的數字是使用者自己填的嗎？」
+        #
+        # 帳號第一次登入時前端會先建一份空白檔案，否則其他 API 全部 404。
+        # 但那份檔案裡的身高體重是預設值，不是任何人填的——沒有這個旗標，
+        # 畫面就沒辦法分辨「他填了 170cm」跟「我們猜他 170cm」，於是會把
+        # 一組沒人確認過的數字當成健康檔案顯示並拿去算每日目標。
+        "profile_complete": bool(data.get("profile_complete", False)),
         # 前端的選項只有葷食／素食（frontend/constants/diet.ts）。
-        # 先前這裡預設「均衡飲食」，新帳號一建好就是「我的」頁不認得的值。
-        "diet_type": data.get("diet_type") or DEFAULT_DIET_TYPE,
+        # 不在選單裡的值（含舊帳號存下來的「均衡飲食」）一律換成預設值，
+        # 否則「我的」頁的儲存鈕會永遠是灰的。
+        "diet_type": normalize_diet_type(data.get("diet_type")),
         "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     }
 

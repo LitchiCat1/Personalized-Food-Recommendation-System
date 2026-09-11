@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import type { Session } from '@supabase/supabase-js';
 
 import { DEFAULT_DIET_TYPE, DIET_TYPES } from '@/constants/diet';
+import { PROFILE_LIMITS, describeLimit, isWithinLimit } from '@/constants/profile-defaults';
 import { Palette, Radius, Shadows, Spacing, Typography } from '@/constants/theme';
 import { fetchMedicalMetadata, fetchUserProfile, saveUserProfile, type MedicalMetadataResponse, type UserProfileResponse } from '@/lib/api';
 import { isSupabaseAuthRequired, supabase, supabaseConfigurationError } from '@/lib/supabase';
@@ -40,8 +41,9 @@ function mapProfileResponse(data: UserProfileResponse, currentUser: UserProfile)
     healthConditions: data.health_conditions,
     allergens: data.allergens,
     dailyCalorieTarget: data.daily_calorie_target,
-    targetWeight: data.target_weight || currentUser.targetWeight,
+    targetWeight: data.target_weight || 0,
     dietType: data.diet_type,
+    profileComplete: Boolean(data.profile_complete),
   };
 }
 
@@ -87,13 +89,15 @@ function buildInitialDraft(email?: string | null) {
   return {
     name: fallbackName,
     gender: 'male' as 'male' | 'female',
-    height: '170',
-    weight: '70',
-    age: '22',
+    height: '',
+    weight: '',
+    age: '',
     // 這裡原本是一個「活動係數」欄位，要使用者自己填 1.55；
     // 改成挑活動量，係數與每日熱量都交給後端算。
     activityLevel: 'moderate',
-    targetWeight: '70',
+    // 先前預填 '70'，而下面的 submit 又把空白補成「目前體重」——兩種情況都是
+    // 替使用者編一個他沒說過的目標，然後「飲食目標」分頁把它當成真的顯示。
+    targetWeight: '',
     dietType: DEFAULT_DIET_TYPE as string,
   };
 }
@@ -234,8 +238,14 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       setProfileMessage('請輸入姓名或暱稱。');
       return;
     }
-    if (![height, weight, age].every((value) => Number.isFinite(value) && value > 0)) {
-      setProfileMessage('請確認身高、體重與年齡都填了有效的數字。');
+    const outOfRange = ([['height', height], ['weight', weight], ['age', age]] as const)
+      .find(([field, value]) => !isWithinLimit(PROFILE_LIMITS[field], String(value)));
+    if (outOfRange) {
+      setProfileMessage(`${describeLimit(PROFILE_LIMITS[outOfRange[0]])}。`);
+      return;
+    }
+    if (profileDraft.targetWeight.trim() && !isWithinLimit(PROFILE_LIMITS.target_weight, profileDraft.targetWeight)) {
+      setProfileMessage(`${describeLimit(PROFILE_LIMITS.target_weight)}，或留空不設定。`);
       return;
     }
 
@@ -253,8 +263,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         activity_level: profileDraft.activityLevel,
         health_conditions: selectedConditions,
         allergens: selectedAllergens,
-        target_weight: Number.isFinite(targetWeight) && targetWeight > 0 ? targetWeight : weight,
+        // 沒填就是沒設定。先前這裡補上「目前體重」，於是每個人的檔案裡都有
+        // 一個他沒設過的目標體重。
+        target_weight: Number.isFinite(targetWeight) && targetWeight > 0 ? targetWeight : null,
         diet_type: profileDraft.dietType.trim() || DEFAULT_DIET_TYPE,
+        profile_complete: true,
       }, { accessToken });
       replaceUser(mapProfileResponse(response.user, useStore.getState().user));
       resetDashboard();
@@ -377,7 +390,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             ['height', '身高 cm'],
             ['weight', '體重 kg'],
             ['age', '年齡'],
-            ['targetWeight', '目標體重 kg'],
+            ['targetWeight', '目標體重 kg（可留空）'],
           ].map(([key, label]) => (
             <View key={key}>
               <Text style={styles.inputLabel}>{label}</Text>
@@ -386,6 +399,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 value={profileDraft[key as keyof typeof profileDraft]}
                 onChangeText={(value) => updateProfileDraft(key as keyof typeof profileDraft, value)}
                 keyboardType="decimal-pad"
+                placeholder={PROFILE_LIMITS[key === 'targetWeight' ? 'target_weight' : key]
+                  ? `${PROFILE_LIMITS[key === 'targetWeight' ? 'target_weight' : key].min}~${PROFILE_LIMITS[key === 'targetWeight' ? 'target_weight' : key].max}`
+                  : undefined}
                 placeholderTextColor={Palette.text.tertiary}
                 style={styles.input}
               />

@@ -73,6 +73,43 @@ class ApiRouteTests(ApiTestBase):
         self.assertGreater(data["disease_rules"]["count"], 0)
         self.assertGreater(data["allergen_taxonomy"]["count"], 0)
 
+    def test_medical_metadata_keeps_the_clinical_wording_out_of_the_app_copy(self):
+        """給使用者看的那句話不能是「需要臨床人員確認要採用哪一邊」。
+
+        那句話在畫面上的意思是這個 App 自己也不知道該用哪個數字。審閱用的
+        全文與逐項數字改放 threshold_conflict_review_note / threshold_conflicts，
+        資料一樣完整。
+        """
+        response = self.client.get("/medical-metadata")
+        data = response.get_json()
+
+        self.assertIn("profile_limits", data)
+        self.assertIn("diet_types", data)
+        if data.get("threshold_conflicts"):
+            self.assertNotIn("臨床人員", data["threshold_conflict_note"])
+            self.assertIn("臨床人員", data["threshold_conflict_review_note"])
+
+    def test_user_route_repairs_a_legacy_diet_type_on_read(self):
+        """舊帳號存的「均衡飲食」不在前端選單裡，會讓儲存鈕永遠是灰的。"""
+        self.app_module.storage.upsert_user({"user_id": "user-a", "name": "User A", "diet_type": "均衡飲食"})
+
+        with self.mock_auth("user-a"):
+            response = self.client.get("/user/user-a", headers=self.auth_headers())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(response.get_json()["diet_type"], ["葷食", "素食"])
+
+    def test_user_route_rejects_out_of_range_body_numbers(self):
+        with self.mock_auth("user-a"):
+            response = self.client.post(
+                "/user",
+                json={"user_id": "user-a", "name": "A", "height": 1, "weight": 50, "age": 22},
+                headers=self.auth_headers(),
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("身高", response.get_json()["error"])
+
     def test_user_route_rejects_missing_token_when_auth_required(self):
         response = self.client.get("/user/user-a")
         self.assertEqual(response.status_code, 401)

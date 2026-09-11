@@ -11,8 +11,8 @@ import {
   DAILY_NUTRITION,
   TODAY_MEALS,
   HEALTH_ALERTS,
-  USER_PROFILE,
 } from '@/constants/mock-data';
+import { NEW_USER_PROFILE } from '@/constants/profile-defaults';
 import { resolveApiBaseUrl } from '@/lib/network';
 import type { DietaryRecord, NutritionGoalTypes, NutritionTargetBasis, NutritionTargets } from '@/lib/api';
 
@@ -37,6 +37,14 @@ export interface UserProfile {
   dailyCalorieTarget: number;
   targetWeight: number;
   dietType: string;
+  /**
+   * 這份檔案的數字是使用者自己填過的嗎？
+   *
+   * 新帳號第一次進「我的」頁時會先建一份空白檔案（否則其他 API 全部 404），
+   * 裡面的身高體重是起始預設值，不是任何人填的。沒有這個旗標，畫面就沒辦法
+   * 分辨「他填了 165cm」跟「我們猜他 165cm」。
+   */
+  profileComplete: boolean;
 }
 
 export interface ScanResult {
@@ -114,30 +122,45 @@ function computeBMR(gender: string, weight: number, height: number, age: number)
   return Math.round(10 * weight + 6.25 * height - 5 * age - 161);
 }
 
+function computeBMI(weight: number, height: number): number {
+  return Math.round((weight / (height / 100) ** 2) * 10) / 10;
+}
+
 // ─── Store ──────────────────────────────────────────────────
 export const useStore = create<NutriLensState>((set, get) => ({
   // ── User Profile ──
+  // 先前這裡整份抄 constants/mock-data.ts 的 USER_PROFILE（示範用的「王小明」），
+  // 而「我的」頁會把它 POST 上去當成新帳號的健康檔案——包含一個沒人說過的
+  // 高血壓診斷與兩項過敏原。疾病與過敏原現在一律留空，只能由使用者自己勾。
+  // 詳見 constants/profile-defaults.ts。
   user: {
     userId: 'demo_user',
-    name: USER_PROFILE.name,
-    email: USER_PROFILE.email,
-    gender: USER_PROFILE.gender,
-    height: USER_PROFILE.stats.height,
-    weight: USER_PROFILE.stats.weight,
-    age: USER_PROFILE.stats.age,
-    bmi: USER_PROFILE.stats.bmi,
-    activityLevel: USER_PROFILE.stats.activityLevel,
-    activityMultiplier: USER_PROFILE.stats.activityMultiplier,
-    bmr: USER_PROFILE.computed.bmr,
-    tdee: USER_PROFILE.computed.tdee,
-    healthConditions: [...USER_PROFILE.healthConditions],
-    allergens: [...USER_PROFILE.allergens],
+    name: '',
+    email: '',
+    gender: NEW_USER_PROFILE.gender,
+    height: NEW_USER_PROFILE.height,
+    weight: NEW_USER_PROFILE.weight,
+    age: NEW_USER_PROFILE.age,
+    bmi: computeBMI(NEW_USER_PROFILE.weight, NEW_USER_PROFILE.height),
+    activityLevel: NEW_USER_PROFILE.activityLevel,
+    activityMultiplier: NEW_USER_PROFILE.activityMultiplier,
+    bmr: computeBMR(NEW_USER_PROFILE.gender, NEW_USER_PROFILE.weight, NEW_USER_PROFILE.height, NEW_USER_PROFILE.age),
+    tdee: Math.round(
+      computeBMR(NEW_USER_PROFILE.gender, NEW_USER_PROFILE.weight, NEW_USER_PROFILE.height, NEW_USER_PROFILE.age)
+        * NEW_USER_PROFILE.activityMultiplier,
+    ),
+    healthConditions: [...NEW_USER_PROFILE.healthConditions],
+    allergens: [...NEW_USER_PROFILE.allergens],
     // 真實數字由 setActivityStats 依實際紀錄算出來；在那之前是 0，不是假的 14 天。
     streak: 0,
     totalMeals: 0,
-    dailyCalorieTarget: USER_PROFILE.goals.dailyCalories,
-    targetWeight: USER_PROFILE.goals.targetWeight,
-    dietType: USER_PROFILE.goals.dietType,
+    dailyCalorieTarget: Math.round(
+      computeBMR(NEW_USER_PROFILE.gender, NEW_USER_PROFILE.weight, NEW_USER_PROFILE.height, NEW_USER_PROFILE.age)
+        * NEW_USER_PROFILE.activityMultiplier,
+    ),
+    targetWeight: NEW_USER_PROFILE.targetWeight,
+    dietType: NEW_USER_PROFILE.dietType,
+    profileComplete: false,
   },
 
   accessToken: null,

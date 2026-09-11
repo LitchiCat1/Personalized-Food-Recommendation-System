@@ -1078,9 +1078,31 @@ class ActivityLevelTests(unittest.TestCase):
         self.assertTrue(changed)
         self.assertIn(fixed["diet_type"], DIET_TYPES)
 
-        untouched, changed_again = normalize_stored_user({"user_id": "u", "diet_type": "素食"})
-        self.assertFalse(changed_again)
+        untouched, _ = normalize_stored_user({"user_id": "u", "diet_type": "素食"})
         self.assertEqual(untouched["diet_type"], "素食")
+
+        # 已經正規化過的資料列不該每次讀取都被重寫一次。
+        settled, changed_again = normalize_stored_user(untouched)
+        self.assertFalse(changed_again)
+
+    def test_an_account_from_before_the_flag_counts_as_filled_in(self):
+        """profile_complete 是後加的欄位，缺這個鍵不代表使用者沒填過。
+
+        build_user_profile 一定會寫這個鍵，所以「資料列存在、但沒有這個鍵」
+        只有一種可能：它是旗標出現之前建的。不補這一筆的話，每個既有帳號
+        一進「我的」頁都會被說「這些還不是你的資料」，還被強制打開表單。
+        """
+        from services.profile_service import normalize_stored_user
+
+        fixed, changed = normalize_stored_user({"user_id": "u", "diet_type": "葷食", "height": 157})
+        self.assertTrue(changed)
+        self.assertTrue(fixed["profile_complete"])
+
+        # 明確標成 false 的（剛建好的空白檔案）不能被改掉。
+        blank, _ = normalize_stored_user(
+            {"user_id": "u", "diet_type": "葷食", "profile_complete": False}
+        )
+        self.assertFalse(blank["profile_complete"])
 
     def test_absurd_body_numbers_are_rejected(self):
         """先前前後端都只檢查「大於 0」。

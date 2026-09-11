@@ -48,8 +48,10 @@ def _validate_range(field: str, value) -> float:
     except (TypeError, ValueError):
         raise ValueError(f"{limit['label_zh']}要填數字。")
     if not (limit["min"] <= number <= limit["max"]):
+        # 拉丁字母的單位（cm / kg / kcal）前後留空白，中文單位（歲）不要。
+        unit = f" {limit['unit']} " if limit["unit"][:1].isascii() and limit["unit"][:1].isalpha() else limit["unit"]
         raise ValueError(
-            f"{limit['label_zh']}要在 {limit['min']}~{limit['max']} {limit['unit']} 之間，"
+            f"{limit['label_zh']}要在 {limit['min']}~{limit['max']}{unit}之間，"
             f"目前填的是 {number:g}。"
         )
     return number
@@ -70,6 +72,14 @@ def normalize_stored_user(user: dict) -> tuple[dict, bool]:
     diet_type = normalize_diet_type(fixed.get("diet_type"))
     if diet_type != fixed.get("diet_type"):
         fixed["diet_type"] = diet_type
+        changed = True
+
+    # profile_complete 是後加的欄位。build_user_profile 一定會寫這個鍵，所以
+    # 「資料列存在、但沒有這個鍵」只有一種可能：它是這個旗標出現之前建的，
+    # 也就是使用者早就自己填過了。不補這一筆的話，每個既有帳號一進「我的」頁
+    # 都會被橘色卡片說「這些還不是你的資料」，還被強制打開編輯表單。
+    if "profile_complete" not in fixed:
+        fixed["profile_complete"] = True
         changed = True
 
     return fixed, changed

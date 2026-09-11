@@ -56,5 +56,8 @@ export function isWithinLimit(limit: ProfileLimit | undefined, raw: string): boo
 }
 
 export function describeLimit(limit: ProfileLimit): string {
-  return `${limit.label_zh}要在 ${limit.min}~${limit.max} ${limit.unit} 之間`;
+  // 拉丁字母的單位（cm / kg / kcal）前後要留空白，中文單位（歲）不要——
+  // 先前一律加空白，「年齡要在 13~120 歲 之間」中間會斷開。
+  const unit = /^[A-Za-z]/.test(limit.unit) ? ` ${limit.unit} ` : `${limit.unit}`;
+  return `${limit.label_zh}要在 ${limit.min}~${limit.max}${unit}之間`;
 }

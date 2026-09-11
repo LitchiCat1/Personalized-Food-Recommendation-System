@@ -43,7 +43,8 @@ function mapProfileResponse(data: UserProfileResponse, currentUser: UserProfile)
     dailyCalorieTarget: data.daily_calorie_target,
     targetWeight: data.target_weight || 0,
     dietType: data.diet_type,
-    profileComplete: Boolean(data.profile_complete),
+    // 後端落後一版時這個欄位是 undefined；判不出來就當成填過了。
+    profileComplete: data.profile_complete !== false,
   };
 }
 
@@ -88,7 +89,9 @@ function buildInitialDraft(email?: string | null) {
   const fallbackName = email?.split('@')[0] || '';
   return {
     name: fallbackName,
-    gender: 'male' as 'male' | 'female',
+    // 不預選。BMR 的公式男女差 166 kcal，而這一格先前是預先選好「男性」的：
+    // 表單上其他欄位都要自己填，唯獨這個替使用者決定了，而且看起來像他選的。
+    gender: '' as '' | 'male' | 'female',
     height: '',
     weight: '',
     age: '',
@@ -236,6 +239,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
     if (!profileDraft.name.trim()) {
       setProfileMessage('請輸入姓名或暱稱。');
+      return;
+    }
+    if (!profileDraft.gender) {
+      setProfileMessage('請選擇生理性別，基礎代謝率的公式需要它。');
       return;
     }
     const outOfRange = ([['height', height], ['weight', weight], ['age', age]] as const)

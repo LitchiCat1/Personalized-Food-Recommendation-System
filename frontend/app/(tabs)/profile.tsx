@@ -18,6 +18,7 @@ import SegmentedControl from '@/components/ui/segmented-control';
 import FeedbackBanner from '@/components/ui/feedback-banner';
 import { clearNearbyVenueIndex, fetchAllRecordsWithTargets, fetchMedicalMetadata, fetchUserProfile, indexNearbyVenues, listNearbyVenueIndex, saveUserProfile } from '@/lib/api';
 import { bmiCategory, readWeightGoal } from '@/lib/body-metrics';
+import { describeRequestError } from '@/lib/error-copy';
 import { describeCalorieTarget, describeUserTargetFallback, formatCalories } from '@/lib/calorie-target';
 import { calculateActivityStats } from '@/lib/dietary-trends';
 import { describeLocation, resolveLocation } from '@/lib/location';
@@ -34,7 +35,7 @@ const PROFILE_SECTIONS = [
 
 export default function ProfileScreen() {
   const { gridCol2, isDesktop } = useResponsive();
-  const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser, invalidateDietaryRecords , dailyNutrition, nutritionTargetBasis, setActivityStats, applyNutritionTargets } = useStore();
+  const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser, invalidateDietaryRecords , dailyNutrition, nutritionTargetBasis, setActivityStats, applyNutritionTargets, isAuthenticated } = useStore();
   const initialUserRef = useRef(user);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -123,7 +124,11 @@ export default function ProfileScreen() {
           dailyCalorieTarget: data.daily_calorie_target,
           targetWeight: data.target_weight || 0,
           dietType: data.diet_type,
-          profileComplete: Boolean(data.profile_complete),
+          // `!== false` 而不是 Boolean()：profile_complete 是後加的欄位，
+          // 線上後端落後一版時整個欄位會是 undefined。判不出來的時候要當成
+          // 「填過了」，不然既有帳號會被說「這些還不是你的資料」並被強制
+          // 打開表單——誤判的代價是不對稱的，寧可少問一次。
+          profileComplete: data.profile_complete !== false,
           // 這兩個不在 /user 的回應裡，要沿用 store 目前的值。
           // 用 seedUser（mount 當下的快照）會蓋掉 setActivityStats 剛算好的數字：
           // 兩個請求誰先回是不一定的，實測就出現過連續天數被打回 0。
@@ -133,7 +138,7 @@ export default function ProfileScreen() {
         setError(null);
       })
       .catch((err: Error) => {
-        if (!cancelled) setError(err.message);
+        if (!cancelled) setError(describeRequestError(err, '無法載入健康檔案'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -201,8 +206,10 @@ export default function ProfileScreen() {
    * 而它會一路變成每日目標與單餐上限。
    */
   useEffect(() => {
-    if (!loading && !user.profileComplete) setProfileModalVisible(true);
-  }, [loading, user.profileComplete]);
+    // error 一定要看：載入失敗時 user 還是 store 的起始預設值，這時候把表單
+    // 打開等於請使用者按下「用預設值覆蓋我後端的真實檔案」。
+    if (!loading && !error && !user.profileComplete) setProfileModalVisible(true);
+  }, [loading, error, user.profileComplete]);
 
   /**
    * Esc 關閉編輯視窗。
@@ -233,16 +240,38 @@ export default function ProfileScreen() {
    */
   const profileSyncChain = useRef<Promise<void>>(Promise.resolve());
 
-  const queueProfileSync = () => {
+  /**
+   * 勾／取消一個疾病或過敏原，並且在後端沒收到時把畫面改回去。
+   *
+   * 先前失敗只會在上面顯示一行「同步失敗」，chip 照樣是亮的——畫面說你已經
+   * 勾了高血壓，後端的檔案裡沒有，而整組鈉的禁忌規則是照後端的檔案跑的。
+   * 這比看不到任何東西更危險，因為使用者會以為已經設定好了。
+   *
+   * 這條路徑現在比以前容易踩到：身高體重年齡加了合理範圍之後，一個早年存進
+   * 去的離譜數值會讓「整份檔案」的寫入被退回，即使這次只是想勾一個疾病。
+   */
+  const applySafetySelection = (mutate: () => void) => {
+    const before = useStore.getState().user;
+    mutate();
     profileSyncChain.current = profileSyncChain.current
       .catch(() => {})
-      .then(() => syncProfile(useStore.getState().user));
+      .then(async () => {
+        const saved = await syncProfile(useStore.getState().user);
+        if (saved) return;
+        const current = useStore.getState().user;
+        replaceUser({
+          ...current,
+          healthConditions: before.healthConditions,
+          allergens: before.allergens,
+        });
+      });
     return profileSyncChain.current;
   };
 
   const thresholdConflicts = medicalMetadata?.threshold_conflicts ?? [];
 
-  const syncProfile = async (nextUser = user) => {
+  /** 回傳後端是否真的收下了——呼叫端要據此決定畫面要不要改回去。 */
+  const syncProfile = async (nextUser = user): Promise<boolean> => {
     setSaving(true);
     try {
       const response = await saveUserProfile(apiBaseUrl, {
@@ -269,12 +298,17 @@ export default function ProfileScreen() {
         tdee: response.user.tdee,
         dailyCalorieTarget: response.user.daily_calorie_target,
         dietType: response.user.diet_type,
-        profileComplete: Boolean(response.user.profile_complete),
+        profileComplete: response.user.profile_complete !== false,
       });
       setError(null);
       await refreshTargets();
+      return true;
     } catch (err: any) {
-      setError(err?.message || '儲存失敗');
+      const message = describeRequestError(err);
+      // 後端退回身體數值時，出問題的欄位不在這一頁上——要講去哪裡改。
+      const needsProfileEdit = /身高|體重|年齡|目標體重|每日熱量基準/.test(message);
+      setError(needsProfileEdit ? `${message}請按「編輯資料」修正後再試。` : message);
+      return false;
     } finally {
       setSaving(false);
     }
@@ -444,6 +478,8 @@ export default function ProfileScreen() {
 
   // BMI 那張卡片先前的顏色是寫死的橘色：20.3（標準）跟 35 長得一模一樣，
   // 而且只有一個數字，分級要讀者自己查表。
+  const displayName = user.name.trim() || (user.email || '').split('@')[0] || '';
+
   const bmi = bmiCategory(user.bmi);
   const bmiAccent = bmi.tone === 'normal'
     ? Palette.accent.green
@@ -456,6 +492,7 @@ export default function ProfileScreen() {
     user.targetWeight,
     dailyNutrition.calories.target,
     user.tdee,
+    nutritionTargetBasis?.source === 'disease',
   );
 
   const dietGoals = [
@@ -552,9 +589,24 @@ export default function ProfileScreen() {
     return null;
   }, [error, loading, saving]);
 
+  /**
+   * 載入失敗時，畫面上的身高體重與每日目標都是 store 的起始預設值。
+   *
+   * 先前只寫一句「同步失敗」，旁邊照樣有三張寫著具體數字的卡片——使用者會
+   * 以為那是他的資料，只是這次沒存上去。
+   */
+  const showingFallbackNumbers = Boolean(error) && !user.profileComplete;
+
   return (
     <AppContainer>
-      <ScreenHeader title="我的健康檔案" subtitle="管理身體資料、飲食目標、疾病條件與過敏原。" badge={isSupabaseAuthConfigured ? 'Auth 已登入' : 'Demo 模式'} badgeTone={isSupabaseAuthConfigured ? 'success' : 'warning'} />
+      {/* 徽章先前只看「有沒有設定 Supabase」，不看有沒有真的登入：session 過期
+          之後畫面照樣寫「Auth 已登入」，而下面每一次同步都會 401。 */}
+      <ScreenHeader
+        title="我的健康檔案"
+        subtitle="管理身體資料、飲食目標、疾病條件與過敏原。"
+        badge={!isSupabaseAuthConfigured ? 'Demo 模式' : isAuthenticated ? 'Auth 已登入' : '尚未登入'}
+        badgeTone={isSupabaseAuthConfigured && isAuthenticated ? 'success' : 'warning'}
+      />
 
       {profileFeedback ? (
         <FeedbackBanner
@@ -568,7 +620,10 @@ export default function ProfileScreen() {
       {savingMessage ? (
         <View style={[styles.syncBanner, error && styles.syncWarning]}>
           {loading || saving ? <ActivityIndicator size="small" color={Palette.accent.green} /> : <Ionicons name="cloud-offline-outline" size={16} color={Palette.status.warning} />}
-          <Text style={[styles.syncText, error && styles.syncWarningText]}>{savingMessage}</Text>
+          <Text style={[styles.syncText, error && styles.syncWarningText]}>
+            {savingMessage}
+            {showingFallbackNumbers ? '下面顯示的是預設值，不是你的資料。' : ''}
+          </Text>
         </View>
       ) : null}
 
@@ -577,13 +632,19 @@ export default function ProfileScreen() {
       <View style={isDesktop ? styles.desktopColumns : styles.mobileSectionContent}>
       {isDesktop || activeSection === 'personal' ? (
       <View style={isDesktop ? styles.desktopPane : undefined}>
+        {/* name 在起始檔案裡是空字串（載入失敗時也還是空的），先前這裡會渲染出
+            一個沒有字母的圓圈加兩行空白，看起來像畫面壞了。 */}
         <View style={styles.accountCard}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarInitial}>{user.name.slice(0, 1).toUpperCase()}</Text>
+            {displayName ? (
+              <Text style={styles.avatarInitial}>{displayName.slice(0, 1).toUpperCase()}</Text>
+            ) : (
+              <Ionicons name="person-outline" size={30} color={Palette.accent.green} />
+            )}
           </View>
           <View style={styles.accountCopy}>
-            <Text style={styles.userName}>{user.name}</Text>
-            <Text style={styles.userEmail}>{user.email}</Text>
+            <Text style={styles.userName}>{displayName || '尚未設定名稱'}</Text>
+            {user.email ? <Text style={styles.userEmail}>{user.email}</Text> : null}
             <View style={styles.badgeRow}>
               <DataPill tone="success">連續 {user.streak} 天</DataPill>
               <DataPill tone="info">累積 {user.totalMeals} 餐</DataPill>
@@ -614,7 +675,7 @@ export default function ProfileScreen() {
 
         {/* 還沒填過的檔案裡，上面那些數字都是起始預設值，不是任何人填的。
             不講清楚的話，使用者會以為 App 已經知道他的身體狀況。 */}
-        {!loading && !user.profileComplete ? (
+        {!loading && !error && !user.profileComplete ? (
           <View style={styles.onboardingCard}>
             <Ionicons name="alert-circle-outline" size={18} color={Palette.status.warning} />
             <View style={styles.onboardingCopy}>
@@ -682,8 +743,7 @@ export default function ProfileScreen() {
                 accessibilityLabel={cond.label_zh}
                 aria-checked={isActive}
                 onPress={() => {
-                  toggleCondition(cond.id, [cond.label_zh]);
-                  void queueProfileSync();
+                  void applySafetySelection(() => toggleCondition(cond.id, [cond.label_zh]));
                 }}
                 style={[styles.conditionChip, isActive && styles.conditionChipActive]}
               >
@@ -719,8 +779,7 @@ export default function ProfileScreen() {
                 accessibilityLabel={allergen.label_zh}
                 aria-checked={isActive}
                 onPress={() => {
-                  toggleAllergen(allergen.id, [allergen.label_zh]);
-                  void queueProfileSync();
+                  void applySafetySelection(() => toggleAllergen(allergen.id, [allergen.label_zh]));
                 }}
                 style={[styles.allergenChip, isActive && styles.allergenChipActive]}
               >
@@ -1207,8 +1266,6 @@ const styles = StyleSheet.create({
   },
   thresholdConflictHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xs },
   thresholdConflictTitle: { ...Typography.caption, color: Palette.text.primary, fontWeight: '700', flex: 1 },
-  thresholdConflictRow: { ...Typography.small, color: Palette.text.secondary },
-  thresholdConflictFoot: { ...Typography.small, color: Palette.status.warning },
   medicalDisclaimer: {
     flexDirection: 'row',
     alignItems: 'flex-start',

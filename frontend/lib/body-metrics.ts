@@ -56,6 +56,13 @@ export function readWeightGoal(
   targetWeight: number,
   dailyTarget: number,
   tdee: number,
+  /**
+   * 目前生效的每日熱量是不是疾病指引算出來的。
+   *
+   * 是的話，不一致的那一邊比較可能是使用者自己設的目標體重，而不是臨床
+   * 數字——這種時候不能寫得像在叫他多吃一點把熱量補回來。
+   */
+  targetIsClinical = false,
 ): WeightGoalReading | null {
   if (!targetWeight || !Number.isFinite(targetWeight) || targetWeight <= 0) return null;
   if (!currentWeight || !Number.isFinite(currentWeight)) return null;
@@ -73,15 +80,19 @@ export function readWeightGoal(
   let conflict: string | null = null;
   if (Number.isFinite(dailyTarget) && Number.isFinite(tdee) && tdee > 0) {
     const balance = dailyTarget - tdee;
+    const advice = targetIsClinical
+      ? '這個每日目標是依你勾選的疾病、按臨床指引算出來的，不要為了體重目標自行調高；要改請先諮詢醫療人員。'
+      : '兩個數字要改一個：調整目標體重，或在「編輯資料」改每日熱量基準。';
+
     if (direction === 'gain' && balance < -ENERGY_TOLERANCE_KCAL) {
       conflict =
         `每日目標 ${Math.round(dailyTarget).toLocaleString()} kcal 比你的 TDEE 少 ` +
         `${Math.abs(Math.round(balance)).toLocaleString()} kcal，照這個吃是會往下掉的，` +
-        `跟「增重 ${gapKg} kg」的目標相反。`;
+        `跟「增重 ${gapKg} kg」的目標相反。${advice}`;
     } else if (direction === 'lose' && balance > ENERGY_TOLERANCE_KCAL) {
       conflict =
         `每日目標 ${Math.round(dailyTarget).toLocaleString()} kcal 比你的 TDEE 多 ` +
-        `${Math.round(balance).toLocaleString()} kcal，跟「減重 ${gapKg} kg」的目標相反。`;
+        `${Math.round(balance).toLocaleString()} kcal，跟「減重 ${gapKg} kg」的目標相反。${advice}`;
     }
   }
 

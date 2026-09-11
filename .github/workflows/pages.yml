@@ -1,12 +1,13 @@
 name: Deploy web app to GitHub Pages
 
-# 前端的 JS bundle 約 3 MB，每次有人打開網站就下載一次。放在 Render 的
+# 前端的 JS bundle 約 2.6 MB（brotli 後約 650 KB），每次有人打開網站就下載一次。放在 Render 的
 # 免費方案上，1,700 次載入就會把 5 GB 頻寬吃完並停掉整個 workspace。
 # GitHub Pages 對公開倉庫的頻寬寬鬆得多，而後端只需要處理 API 流量。
 
 on:
   push:
     branches:
+      - v0.0.9
       - v0.0.8f
       - main
   workflow_dispatch:

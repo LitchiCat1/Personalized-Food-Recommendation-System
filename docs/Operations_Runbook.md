@@ -213,7 +213,7 @@ GEMINI_API_KEYS=key1,key2,key3
 - Backend Render URL：由 Blueprint 建立 `personalized-food-recommendation-backend` 後由 Render 指派，每次部署各自不同
 - Frontend Render Static Site：由 Blueprint 建立 `personalized-food-recommendation-frontend`，部署後使用 Render 指派網址
 - Render service id：以部署者自己的 Render Dashboard 顯示為準
-- 部署分支：`v0.0.8f`
+- 部署分支：`v0.0.9`
 - 後端儲存：Supabase Postgres Session Pooler
 - 後端 Auth：`SUPABASE_AUTH_REQUIRED=true`
 
@@ -237,6 +237,68 @@ Blueprint 首次建立時，`DATABASE_URL`、`GEMINI_API_KEYS`、`SUPABASE_URL`�
 
 `render.yaml` 已設定 frontend build：`npm ci && npm run build:web`，publish path：`dist`，並加上 SPA rewrite `/* -> /index.html`。
 Blueprint 會把 `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY` 與 `GOOGLE_PLACES_API_KEY` 引用到 Frontend Static Site，並把前後端 Auth flag 固定為 `true`。若缺少 Supabase URL 或 publishable key，正式 Render 前端會顯示設定錯誤並停止載入 demo profile。
+
+### 5.1 GitHub Pages 部署（前端）
+
+前端 bundle 約 2.6 MB（brotli 後約 650 KB），每次有人打開網站就下載一次。Render 免費方案 5 GB 頻寬約 1,700 次載入就會用完並停掉整個 workspace，所以前端改放 GitHub Pages，Render 只留後端 API。
+
+`.github/workflows/pages.yml` 負責這件事。換到新倉庫時，以下每一項都要做，少一項網站會「部署成功但打不開」。
+
+**① 啟用 Pages**
+
+倉庫 Settings → Pages → Source 選 **GitHub Actions**（不是 Deploy from a branch）。
+
+免費方案的 Pages 只支援**公開**倉庫。私有倉庫要改成 public：Settings → General → 最底部 Danger Zone → Change repository visibility。
+
+**② 設定 Actions variables**
+
+Settings → Secrets and variables → Actions → **Variables** 分頁（不是 Secrets）→ New repository variable：
+
+| 變數 | 值 | 沒設會怎樣 |
+|---|---|---|
+| `EXPO_PUBLIC_API_BASE_URL` | 後端的 Render 網址 | 退回 `http://localhost:5000`，所有 API 請求失敗 |
+| `SUPABASE_URL` | `https://<project>.supabase.co` | `SUPABASE_AUTH_REQUIRED` 在 workflow 裡寫死 `true`，缺這個會直接卡在設定錯誤畫面 |
+| `SUPABASE_PUBLISHABLE_KEY` | Supabase → Project Settings → API | 同上 |
+| `GOOGLE_MAPS_BROWSER_KEY` | Google Maps 瀏覽器金鑰 | 只有地圖不顯示，其他功能正常 |
+
+這幾個值最後都會出現在公開的 JS bundle 裡，所以用 variables 而不是 secrets——標成 secret 只會讓人誤以為它們是機密的。
+
+**③ 後端 CORS 要放行新網域**
+
+`backend/app.py` 只放行 `ALLOWED_ORIGINS` 列出的來源。到 Render 後端服務的環境變數，把 Pages 的 origin 加進去（只要 origin，不含路徑），改完要重啟後端：
+
+```
+https://<帳號>.github.io
+```
+
+漏掉這一步的症狀是網站畫面正常、但每個請求都被 CORS 擋掉。
+
+**④ 確認 workflow 的觸發分支**
+
+`pages.yml` 的 `on.push.branches` 是寫死的分支清單，發新版時要把新分支加進去，否則 push 了不會部署：
+
+```yaml
+on:
+  push:
+    branches:
+      - v0.0.9
+      - main
+  workflow_dispatch:
+```
+
+`EXPO_BASE_URL` 不用手動改。GitHub Pages 的網址是 `https://<帳號>.github.io/<倉庫名>/`，靜態輸出必須知道這個子路徑前綴，workflow 用 `/${{ github.event.repository.name }}` 自動帶入，換倉庫名稱會自己跟著變。
+
+**⑤ 跑 workflow**
+
+Actions → Deploy web app to GitHub Pages → Run workflow。網址是 `https://<帳號>.github.io/<倉庫名>/`。
+
+**常見失敗**
+
+Build job 全綠、只有 Deploy job 的 `Deploy to GitHub Pages` 這一步失敗，幾乎都是**跑的當下 Pages 還沒啟用**——例如剛 push 完才想到要去開 Pages。把①做完再重跑一次就會過。查 `has_pages` 可以確認：
+
+```bash
+curl -s https://api.github.com/repos/<帳號>/<倉庫> | grep has_pages
+```
 
 ## 6. 部署後驗收流程
 

@@ -465,3 +465,80 @@ Supabase Auth 測試註冊可能遇到 `email rate limit exceeded`。遠端驗�
 ### 8.7 Secrets 外洩處理
 
 即使沒有寫入檔案，只要 secret 出現在聊天內容，就視為外洩。曾貼出的 Render API key、Gemini API keys、Supabase database password 應立即輪替或撤銷。
+
+## 9. 在 Render 另外開一個後端服務
+
+2026-09-11：前端已換版，後端服務卻停在 2026-09-06 之前的程式碼，`86d2716`、
+`257b7c3`、`49864ab` 三批修正都沒有上線。若原服務所在的 workspace 無法恢復，
+依本節另建一個後端。
+
+### 9.1 只建後端，不要建前端
+
+`render.yaml` 這份 Blueprint 會同時建立前端 static site 與後端 web service。
+**不要用它**——前端那顆約 3 MB 的 bundle 由 Render static 供應，正是先前把免費
+方案 5 GB 頻寬用盡、導致整個 workspace 被停的原因。前端維持在 GitHub Pages，
+Render 只放後端。
+
+改用 Dashboard 手動建立 Web Service：
+
+1. Render Dashboard → **New** → **Web Service**
+2. 連結 repo `LitchiCat1/Personalized-Food-Recommendation-System`
+3. 設定：
+   - **Branch**：`v0.0.9`
+   - **Root Directory**：`backend`
+   - **Runtime**：Python 3
+   - **Build Command**：`pip install -r requirements.txt`
+   - **Start Command**：`python -u app.py`
+   - **Instance Type**：Free
+
+`app.py` 在非 debug 模式下用 waitress 啟動並讀取 `PORT`，Render 注入自己的埠號即可，
+不必額外設定。
+
+### 9.2 要填的環境變數
+
+沿用原後端的值。`DATABASE_URL` 指向同一個 Supabase 專案的話，**既有資料會保留**。
+
+| 變數 | 值 | 備註 |
+| --- | --- | --- |
+| `DATABASE_URL` | 沿用原值 | Supabase Postgres 連線字串；沿用才不會掉資料 |
+| `SUPABASE_URL` | 沿用原值 | 驗證 access token 用 |
+| `SUPABASE_PUBLISHABLE_KEY` | 沿用原值 | 可公開 |
+| `SUPABASE_AUTH_REQUIRED` | `true` | 預設就是要驗證，這裡明寫 |
+| `GEMINI_API_KEYS` | 沿用原值 | 逗號分隔多把，會輪替 |
+| `GOOGLE_PLACES_API_KEY` | 沿用原值 | 附近店家搜尋 |
+| `ALLOWED_ORIGINS` | 前端網址，逗號分隔 | **沒設的話只放行 localhost**，線上前端會被 CORS 擋掉 |
+| `APP_UTC_OFFSET_HOURS` | `8` | Render 跑 UTC，不設會讓「今天」與店家營業時間算錯 |
+| `FLASK_DEBUG` | `false` | |
+
+可以不填：`MENU_DATABASE_URL`（留空就跟 `DATABASE_URL` 同一個）、
+`GEMINI_MODELS`（不設會用內建候選順序）、
+`HEALTHY_FOOD_DEV_CATALOG_FALLBACK`（**正式環境絕對不要開**，開了會把內建示範
+店家平移到使用者座標，變出當地不存在的店）。
+
+### 9.3 換網址之後
+
+新服務會拿到新的 `https://<name>-<hash>.onrender.com`，前端必須跟著改：
+
+- **GitHub Pages 前端**：repo → Settings → Secrets and variables → Actions →
+  Variables，把 `EXPO_PUBLIC_API_BASE_URL` 改成新網址，再重跑 `pages.yml`。
+  網址是 build 時打進 bundle 的，不重跑不會生效。
+- **舊的 Render static 前端**：若還在用，改它的 `EXPO_PUBLIC_API_BASE_URL` 並重新部署。
+- 別忘了把新的前端網址加進後端的 `ALLOWED_ORIGINS`。
+
+### 9.4 驗收
+
+`/health` 會回報實際跑的版本：
+
+```bash
+curl -s https://<新後端>.onrender.com/health
+```
+
+- `deployed_commit` 要對得上 `git log -1 --format=%h origin/v0.0.9`
+- 看不到 `deployed_branch` / `deployed_commit` 這兩個欄位，就表示跑的是
+  2026-09-10 之前的舊程式碼
+- `postgres: true`、`places_enabled: true` 表示 `DATABASE_URL` 與
+  `GOOGLE_PLACES_API_KEY` 有讀到
+
+登入後再確認每日熱量目標：157cm／50kg／中等活動量、四病分開各跑一次，
+每日目標應為 **1898 kcal**（理想體重 54.23 kg × 35）。若仍是 1627 kcal
+（× 30，不看活動量），表示跑的還是舊版。

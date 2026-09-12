@@ -522,6 +522,19 @@ def create_or_update_user():
     if is_auth_required():
         data["user_id"] = require_user_access(data.get("user_id"))
 
+    # profile_complete 沒送的話，不能當成 False。
+    #
+    # 部署是分開的：後端會先上，而那時候線上的前端還是舊版，它根本不知道有
+    # 這個欄位。若沒有這一段，舊前端每存一次檔（連「勾一個疾病」都會送整份
+    # 檔案）就會把使用者標成「沒填過基本資料」，等新前端上線，這些人就會被
+    # 那張「還沒填寫你的基本資料」的卡片攔下來——而他們早就填完了。
+    #
+    # 規則：沒送就沿用已存的值；連資料列都沒有的才算新帳號。會建空白檔案的
+    # 只有前端那條 404 路徑，而它一定會明確送 profile_complete: false。
+    if "profile_complete" not in data:
+        existing = storage.get_user(data["user_id"])
+        data["profile_complete"] = bool(existing.get("profile_complete", True)) if existing else True
+
     try:
         user_doc = build_user_profile(data, DISEASE_RULES, ALLERGEN_TAXONOMY)
     except ValueError as e:

@@ -99,6 +99,34 @@ class ApiRouteTests(ApiTestBase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(response.get_json()["diet_type"], ["葷食", "素食"])
 
+    def test_a_save_without_the_flag_does_not_mark_an_account_unfilled(self):
+        """舊版前端不知道有 profile_complete 這個欄位。
+
+        後端會先於前端上線，那段期間舊前端每存一次檔（「勾一個疾病」也是送
+        整份檔案）都會少送這個欄位。如果因此寫成 False，等新前端上線，這些
+        早就填完資料的人會被「還沒填寫你的基本資料」攔下來。
+        """
+        self.app_module.storage.upsert_user(
+            {"user_id": "user-a", "name": "A", "profile_complete": True, "diet_type": "葷食"}
+        )
+        with self.mock_auth("user-a"):
+            response = self.client.post(
+                "/user",
+                json={"user_id": "user-a", "name": "A", "height": 170, "weight": 65, "age": 30},
+                headers=self.auth_headers(),
+            )
+        self.assertTrue(response.get_json()["user"]["profile_complete"])
+
+        # 沒有資料列的才算新帳號；而會建空白檔案的路徑一定會明確送 false。
+        with self.mock_auth("user-a"):
+            blank = self.client.post(
+                "/user",
+                json={"user_id": "user-a", "name": "A", "height": 170, "weight": 65,
+                      "age": 30, "profile_complete": False},
+                headers=self.auth_headers(),
+            )
+        self.assertFalse(blank.get_json()["user"]["profile_complete"])
+
     def test_user_route_rejects_out_of_range_body_numbers(self):
         with self.mock_auth("user-a"):
             response = self.client.post(

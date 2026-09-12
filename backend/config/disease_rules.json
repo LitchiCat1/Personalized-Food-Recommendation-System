@@ -78,7 +78,7 @@
         "meals_per_day": 3
       }
     },
-    "personalized_limits_note": "依個人理想體重推算的單餐上限。先前這些公式只寫在 medical_risk_service.py 裡，跟本檔的 risk_nutrients 是兩套數字，寬的那條永遠不會生效——審閱者看到的門檻可能不是系統實際執行的。移到這裡讓兩者並列，需要臨床人員裁決要採用哪一邊。"
+    "personalized_limits_note": "依個人理想體重推算的單餐上限，與本檔 risk_nutrients 的門檻並列。兩邊數字不一致時，預設採用較嚴的那一組——那是安全的預設，不是臨床裁決。要記錄裁決，在本條件加上 threshold_resolutions，例如：\"threshold_resolutions\": {\"sodium\": {\"use\": \"configured\", \"decided_by\": \"姓名／單位\", \"decided_on\": \"YYYY-MM-DD\", \"note\": \"理由\"}}；use 只接受 \"configured\"（本檔的 risk_nutrients）或 \"derived\"（下方公式），寫了之後篩選會照裁決執行，/medical-metadata 的 threshold_conflicts 也會標成 resolved。"
   },
   "hypertension": {
     "id": "hypertension",
@@ -139,7 +139,7 @@
         "meals_per_day": 3
       }
     },
-    "personalized_limits_note": "依個人理想體重推算的單餐上限。先前這些公式只寫在 medical_risk_service.py 裡，跟本檔的 risk_nutrients 是兩套數字，寬的那條永遠不會生效——審閱者看到的門檻可能不是系統實際執行的。移到這裡讓兩者並列，需要臨床人員裁決要採用哪一邊。"
+    "personalized_limits_note": "依個人理想體重推算的單餐上限，與本檔 risk_nutrients 的門檻並列。兩邊數字不一致時，預設採用較嚴的那一組——那是安全的預設，不是臨床裁決。要記錄裁決，在本條件加上 threshold_resolutions，例如：\"threshold_resolutions\": {\"sodium\": {\"use\": \"configured\", \"decided_by\": \"姓名／單位\", \"decided_on\": \"YYYY-MM-DD\", \"note\": \"理由\"}}；use 只接受 \"configured\"（本檔的 risk_nutrients）或 \"derived\"（下方公式），寫了之後篩選會照裁決執行，/medical-metadata 的 threshold_conflicts 也會標成 resolved。"
   },
   "kidney_disease": {
     "id": "kidney_disease",
@@ -208,7 +208,7 @@
         "meals_per_day": 3
       }
     },
-    "personalized_limits_note": "依個人理想體重推算的單餐上限。先前這些公式只寫在 medical_risk_service.py 裡，跟本檔的 risk_nutrients 是兩套數字，寬的那條永遠不會生效——審閱者看到的門檻可能不是系統實際執行的。移到這裡讓兩者並列，需要臨床人員裁決要採用哪一邊。"
+    "personalized_limits_note": "依個人理想體重推算的單餐上限，與本檔 risk_nutrients 的門檻並列。兩邊數字不一致時，預設採用較嚴的那一組——那是安全的預設，不是臨床裁決。要記錄裁決，在本條件加上 threshold_resolutions，例如：\"threshold_resolutions\": {\"sodium\": {\"use\": \"configured\", \"decided_by\": \"姓名／單位\", \"decided_on\": \"YYYY-MM-DD\", \"note\": \"理由\"}}；use 只接受 \"configured\"（本檔的 risk_nutrients）或 \"derived\"（下方公式），寫了之後篩選會照裁決執行，/medical-metadata 的 threshold_conflicts 也會標成 resolved。"
   },
   "gout": {
     "id": "gout",
@@ -278,7 +278,7 @@
         "meals_per_day": 3
       }
     },
-    "personalized_limits_note": "依個人理想體重推算的單餐上限。先前這些公式只寫在 medical_risk_service.py 裡，跟本檔的 risk_nutrients 是兩套數字，寬的那條永遠不會生效——審閱者看到的門檻可能不是系統實際執行的。移到這裡讓兩者並列，需要臨床人員裁決要採用哪一邊。"
+    "personalized_limits_note": "依個人理想體重推算的單餐上限，與本檔 risk_nutrients 的門檻並列。兩邊數字不一致時，預設採用較嚴的那一組——那是安全的預設，不是臨床裁決。要記錄裁決，在本條件加上 threshold_resolutions，例如：\"threshold_resolutions\": {\"sodium\": {\"use\": \"configured\", \"decided_by\": \"姓名／單位\", \"decided_on\": \"YYYY-MM-DD\", \"note\": \"理由\"}}；use 只接受 \"configured\"（本檔的 risk_nutrients）或 \"derived\"（下方公式），寫了之後篩選會照裁決執行，/medical-metadata 的 threshold_conflicts 也會標成 resolved。"
   },
   "hyperlipidemia": {
     "id": "hyperlipidemia",
@@ -351,6 +351,6 @@
         "meals_per_day": 3
       }
     },
-    "personalized_limits_note": "依個人理想體重推算的單餐上限。先前這些公式只寫在 medical_risk_service.py 裡，跟本檔的 risk_nutrients 是兩套數字，寬的那條永遠不會生效——審閱者看到的門檻可能不是系統實際執行的。移到這裡讓兩者並列，需要臨床人員裁決要採用哪一邊。"
+    "personalized_limits_note": "依個人理想體重推算的單餐上限，與本檔 risk_nutrients 的門檻並列。兩邊數字不一致時，預設採用較嚴的那一組——那是安全的預設，不是臨床裁決。要記錄裁決，在本條件加上 threshold_resolutions，例如：\"threshold_resolutions\": {\"sodium\": {\"use\": \"configured\", \"decided_by\": \"姓名／單位\", \"decided_on\": \"YYYY-MM-DD\", \"note\": \"理由\"}}；use 只接受 \"configured\"（本檔的 risk_nutrients）或 \"derived\"（下方公式），寫了之後篩選會照裁決執行，/medical-metadata 的 threshold_conflicts 也會標成 resolved。"
   }
 }

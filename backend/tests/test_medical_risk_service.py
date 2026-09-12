@@ -461,3 +461,62 @@ class MealLevelLimitTests(MedicalRiskTestCase):
         message = " ".join(result["block_reasons"])
         self.assertIn("這一道", message)
         self.assertNotIn("單餐鈉", message)
+
+
+class ThresholdResolutionTests(MedicalRiskTestCase):
+    """規則檔門檻與公式門檻不一致時，誰說了算。
+
+    先前「較嚴的那一組生效」不是有人決定的——它是兩段檢查各跑一次的副作用。
+    審閱者在 disease_rules.json 上簽核的數字，可能不是系統實際執行的，而且
+    檔案裡沒有任何地方能記下「我們決定用哪一邊」。
+    """
+
+    def _rules_with_conflict(self, resolution=None):
+        import copy
+
+        rules = copy.deepcopy(self.rules)
+        rule = rules["hypertension"]
+        # 規則檔 600 mg vs 公式 2000/3 = 666.7 mg，本來就不一致。
+        if resolution is not None:
+            rule["threshold_resolutions"] = {"sodium": resolution}
+        return rules
+
+    def test_without_a_decision_the_stricter_limit_still_wins(self):
+        """沒人裁決時要維持安全預設，不能因為加了裁決機制就放寬。"""
+        from services.medical_risk_service import rule_threshold_conflicts
+
+        conflicts = rule_threshold_conflicts(self._rules_with_conflict(), PROFILE)
+        sodium = next(c for c in conflicts if c["condition_id"] == "hypertension" and c["nutrient"] == "sodium")
+        self.assertFalse(sodium["resolved"])
+        self.assertEqual(sodium["effective_block"], min(sodium["configured_block"], sodium["derived_block"]))
+
+    def test_a_recorded_decision_is_honoured_even_when_it_is_looser(self):
+        """裁決的意義就是它會改變執行結果，包括採用比較寬的那一邊。"""
+        from services.medical_risk_service import rule_threshold_conflicts
+
+        rules = self._rules_with_conflict({
+            "use": "derived",
+            "decided_by": "test-clinician",
+            "decided_on": "2026-07-01",
+            "note": "以每日 2000 mg ÷ 3 餐為準",
+        })
+        conflicts = rule_threshold_conflicts(rules, PROFILE)
+        sodium = next(c for c in conflicts if c["condition_id"] == "hypertension" and c["nutrient"] == "sodium")
+        self.assertTrue(sodium["resolved"])
+        self.assertEqual(sodium["effective_block"], sodium["derived_block"])
+        self.assertEqual(sodium["ignored_source"], "configured")
+
+    def test_the_decision_changes_what_actually_blocks_a_dish(self):
+        """報表寫了什麼不重要，重要的是篩選真的照著做。"""
+        rules_default = self._rules_with_conflict()
+        rules_derived = self._rules_with_conflict({
+            "use": "derived", "decided_by": "test-clinician", "decided_on": "2026-07-01",
+        })
+        # 630 mg：超過規則檔的 600，但沒超過公式的 666.7。
+        item = dish(sodium=630)
+
+        blocked = evaluate_medical_risk(item, ["hypertension"], [], rules_default, self.taxonomy, user_profile=PROFILE)
+        allowed = evaluate_medical_risk(item, ["hypertension"], [], rules_derived, self.taxonomy, user_profile=PROFILE)
+
+        self.assertFalse(blocked["is_safe"], "沒有裁決時應該照較嚴的 600 mg 擋下來")
+        self.assertTrue(allowed["is_safe"], "裁決採用公式（666.7 mg）後這一道應該通過")

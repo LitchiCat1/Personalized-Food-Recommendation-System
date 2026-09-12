@@ -612,6 +612,7 @@ export default function RecommendScreen() {
                               <Text style={styles.menuItemName}>{item.item_name}</Text>
                               <Text style={styles.menuItemPrice}>${item.price}</Text>
                             </View>
+                            <MenuVerifiedPill verified={item.menu_verified} />
                             <View style={styles.nutritionRow}>
                               <NutritionMini label="熱量" value={`${item.calories} kcal`} color={Palette.accent.green} />
                               <NutritionMini label="蛋白質" value={`${item.protein} g`} color={Palette.accent.blue} />
@@ -734,7 +735,10 @@ function RestaurantCard({
       </View>
       {restaurant.recommended_items.slice(0, 5).map((item) => (
         <View key={`${restaurant.restaurant_id}_${item.item_id || item.item_name}`} style={styles.restaurantItem}>
-          <Text style={styles.itemName}>{item.item_name}</Text>
+          <View style={styles.itemNameRow}>
+            <Text style={styles.itemName}>{item.item_name}</Text>
+            <MenuVerifiedPill verified={item.menu_verified} />
+          </View>
           {item.nutrition_available ? (
             <View style={styles.nutritionRow}>
               <NutritionMini label="熱量" value={`${item.calories} kcal`} color={Palette.accent.green} />
@@ -793,6 +797,28 @@ function RestaurantCard({
 }
 
 
+/**
+ * 這一道是怎麼過關的：逐道菜比對，還是只靠店名猜。
+ *
+ * 沒有這個標記時，兩種來源的推薦卡長得一模一樣——而它們的可信度差很多。
+ * 後端只有 16 家店建過菜單，其餘店家 Google Places 只給店名與類型。
+ */
+function MenuVerifiedPill({ verified }: { verified?: boolean }) {
+  if (verified === undefined) return null;
+  return (
+    <View style={[styles.verifyPill, verified ? styles.verifyPillOk : styles.verifyPillGuess]}>
+      <Ionicons
+        name={verified ? 'checkmark-circle-outline' : 'help-circle-outline'}
+        size={12}
+        color={verified ? Palette.accent.green : Palette.status.warning}
+      />
+      <Text style={[styles.verifyPillText, { color: verified ? Palette.accent.green : Palette.status.warning }]}>
+        {verified ? '逐道菜比對' : '僅店名比對'}
+      </Text>
+    </View>
+  );
+}
+
 function NutritionMini({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <View style={styles.nutritionMini}>
@@ -803,6 +829,21 @@ function NutritionMini({ label, value, color }: { label: string; value: string; 
 }
 
 const styles = StyleSheet.create({
+  itemNameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.xs },
+  verifyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    alignSelf: 'flex-start',
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginTop: 2,
+  },
+  verifyPillOk: { backgroundColor: Palette.accent.greenDim, borderColor: 'rgba(31,157,114,0.26)' },
+  verifyPillGuess: { backgroundColor: Palette.accent.orangeDim, borderColor: 'rgba(245,158,11,0.28)' },
+  verifyPillText: { ...Typography.small, fontSize: 11 },
   emptyText: { ...Typography.body, color: Palette.text.tertiary, textAlign: 'center' },
   nutritionNotice: {
     gap: Spacing.sm,

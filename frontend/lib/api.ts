@@ -178,6 +178,14 @@ export type HealthyFoodRecommendation = {
   gi?: 'low' | 'medium' | 'high' | null;
   match_score: number;
   nutrition_available?: boolean;
+  /**
+   * 這一道是逐道菜比對過疾病禁忌與過敏原，還是只用店名與店家類型猜的。
+   *
+   * 回應裡本來只有整體的 venues_with_menu 與一句總結，但使用者看到的是一張
+   * 一張的推薦卡——兩種來源長得一模一樣。對一個以「逐道菜比對」為賣點的
+   * App，這個差別必須在每一筆上看得見。
+   */
+  menu_verified?: boolean;
   reasons: string[];
 };
 

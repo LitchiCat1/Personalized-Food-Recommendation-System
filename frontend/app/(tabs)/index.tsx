@@ -38,7 +38,7 @@ function getLocalDateString(): string {
 
 export default function DashboardScreen() {
   const { isDesktop } = useResponsive();
-  const { dailyNutrition, todayMeals, healthAlerts, apiBaseUrl, accessToken, dietaryRecordsRevision, replaceDashboardFromRecords, nutritionGoalTypes, user } = useStore();
+  const { dailyNutrition, todayMeals, healthAlerts, apiBaseUrl, accessToken, dietaryRecordsRevision, replaceDashboardFromRecords, nutritionGoalTypes, user, dashboardReady } = useStore();
   const [syncing, setSyncing] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [conditionRules, setConditionRules] = useState<MedicalConditionRule[]>([]);
@@ -46,6 +46,16 @@ export default function DashboardScreen() {
   const { calories, protein, carbs, sugar, fat, saturated_fat, trans_fat, sodium, fiber } = dailyNutrition;
   const remaining = Math.max(0, Math.round(calories.target - calories.current));
   const sodiumRisk = sodium.current >= sodium.target ? '超標' : sodium.current >= sodium.target * 0.8 ? '接近上限' : '正常';
+
+  /**
+   * 今日紀錄還沒到手之前，一個數字都不要講。
+   *
+   * 先前 store 的初始值是 mock（1450 kcal／1800 mg 鈉／四筆假餐點／一則
+   * 「鈉含量接近上限」的假警示），開頁的頭幾秒就這樣顯示給使用者。mock 已經
+   * 拿掉了，但換成 0 也還是在講一件我們還不知道的事——「今天還能吃 0 kcal」
+   * 跟「鈉風險：正常」對高血壓使用者一樣是沒有根據的斷言。
+   */
+  const dash = (value: string) => (dashboardReady ? value : '—');
   const nutrientSensitivities = useMemo(
     () => buildNutrientSensitivityMap(user.healthConditions, conditionRules),
     [conditionRules, user.healthConditions]
@@ -107,7 +117,13 @@ export default function DashboardScreen() {
     };
   }, [apiBaseUrl]);
 
-  const alertContent = healthAlerts.length > 0 ? (
+  const alertContent = !dashboardReady ? (
+    // 「目前沒有需要優先處理的飲食警示」在還沒拿到紀錄時同樣是斷言。
+    <View style={styles.safeBanner}>
+      <ActivityIndicator size="small" color={Palette.accent.green} />
+      <Text style={styles.safeBannerText}>正在讀取今日飲食警示</Text>
+    </View>
+  ) : healthAlerts.length > 0 ? (
     <View style={styles.alertStack}>
       {healthAlerts.map((alert) => (
         <View key={alert.id} style={[styles.alertCard, alert.type === 'danger' && styles.alertDanger, alert.type === 'warning' && styles.alertWarning]}>
@@ -133,7 +149,7 @@ export default function DashboardScreen() {
           <Text style={styles.sectionTitle}>今日餐點</Text>
           <Text style={styles.sectionSubtitle}>依時間排列，快速回看已吃內容</Text>
         </View>
-        <DataPill tone="info">{todayMeals.length} 筆</DataPill>
+        <DataPill tone="info">{dash(`${todayMeals.length} 筆`)}</DataPill>
       </View>
       {todayMeals.map((meal) => <MealCard key={meal.id} meal={meal} sodiumDailyTarget={sodium.target} />)}
       {!syncing && !syncError && todayMeals.length === 0 ? (
@@ -160,6 +176,13 @@ export default function DashboardScreen() {
           </View>
         </View>
       ) : null}
+      {!dashboardReady ? (
+        // 目標值也是後端給的，還沒回來時每一條都是 0 / 0g，看起來像壞掉。
+        <View style={styles.safeBanner}>
+          <ActivityIndicator size="small" color={Palette.accent.green} />
+          <Text style={styles.safeBannerText}>正在讀取今日營養素進度</Text>
+        </View>
+      ) : (
       <View style={styles.nutrientStack}>
         <NutrientBar label={protein.label} current={protein.current} target={protein.target} unit={protein.unit} color={protein.color} goalType={goalTypeOf('protein')} attentionLabel={getAttentionLabel('protein')} />
         <NutrientBar label={carbs.label} current={carbs.current} target={carbs.target} unit={carbs.unit} color={carbs.color} goalType={goalTypeOf('carbs')} attentionLabel={getAttentionLabel('carbs')} />
@@ -170,6 +193,7 @@ export default function DashboardScreen() {
         <NutrientBar label={sodium.label} current={sodium.current} target={sodium.target} unit={sodium.unit} color={sodium.color} goalType={goalTypeOf('sodium')} attentionLabel={getAttentionLabel('sodium')} />
         <NutrientBar label={fiber.label} current={fiber.current} target={fiber.target} unit={fiber.unit} color={fiber.color} goalType={goalTypeOf('fiber')} attentionLabel={getAttentionLabel('fiber')} />
       </View>
+      )}
     </SectionBlock>
   );
 
@@ -196,11 +220,21 @@ export default function DashboardScreen() {
       <View style={styles.heroCard}>
         <View style={styles.heroTop}>
           <View style={styles.heroCopy}>
-            <DataPill tone={sodiumRisk === '正常' ? 'success' : 'warning'}>鈉風險：{sodiumRisk}</DataPill>
-            <Text style={styles.heroTitle}>今天還能吃 {formatCalories(remaining)} kcal</Text>
-            <Text style={styles.heroSubtitle}>目標 {formatCalories(calories.target)} kcal，目前已紀錄 {todayMeals.length} 筆餐點。</Text>
+            {dashboardReady ? (
+              <DataPill tone={sodiumRisk === '正常' ? 'success' : 'warning'}>鈉風險：{sodiumRisk}</DataPill>
+            ) : (
+              <DataPill tone="info">讀取今日紀錄中</DataPill>
+            )}
+            <Text style={styles.heroTitle}>
+              {dashboardReady ? `今天還能吃 ${formatCalories(remaining)} kcal` : '正在讀取今天的紀錄'}
+            </Text>
+            <Text style={styles.heroSubtitle}>
+              {dashboardReady
+                ? `目標 ${formatCalories(calories.target)} kcal，目前已紀錄 ${todayMeals.length} 筆餐點。`
+                : '還沒拿到今日資料，先不顯示數字以免誤導。'}
+            </Text>
           </View>
-          <CalorieRing current={Math.round(calories.current)} target={calories.target} />
+          <CalorieRing current={dashboardReady ? Math.round(calories.current) : 0} target={dashboardReady ? calories.target : 0} />
         </View>
         <View style={styles.heroActions}>
           <Link href="/scanner" asChild>
@@ -218,9 +252,9 @@ export default function DashboardScreen() {
       {isDesktop ? (
         <>
           <View style={styles.metricGrid}>
-            <MetricCard label="剩餘熱量" value={remaining} unit="kcal" accent={Palette.accent.green} />
-            <MetricCard label="已攝取" value={Math.round(calories.current)} unit="kcal" accent={Palette.accent.blue} />
-            <MetricCard label="鈉攝取" value={Math.round(sodium.current)} unit="mg" accent={sodiumRisk === '正常' ? Palette.accent.green : Palette.status.warning} />
+            <MetricCard label="剩餘熱量" value={dash(String(remaining))} unit={dashboardReady ? 'kcal' : undefined} accent={Palette.accent.green} />
+            <MetricCard label="已攝取" value={dash(String(Math.round(calories.current)))} unit={dashboardReady ? 'kcal' : undefined} accent={Palette.accent.blue} />
+            <MetricCard label="鈉攝取" value={dash(String(Math.round(sodium.current)))} unit={dashboardReady ? 'mg' : undefined} accent={dashboardReady && sodiumRisk !== '正常' ? Palette.status.warning : Palette.accent.green} />
           </View>
           <View style={styles.desktopColumns}>
             <View style={styles.desktopMain}>{alertContent}{mealsContent}</View>

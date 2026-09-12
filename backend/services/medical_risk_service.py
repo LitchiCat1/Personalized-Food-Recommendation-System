@@ -156,6 +156,10 @@ def _condition_nutrient_hits(nutrients: dict, condition_id: str, rule: dict) -> 
     hits = []
     condition_label = rule.get("label_zh", condition_id)
     for nutrient, meta in rule.get("risk_nutrients", {}).items():
+        # 臨床人員若裁決這個營養素採用公式那一套，規則檔的 block 就不生效。
+        decided = threshold_resolution(rule, nutrient)
+        if decided and decided["use"] == "derived":
+            continue
         value = normalize_number(nutrients.get(nutrient))
         caution = meta.get("caution")
         block = meta.get("block")
@@ -298,6 +302,9 @@ def evaluate_medical_risk(
         # personalized_limits，這裡只負責求值——先前每個疾病各寫一段 if，
         # 跟規則檔的 risk_nutrients 形成兩套會各自漂移的數字。
         for nutrient, spec in (rule.get("personalized_limits") or {}).items():
+            decided = threshold_resolution(rule, nutrient)
+            if decided and decided["use"] == "configured":
+                continue
             limit = resolve_personalized_limit(spec, E, W)
             if limit is None:
                 continue
@@ -450,6 +457,9 @@ def evaluate_meal_medical_risk(
             continue
         condition_label = rule.get("label_zh", condition_id)
         for nutrient, spec in (rule.get("personalized_limits") or {}).items():
+            decided = threshold_resolution(rule, nutrient)
+            if decided and decided["use"] == "configured":
+                continue
             limit = resolve_personalized_limit(spec, E, W)
             if limit is None:
                 continue
@@ -518,6 +528,31 @@ def derived_meal_limits(disease_rules: dict, user_profile: dict | None = None) -
     return limits
 
 
+def threshold_resolution(rule: dict, nutrient: str) -> dict | None:
+    """臨床人員對某個營養素「該採用哪一套門檻」的裁決，沒有就回 None。
+
+    規則檔裡長這樣：
+
+        "threshold_resolutions": {
+          "sodium": {
+            "use": "configured",              # 或 "derived"
+            "decided_by": "...", "decided_on": "2026-07-01",
+            "note": "…為什麼"
+          }
+        }
+
+    沒有裁決時，兩套檢查都會跑，等於自動採用較嚴的那一組——那是安全的
+    預設，但它是「兩段程式各跑一次」的副作用，不是有人決定的結果。把裁決
+    寫進規則檔，才會跟簽核紀錄、引用來源放在同一個地方。
+    """
+    resolution = ((rule.get("threshold_resolutions") or {}).get(nutrient) or None)
+    if not isinstance(resolution, dict):
+        return None
+    if resolution.get("use") not in ("configured", "derived"):
+        return None
+    return resolution
+
+
 def rule_threshold_conflicts(disease_rules: dict, user_profile: dict | None = None) -> list[dict]:
     """列出兩套門檻不一致的地方，並指出實際生效的是哪一個。"""
     derived = derived_meal_limits(disease_rules, user_profile)
@@ -530,12 +565,24 @@ def rule_threshold_conflicts(disease_rules: dict, user_profile: dict | None = No
                 continue
             if abs(configured_limit - formula_limit) < 0.5:
                 continue
+
+            resolution = threshold_resolution(rule, nutrient)
+            if resolution:
+                effective = configured_limit if resolution["use"] == "configured" else formula_limit
+                ignored = "derived" if resolution["use"] == "configured" else "configured"
+            else:
+                # 還沒有人裁決：維持較嚴的那一組。
+                effective = min(configured_limit, formula_limit)
+                ignored = "derived" if configured_limit < formula_limit else "configured"
+
             conflicts.append({
                 "condition_id": condition_id,
                 "nutrient": nutrient,
                 "configured_block": round(configured_limit, 1),
                 "derived_block": round(formula_limit, 1),
-                "effective_block": round(min(configured_limit, formula_limit), 1),
-                "ignored_source": "derived" if configured_limit < formula_limit else "configured",
+                "effective_block": round(effective, 1),
+                "ignored_source": ignored,
+                "resolved": bool(resolution),
+                "resolution": resolution,
             })
     return conflicts

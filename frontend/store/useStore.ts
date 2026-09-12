@@ -7,11 +7,7 @@ import { create } from 'zustand';
 import { MEALS_PER_DAY, getAutoMealType, normalizeMealType } from '@/lib/meal';
 import { toggleSelection } from '@/lib/safety-selection';
 import type { DetectedFood, MealEntry, HealthAlert } from '@/constants/mock-data';
-import {
-  DAILY_NUTRITION,
-  TODAY_MEALS,
-  HEALTH_ALERTS,
-} from '@/constants/mock-data';
+import { EMPTY_DAILY_NUTRITION } from '@/constants/nutrition-display';
 import { NEW_USER_PROFILE } from '@/constants/profile-defaults';
 import { resolveApiBaseUrl } from '@/lib/network';
 import type { DietaryRecord, NutritionGoalTypes, NutritionTargetBasis, NutritionTargets } from '@/lib/api';
@@ -69,7 +65,25 @@ export interface NutriLensState {
   recalculateBMR: () => void;
 
   // Dashboard
-  dailyNutrition: typeof DAILY_NUTRITION;
+  dailyNutrition: typeof EMPTY_DAILY_NUTRITION;
+  /**
+   * 後端的今日紀錄與目標回來了沒。
+   *
+   * 沒有這個旗標，畫面就分不出「0 kcal 是他今天真的還沒吃」跟「0 kcal 是
+   * 我們還不知道」——而這兩件事在首頁上長得一模一樣。
+   */
+  dashboardReady: boolean;
+  /**
+   * 每日目標值本身回來了沒——比 dashboardReady 弱的條件。
+   *
+   * 「我的」頁只抓目標（applyNutritionTargets），不抓今日已攝取量，所以它
+   * 不能等 dashboardReady：那個旗標只有首頁的 replaceDashboardFromRecords
+   * 會設，直接開「我的」頁會永遠停在「讀取中…」。
+   *
+   * 反過來也不能共用一個：首頁顯示的是「已攝取 / 目標」，只有目標到手時把
+   * 已攝取的 0 當成真的，就是這次要修掉的那個問題。
+   */
+  nutritionTargetsReady: boolean;
   todayMeals: MealEntry[];
   healthAlerts: HealthAlert[];
   dietaryRecordsRevision: number;
@@ -210,9 +224,15 @@ export const useStore = create<NutriLensState>((set, get) => ({
     }),
 
   // ── Dashboard ──
-  dailyNutrition: { ...DAILY_NUTRITION },
-  todayMeals: [...TODAY_MEALS],
-  healthAlerts: [...HEALTH_ALERTS],
+  //
+  // 初始值先前是 constants/mock-data.ts 的 DAILY_NUTRITION / TODAY_MEALS /
+  // HEALTH_ALERTS——也就是 1450 kcal、1800 mg 鈉、四筆假餐點與一則假的
+  // 「鈉含量接近上限」警示。那些在後端紀錄回來之前會直接顯示給使用者看。
+  dailyNutrition: { ...EMPTY_DAILY_NUTRITION },
+  todayMeals: [],
+  healthAlerts: [],
+  dashboardReady: false,
+  nutritionTargetsReady: false,
   dietaryRecordsRevision: 0,
   nutritionGoalTypes: {},
   nutritionTargetBasis: null,
@@ -222,6 +242,9 @@ export const useStore = create<NutriLensState>((set, get) => ({
     set((state) => ({
       todayMeals: [],
       healthAlerts: [],
+      // 清空之後在新資料回來前一樣是「還不知道」，不是「確定沒吃」。
+      dashboardReady: false,
+      nutritionTargetsReady: false,
       dailyNutrition: {
         ...state.dailyNutrition,
         calories: { ...state.dailyNutrition.calories, current: 0, target: state.user.dailyCalorieTarget },
@@ -338,6 +361,9 @@ export const useStore = create<NutriLensState>((set, get) => ({
       return {
         todayMeals,
         healthAlerts,
+        // 這是唯一「今日紀錄真的到手了」的地方。
+        dashboardReady: true,
+        nutritionTargetsReady: true,
         nutritionGoalTypes: goalTypes ?? state.nutritionGoalTypes,
         nutritionTargetBasis: basis ?? state.nutritionTargetBasis,
         dailyNutrition: {
@@ -365,6 +391,7 @@ export const useStore = create<NutriLensState>((set, get) => ({
         next === undefined ? entry : { ...entry, target: next };
       const daily = state.dailyNutrition;
       return {
+        nutritionTargetsReady: true,
         nutritionGoalTypes: goalTypes ?? state.nutritionGoalTypes,
         nutritionTargetBasis: basis ?? state.nutritionTargetBasis,
         dailyNutrition: {

@@ -35,7 +35,7 @@ const PROFILE_SECTIONS = [
 
 export default function ProfileScreen() {
   const { gridCol2, isDesktop } = useResponsive();
-  const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser, invalidateDietaryRecords , dailyNutrition, nutritionTargetBasis, setActivityStats, applyNutritionTargets, isAuthenticated } = useStore();
+  const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser, invalidateDietaryRecords , dailyNutrition, nutritionTargetBasis, setActivityStats, applyNutritionTargets, isAuthenticated, nutritionTargetsReady } = useStore();
   const initialUserRef = useRef(user);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -487,18 +487,22 @@ export default function ProfileScreen() {
 
   // 目標體重先前只是顯示出來而已——後端也只是存進去再讀出來，沒有任何
   // 計算用到它，所以「增重 20kg」配上一個赤字目標也不會有人說話。
-  const weightGoal = readWeightGoal(
-    user.weight,
-    user.targetWeight,
-    dailyNutrition.calories.target,
-    user.tdee,
-    nutritionTargetBasis?.source === 'disease',
-  );
+  // 每日目標是後端給的；還沒回來時是 0，拿 0 去比對會生出一則假的矛盾提示
+  // （「每日目標 0 kcal 比你的 TDEE 少 2,133 kcal」）。
+  const weightGoal = nutritionTargetsReady
+    ? readWeightGoal(
+        user.weight,
+        user.targetWeight,
+        dailyNutrition.calories.target,
+        user.tdee,
+        nutritionTargetBasis?.source === 'disease',
+      )
+    : null;
 
   const dietGoals = [
     {
       label: '每日目標熱量',
-      value: `${formatCalories(dailyNutrition.calories.target)} kcal`,
+      value: nutritionTargetsReady ? `${formatCalories(dailyNutrition.calories.target)} kcal` : '讀取中…',
       color: '#FB923C',
     },
     {
@@ -659,7 +663,12 @@ export default function ProfileScreen() {
         */}
         <View style={styles.metricRow}>
           <MetricCard label="BMR" value={user.bmr} unit="kcal" accent={Palette.accent.blue} />
-          <MetricCard label="每日目標" value={Math.round(dailyNutrition.calories.target)} unit="kcal" accent={Palette.accent.green} />
+          <MetricCard
+            label="每日目標"
+            value={nutritionTargetsReady ? Math.round(dailyNutrition.calories.target) : '—'}
+            unit={nutritionTargetsReady ? 'kcal' : undefined}
+            accent={Palette.accent.green}
+          />
           <MetricCard label="BMI" value={user.bmi} accent={bmiAccent} caption={bmi.label} />
         </View>
 
@@ -828,7 +837,7 @@ export default function ProfileScreen() {
               ) : null}
             </View>
           </View>
-        ) : (
+        ) : nutritionTargetsReady ? (
           <View style={styles.targetExplainCard}>
             <Ionicons name="information-circle-outline" size={16} color={Palette.text.tertiary} />
             <View style={styles.targetExplainCopy}>
@@ -837,7 +846,7 @@ export default function ProfileScreen() {
               </Text>
             </View>
           </View>
-        )}
+        ) : null}
 
         {calorieTargetExplanation ? (
           <View style={styles.targetExplainCard}>

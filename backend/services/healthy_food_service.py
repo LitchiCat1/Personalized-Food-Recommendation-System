@@ -593,6 +593,14 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
         )
         if from_menu is not None:
             restaurant_allowed, restaurant_blocked = from_menu
+            # 逐筆標記這道菜是怎麼過關的。
+            #
+            # 回應裡本來只有整體的 venues_with_menu 與一句總結，但使用者看到的
+            # 是一張一張的推薦卡——「這家店的滷雞腿便當」不論是逐道菜比對過鈉
+            # 含量，還是只因為店名不像炸雞店而放行，長得一模一樣。對一個以
+            # 「逐道菜比對疾病禁忌」為賣點的 App，這個差別必須看得見。
+            for allowed_item in restaurant_allowed:
+                allowed_item["menu_verified"] = True
             restaurant["recommended_items"] = restaurant_allowed
             restaurant["filtered_items"] = restaurant_blocked
             restaurant["nutrition_available"] = True
@@ -636,8 +644,12 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
                     item["reasons"] = [*item.get("reasons", []), *medical_risk["caution_reasons"]]
                 restaurant_allowed.append(item)
 
+        for allowed_item in restaurant_allowed:
+            # 這條路徑只有店名與店家類型可比，沒有菜色營養。
+            allowed_item["menu_verified"] = False
         restaurant["recommended_items"] = restaurant_allowed
         restaurant["filtered_items"] = restaurant_blocked
+        restaurant["nutrition_available"] = False
         recommendations.extend(restaurant_allowed)
 
     restaurants = [restaurant for restaurant in restaurants if restaurant["recommended_items"]]

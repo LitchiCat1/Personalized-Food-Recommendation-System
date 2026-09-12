@@ -124,6 +124,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileDraft, setProfileDraft] = useState(buildInitialDraft(null));
   const [profileReloadKey, setProfileReloadKey] = useState(0);
+  /** 載入已經等了幾秒——用來在冷啟動時把畫面上的沉默換成一句解釋。 */
+  const [loadingSeconds, setLoadingSeconds] = useState(0);
   // 新帳號原本一律送出空的疾病與過敏原陣列，等於整套醫療過濾在初次設定時是關掉的。
   const [medicalMetadata, setMedicalMetadata] = useState<MedicalMetadataResponse | null>(null);
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
@@ -226,6 +228,28 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   const toggleFrom = (list: string[], id: string) =>
     list.includes(id) ? list.filter((entry) => entry !== id) : [...list, id];
+
+  /**
+   * 後端在 Render 免費方案上會休眠，第一個請求要等它冷啟動。
+   *
+   * 實測開首頁時 `OPTIONS /user/...` 一直 pending，畫面停在「正在載入你的
+   * 基本資料...」超過 30 秒——沒有說明、沒有逾時、沒有重試。而 AuthGate 會
+   * 擋住所有子畫面，所以那 30 秒裡整個 App 都不能用，看起來像壞了。
+   *
+   * 修不掉冷啟動本身（那是方案限制），但可以不要讓使用者對著一個沉默的
+   * 轉圈圈猜發生什麼事。
+   */
+  useEffect(() => {
+    if (profileStatus !== 'loading') {
+      setLoadingSeconds(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      setLoadingSeconds(Math.round((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [profileStatus]);
 
   const updateProfileDraft = (key: keyof typeof profileDraft, value: string) => {
     setProfileDraft((current) => ({ ...current, [key]: value }));
@@ -358,10 +382,22 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (isAuthenticated && profileStatus === 'loading') {
+    // 超過 5 秒幾乎都是後端在冷啟動；超過 20 秒就給一個重試的出口。
+    const slow = loadingSeconds >= 5;
     return (
       <View style={styles.centered}>
         <ActivityIndicator color={Palette.accent.green} />
         <Text style={styles.mutedText}>正在載入你的基本資料...</Text>
+        {slow ? (
+          <Text style={styles.message}>
+            伺服器閒置後會休眠，第一次連線需要喚醒，通常 30~60 秒。已等待 {loadingSeconds} 秒。
+          </Text>
+        ) : null}
+        {loadingSeconds >= 20 ? (
+          <Pressable onPress={() => setProfileReloadKey((key) => key + 1)} style={styles.primaryButton}>
+            <Text style={styles.primaryText}>重新嘗試</Text>
+          </Pressable>
+        ) : null}
       </View>
     );
   }

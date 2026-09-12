@@ -1,9 +1,25 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import Constants from 'expo-constants';
 import { Link, usePathname } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Palette, Typography, Spacing, Radius } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
+
+/**
+ * 版本號跟著 app.json 的 expo.version 走，不要寫死。
+ *
+ * 這裡原本掛著 'v0.0.8f'，而程式早就到 v0.0.9 了（app.json、package.json、
+ * 後端 /health 的 app_version 全是）。一個對不上的版本號會讓「線上跑的是哪
+ * 一版」得靠猜。
+ *
+ * 注意：本機 `expo start` 時這個值可能是舊的——實測回過 0.0.4，五個版本以前
+ * 的數字，而且清 .expo/cache 與 node_modules/.cache 都沒用（卡在系統 temp 的
+ * metro-cache，要一併刪掉）。`expo export` 產出的正式 bundle 沒有這個問題，
+ * 裡面的 config 是當次解析出來的。所以標籤在部署後是準的，本機看到怪數字先
+ * 想到快取。
+ */
+const APP_VERSION = Constants.expoConfig?.version || '';
 
 const NAV_ITEMS = [
   { href: '/', label: '首頁', icon: 'home-outline' },
@@ -22,9 +38,11 @@ export default function DesktopSidebar() {
       <View style={styles.brandBlock}>
         <Text style={styles.brand}>NutriLens</Text>
         <Text style={styles.tagline}>AI food safety radar</Text>
-        <View style={styles.versionPill}>
-          <Text style={styles.versionText}>v0.0.8f</Text>
-        </View>
+        {APP_VERSION ? (
+          <View style={styles.versionPill}>
+            <Text style={styles.versionText}>v{APP_VERSION}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.navigation} accessibilityRole="tablist">
@@ -48,8 +66,14 @@ export default function DesktopSidebar() {
       </View>
 
       <View style={styles.accountBlock}>
-        <Text style={styles.accountName} numberOfLines={1}>{user.name}</Text>
-        <Text style={styles.accountStatus}>健康條件已同步</Text>
+        <Text style={styles.accountName} numberOfLines={1}>
+          {user.name.trim() || (user.email || '').split('@')[0] || '尚未設定名稱'}
+        </Text>
+        {/* 先前這行寫死「健康條件已同步」——同步失敗時也照樣這樣寫。
+            真正的同步狀態在「我的」頁上，這裡只說這個檔案填了沒有。 */}
+        <Text style={styles.accountStatus}>
+          {user.profileComplete ? '健康檔案已設定' : '尚未完成基本資料'}
+        </Text>
       </View>
     </View>
   );

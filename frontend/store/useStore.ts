@@ -10,7 +10,7 @@ import type { DetectedFood, MealEntry, HealthAlert } from '@/constants/mock-data
 import { EMPTY_DAILY_NUTRITION } from '@/constants/nutrition-display';
 import { NEW_USER_PROFILE } from '@/constants/profile-defaults';
 import { resolveApiBaseUrl } from '@/lib/network';
-import type { DietaryRecord, NutritionGoalTypes, NutritionTargetBasis, NutritionTargets } from '@/lib/api';
+import type { DietaryRecord, MealNutrientLimits, NutritionGoalTypes, NutritionTargetBasis, NutritionTargets } from '@/lib/api';
 
 // ─── Types ──────────────────────────────────────────────────
 export interface UserProfile {
@@ -98,6 +98,7 @@ export interface NutriLensState {
     targets?: NutritionTargets,
     goalTypes?: NutritionGoalTypes,
     basis?: NutritionTargetBasis,
+    mealLimits?: MealNutrientLimits,
   ) => void;
   /** 由實際紀錄算出的連續天數與累積餐數。 */
   setActivityStats: (stats: { streak: number; totalMeals: number }) => void;
@@ -310,7 +311,7 @@ export const useStore = create<NutriLensState>((set, get) => ({
       };
     }),
 
-  replaceDashboardFromRecords: (records, targets, goalTypes, basis) =>
+  replaceDashboardFromRecords: (records, targets, goalTypes, basis, mealLimits) =>
     set((state) => {
       const todayMeals = records.flatMap((record, recordIndex) => {
         const foods = record.foods && record.foods.length > 0
@@ -356,7 +357,10 @@ export const useStore = create<NutriLensState>((set, get) => ({
       const sodiumTarget = targets?.sodium ?? state.dailyNutrition.sodium.target;
       const proteinTarget = targets?.protein ?? state.dailyNutrition.protein.target;
       const calorieTarget = targets?.calories ?? state.user.dailyCalorieTarget;
-      const healthAlerts = buildHealthAlerts(totals, sodiumTarget, proteinTarget, calorieTarget, todayMeals.length);
+      const healthAlerts = buildHealthAlerts(
+        totals, sodiumTarget, proteinTarget, calorieTarget, todayMeals.length,
+        todayMeals, mealLimits,
+      );
 
       return {
         todayMeals,
@@ -515,14 +519,64 @@ function sumMeals(meals: MealEntry[]) {
   };
 }
 
+/**
+ * 單餐上限的檢查。
+ *
+ * 先前這整個函式只比整日總量，所以疾病規則裡的「單餐上限」對使用者**自己
+ * 記下的餐點**從來沒有生效過：一位高血壓使用者記了一筆 620 mg 鈉的三明治
+ * （規則檔的單餐上限是 600 mg），首頁照樣顯示「目前沒有需要優先處理的飲食
+ * 警示」。那條上限只在推薦與掃描時擋得住「還沒吃的」候選餐點。
+ *
+ * 門檻數字一律由後端給（/records 的 meal_nutrient_limits），這裡只負責比
+ * 大小——前端再抄一份就會變成第二套會漂移的數字。
+ *
+ * 粒度是「一筆紀錄」而不是「一餐」：meal_type 目前不可靠（手動新增一律存成
+ * 午餐），依餐別加總會把不同餐算在一起。單獨一筆就超過上限已經是明確的事實。
+ */
+function buildMealLimitAlerts(meals: MealEntry[], limits?: MealNutrientLimits): HealthAlert[] {
+  if (!limits) return [];
+  const alerts: HealthAlert[] = [];
+
+  // 規則檔的病名是「高血壓 / 鈉控制」這種兩段式標籤。整段塞進句子裡，熱量的
+  // 訊息會變成「超過高血壓 / 鈉控制的單餐上限 632.7kcal」——把熱量說成鈉控制
+  // 的限制。句子裡只要病名。
+  const conditionName = (label: string) => label.split('/')[0].trim() || label;
+
+  for (const [nutrient, spec] of Object.entries(limits)) {
+    if (!spec || !(spec.limit > 0)) continue;
+    const over = meals
+      .map((meal) => ({ meal, value: Number((meal as unknown as Record<string, number>)[nutrient]) }))
+      .filter((entry) => Number.isFinite(entry.value) && entry.value > spec.limit);
+    if (!over.length) continue;
+
+    const worst = over.reduce((a, b) => (b.value > a.value ? b : a));
+    const names = over.map((entry) => entry.meal.name).join('、');
+    alerts.push({
+      id: `meal-limit-${nutrient}`,
+      type: 'danger',
+      title: `單餐${spec.label_zh}超過上限`,
+      message:
+        `${names}${over.length > 1 ? `（共 ${over.length} 筆）` : ''}的${spec.label_zh}`
+        + `${over.length > 1 ? `最高 ${Math.round(worst.value)}` : ` ${Math.round(worst.value)}`}${spec.unit}，`
+        + `超過${spec.conditions.map(conditionName).join('、')}的單餐上限 ${spec.limit}${spec.unit}。`,
+      icon: '⚠️',
+    });
+  }
+
+  return alerts;
+}
+
 function buildHealthAlerts(
   totals: ReturnType<typeof sumMeals>,
   sodiumTarget: number,
   proteinTarget: number,
   calorieTarget: number,
   mealCount: number,
+  meals: MealEntry[] = [],
+  mealLimits?: MealNutrientLimits,
 ): HealthAlert[] {
-  const alerts: HealthAlert[] = [];
+  // 單餐超標排在最前面：它是「這一餐就已經出事」，比整日累計更該先看到。
+  const alerts: HealthAlert[] = [...buildMealLimitAlerts(meals, mealLimits)];
 
   // 吃太少一樣是風險。先前這裡只檢查「有沒有超過」，所以整天只吃到目標的
   // 六成也會顯示「目前沒有需要優先處理的飲食警示」。等三餐都記錄完才提醒，

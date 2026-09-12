@@ -17,7 +17,13 @@ from repositories.storage import StorageRepository
 from services.app_time_service import app_now
 from services.auth_service import AuthError, is_auth_required, is_supabase_auth_configured, verify_supabase_user
 from services.rate_limit_service import RateLimitExceeded, build_limiter
-from services.disease_rule_service import build_disease_rules_response, build_medical_metadata_response, load_allergen_taxonomy, load_disease_rules
+from services.disease_rule_service import (
+    build_disease_rules_response,
+    build_medical_metadata_response,
+    load_allergen_taxonomy,
+    load_disease_rules,
+    normalize_condition_ids,
+)
 from services.env_service import load_local_env
 from services.history_service import build_history_response
 from services.google_places_service import GooglePlacesAPIError, GooglePlacesConfigError
@@ -53,6 +59,7 @@ from services.vision_food_service import (
 from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini, parse_menu_image_with_gemini
 from services.medical_risk_service import (
     MEALS_PER_DAY,
+    effective_meal_limits,
     evaluate_medical_risk,
     normalize_number,
     resolve_user_energy_and_weight,
@@ -668,6 +675,15 @@ def get_records(user_id):
         # 目標值本身看不出方向。蛋白質對一般人是「至少吃到」，對慢性腎臟病
         # 是「不可超過」，前端沒有這個就只能猜，超標也標不出來。
         "nutrition_goal_types": build_nutrition_goal_types(user),
+        # 單餐上限。先前這組數字只在推薦與掃描時擋得住候選餐點，使用者自己
+        # 記下的餐點從來沒被檢查過——一位高血壓使用者記了 620mg 的一餐
+        # （單餐上限 600mg），首頁照樣寫「目前沒有需要優先處理的飲食警示」。
+        # 數字從後端出去，前端只負責比大小，不再自己抄一份會漂移的門檻。
+        "meal_nutrient_limits": effective_meal_limits(
+            DISEASE_RULES,
+            normalize_condition_ids(user.get("health_conditions") or [], DISEASE_RULES),
+            user,
+        ),
     })
 
 

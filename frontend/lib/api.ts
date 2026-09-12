@@ -84,6 +84,23 @@ export type NutritionTargets = {
 /** 每個營養素的目標是「上限」還是「至少要吃到」。同一個數字方向相反，結論就相反。 */
 export type NutritionGoalTypes = Partial<Record<keyof NutritionTargets, 'upper_limit' | 'minimum_target'>>;
 
+/**
+ * 使用者現在生效的單餐上限，由後端依疾病規則算出。
+ *
+ * 前端只比大小，不自己抄門檻數字——這個專案已經因為「兩套會各自漂移的
+ * 門檻」吃過好幾次虧（見 backend/services/medical_risk_service.py 的門檻
+ * 一致性檢查）。
+ */
+export type MealNutrientLimit = {
+  limit: number;
+  unit: string;
+  label_zh: string;
+  /** 是哪些疾病要求這個上限，用來在訊息裡說清楚理由。 */
+  conditions: string[];
+};
+
+export type MealNutrientLimits = Partial<Record<keyof NutritionTargets, MealNutrientLimit>>;
+
 /** 後端還沒回時的預設方向，與 nutrition_progress_service.NUTRITION_GOAL_TYPES 一致。 */
 export const DEFAULT_NUTRITION_GOAL_TYPES = {
   calories: 'upper_limit',
@@ -125,6 +142,7 @@ export type RecordsResponse = {
   nutrition_targets?: NutritionTargets;
   nutrition_goal_types?: NutritionGoalTypes;
   nutrition_target_basis?: NutritionTargetBasis;
+  meal_nutrient_limits?: MealNutrientLimits;
 };
 
 export type RecordMutationResponse = {

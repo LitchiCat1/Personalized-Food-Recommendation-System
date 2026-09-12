@@ -553,6 +553,65 @@ def threshold_resolution(rule: dict, nutrient: str) -> dict | None:
     return resolution
 
 
+def effective_meal_limits(
+    disease_rules: dict,
+    conditions: list,
+    user_profile: dict | None = None,
+) -> dict:
+    """這個人現在生效的單餐上限，逐個營養素給一個數字。
+
+    為什麼需要這支：先前單餐上限只在「推薦」與「掃描」時擋得住候選餐點，
+    使用者**自己記下**的餐點從來沒有被它檢查過。首頁的警示只比整日總量，
+    所以一位高血壓使用者記了一筆 620 mg 的三明治（規則檔的單餐上限是
+    600 mg），畫面照樣寫「目前沒有需要優先處理的飲食警示」。
+
+    數字一定要從這裡出去，不能讓前端自己抄一份——這個專案已經因為
+    「兩套會各自漂移的門檻」吃過好幾次虧（見本檔的門檻一致性檢查）。
+    這裡的取值方式跟 evaluate_medical_risk 實際執行的完全一致：
+    規則檔的 risk_nutrients.block 與 personalized_limits 兩套取較嚴，
+    有臨床裁決（threshold_resolutions）就照裁決，多個疾病取最嚴的那個。
+    """
+    E, W = resolve_user_energy_and_weight(list(conditions or []), user_profile)
+    limits: dict[str, dict] = {}
+
+    def consider(nutrient: str, value, unit: str, condition_label: str):
+        if value is None:
+            return
+        value = normalize_number(value)
+        if value <= 0:
+            return
+        current = limits.get(nutrient)
+        if current is None or value < current["limit"]:
+            limits[nutrient] = {
+                "limit": round(value, 1),
+                "unit": unit or "",
+                "label_zh": NUTRIENT_LABELS_ZH.get(nutrient, nutrient),
+                "conditions": [condition_label],
+            }
+        elif abs(value - current["limit"]) < 0.5 and condition_label not in current["conditions"]:
+            current["conditions"].append(condition_label)
+
+    for condition_id in conditions or []:
+        rule = (disease_rules or {}).get(condition_id)
+        if not rule:
+            continue
+        label = rule.get("label_zh", condition_id)
+
+        for nutrient, meta in (rule.get("risk_nutrients") or {}).items():
+            decided = threshold_resolution(rule, nutrient)
+            if decided and decided["use"] == "derived":
+                continue
+            consider(nutrient, meta.get("block"), meta.get("unit", ""), label)
+
+        for nutrient, spec in (rule.get("personalized_limits") or {}).items():
+            decided = threshold_resolution(rule, nutrient)
+            if decided and decided["use"] == "configured":
+                continue
+            consider(nutrient, resolve_personalized_limit(spec, E, W), spec.get("unit", ""), label)
+
+    return limits
+
+
 def rule_threshold_conflicts(disease_rules: dict, user_profile: dict | None = None) -> list[dict]:
     """列出兩套門檻不一致的地方，並指出實際生效的是哪一個。"""
     derived = derived_meal_limits(disease_rules, user_profile)

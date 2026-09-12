@@ -45,7 +45,12 @@ export default function DashboardScreen() {
   const [recordManagerVisible, setRecordManagerVisible] = useState(false);
   const { calories, protein, carbs, sugar, fat, saturated_fat, trans_fat, sodium, fiber } = dailyNutrition;
   const remaining = Math.max(0, Math.round(calories.target - calories.current));
-  const sodiumRisk = sodium.current >= sodium.target ? '超標' : sodium.current >= sodium.target * 0.8 ? '接近上限' : '正常';
+  // 徽章先前只看整日總量，所以一筆 620mg 的餐（單餐上限 600mg）會配上
+  // 「鈉風險：正常」——旁邊的警示卻寫著單餐超標，同一頁自己打自己。
+  const mealSodiumOver = healthAlerts.some((alert) => alert.id === 'meal-limit-sodium');
+  const sodiumRisk = sodium.current >= sodium.target || mealSodiumOver
+    ? '超標'
+    : sodium.current >= sodium.target * 0.8 ? '接近上限' : '正常';
 
   /**
    * 今日紀錄還沒到手之前，一個數字都不要講。
@@ -86,7 +91,7 @@ export default function DashboardScreen() {
       fetchRecords(apiBaseUrl, user.userId, getLocalDateString(), { accessToken })
         .then((data) => {
           if (cancelled || requestRevision !== useStore.getState().dietaryRecordsRevision) return;
-          replaceDashboardFromRecords(data.records || [], data.nutrition_targets, data.nutrition_goal_types, data.nutrition_target_basis);
+          replaceDashboardFromRecords(data.records || [], data.nutrition_targets, data.nutrition_goal_types, data.nutrition_target_basis, data.meal_nutrient_limits);
         })
         .catch((err: Error) => {
           if (!cancelled) setSyncError(err.message);

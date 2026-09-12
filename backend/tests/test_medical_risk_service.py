@@ -520,3 +520,54 @@ class ThresholdResolutionTests(MedicalRiskTestCase):
 
         self.assertFalse(blocked["is_safe"], "沒有裁決時應該照較嚴的 600 mg 擋下來")
         self.assertTrue(allowed["is_safe"], "裁決採用公式（666.7 mg）後這一道應該通過")
+
+
+class EffectiveMealLimitTests(MedicalRiskTestCase):
+    """單餐上限要能被拿出來，前端才有數字可以比對已經記下的餐點。
+
+    先前這組門檻只在推薦與掃描時擋得住「還沒吃的」候選餐點；使用者自己記下
+    的餐點只跟整日總量比，所以高血壓使用者記一筆 620 mg 的三明治（單餐上限
+    600 mg），首頁照樣寫「目前沒有需要優先處理的飲食警示」。
+    """
+
+    def test_it_reports_the_same_number_the_screening_enforces(self):
+        """報出來的數字必須跟實際擋人的那個一致，否則又是兩套會漂移的門檻。"""
+        from services.medical_risk_service import effective_meal_limits
+
+        limits = effective_meal_limits(self.rules, ["hypertension"], PROFILE)
+        self.assertIn("sodium", limits)
+        sodium_limit = limits["sodium"]["limit"]
+
+        just_over = evaluate_medical_risk(
+            dish(sodium=sodium_limit + 20), ["hypertension"], [],
+            self.rules, self.taxonomy, user_profile=PROFILE,
+        )
+        just_under = evaluate_medical_risk(
+            dish(sodium=sodium_limit - 20), ["hypertension"], [],
+            self.rules, self.taxonomy, user_profile=PROFILE,
+        )
+        self.assertIn("sodium", self.blocked_nutrients(just_over))
+        self.assertNotIn("sodium", self.blocked_nutrients(just_under))
+
+    def test_it_names_the_condition_that_asked_for_the_limit(self):
+        """訊息要說得出「為什麼」，不然使用者只看到一個沒有來歷的數字。"""
+        from services.medical_risk_service import effective_meal_limits
+
+        limits = effective_meal_limits(self.rules, ["hypertension"], PROFILE)
+        self.assertTrue(limits["sodium"]["conditions"])
+        self.assertIn("高血壓", limits["sodium"]["conditions"][0])
+        self.assertEqual(limits["sodium"]["unit"], "mg")
+
+    def test_several_conditions_take_the_strictest(self):
+        from services.medical_risk_service import effective_meal_limits
+
+        hypertension = effective_meal_limits(self.rules, ["hypertension"], PROFILE)["sodium"]["limit"]
+        kidney = effective_meal_limits(self.rules, ["kidney_disease"], PROFILE)["sodium"]["limit"]
+        both = effective_meal_limits(self.rules, ["hypertension", "kidney_disease"], PROFILE)["sodium"]["limit"]
+        self.assertEqual(both, min(hypertension, kidney))
+
+    def test_no_conditions_means_no_meal_limits(self):
+        """沒有勾疾病的人不該被單餐上限攔——那些數字是疾病指引來的。"""
+        from services.medical_risk_service import effective_meal_limits
+
+        self.assertEqual(effective_meal_limits(self.rules, [], PROFILE), {})

@@ -126,6 +126,75 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertEqual(result["targets"]["calories"], 2570)
         self.assertEqual(result["basis"]["source"], "user")
         self.assertFalse(result["basis"]["floored_at_bmr"])
+        self.assertIsNone(result["basis"]["kcal_per_kg"])
+        self.assertFalse(result["basis"]["weight_reduced"])
+
+    # 線上重現的個案：158 cm／60 kg（BMI 24.0，剛好算過重）／62 歲女性／輕度活動。
+    # BMR 1116，三種組合算出來都比它高，不會被抬到 BMR。
+    OVERWEIGHT_LIGHT_ACTIVITY = {
+        "height": 158,
+        "weight": 60,
+        "age": 62,
+        "gender": "female",
+        "activity_multiplier": 1.375,
+    }
+
+    def test_overweight_hypertension_reports_unreduced_factor(self):
+        """高血壓不做過重減量，basis 不能說成 25 kcal、再下調一級。"""
+        result = calculate_daily_targets_with_basis({
+            **self.OVERWEIGHT_LIGHT_ACTIVITY,
+            "health_conditions": ["高血壓"],
+        })
+        basis = result["basis"]
+        ideal_weight = 22 * (1.58 ** 2)
+        self.assertTrue(basis["is_overweight"])
+        self.assertEqual(basis["kcal_per_kg"], 30)
+        self.assertFalse(basis["weight_reduced"])
+        self.assertFalse(basis["floored_at_bmr"])
+        self.assertAlmostEqual(result["targets"]["calories"], ideal_weight * 30)
+        self.assertEqual(round(result["targets"]["calories"]), 1648)
+
+    def test_overweight_diabetes_reports_reduced_factor(self):
+        result = calculate_daily_targets_with_basis({
+            **self.OVERWEIGHT_LIGHT_ACTIVITY,
+            "health_conditions": ["糖尿病"],
+        })
+        basis = result["basis"]
+        ideal_weight = 22 * (1.58 ** 2)
+        self.assertEqual(basis["kcal_per_kg"], 25)
+        self.assertTrue(basis["weight_reduced"])
+        self.assertFalse(basis["floored_at_bmr"])
+        self.assertAlmostEqual(result["targets"]["calories"], ideal_weight * 25)
+
+    def test_multiple_conditions_report_the_factor_that_won(self):
+        """高血壓 30、糖尿病 25，取小的；回報的係數要能乘回實際目標。"""
+        result = calculate_daily_targets_with_basis({
+            **self.OVERWEIGHT_LIGHT_ACTIVITY,
+            "health_conditions": ["高血壓", "糖尿病"],
+        })
+        basis = result["basis"]
+        self.assertEqual(basis["kcal_per_kg"], 25)
+        self.assertTrue(basis["weight_reduced"])
+        self.assertFalse(basis["floored_at_bmr"])
+        self.assertAlmostEqual(
+            result["targets"]["calories"],
+            22 * (1.58 ** 2) * basis["kcal_per_kg"],
+        )
+
+    def test_basis_factor_is_pre_floor_when_raised_to_bmr(self):
+        """被抬到 BMR 時，kcal_per_kg 仍是抬之前實際用的係數。"""
+        result = calculate_daily_targets_with_basis({
+            "height": 170,
+            "weight": 80,
+            "age": 25,
+            "gender": "male",
+            "activity_multiplier": 1.2,
+            "health_conditions": ["糖尿病", "高血壓"],
+        })
+        basis = result["basis"]
+        self.assertTrue(basis["floored_at_bmr"])
+        self.assertEqual(basis["kcal_per_kg"], 20)
+        self.assertTrue(basis["weight_reduced"])
 
     def test_disease_rules_load(self):
         rules = load_disease_rules(os.path.dirname(os.path.dirname(__file__)))

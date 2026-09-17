@@ -126,7 +126,7 @@ export type NutritionTargetBasis = {
   source: 'disease' | 'user';
   conditions: string[];
   ideal_body_weight: number;
-  /** 每公斤理想體重給幾大卡，依活動量分級；source 為 user 時是 null。 */
+  /** 實際算出目標的每公斤大卡數（多個疾病取最小者）；source 為 user 時是 null。 */
   kcal_per_kg: number | null;
   activity_multiplier: number;
   bmr: number | null;
@@ -134,6 +134,11 @@ export type NutritionTargetBasis = {
   floored_at_bmr: boolean;
   user_target: number | null;
   is_overweight: boolean;
+  /**
+   * kcal_per_kg 是否因 BMI 偏高而下調一級。過重不代表有下調：只有糖尿病／
+   * 高血脂會減量，高血壓、痛風、腎病不會。舊版後端沒有這個欄位。
+   */
+  weight_reduced?: boolean;
 };
 
 export type RecordsResponse = {

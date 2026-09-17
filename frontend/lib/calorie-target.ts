@@ -34,8 +34,10 @@ export function describeCalorieTarget(basis: NutritionTargetBasis | null | undef
   }
 
   const conditions = conditionLabels(basis.conditions, '慢性疾病');
+  // 看 weight_reduced 而不是 is_overweight：過重的高血壓患者並沒有減量，
+  // 先前這裡照樣寫「BMI 偏高再下調一級」。
   const parts = [
-    `依${conditions}的臨床指引計算：理想體重 ${basis.ideal_body_weight} kg × ${basis.kcal_per_kg} kcal（${activityLabel(basis.activity_multiplier)}${basis.is_overweight ? '，BMI 偏高再下調一級' : ''}）。`,
+    `依${conditions}的臨床指引計算：理想體重 ${basis.ideal_body_weight} kg × ${basis.kcal_per_kg} kcal（${activityLabel(basis.activity_multiplier)}${basis.weight_reduced ? '，BMI 偏高再下調一級' : ''}）。`,
   ];
 
   if (basis.floored_at_bmr && basis.bmr) {

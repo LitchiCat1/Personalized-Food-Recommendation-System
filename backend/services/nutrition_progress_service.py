@@ -155,21 +155,29 @@ def calculate_daily_targets_with_basis(user: dict) -> dict:
     # 決定不同疾病下的每日總熱量需求 E
     conditions = normalize_conditions(user)
 
-    e_candidates = []
+    # 每個疾病各給一個「每公斤幾大卡」，取最小的那個。W 是同一個數字，
+    # 所以比係數跟比 W × 係數結果一樣；留著係數才說得出實際採用的是哪一級。
+    # 先前 basis 不管誰勝出都回報 weight_managed_factor：過重的高血壓患者
+    # 畫面寫「× 25 kcal，BMI 偏高再下調一級」，實際卻是 × 30。
+    factor_candidates = []
     if "diabetes" in conditions:
-        e_candidates.append(W * weight_managed_factor)
+        factor_candidates.append(weight_managed_factor)
     if "gout" in conditions:
-        e_candidates.append(W * energy_factor)
+        factor_candidates.append(energy_factor)
     if "hyperlipidemia" in conditions:
-        e_candidates.append(W * weight_managed_factor)
+        factor_candidates.append(weight_managed_factor)
     if "hypertension" in conditions:
-        e_candidates.append(W * energy_factor)
+        factor_candidates.append(energy_factor)
     if "kidney_disease" in conditions:
-        e_candidates.append(W * energy_factor)
+        factor_candidates.append(energy_factor)
 
+    kcal_per_kg = None
+    weight_reduced = False
     floored_at_bmr = False
-    if e_candidates:
-        E = min(e_candidates)
+    if factor_candidates:
+        kcal_per_kg = min(factor_candidates)
+        weight_reduced = kcal_per_kg < energy_factor
+        E = W * kcal_per_kg
         # 疾病目標是 App 幫使用者決定的，不能低到基礎代謝以下；
         # 使用者自己填的數字則尊重他的選擇，不在這裡改。
         if bmr > 0 and E < bmr:
@@ -276,12 +284,15 @@ def calculate_daily_targets_with_basis(user: dict) -> dict:
         "source": target_source,
         "conditions": sorted(conditions),
         "ideal_body_weight": round(W, 1),
-        "kcal_per_kg": weight_managed_factor if target_source == "disease" else None,
+        # 實際算出 E 的那個係數（若 E 被抬到 BMR，這是抬之前用的係數）。
+        "kcal_per_kg": kcal_per_kg,
         "activity_multiplier": activity_multiplier,
         "bmr": round(bmr) if bmr > 0 else None,
         "floored_at_bmr": floored_at_bmr,
         "user_target": round(daily_calorie_target) if daily_calorie_target > 0 else None,
         "is_overweight": is_overweight,
+        # 過重不等於有減量：只有糖尿病／高血脂的係數勝出時才真的下調一級。
+        "weight_reduced": weight_reduced,
     }
 
     return {"targets": targets, "basis": basis}

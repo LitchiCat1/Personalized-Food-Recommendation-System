@@ -1,4 +1,7 @@
 import * as Location from 'expo-location';
+import { Platform } from 'react-native';
+
+import { getBrowserPosition } from '@/lib/browser-location';
 
 /**
  * 拿不到定位時退回的座標（台北 101）。
@@ -32,12 +35,14 @@ export async function resolveLocation(timeoutMs = 10000): Promise<ResolvedLocati
           reason = '未授權定位';
           throw new Error(reason);
         }
-        const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        // 網頁版不能交給 expo-location，它會讓瀏覽器一直回傳第一次的位置，見 browser-location.ts
+        const { coords } =
+          Platform.OS === 'web'
+            ? await getBrowserPosition(navigator.geolocation)
+            : await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         return {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
+          lat: coords.latitude,
+          lng: coords.longitude,
           source: 'device',
         };
       })(),

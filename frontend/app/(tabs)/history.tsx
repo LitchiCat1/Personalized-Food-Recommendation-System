@@ -12,28 +12,9 @@ import MetricCard from '@/components/ui/metric-card';
 import DataPill from '@/components/ui/data-pill';
 import ProgressBar from '@/components/ui/progress-bar';
 import PrimaryButton from '@/components/ui/primary-button';
-import { DEFAULT_NUTRITION_GOAL_TYPES, fetchAllRecordsWithTargets, type HistoryDay, type HistoryResponse, type NutritionGoalTypes, type NutritionTargets } from '@/lib/api';
+import { DEFAULT_NUTRITION_GOAL_TYPES, fetchAllRecordsWithTargets, type NutritionGoalTypes, type NutritionTargets } from '@/lib/api';
 import { buildDietaryTrend, type DietaryTrendData } from '@/lib/dietary-trends';
-
-function buildInsights(summary: HistoryResponse['summary'], daily: HistoryDay[], target: number, sodiumTarget: number) {
-  if (daily.length === 0) {
-    return ['尚無歷史紀錄，先從掃描或手動加入餐點開始建立趨勢。'];
-  }
-
-  const overSodiumDay = daily.find((day) => day.sodium > sodiumTarget);
-  const avgCalories = summary.avg_calories || 0;
-  const latest = daily[daily.length - 1];
-
-  return [
-    `近 ${daily.length} 天平均熱量 ${avgCalories} kcal/日。`,
-    overSodiumDay
-      ? `${overSodiumDay.date} 的鈉攝取超過每日上限 ${sodiumTarget.toLocaleString()}mg，建議檢查加工食品與外食比例。`
-      : '近期鈉攝取沒有明顯超標日，維持目前記錄習慣。',
-    latest.calories < target * 0.75
-      ? `最近一天熱量偏低，距離目標仍差 ${Math.max(0, target - latest.calories)} kcal。`
-      : '最近一天的熱量接近個人目標，可觀察蛋白質與纖維是否同步達標。',
-  ];
-}
+import { buildTrendInsights, classifyCalories, findSodiumOverDays } from '@/lib/trend-insights';
 
 export default function HistoryScreen() {
   const { rs, isSmall, isDesktop } = useResponsive();
@@ -85,9 +66,9 @@ export default function HistoryScreen() {
   const daily = useMemo(() => trend?.daily || [], [trend]);
   const summary = useMemo(() => trend?.summary || {}, [trend]);
   const maxCal = Math.max(target, ...daily.map((d) => d.calories), 1);
-  const calorieGoalHitDays = daily.filter((d) => d.calories >= target * 0.85 && d.calories <= target * 1.15).length;
-  const sodiumOverDays = daily.filter((d) => d.sodium > sodiumTarget).length;
-  const insights = useMemo(() => buildInsights(summary, daily, target, sodiumTarget), [summary, daily, target, sodiumTarget]);
+  const calorieGoalHitDays = daily.filter((d) => classifyCalories(d.calories, target) === 'on-target').length;
+  const sodiumOverDays = findSodiumOverDays(daily, sodiumTarget).length;
+  const insights = useMemo(() => buildTrendInsights(summary, daily, target, sodiumTarget), [summary, daily, target, sodiumTarget]);
   const totalRecords = summary.total_records || daily.reduce((sum, day) => sum + (day.record_count || 0), 0);
   const recordedDays = summary.recorded_days || daily.length;
 
@@ -142,7 +123,7 @@ export default function HistoryScreen() {
               {daily.map((day, index) => {
                 const barHeight = (day.calories / maxCal) * 100;
                 const isLatest = index === daily.length - 1;
-                const overTarget = day.calories > target * 1.15;
+                const overTarget = classifyCalories(day.calories, target) === 'high';
                 return (
                   <View key={day.date} style={styles.barColumn}>
                     <Text style={[styles.barValue, { color: overTarget ? Palette.status.warning : Palette.text.tertiary }]}>{day.calories}</Text>

@@ -9,6 +9,7 @@
     "web": "node scripts/with-google-map-env.js expo start --web",
     "build:web": "node scripts/with-google-map-env.js expo export --platform web",
     "test:trends": "node --test scripts/test-dietary-trends.mjs",
+    "test:insights": "node --test scripts/test-trend-insights.mjs",
     "test:records": "node --test scripts/test-dietary-records.mjs",
     "test:scanner": "node --test scripts/test-scanner-records.mjs",
     "test:config": "node --test scripts/test-build-env.mjs",

@@ -571,3 +571,110 @@ class EffectiveMealLimitTests(MedicalRiskTestCase):
         from services.medical_risk_service import effective_meal_limits
 
         self.assertEqual(effective_meal_limits(self.rules, [], PROFILE), {})
+
+
+class GoutKeywordTests(MedicalRiskTestCase):
+    """痛風要靠菜名擋掉內臟類餐點。
+
+    建檔菜單送進 evaluate_medical_risk 的只有中文菜名，label 是 menu_001 這種
+    編號。規則先前只寫了「內臟」這個統稱，台灣菜單卻是直接寫部位：線上實測
+    只勾痛風，台南國華街的「腰子冬粉」「豬心冬粉」被當成可以吃的推薦出來，
+    「薑絲炒大腸」也沒擋。這是關鍵字篩選，不是普林含量資料。
+    """
+
+    @staticmethod
+    def menu_item(name):
+        # 跟 healthy_food_service._items_from_indexed_menu 送進來的形狀一樣
+        return dish(label="menu_001", name_zh=name)
+
+    @staticmethod
+    def gout_keyword_hits(result):
+        return [
+            risk for risk in result["risks"]
+            if risk["type"] == "condition_keyword" and risk["condition_id"] == "gout"
+        ]
+
+    def test_organ_meat_dishes_are_blocked(self):
+        for name in ("腰子冬粉", "豬心冬粉", "薑絲炒大腸", "下水湯"):
+            with self.subTest(dish=name):
+                result = self.evaluate(self.menu_item(name), conditions=["gout"])
+                self.assertFalse(result["is_safe"])
+                self.assertTrue(self.gout_keyword_hits(result))
+
+    def test_the_reason_names_the_word_that_matched(self):
+        result = self.evaluate(self.menu_item("腰子冬粉"), conditions=["gout"])
+        self.assertIn("腰子", " ".join(result["block_reasons"]))
+
+    def test_ordinary_meat_dishes_pass(self):
+        for name in ("豬肉冬粉", "雞肉飯"):
+            with self.subTest(dish=name):
+                result = self.evaluate(self.menu_item(name), conditions=["gout"])
+                self.assertTrue(result["is_safe"], result["block_reasons"])
+
+    def test_names_that_only_look_like_organ_meat_are_not_matched(self):
+        """刻意不列的字，理由寫在 disease_rules.json 的 blocked_keywords_note。"""
+        for name in ("肝連湯", "豬血湯", "香腸炒飯", "玉米濃湯", "百頁豆腐", "牛肝菌燉飯"):
+            with self.subTest(dish=name):
+                result = self.evaluate(self.menu_item(name), conditions=["gout"])
+                self.assertEqual(self.gout_keyword_hits(result), [])
+
+    def test_the_organ_keywords_belong_to_gout_only(self):
+        result = self.evaluate(self.menu_item("腰子冬粉"), conditions=["hypertension"])
+        self.assertTrue(result["is_safe"], result["block_reasons"])
+
+
+class GoutIndexedMenuTests(unittest.TestCase):
+    """走真正的建檔菜單路徑重現線上那一次：只勾痛風，店是阿明豬心冬粉。
+
+    店名本身含「豬心」，但擋的依據必須是菜名——不然整家店連豬肉冬粉都會
+    被擋掉。
+    """
+
+    VENUE_NAME = "阿明豬心冬粉"
+    PLACE_ID = "p_aming"
+
+    @staticmethod
+    def _dish(name):
+        return {
+            "name": name, "price": 70, "calories": 380, "protein": 18, "carbs": 50,
+            "fat": 10, "sugar": 2, "saturated_fat": 3, "trans_fat": 0, "fiber": 2, "sodium": 900,
+        }
+
+    def _build(self):
+        from unittest.mock import patch
+
+        import services.healthy_food_service as healthy_food_service_module
+        from repositories.storage import StorageRepository
+
+        storage = StorageRepository(None, False, {}, [], [])
+        storage.upsert_user({
+            "user_id": "u1", "name": "U", "height": 170, "weight": 65, "age": 30,
+            "health_conditions": ["痛風"], "allergens": [],
+        })
+        storage.save_restaurant_menu(
+            self.VENUE_NAME,
+            [self._dish("腰子冬粉"), self._dish("豬心冬粉"), self._dish("豬肉冬粉")],
+            venue={"google_place_id": self.PLACE_ID},
+        )
+        venue = {
+            "restaurant_id": f"google_{self.PLACE_ID}", "name": self.VENUE_NAME,
+            "lat": 22.9950, "lng": 120.1990, "address": "台南市中西區國華街",
+            "distance_km": 0.1, "tags": ["Google Places"], "google_place_id": self.PLACE_ID,
+            "price_level": 1, "is_open": True, "rating": 4.2, "user_ratings_total": 800,
+            "match_score": 70, "data_source": "google_places", "nutrition_available": False,
+            "recommended_items": [],
+        }
+        with patch.object(healthy_food_service_module, "fetch_google_places_restaurants",
+                          return_value=[venue]):
+            return healthy_food_service_module.build_google_places_food_recommendations(
+                storage, "u1", {"budget": 150, "lat": 22.9950, "lng": 120.1990},
+            )
+
+    def test_organ_dishes_are_filtered_out_and_the_plain_one_is_kept(self):
+        result = self._build()
+        self.assertEqual(result["venues_with_menu"], 1)
+        recommended = [item["item_name"] for item in result["recommended"]]
+        filtered = {entry["item_name"]: entry["reasons"] for entry in result["filtered_out"]}
+        self.assertEqual(recommended, ["豬肉冬粉"])
+        self.assertEqual(set(filtered), {"腰子冬粉", "豬心冬粉"})
+        self.assertTrue(any("腰子" in reason for reason in filtered["腰子冬粉"]))

@@ -180,3 +180,106 @@ class BusinessStatusTests(unittest.TestCase):
         results = self._search([self._v1_place("shut", "現在休息中", open_now=False)])
         self.assertEqual(results[0]["name"], "現在休息中")
         self.assertFalse(results[0]["is_open"])
+
+
+class SearchRadiusTests(unittest.TestCase):
+    """半徑外的店不能被當成附近的選擇。
+
+    線上在太魯閣（24.1586, 121.6214）搜 3 km，回來的有 20 km 外花蓮市區的店，
+    旅客就被叫去那裡吃飯。
+    """
+
+    TAROKO = (24.1586, 121.6214)
+    NEARBY = (24.1600, 121.6230)       # 約 0.2 km
+    HUALIEN_CITY = (23.9760, 121.6040)  # 約 20.3 km
+
+    def setUp(self):
+        clear_search_cache()
+        env = patch.dict(os.environ, {"GOOGLE_PLACES_API_KEY": "test-key", "GOOGLE_MAPS_API_KEY": ""}, clear=False)
+        env.start()
+        self.addCleanup(env.stop)
+
+    @staticmethod
+    def _v1_place(place_id, name, location):
+        return {
+            "id": place_id,
+            "displayName": {"text": name},
+            "formattedAddress": "花蓮",
+            "location": {"latitude": location[0], "longitude": location[1]},
+            "types": ["restaurant"],
+            "businessStatus": "OPERATIONAL",
+        }
+
+    @staticmethod
+    def _legacy_place(place_id, name, location):
+        return {
+            "place_id": place_id,
+            "name": name,
+            "vicinity": "花蓮",
+            "geometry": {"location": {"lat": location[0], "lng": location[1]}},
+            "types": ["restaurant"],
+        }
+
+    def _search(self, radius_km=3):
+        return fetch_google_places_restaurants(*self.TAROKO, radius_km, "all", 150, limit=10)
+
+    @patch("services.google_places_service.requests.get")
+    @patch("services.google_places_service.requests.post")
+    def test_new_places_api_result_outside_radius_is_dropped(self, mock_post, mock_get):
+        mock_post.return_value = FakeResponse(200, {"places": [
+            self._v1_place("near", "太魯閣附近的店", self.NEARBY),
+            self._v1_place("far", "花蓮市區的店", self.HUALIEN_CITY),
+        ]})
+
+        results = self._search()
+
+        self.assertEqual([r["name"] for r in results], ["太魯閣附近的店"])
+        self.assertLessEqual(results[0]["distance_km"], 3)
+        mock_get.assert_not_called()
+
+    @patch("services.google_places_service.requests.get")
+    @patch("services.google_places_service.requests.post", return_value=FakeResponse(200, {"places": []}))
+    def test_legacy_fallback_result_outside_radius_is_dropped(self, _mock_post, mock_get):
+        """舊版 Nearby Search 的 radius 只是偏好，這正是線上出現 20 km 外店家的路徑。"""
+        mock_get.side_effect = [
+            FakeResponse(200, {"status": "OK", "results": [
+                self._legacy_place("far", "歐桑米粉湯", self.HUALIEN_CITY),
+                self._legacy_place("near", "太魯閣附近的店", self.NEARBY),
+            ]}),
+            FakeResponse(200, {"status": "OK", "result": {}}),
+        ]
+
+        with patch("builtins.print") as mock_print:
+            results = self._search()
+
+        self.assertEqual([r["name"] for r in results], ["太魯閣附近的店"])
+        # 半徑外的店也不該再花一次 Place Details 的錢
+        self.assertEqual(mock_get.call_count, 2)
+        self.assertEqual(mock_get.call_args.kwargs["params"]["place_id"], "near")
+        logged = "\n".join(str(call.args[0]) for call in mock_print.call_args_list if call.args)
+        self.assertIn("歐桑米粉湯", logged)
+        self.assertIn("舊版 Nearby Search", logged)
+
+    @patch("services.google_places_service.requests.get")
+    @patch("services.google_places_service.requests.post", return_value=FakeResponse(200, {"places": []}))
+    def test_only_out_of_range_places_gives_empty_list_not_error(self, _mock_post, mock_get):
+        """丟例外會讓推薦改用內建示範店家；附近真的沒店就該老實回空的。"""
+        mock_get.return_value = FakeResponse(200, {"status": "OK", "results": [
+            self._legacy_place("far", "歐桑米粉湯", self.HUALIEN_CITY),
+        ]})
+
+        self.assertEqual(self._search(), [])
+        mock_get.assert_called_once()
+
+    @patch("services.google_places_service.requests.post")
+    def test_small_overshoot_is_tolerated_but_not_more(self, mock_post):
+        km_per_degree_lat = 6371.0 * 3.141592653589793 / 180
+        lat, lng = self.TAROKO
+        mock_post.return_value = FakeResponse(200, {"places": [
+            self._v1_place("edge", "3.2 km 的店", (lat + 3.2 / km_per_degree_lat, lng)),
+            self._v1_place("over", "3.5 km 的店", (lat + 3.5 / km_per_degree_lat, lng)),
+        ]})
+
+        results = self._search(radius_km=3)
+
+        self.assertEqual([r["name"] for r in results], ["3.2 km 的店"])

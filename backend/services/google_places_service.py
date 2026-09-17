@@ -74,6 +74,10 @@ PLACE_TYPE_LABELS = {
 # 這些類型每家店都有，講了等於沒講，不值得佔一個標籤的位置。
 GENERIC_PLACE_TYPES = {"point_of_interest", "establishment", "food", "store"}
 
+# 店家離搜尋中心可以超出半徑多少還算數。舊版 Nearby Search 的 radius 只是
+# 「偏好」，太魯閣搜 3 km 會回 20 幾 km 外的店；留一點餘裕給座標誤差就好。
+RADIUS_TOLERANCE = 1.1
+
 
 def readable_place_types(types, limit: int = 2) -> list[str]:
     """把 Places 的英文 types 轉成可以直接顯示的中文標籤。
@@ -430,6 +434,8 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
                 "Google Places 兩種 API 都沒有回傳結果，請確認金鑰權限與 Billing 設定。"
             )
 
+    max_distance_km = radius_m / 1000 * RADIUS_TOLERANCE
+    out_of_range = []
     candidates = []
     for place in results:
         geometry = place.get("geometry") or {}
@@ -447,6 +453,10 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
             continue
 
         distance_km = haversine_km(lat, lng, float(place_lat), float(place_lng))
+        # 先前沒有這一關，半徑外的店照樣被列成「附近」，旅客就被叫去 20 km 外吃飯
+        if distance_km > max_distance_km:
+            out_of_range.append((place, distance_km))
+            continue
         opening_hours = place.get("opening_hours") or {}
         # 新版 API 叫 openNow，舊版叫 open_now；兩個都沒有就是「不知道」，
         # 不能當成營業中——那正是先前顯示假「營業中」的原因。
@@ -511,6 +521,16 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
             "filtered_items": [],
         }
         candidates.append((restaurant, place))
+
+    if out_of_range:
+        dropped = ", ".join(
+            f"{place.get('name') or '?'} {distance_km:.2f} km"
+            f"（{'Places API (New)' if place.get('_new_places_api') else '舊版 Nearby Search'}）"
+            for place, distance_km in out_of_range
+        )
+        print(
+            f"[Google Places] 排除 {len(out_of_range)} 家超出半徑 {radius_m / 1000:g} km 的店：{dropped}"
+        )
 
     candidates.sort(key=lambda item: (-item[0]["match_score"], item[0]["distance_km"]))
     selected_candidates = candidates[:limit]

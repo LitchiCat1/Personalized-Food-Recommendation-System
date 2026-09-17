@@ -18,6 +18,7 @@ import { saveRecord } from '@/lib/scanner';
 import { getAutoMealType } from '@/lib/meal';
 import { resolveImageBase64 } from '@/lib/image';
 import { describeLocation, resolveLocation } from '@/lib/location';
+import { describeIndexProgress, describeIndexRun, indexVenuesUntilDone, type VenueIndexProgress } from '@/lib/venue-indexing';
 import {
   fetchHealthyFoodRecommendations,
   fetchRestaurantAiSummary,
@@ -70,6 +71,7 @@ export default function RecommendScreen() {
   const [menuUploadFeedback, setMenuUploadFeedback] = useState<{ tone: 'success' | 'error'; title: string; message?: string } | null>(null);
   const [pageFeedback, setPageFeedback] = useState<{ tone: 'success' | 'error'; title: string; message?: string } | null>(null);
   const [indexingVenues, setIndexingVenues] = useState(false);
+  const [indexProgress, setIndexProgress] = useState<VenueIndexProgress | null>(null);
 
   const captureMenuPhoto = async (source: 'camera' | 'library'): Promise<string | null> => {
     if (source === 'camera') {
@@ -327,28 +329,32 @@ export default function RecommendScreen() {
 
   // 沒建檔就只能用店名比對疾病禁忌，這是整個推薦最大的落差。
   // 原本建檔入口埋在「我的」分頁，這裡直接做，做完重跑一次搜尋。
+  // 後端一次只做得完一部分，有進度就自動接著送，按一次就建完。
   const handleIndexNearby = async () => {
     setIndexingVenues(true);
+    setIndexProgress(null);
     setPageFeedback(null);
     try {
       const location = await resolveLocation();
-      const summary = await indexNearbyVenues(
-        apiBaseUrl,
-        user.userId,
-        { budget: Number(budget) || 150, lat: location.lat, lng: location.lng, radiusKm, category },
-        { accessToken }
+      const run = await indexVenuesUntilDone(
+        () =>
+          indexNearbyVenues(
+            apiBaseUrl,
+            user.userId,
+            { budget: Number(budget) || 150, lat: location.lat, lng: location.lng, radiusKm, category },
+            // 一次建檔可能跑好幾分鐘，每一輪都拿最新的登入憑證，中途換發過也不會被擋
+            { accessToken: useStore.getState().accessToken }
+          ),
+        setIndexProgress
       );
-      const rest = summary.remaining ? `，還有 ${summary.remaining} 家沒建，可以再按一次` : '';
-      setPageFeedback({
-        tone: summary.analysed > 0 || summary.already_cached > 0 ? 'success' : 'error',
-        title: `本次建檔 ${summary.analysed} 家，先前已建檔 ${summary.already_cached} 家${rest}`,
-        message: summary.failed ? `${summary.failed} 家菜單分析失敗，稍後可以再試。` : undefined,
-      });
+      const report = describeIndexRun(run);
+      setPageFeedback({ ...report, message: report.message || undefined });
       await handleHealthyFoodSearch();
     } catch (err: any) {
       setPageFeedback({ tone: 'error', title: '建立菜單檔案失敗', message: err?.message });
     } finally {
       setIndexingVenues(false);
+      setIndexProgress(null);
     }
   };
 
@@ -403,6 +409,8 @@ export default function RecommendScreen() {
               <PrimaryButton
                 label={healthyLoading ? '搜尋中' : '更新地圖'}
                 onPress={handleHealthyFoodSearch}
+                // 建檔中重新搜尋，結果換掉後建檔按鈕和它的進度會一起消失；建完會自動重搜
+                disabled={indexingVenues}
                 fullWidth={false}
                 icon={healthyLoading ? <ActivityIndicator size="small" color={Palette.text.inverse} /> : <Ionicons name="location-outline" size={17} color={Palette.text.inverse} />}
               />
@@ -445,7 +453,7 @@ export default function RecommendScreen() {
               </View>
               {healthyData.nutrition_available ? null : (
                 <SecondaryButton
-                  label={indexingVenues ? '建檔中…' : '建立附近店家菜單檔案'}
+                  label={indexingVenues ? describeIndexProgress(indexProgress) : '建立附近店家菜單檔案'}
                   onPress={handleIndexNearby}
                   disabled={indexingVenues}
                 />

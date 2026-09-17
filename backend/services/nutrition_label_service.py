@@ -3,6 +3,8 @@ import binascii
 import json
 import os
 import re
+import threading
+import time
 
 import requests
 
@@ -201,6 +203,74 @@ def get_gemini_api_keys(explicit_key: str | None = None) -> list[str]:
     return keys
 
 
+# 404 = 這把金鑰沒有這個模型的權限，下一次再問也一樣是 404。各功能
+# （菜單建檔、營養標示、食物辨識、店家摘要）原本在每次呼叫時都把同樣的
+# 404 重打一遍；記在這裡共用，幾小時內直接跳過。權限改了可以用
+# /health/gemini?generate=1 重新確認，重新部署（行程重啟）也會清掉。
+FORBIDDEN_MODEL_TTL_SECONDS = 6 * 60 * 60
+_forbidden_until: dict[tuple[str, str], float] = {}
+_forbidden_lock = threading.Lock()
+
+
+def remember_forbidden_gemini_model(key: str, model: str) -> None:
+    now = time.monotonic()
+    with _forbidden_lock:
+        # 順手清掉過期的，字典才不會只增不減
+        for pair in [pair for pair, until in _forbidden_until.items() if until <= now]:
+            del _forbidden_until[pair]
+        _forbidden_until[(key, model)] = now + FORBIDDEN_MODEL_TTL_SECONDS
+
+
+def is_forbidden_gemini_model(key: str, model: str) -> bool:
+    with _forbidden_lock:
+        return _forbidden_until.get((key, model), 0) > time.monotonic()
+
+
+def forget_forbidden_gemini_models(key: str | None = None, model: str | None = None) -> None:
+    """不帶參數就全部清掉（測試用）；帶金鑰與模型只清那一組（確認它其實能用時）。"""
+    with _forbidden_lock:
+        if key is None and model is None:
+            _forbidden_until.clear()
+        else:
+            _forbidden_until.pop((key, model), None)
+
+
+def gemini_key_model_pairs(keys: list[str], models: list[str]) -> list[tuple[str, str]]:
+    """依序列出要試的（金鑰, 模型），跳過最近回過 404 的組合。
+
+    全部都被記成 404 時照樣全部列出：記憶可能已經過時，寧可多試一輪，
+    也不要讓整個功能因為一份舊紀錄而停擺。
+    """
+    pairs = [(key, model) for key in keys for model in models]
+    usable = [pair for pair in pairs if not is_forbidden_gemini_model(*pair)]
+    return usable or pairs
+
+
+def call_gemini_with_rotation(api_keys: list[str], call, label: str):
+    """依序換金鑰與模型呼叫 call(api_key, model)，直到成功或遇到不該重試的錯誤。"""
+    if not api_keys:
+        raise ValueError("缺少 Gemini API key，請設定 GEMINI_API_KEYS 或 GEMINI_API_KEY 環境變數")
+
+    pairs = gemini_key_model_pairs(api_keys, get_gemini_models())
+    last_error: requests.HTTPError | None = None
+    for attempt, (api_key, model) in enumerate(pairs, start=1):
+        try:
+            return call(api_key, model)
+        except requests.HTTPError as e:
+            last_error = e
+            status_code = e.response.status_code if e.response is not None else None
+            if status_code == 404:
+                remember_forbidden_gemini_model(api_key, model)
+            if status_code not in RETRYABLE_GEMINI_STATUS_CODES or attempt == len(pairs):
+                raise
+            key_number = api_keys.index(api_key) + 1
+            print(f"[WARN] Gemini {label} key #{key_number} model {model} failed with HTTP {status_code}; trying next option")
+
+    if last_error:
+        raise last_error
+    raise ValueError(f"Gemini {label} 金鑰輪替失敗")
+
+
 def _try_generate(key: str, model: str, timeout: float) -> tuple[int, str]:
     """實際打一次最小的 generateContent，回 (status, 訊息)。"""
     try:
@@ -264,6 +334,11 @@ def probe_gemini_models(timeout: float = 10.0, generate: bool = False) -> dict:
             for model in entry["configured_and_usable"]:
                 status, detail = _try_generate(key, model, timeout)
                 entry["generate_results"][model] = status if status == 200 else f"{status} {detail}"
+                # 實際打過的結果最準，順便更新各功能共用的 404 記憶
+                if status == 404:
+                    remember_forbidden_gemini_model(key, model)
+                elif status == 200:
+                    forget_forbidden_gemini_models(key, model)
                 if status == 200:
                     entry["first_working_model"] = model
                     break
@@ -305,28 +380,11 @@ def get_gemini_models() -> list[str]:
 
 
 def call_gemini_nutrition_ocr_with_rotation(image_b64: str, mime_type: str, api_keys: list[str]) -> dict:
-    if not api_keys:
-        raise ValueError("缺少 Gemini API key，請設定 GEMINI_API_KEYS 或 GEMINI_API_KEY 環境變數")
-
-    last_error: requests.HTTPError | None = None
-    models = get_gemini_models()
-    total_attempts = len(api_keys) * len(models)
-    attempt = 0
-    for key_index, api_key in enumerate(api_keys):
-        for model in models:
-            attempt += 1
-            try:
-                return call_gemini_nutrition_ocr(image_b64, mime_type, api_key, model)
-            except requests.HTTPError as e:
-                last_error = e
-                status_code = e.response.status_code if e.response is not None else None
-                if status_code not in RETRYABLE_GEMINI_STATUS_CODES or attempt == total_attempts:
-                    raise
-                print(f"[WARN] Gemini key #{key_index + 1} model {model} failed with HTTP {status_code}; trying next option")
-
-    if last_error:
-        raise last_error
-    raise ValueError("Gemini API key 輪替失敗")
+    return call_gemini_with_rotation(
+        api_keys,
+        lambda api_key, model: call_gemini_nutrition_ocr(image_b64, mime_type, api_key, model),
+        "OCR",
+    )
 
 
 def call_gemini_nutrition_ocr(image_b64: str, mime_type: str, api_key: str, gemini_model: str | None = None) -> dict:

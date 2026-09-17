@@ -740,6 +740,8 @@ def _venue_search_params(data: dict) -> dict:
 def index_nearby_restaurants(user_id):
     """把附近店家的菜單建檔，推薦才能逐道菜比對疾病禁忌與過敏原。"""
     require_user_access(user_id)
+    # 一次會打 Google Places 和好幾家店的 Gemini 分析，都是按次計費的
+    enforce_rate_limit(_paid_api_limiter, "venue-index")
     data = request.get_json(silent=True) or {}
     try:
         summary = index_nearby_venues(
@@ -799,6 +801,8 @@ def clear_nearby_restaurant_index(user_id):
     """清空店家菜單快取，讓建檔可以用目前的規則重來一次。"""
     require_user_access(user_id)
     removed = storage.clear_restaurant_menus()
+    # 重建就是要照新規則重來，先前問不出菜單的店也要再問一次
+    storage.clear_restaurant_menu_failures()
     return jsonify({"message": f"已清除 {removed} 家店的菜單檔案", "removed": removed})
 
 

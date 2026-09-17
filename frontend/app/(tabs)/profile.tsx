@@ -22,6 +22,7 @@ import { describeRequestError } from '@/lib/error-copy';
 import { describeCalorieTarget, describeUserTargetFallback, formatCalories } from '@/lib/calorie-target';
 import { calculateActivityStats } from '@/lib/dietary-trends';
 import { describeLocation, resolveLocation } from '@/lib/location';
+import { describeIndexProgress, describeIndexRun, indexVenuesUntilDone, type VenueIndexProgress } from '@/lib/venue-indexing';
 import { isSupabaseAuthConfigured, supabase } from '@/lib/supabase';
 import { isSelected } from '@/lib/safety-selection';
 
@@ -44,6 +45,7 @@ export default function ProfileScreen() {
   const [profileFeedback, setProfileFeedback] = useState<{ tone: 'success' | 'error'; title: string; message?: string } | null>(null);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [seedBusy, setSeedBusy] = useState<'index' | 'rebuild' | 'list' | null>(null);
+  const [indexProgress, setIndexProgress] = useState<VenueIndexProgress | null>(null);
   const [activeSection, setActiveSection] = useState('personal');
   const [medicalMetadata, setMedicalMetadata] = useState<MedicalMetadata | null>(null);
   const [profileDraft, setProfileDraft] = useState({
@@ -516,20 +518,27 @@ export default function ProfileScreen() {
 
   const handleIndexVenues = () =>
     runSeedAction('index', async () => {
-      // 之前沒送座標，後端就用預設的台北 101，建的是那裡的店而不是你附近的
-      const location = await resolveLocation();
-      const summary = await indexNearbyVenues(
-        apiBaseUrl,
-        user.userId,
-        { budget: 150, lat: location.lat, lng: location.lng },
-        { accessToken }
-      );
-      const rest = summary.remaining ? `，還有 ${summary.remaining} 家沒建（再按一次繼續）` : '';
-      return {
-        tone: summary.analysed > 0 || summary.already_cached > 0 ? 'success' : 'error',
-        title: `附近 ${summary.found} 家店：本次建檔 ${summary.analysed} 家，已建檔過 ${summary.already_cached} 家${rest}`,
-        message: `${describeLocation(location)} 資料庫目前累積 ${summary.total_cached} 家店的菜單${summary.failed ? `，${summary.failed} 家分析失敗` : ''}。`,
-      };
+      setIndexProgress(null);
+      try {
+        // 之前沒送座標，後端就用預設的台北 101，建的是那裡的店而不是你附近的
+        const location = await resolveLocation();
+        // 後端一次只做得完一部分，有進度就自動接著送，按一次就建完
+        const run = await indexVenuesUntilDone(
+          () =>
+            indexNearbyVenues(
+              apiBaseUrl,
+              user.userId,
+              { budget: 150, lat: location.lat, lng: location.lng },
+              // 一次建檔可能跑好幾分鐘，每一輪都拿最新的登入憑證
+              { accessToken: useStore.getState().accessToken }
+            ),
+          setIndexProgress
+        );
+        const totalCached = run.last ? `資料庫目前累積 ${run.last.total_cached} 家店的菜單。` : '';
+        return describeIndexRun(run, `${describeLocation(location)} ${totalCached}`);
+      } finally {
+        setIndexProgress(null);
+      }
     });
 
   const handleListIndex = () =>
@@ -865,7 +874,7 @@ export default function ProfileScreen() {
       <SectionBlock title="附近店家菜單" subtitle="建檔後，推薦才能逐道菜比對疾病禁忌與過敏原。">
         <View style={styles.seedActions}>
           <PrimaryButton
-            label={seedBusy === 'index' ? '建檔中…' : '建立附近店家菜單檔案'}
+            label={seedBusy === 'index' ? describeIndexProgress(indexProgress) : '建立附近店家菜單檔案'}
             onPress={handleIndexVenues}
             disabled={seedBusy !== null}
           />
@@ -881,7 +890,7 @@ export default function ProfileScreen() {
           />
         </View>
         <Text style={styles.seedHint}>
-Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini 讀出菜單並估算營養，一家約 20~30 秒，可以重複按累積。已建檔且未過期的店家不會重複分析。沒有建檔的店家，推薦只能用店名比對，無法逐道菜篩選。
+Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini 讀出菜單並估算營養，一家約 20~30 秒，會同時分析幾家並自動分批做完。已建檔且未過期的店家不會重複分析。沒有建檔的店家，推薦只能用店名比對，無法逐道菜篩選。
         </Text>
       </SectionBlock>
 

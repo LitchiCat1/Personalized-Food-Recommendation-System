@@ -714,8 +714,20 @@ class GeminiKeyRotationTests(unittest.TestCase):
     """一把金鑰額度用完或沒權限，不能把後面的金鑰一起拖下水。"""
 
     def setUp(self):
+        from services.nutrition_label_service import forget_forbidden_gemini_models
+
         os.environ["GEMINI_API_KEYS"] = "key-a,key-b,key-c"
         os.environ["GEMINI_MODELS"] = "m-lite,m-flash,m-pro"
+        # 404 記在模組層級，不清的話會從別的測試漏過來
+        forget_forbidden_gemini_models()
+        self.addCleanup(forget_forbidden_gemini_models)
+        # get_gemini_models() 會把預設模型接在後面；固定成這三個，呼叫順序才寫得出來
+        models = patch(
+            "services.robust_restaurant_scraper_service.get_gemini_models",
+            return_value=["m-lite", "m-flash", "m-pro"],
+        )
+        models.start()
+        self.addCleanup(models.stop)
 
     @staticmethod
     def _reply(status, items=None):
@@ -767,6 +779,308 @@ class GeminiKeyRotationTests(unittest.TestCase):
 
         self.assertTrue(result["items"])
         self.assertIn("key-c", [key for key, _ in tried])
+
+    @staticmethod
+    def _model_of(url):
+        return url.split("/models/")[1].split(":")[0]
+
+    def test_a_model_that_404d_is_not_asked_again_by_the_next_venue(self):
+        """建檔時每一家店都把同樣的 404 重打一遍，分析預算就這樣被吃掉。"""
+        from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
+
+        menu = [{"name": "餐點", "calories": 500, "protein": 20, "carbs": 60, "fat": 15, "sodium": 500}]
+        tried = []
+
+        def fake_post(url, **kwargs):
+            key, model = url.split("key=")[1], self._model_of(url)
+            tried.append((key, model))
+            if model == "m-lite":
+                return self._reply(404)
+            return self._reply(200, menu)
+
+        with patch("services.robust_restaurant_scraper_service.requests.post", fake_post):
+            first = enrich_restaurant_with_gemini("第一家", "台南")
+            first_calls = list(tried)
+            tried.clear()
+            second = enrich_restaurant_with_gemini("第二家", "台南")
+
+        self.assertTrue(first["items"])
+        self.assertIn(("key-a", "m-lite"), first_calls)
+        self.assertTrue(second["items"])
+        self.assertNotIn(("key-a", "m-lite"), tried)
+        self.assertEqual(tried, [("key-a", "m-flash")])
+
+    def test_the_404_memory_is_per_key(self):
+        """key-a 沒權限，不代表 key-b 也沒有。"""
+        from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
+
+        menu = [{"name": "餐點", "calories": 500, "protein": 20, "carbs": 60, "fat": 15, "sodium": 500}]
+        tried = []
+
+        def fake_post(url, **kwargs):
+            key, model = url.split("key=")[1], self._model_of(url)
+            tried.append((key, model))
+            if key == "key-a":
+                return self._reply(404)
+            return self._reply(200, menu)
+
+        with patch("services.robust_restaurant_scraper_service.requests.post", fake_post):
+            enrich_restaurant_with_gemini("第一家", "台南")
+            tried.clear()
+            result = enrich_restaurant_with_gemini("第二家", "台南")
+
+        self.assertTrue(result["items"])
+        # key-a 的三個模型都記住了，直接從 key-b 的第一個模型開始
+        self.assertEqual(tried, [("key-b", "m-lite")])
+
+    def test_the_404_memory_expires(self):
+        import services.nutrition_label_service as gemini
+        from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
+
+        menu = [{"name": "餐點", "calories": 500, "protein": 20, "carbs": 60, "fat": 15, "sodium": 500}]
+        tried = []
+
+        def fake_post(url, **kwargs):
+            model = self._model_of(url)
+            tried.append(model)
+            return self._reply(404) if model == "m-lite" else self._reply(200, menu)
+
+        with patch.object(gemini, "FORBIDDEN_MODEL_TTL_SECONDS", -1), \
+                patch("services.robust_restaurant_scraper_service.requests.post", fake_post):
+            enrich_restaurant_with_gemini("第一家", "台南")
+            tried.clear()
+            enrich_restaurant_with_gemini("第二家", "台南")
+
+        self.assertEqual(tried[0], "m-lite")
+
+    def test_every_pair_is_tried_again_when_all_of_them_are_remembered_as_404(self):
+        """記憶可能過時；全部都記成 404 時，寧可再試一輪，也不要整個功能停擺。"""
+        from services.nutrition_label_service import remember_forbidden_gemini_model
+        from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
+
+        for key in ("key-a", "key-b", "key-c"):
+            for model in ("m-lite", "m-flash", "m-pro"):
+                remember_forbidden_gemini_model(key, model)
+        menu = [{"name": "餐點", "calories": 500, "protein": 20, "carbs": 60, "fat": 15, "sodium": 500}]
+
+        with patch("services.robust_restaurant_scraper_service.requests.post",
+                   lambda url, **kwargs: self._reply(200, menu)):
+            result = enrich_restaurant_with_gemini("權限剛開通", "台南")
+
+        self.assertTrue(result["items"])
+
+    def test_timeouts_and_rate_limits_are_not_remembered_across_calls(self):
+        """逾時與 429 可能只是一時的，只在同一次呼叫裡跳過。"""
+        import requests
+
+        from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
+
+        menu = [{"name": "餐點", "calories": 500, "protein": 20, "carbs": 60, "fat": 15, "sodium": 500}]
+        tried = []
+
+        def fake_post(url, **kwargs):
+            key, model = url.split("key=")[1], self._model_of(url)
+            tried.append((key, model))
+            if key == "key-a":
+                return self._reply(429)
+            if model == "m-lite":
+                raise requests.Timeout("slow")
+            return self._reply(200, menu)
+
+        with patch("services.robust_restaurant_scraper_service.requests.post", fake_post):
+            enrich_restaurant_with_gemini("第一家", "台南")
+            tried.clear()
+            enrich_restaurant_with_gemini("第二家", "台南")
+
+        self.assertEqual(tried, [("key-a", "m-lite"), ("key-b", "m-lite"), ("key-b", "m-flash")])
+
+    def test_an_empty_answer_is_not_asked_again_with_another_key(self):
+        """模型說看不出這家店賣什麼，換金鑰問同一個模型答案也一樣。"""
+        from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
+
+        tried = []
+
+        def fake_post(url, **kwargs):
+            tried.append((url.split("key=")[1], self._model_of(url)))
+            return self._reply(200, [])
+
+        with patch("services.robust_restaurant_scraper_service.requests.post", fake_post):
+            result = enrich_restaurant_with_gemini("看不出賣什麼的店", "台南")
+
+        self.assertEqual(result["items"], [])
+        self.assertEqual(result["failure"], "no_items")
+        self.assertEqual([model for _, model in tried], ["m-lite", "m-flash", "m-pro"])
+
+    def test_one_empty_answer_does_not_condemn_the_venue_when_others_never_answered(self):
+        """lite 說看不出來、其他模型卻因額度或逾時沒回答到，不能算這家店問不出菜單。"""
+        import requests
+
+        from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
+
+        def lite_empty_then_429(url, **kwargs):
+            if self._model_of(url) == "m-lite":
+                return self._reply(200, [])
+            return self._reply(429)
+
+        with patch("services.robust_restaurant_scraper_service.requests.post", lite_empty_then_429):
+            limited = enrich_restaurant_with_gemini("某店", "台南")
+        self.assertEqual(limited["failure"], "rate_limited")
+
+        def lite_empty_then_slow(url, **kwargs):
+            if self._model_of(url) == "m-lite":
+                return self._reply(200, [])
+            raise requests.Timeout("slow")
+
+        with patch("services.robust_restaurant_scraper_service.requests.post", lite_empty_then_slow):
+            unfinished = enrich_restaurant_with_gemini("某店", "台南")
+        self.assertEqual(unfinished["failure"], "inconclusive")
+
+    def test_models_without_permission_do_not_block_a_no_items_verdict(self):
+        """m-pro 每把金鑰都 404，它本來就沒辦法回答；其他模型都說看不出來就是 no_items。"""
+        from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
+
+        def fake_post(url, **kwargs):
+            if self._model_of(url) == "m-pro":
+                return self._reply(404)
+            return self._reply(200, [])
+
+        with patch("services.robust_restaurant_scraper_service.requests.post", fake_post):
+            result = enrich_restaurant_with_gemini("某店", "台南")
+        self.assertEqual(result["failure"], "no_items")
+
+    def test_no_keys_and_no_template_is_reported_as_unavailable(self):
+        from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
+
+        with patch("services.robust_restaurant_scraper_service.get_gemini_api_keys", return_value=[]):
+            result = enrich_restaurant_with_gemini("樣板裡沒有的店", "台南")
+        self.assertEqual(result, {"items": [], "failure": "unavailable"})
+
+    def test_the_failure_says_whether_the_venue_or_the_quota_was_the_problem(self):
+        import time
+
+        from services.nutrition_label_service import forget_forbidden_gemini_models
+        from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
+
+        with patch("services.robust_restaurant_scraper_service.requests.post",
+                   lambda url, **kwargs: self._reply(429)):
+            limited = enrich_restaurant_with_gemini("某店", "台南")
+        self.assertEqual(limited["failure"], "rate_limited")
+
+        with patch("services.robust_restaurant_scraper_service.requests.post",
+                   lambda url, **kwargs: self._reply(404)):
+            unavailable = enrich_restaurant_with_gemini("某店", "台南")
+        self.assertEqual(unavailable["failure"], "unavailable")
+        forget_forbidden_gemini_models()
+
+        def must_not_be_called(url, **kwargs):
+            raise AssertionError("時間預算已過，不該再送請求")
+
+        with patch("services.robust_restaurant_scraper_service.requests.post", must_not_be_called):
+            late = enrich_restaurant_with_gemini("另一家", "台南", deadline=time.monotonic() - 1)
+        self.assertEqual(late["failure"], "out_of_budget")
+
+
+class SharedGeminiRotationTests(unittest.TestCase):
+    """營養標示、食物辨識、店家摘要也要跳過最近回過 404 的組合。"""
+
+    def setUp(self):
+        from services.nutrition_label_service import forget_forbidden_gemini_models
+
+        forget_forbidden_gemini_models()
+        self.addCleanup(forget_forbidden_gemini_models)
+        models = patch("services.nutrition_label_service.get_gemini_models", return_value=["m-lite", "m-flash"])
+        models.start()
+        self.addCleanup(models.stop)
+
+    @staticmethod
+    def _http_error(status):
+        import requests
+
+        response = requests.Response()
+        response.status_code = status
+        return requests.HTTPError(response=response)
+
+    def test_a_404_pair_is_skipped_by_the_next_ocr_call(self):
+        from services.nutrition_label_service import call_gemini_nutrition_ocr_with_rotation
+
+        tried = []
+
+        def fake_ocr(image_b64, mime_type, api_key, model):
+            tried.append((api_key, model))
+            if model == "m-lite":
+                raise self._http_error(404)
+            return {"product_name": "豆漿"}
+
+        with patch("services.nutrition_label_service.call_gemini_nutrition_ocr", fake_ocr):
+            first = call_gemini_nutrition_ocr_with_rotation("img", "image/png", ["key-a"])
+            tried.clear()
+            second = call_gemini_nutrition_ocr_with_rotation("img", "image/png", ["key-a"])
+
+        self.assertEqual(first, {"product_name": "豆漿"})
+        self.assertEqual(second, {"product_name": "豆漿"})
+        self.assertEqual(tried, [("key-a", "m-flash")])
+
+    def test_the_last_real_attempt_still_raises(self):
+        from services.nutrition_label_service import call_gemini_with_rotation, remember_forbidden_gemini_model
+
+        remember_forbidden_gemini_model("key-a", "m-lite")
+
+        def always_busy(api_key, model):
+            raise self._http_error(503)
+
+        with self.assertRaises(Exception) as caught:
+            call_gemini_with_rotation(["key-a"], always_busy, "test")
+        self.assertEqual(caught.exception.response.status_code, 503)
+
+    def test_a_non_retryable_error_stops_at_once(self):
+        from services.nutrition_label_service import call_gemini_with_rotation
+
+        tried = []
+
+        def bad_request(api_key, model):
+            tried.append(model)
+            raise self._http_error(400)
+
+        with self.assertRaises(Exception):
+            call_gemini_with_rotation(["key-a"], bad_request, "test")
+        self.assertEqual(tried, ["m-lite"])
+
+    def test_the_food_and_summary_features_use_the_shared_rotation(self):
+        from services.nutrition_label_service import remember_forbidden_gemini_model
+        from services.vision_food_service import call_gemini_food_recognition_with_rotation
+
+        remember_forbidden_gemini_model("key-a", "m-lite")
+        tried = []
+
+        def fake_food(image_b64, mime_type, api_key, model):
+            tried.append(model)
+            return {"foods": []}
+
+        with patch("services.vision_food_service.call_gemini_food_recognition", fake_food):
+            call_gemini_food_recognition_with_rotation("img", "image/png", ["key-a"])
+        self.assertEqual(tried, ["m-flash"])
+
+    def test_a_probe_that_generates_successfully_clears_the_404(self):
+        from services.nutrition_label_service import (
+            is_forbidden_gemini_model,
+            probe_gemini_models,
+            remember_forbidden_gemini_model,
+        )
+
+        remember_forbidden_gemini_model("key-a", "m-lite")
+
+        class Listing:
+            status_code = 200
+
+            def json(self):
+                return {"models": [{"name": "models/m-lite", "supportedGenerationMethods": ["generateContent"]}]}
+
+        with patch("services.nutrition_label_service.get_gemini_api_keys", return_value=["key-a"]), \
+                patch("services.nutrition_label_service.requests.get", lambda *a, **k: Listing()), \
+                patch("services.nutrition_label_service._try_generate", lambda key, model, timeout: (200, "ok")):
+            probe_gemini_models(generate=True)
+
+        self.assertFalse(is_forbidden_gemini_model("key-a", "m-lite"))
 
 
 class GeminiModelDefaultsTests(unittest.TestCase):

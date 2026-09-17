@@ -21,6 +21,7 @@ class StorageRepository:
         self.mem_records = mem_records
         self.mem_custom_foods = mem_custom_foods
         self.mem_restaurant_menus: dict = {}
+        self.mem_restaurant_menu_failures: dict = {}
         if self.use_postgres:
             self._init_postgres_tables()
         if self.use_menu_postgres:
@@ -120,6 +121,16 @@ class StorageRepository:
             # place_id 才是穩定的識別碼；店名只當備援索引。
             cursor.execute("ALTER TABLE restaurant_menus ADD COLUMN IF NOT EXISTS name_key TEXT;")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_restaurant_menus_name ON restaurant_menus (name_key);")
+            # 問不出菜單的店家與冷卻到期時間，見 mark_restaurant_menu_failure
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS restaurant_menu_failures (
+                    venue_key TEXT PRIMARY KEY,
+                    reason TEXT NOT NULL,
+                    failed_until TIMESTAMPTZ NOT NULL
+                );
+                """
+            )
 
     def _fetch_json_doc(self, table: str, key_field: str, key_value: str):
         with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -631,6 +642,75 @@ class StorageRepository:
             self.db.restaurant_menus.update_one({"venue_key": key}, {"$set": doc}, upsert=True)
             return
         self.mem_restaurant_menus[key] = doc
+
+    # ─── 問不出菜單的店家 ────────────────────────────────────
+    # 模型看不出一家店賣什麼時，幾小時內再問多半還是一樣，只會把下一次建檔的
+    # 時間預算燒在同一家上。記在資料庫而不是記憶體：Render 免費方案閒置就會
+    # 休眠，重啟後記憶體裡的紀錄全部消失。
+    def active_restaurant_menu_failures(self, keys: list[str]) -> set[str]:
+        """這些 venue key 裡，哪些還在冷卻期。"""
+        keys = [key for key in keys if key]
+        if not keys:
+            return set()
+        now = datetime.now(timezone.utc)
+        if self.use_menu_postgres:
+            with self.menu_pg_conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT venue_key FROM restaurant_menu_failures WHERE venue_key = ANY(%s) AND failed_until > NOW()",
+                    (keys,),
+                )
+                return {row[0] for row in cursor.fetchall()}
+        if self.use_mongo:
+            docs = self.db.restaurant_menu_failures.find(
+                {"venue_key": {"$in": keys}, "failed_until": {"$gt": now}}, {"_id": 0, "venue_key": 1}
+            )
+            return {doc["venue_key"] for doc in docs}
+        return {
+            key for key in keys
+            if key in self.mem_restaurant_menu_failures
+            and self.mem_restaurant_menu_failures[key]["failed_until"] > now
+        }
+
+    def mark_restaurant_menu_failure(self, key: str, reason: str, cooldown_seconds: float) -> None:
+        if not key:
+            return
+        now = datetime.now(timezone.utc)
+        failed_until = now + timedelta(seconds=cooldown_seconds)
+        if self.use_menu_postgres:
+            with self.menu_pg_conn.cursor() as cursor:
+                # 過期的順手清掉，表格才不會一直長大
+                cursor.execute("DELETE FROM restaurant_menu_failures WHERE failed_until <= NOW()")
+                cursor.execute(
+                    """
+                    INSERT INTO restaurant_menu_failures (venue_key, reason, failed_until)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (venue_key)
+                    DO UPDATE SET reason = EXCLUDED.reason, failed_until = EXCLUDED.failed_until
+                    """,
+                    (key, reason, failed_until),
+                )
+            return
+        if self.use_mongo:
+            self.db.restaurant_menu_failures.delete_many({"failed_until": {"$lte": now}})
+            self.db.restaurant_menu_failures.update_one(
+                {"venue_key": key},
+                {"$set": {"venue_key": key, "reason": reason, "failed_until": failed_until}},
+                upsert=True,
+            )
+            return
+        for expired in [k for k, v in self.mem_restaurant_menu_failures.items() if v["failed_until"] <= now]:
+            del self.mem_restaurant_menu_failures[expired]
+        self.mem_restaurant_menu_failures[key] = {"reason": reason, "failed_until": failed_until}
+
+    def clear_restaurant_menu_failures(self) -> None:
+        """清除菜單檔案重建時一起清，先前問不出菜單的店也要照新規則再問一次。"""
+        if self.use_menu_postgres:
+            with self.menu_pg_conn.cursor() as cursor:
+                cursor.execute("DELETE FROM restaurant_menu_failures")
+        elif self.use_mongo:
+            self.db.restaurant_menu_failures.delete_many({})
+        else:
+            self.mem_restaurant_menu_failures.clear()
 
     def get_custom_food(self, food_id: str, user_id: str | None = None):
         if not user_id:

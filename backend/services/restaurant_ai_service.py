@@ -2,10 +2,7 @@ import json
 
 import requests
 
-from services.nutrition_label_service import extract_json_block, get_gemini_api_keys, get_gemini_models
-
-
-RETRYABLE_GEMINI_STATUS_CODES = {401, 403, 404, 429, 500, 502, 503, 504}
+from services.nutrition_label_service import call_gemini_with_rotation, extract_json_block, get_gemini_api_keys
 
 
 def validate_restaurant_summary_input(restaurant: dict, budget: int, category: str, health_conditions: list[str]) -> tuple[dict, int, str, list[str]]:
@@ -172,33 +169,18 @@ def build_restaurant_ai_summary(
     if not api_keys:
         raise ValueError("缺少 Gemini API key，請設定 GEMINI_API_KEYS 或 GEMINI_API_KEY")
 
-    models = get_gemini_models()
-    total_attempts = len(api_keys) * len(models)
-    attempt = 0
-    last_error: requests.HTTPError | None = None
-
-    for key_index, api_key in enumerate(api_keys):
-        for model in models:
-            attempt += 1
-            try:
-                parsed = call_gemini_restaurant_summary(
-                    restaurant,
-                    budget,
-                    category,
-                    health_conditions,
-                    api_key,
-                    model,
-                    nutrition_progress,
-                    disease_rules,
-                )
-                return normalize_restaurant_summary(parsed, budget)
-            except requests.HTTPError as e:
-                last_error = e
-                status_code = e.response.status_code if e.response is not None else None
-                if status_code not in RETRYABLE_GEMINI_STATUS_CODES or attempt == total_attempts:
-                    raise
-                print(f"[WARN] Gemini restaurant key #{key_index + 1} model {model} failed with HTTP {status_code}; trying next option")
-
-    if last_error:
-        raise last_error
-    raise ValueError("Gemini 店家摘要失敗")
+    parsed = call_gemini_with_rotation(
+        api_keys,
+        lambda api_key, model: call_gemini_restaurant_summary(
+            restaurant,
+            budget,
+            category,
+            health_conditions,
+            api_key,
+            model,
+            nutrition_progress,
+            disease_rules,
+        ),
+        "restaurant",
+    )
+    return normalize_restaurant_summary(parsed, budget)

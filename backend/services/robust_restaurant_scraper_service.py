@@ -11,8 +11,11 @@ from services.nutrition_label_service import (
     extract_json_block,
     extract_json_items,
     extract_number,
+    gemini_key_model_pairs,
     get_gemini_api_keys,
     get_gemini_models,
+    is_forbidden_gemini_model,
+    remember_forbidden_gemini_model,
 )
 
 # Modern User-Agents to prevent anti-bot blocking
@@ -248,12 +251,22 @@ MENU_GENERATION_TIMEOUT_SECONDS = 30
 
 
 def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_text: str = "", deadline: float | None = None) -> dict:
+    """請 Gemini 估這家店的幾道菜。
+
+    回傳 {"items": [...]}；拿不到菜單時多帶 "failure"，讓建檔端決定要不要把
+    這家店記下來、多久內別再問：
+    - no_items：每個能用的模型都明確回了空清單，這家店就是問不出來
+    - inconclusive：有模型逾時或出錯，沒問完
+    - rate_limited：金鑰額度用完（429），還有模型沒問到
+    - out_of_budget：呼叫端給的時間用完了
+    - unavailable：沒有任何模型能用（沒設金鑰，或全部 404）
+    """
     keys = get_gemini_api_keys()
     if not keys:
         print("[!] No Gemini API key found for scraper - using realistic templates")
         fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
-        return {"items": fallback_items}
-    
+        return {"items": fallback_items} if fallback_items else {"items": [], "failure": "unavailable"}
+
     prompt = f"""
     台灣餐廳「{restaurant_name}」（{address}）最常見的 3 道餐點，估算營養。
     只輸出 JSON，不要 markdown、不要說明。數值概略即可，後端會校正熱量一致性。
@@ -276,19 +289,23 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
         return 2
 
     candidate_models = sorted(get_gemini_models(), key=_speed_rank)
+    # 404 是「這把金鑰沒有這個模型的權限」，是金鑰層級的，記憶由各功能共用；
+    # 最近回過 404 的組合不在這份清單裡。
+    usable_pairs = set(gemini_key_model_pairs(keys, candidate_models))
     our_bugs = 0
     # 逾時是模型層級的（這個模型就是生不完），換金鑰重試同一個只是再等一次。
     timed_out_models = set()
-    # 404 是「這把金鑰沒有這個模型的權限」，是金鑰層級的。先前記成全域，
-    # 一把權限不足的金鑰就會把所有模型標成不可用，後面的金鑰全部不會被試到。
-    forbidden_by_key = {}
+    # 模型明確回了空清單（店名看不出賣什麼），換金鑰問同一個模型答案也一樣。
+    answered_empty_models = set()
     out_of_budget = False
+    rate_limited = False
     for gemini_key in keys:
         if out_of_budget:
             break
-        forbidden = forbidden_by_key.setdefault(gemini_key, set())
         for model_name in candidate_models:
-            if model_name in timed_out_models or model_name in forbidden:
+            if model_name in timed_out_models or model_name in answered_empty_models:
+                continue
+            if (gemini_key, model_name) not in usable_pairs:
                 continue
             if deadline is not None and time.monotonic() >= deadline:
                 print("[!] 菜單分析已超出呼叫端給的時間預算，停止重試")
@@ -309,13 +326,16 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
                         print(f"[Scraper] Successfully generated menu using key {gemini_key[:8]}... model: {model_name}")
                         balanced_items = [validate_and_balance_nutrition(item) for item in items]
                         return {"items": balanced_items}
+                    answered_empty_models.add(model_name)
+                    print(f"[!] {restaurant_name}: model {model_name} 回了空菜單，換下一個模型")
                 elif res.status_code == 429:
                     # 額度是綁在金鑰上的，這把已經用完，試它的其他模型只是浪費預算
+                    rate_limited = True
                     print(f"[!] Key {gemini_key[:8]}... 已達額度上限（429），直接換下一把金鑰")
                     break
                 else:
                     if res.status_code == 404:
-                        forbidden.add(model_name)
+                        remember_forbidden_gemini_model(gemini_key, model_name)
                     print(f"[!] Key {gemini_key[:8]}... model {model_name} status {res.status_code}, trying next key/model...")
             except requests.Timeout:
                 # 逾時代表這個模型在預算內生不完，別再拿其他金鑰重試同一個
@@ -330,11 +350,30 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
         print(f"[BUG] 有 {our_bugs} 次失敗是我們自己的程式錯誤，不是模型問題——先看上面的 traceback")
     if timed_out_models:
         print(f"[!] 這些模型在 {MENU_GENERATION_TIMEOUT_SECONDS}s 內生不完：{sorted(timed_out_models)}")
-    never_allowed = set.intersection(*forbidden_by_key.values()) if forbidden_by_key else set()
+    never_allowed = {
+        model for model in candidate_models
+        if all(is_forbidden_gemini_model(key, model) for key in keys)
+    }
     if never_allowed:
         print(f"[!] 沒有任何一把金鑰有權限的模型（404）：{sorted(never_allowed)}。可用 GEMINI_MODELS 指定其他模型。")
     fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
-    return {"items": fallback_items}
+    if fallback_items:
+        return {"items": fallback_items}
+
+    # 只有「每個能用的模型都說看不出來」才算這家店問不出菜單；
+    # 有模型因為時間、額度或錯誤沒回答到，就不能怪到店家頭上。
+    judgeable_models = set(candidate_models) - never_allowed
+    if out_of_budget:
+        failure = "out_of_budget"
+    elif answered_empty_models and judgeable_models <= answered_empty_models:
+        failure = "no_items"
+    elif rate_limited:
+        failure = "rate_limited"
+    elif not judgeable_models:
+        failure = "unavailable"
+    else:
+        failure = "inconclusive"
+    return {"items": [], "failure": failure}
 
 
 def _normalize_menu_items(raw_items) -> list[dict]:
@@ -476,9 +515,13 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
     }}
     """
     candidate_models = get_gemini_models()
+    # 最近回過 404 的（金鑰, 模型）直接跳過，記憶由各功能共用
+    usable_pairs = set(gemini_key_model_pairs(keys, candidate_models))
     last_error = "Gemini 未回傳可用的菜單品項"
     for gemini_key in keys:
         for model_name in candidate_models:
+            if (gemini_key, model_name) not in usable_pairs:
+                continue
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
                 payload = {
@@ -516,6 +559,8 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
                         api_message = (res.json().get("error") or {}).get("message", "")
                     except (TypeError, ValueError):
                         api_message = ""
+                    if res.status_code == 404:
+                        remember_forbidden_gemini_model(gemini_key, model_name)
                     if res.status_code == 429:
                         last_error = "Gemini 使用額度已達上限，請稍後再試，或在 Render 更新 GEMINI_API_KEYS。"
                     elif res.status_code in (401, 403):

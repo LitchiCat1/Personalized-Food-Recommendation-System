@@ -16,7 +16,8 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test:safety": "node --test scripts/test-safety-selection.mjs",
-    "test:location": "node --test scripts/test-browser-location.mjs"
+    "test:location": "node --test scripts/test-browser-location.mjs",
+    "test:indexing": "node --test scripts/test-venue-indexing.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

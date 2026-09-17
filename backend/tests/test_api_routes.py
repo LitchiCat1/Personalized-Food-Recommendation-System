@@ -6,6 +6,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from services.app_time_service import app_now
+from services.venue_index_service import reset_venue_index_state
 from unittest.mock import patch
 
 
@@ -32,6 +33,11 @@ class ApiTestBase(unittest.TestCase):
         self.app_module._mem_custom_foods.clear()
         # 菜單快取掛在 storage 上，不清會從別的測試漏過來
         self.app_module.storage.mem_restaurant_menus.clear()
+        self.app_module.storage.mem_restaurant_menu_failures.clear()
+        # 建檔的進行中名單與降速紀錄是模組層級的，同樣要清
+        reset_venue_index_state()
+        # 付費路由的限流是跨測試累計的；建檔路由也在內，不清會被前面的測試用光
+        self.app_module._paid_api_limiter.reset()
         self.app_module.storage.upsert_user({"user_id": "user-a", "name": "User A", "health_conditions": ["hypertension"], "allergens": ["egg"]})
 
     def auth_headers(self):
@@ -920,6 +926,44 @@ class VenueIndexListingTests(ApiTestBase):
             ).get_json()
         self.assertEqual(data["count"], 0)
         self.assertEqual(data["venues"], [])
+
+    def test_indexing_is_rate_limited_like_the_other_paid_routes(self):
+        """每次建檔都會打 Places 和好幾家店的 Gemini，不能任人連續送。"""
+        self.app_module._paid_api_limiter.max_calls = 2
+        self.addCleanup(setattr, self.app_module._paid_api_limiter, "max_calls", 12)
+        places = [{"name": "限流測試店", "address": "台南", "google_place_id": "p-limit"}]
+        with self.mock_auth("user-a"), \
+             patch.object(self.app_module, "fetch_google_places_restaurants", lambda *a, **k: places), \
+             patch.object(self.app_module, "enrich_restaurant_with_gemini", self._seed_menu):
+            statuses = [
+                self.client.post("/restaurants/index/user-a", json={}, headers=self.auth_headers()).status_code
+                for _ in range(3)
+            ]
+        self.assertEqual(statuses, [200, 200, 429])
+
+    def test_rebuilding_retries_venues_that_failed_before(self):
+        """清除重建就是要照新規則重來，先前問不出菜單的店也要再問。"""
+        places = [{"name": "問不出來的店", "address": "台南", "google_place_id": "p-empty"}]
+        answers = [{"items": [], "failure": "no_items"}, {"items": [], "failure": "no_items"}]
+        calls = []
+
+        def menu(name, address, text, deadline=None):
+            calls.append(name)
+            return answers.pop(0) if answers else self._seed_menu(name, address, text, deadline)
+
+        with self.mock_auth("user-a"), \
+             patch.object(self.app_module, "fetch_google_places_restaurants", lambda *a, **k: places), \
+             patch.object(self.app_module, "enrich_restaurant_with_gemini", menu):
+            first = self.client.post("/restaurants/index/user-a", json={}, headers=self.auth_headers()).get_json()
+            second = self.client.post("/restaurants/index/user-a", json={}, headers=self.auth_headers()).get_json()
+            self.client.delete("/restaurants/index/user-a", headers=self.auth_headers())
+            third = self.client.post("/restaurants/index/user-a", json={}, headers=self.auth_headers()).get_json()
+
+        self.assertEqual(first["failed"], 1)
+        self.assertEqual(second["cooling_down"], 1)
+        self.assertEqual(len(calls), 2, calls)
+        self.assertEqual(third["failed"], 1)
+        self.assertEqual(third["cooling_down"], 0)
 
 
 class AllowedOriginNormalisationTests(unittest.TestCase):

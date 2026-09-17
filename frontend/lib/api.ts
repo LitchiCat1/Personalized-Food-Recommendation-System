@@ -619,7 +619,17 @@ export type VenueIndexSummary = {
   refreshed?: number;
   analysed: number;
   failed: number;
+  /** 先前問不出菜單、還在冷卻期而這次沒再問的店家 */
+  cooling_down?: number;
+  /** 另一個建檔請求正在分析、這次跳過的店家，已算在 remaining 裡 */
+  in_progress?: number;
+  /** 因 Gemini 額度用完（429）而這次沒建成的店家，已算在 remaining 裡 */
+  rate_limited?: number;
   remaining: number;
+  /** 現在有菜單可用的店家（含過期、這次沒更新成功的） */
+  with_menu?: number;
+  /** 這次怎樣都建不出菜單的店家：沒有店名、問不出來、還在冷卻中 */
+  unbuildable?: number;
   total_cached: number;
 };
 

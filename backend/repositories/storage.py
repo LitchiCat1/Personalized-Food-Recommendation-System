@@ -2,145 +2,123 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 import uuid
 
-from psycopg2.extras import Json, RealDictCursor
+from repositories.sqlite_db import SqliteDatabase, from_json, to_json, utc_iso
 from services.app_time_service import app_now, app_today
 from services.nutrient_service import NUTRITION_FIELDS, get_nutrient_value, nutrient_number
 
 
+# 飲食紀錄表的欄位（不含流水號 id）。insert / update / select 都照這個順序。
+RECORD_COLUMNS = (
+    "user_id", "client_record_id", "timestamp", "meal_type", "foods",
+    "total_calories", "total_protein", "total_carbs", "total_fat",
+    "total_sodium", "total_fiber", "total_sugar",
+    "total_saturated_fat", "total_trans_fat", "source",
+)
+RECORD_SELECT = ", ".join(RECORD_COLUMNS)
+
+
 class StorageRepository:
-    def __init__(self, db, use_mongo: bool, mem_users: dict, mem_records: list, mem_custom_foods: list, pg_conn=None, menu_pg_conn=None):
+    def __init__(self, db, use_mongo: bool, mem_users: dict, mem_records: list, mem_custom_foods: list, sql: SqliteDatabase | None = None):
         self.db = db
         self.use_mongo = use_mongo
-        self.pg_conn = pg_conn
-        self.use_postgres = pg_conn is not None
-        # 店家菜單是全體共用的快取，不屬於任何使用者，可以放另一個資料庫，
-        # 免得吃掉主資料庫的容量。沒設定就跟其他資料放一起。
-        self.menu_pg_conn = menu_pg_conn or pg_conn
-        self.use_menu_postgres = self.menu_pg_conn is not None
+        self.sql = sql
+        self.use_sql = sql is not None
         self.mem_users = mem_users
         self.mem_records = mem_records
         self.mem_custom_foods = mem_custom_foods
         self.mem_restaurant_menus: dict = {}
         self.mem_restaurant_menu_failures: dict = {}
-        if self.use_postgres:
-            self._init_postgres_tables()
-        if self.use_menu_postgres:
-            self._init_menu_tables()
+        if self.use_sql:
+            self._init_tables()
 
-    def _init_postgres_tables(self):
-        with self.pg_conn.cursor() as cursor:
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS users (
-                    user_id TEXT PRIMARY KEY,
-                    doc JSONB NOT NULL,
-                    updated_at TIMESTAMPTZ DEFAULT NOW()
-                );
-                """
-            )
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS records (
-                    id BIGSERIAL PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    client_record_id TEXT NOT NULL,
-                    timestamp TEXT NOT NULL,
-                    meal_type TEXT,
-                    foods JSONB,
-                    total_calories DOUBLE PRECISION DEFAULT 0,
-                    total_protein DOUBLE PRECISION DEFAULT 0,
-                    total_carbs DOUBLE PRECISION DEFAULT 0,
-                    total_fat DOUBLE PRECISION DEFAULT 0,
-                    total_sodium DOUBLE PRECISION DEFAULT 0,
-                    total_fiber DOUBLE PRECISION DEFAULT 0,
-                    total_sugar DOUBLE PRECISION DEFAULT 0,
-                    total_saturated_fat DOUBLE PRECISION DEFAULT 0,
-                    total_trans_fat DOUBLE PRECISION DEFAULT 0,
-                    source TEXT DEFAULT 'camera'
-                );
-                """
-            )
-            for nutrient in ("sugar", "saturated_fat", "trans_fat"):
-                cursor.execute(
-                    f"ALTER TABLE records ADD COLUMN IF NOT EXISTS total_{nutrient} DOUBLE PRECISION DEFAULT 0;"
-                )
-            cursor.execute(
-                """
-                UPDATE records
-                SET client_record_id = COALESCE(
-                    client_record_id,
-                    'legacy_record_' || id::text || '_' || substr(md5(random()::text), 1, 8)
-                )
-                WHERE client_record_id IS NULL;
-                """
-            )
-            cursor.execute("ALTER TABLE records ALTER COLUMN client_record_id SET NOT NULL;")
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS custom_foods (
-                    owner_key TEXT PRIMARY KEY,
-                    food_id TEXT NOT NULL,
-                    user_id TEXT NOT NULL,
-                    doc JSONB NOT NULL,
-                    updated_at TIMESTAMPTZ DEFAULT NOW()
-                );
-                """
-            )
-            cursor.execute("ALTER TABLE custom_foods ADD COLUMN IF NOT EXISTS owner_key TEXT;")
-            cursor.execute("ALTER TABLE custom_foods ADD COLUMN IF NOT EXISTS food_id TEXT;")
-            cursor.execute(
-                """
-                UPDATE custom_foods
-                SET owner_key = COALESCE(owner_key, user_id || ':' || food_id)
-                WHERE owner_key IS NULL
-                  AND user_id IS NOT NULL
-                  AND food_id IS NOT NULL;
-                """
-            )
-            cursor.execute("ALTER TABLE custom_foods DROP CONSTRAINT IF EXISTS custom_foods_pkey;")
-            cursor.execute("ALTER TABLE custom_foods ALTER COLUMN owner_key SET NOT NULL;")
-            cursor.execute("ALTER TABLE custom_foods ADD PRIMARY KEY (owner_key);")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_records_user_timestamp ON records (user_id, timestamp DESC);")
-            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_records_user_client_record ON records (user_id, client_record_id);")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_custom_foods_user_id ON custom_foods (user_id);")
-            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_foods_owner_key ON custom_foods (owner_key);")
-
-    def _init_menu_tables(self):
-        with self.menu_pg_conn.cursor() as cursor:
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS restaurant_menus (
-                    venue_key TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    doc JSONB NOT NULL,
-                    updated_at TIMESTAMPTZ DEFAULT NOW()
-                );
-                """
-            )
-            # 店名會因 API 版本不同而有出入（分店名、全形半形），
-            # place_id 才是穩定的識別碼；店名只當備援索引。
-            cursor.execute("ALTER TABLE restaurant_menus ADD COLUMN IF NOT EXISTS name_key TEXT;")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_restaurant_menus_name ON restaurant_menus (name_key);")
-            # 問不出菜單的店家與冷卻到期時間，見 mark_restaurant_menu_failure
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS restaurant_menu_failures (
-                    venue_key TEXT PRIMARY KEY,
-                    reason TEXT NOT NULL,
-                    failed_until TIMESTAMPTZ NOT NULL
-                );
-                """
-            )
+    def _init_tables(self):
+        # SQLite 沒有 JSON 與時間型別：doc / foods 存 JSON 字串，時間存 utc_iso() 的字串
+        self.sql.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                user_id TEXT PRIMARY KEY,
+                doc TEXT NOT NULL,
+                updated_at TEXT
+            );
+            CREATE TABLE IF NOT EXISTS records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                client_record_id TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                meal_type TEXT,
+                foods TEXT,
+                total_calories REAL DEFAULT 0,
+                total_protein REAL DEFAULT 0,
+                total_carbs REAL DEFAULT 0,
+                total_fat REAL DEFAULT 0,
+                total_sodium REAL DEFAULT 0,
+                total_fiber REAL DEFAULT 0,
+                total_sugar REAL DEFAULT 0,
+                total_saturated_fat REAL DEFAULT 0,
+                total_trans_fat REAL DEFAULT 0,
+                source TEXT DEFAULT 'camera'
+            );
+            CREATE INDEX IF NOT EXISTS idx_records_user_timestamp ON records (user_id, timestamp DESC);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_records_user_client_record ON records (user_id, client_record_id);
+            CREATE TABLE IF NOT EXISTS custom_foods (
+                owner_key TEXT PRIMARY KEY,
+                food_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                doc TEXT NOT NULL,
+                updated_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_custom_foods_user_id ON custom_foods (user_id);
+            CREATE TABLE IF NOT EXISTS restaurant_menus (
+                venue_key TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                name_key TEXT,
+                doc TEXT NOT NULL,
+                updated_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_restaurant_menus_name ON restaurant_menus (name_key);
+            CREATE TABLE IF NOT EXISTS restaurant_menu_failures (
+                venue_key TEXT PRIMARY KEY,
+                reason TEXT NOT NULL,
+                failed_until TEXT NOT NULL
+            );
+            """
+        )
 
     def _fetch_json_doc(self, table: str, key_field: str, key_value: str):
-        with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute(f"SELECT doc FROM {table} WHERE {key_field} = %s", (key_value,))
-            row = cursor.fetchone()
-        return row["doc"] if row else None
+        row = self.sql.query_one(f"SELECT doc FROM {table} WHERE {key_field} = ?", (key_value,))
+        return from_json(row["doc"]) if row else None
+
+    def _record_from_row(self, row: dict | None):
+        if not row:
+            return None
+        record = dict(row)
+        record.pop("id", None)
+        record["foods"] = from_json(record.get("foods")) or []
+        return self._enrich_record_totals(record)
+
+    @staticmethod
+    def _record_values(record: dict) -> tuple:
+        return (
+            record.get("user_id"),
+            record.get("client_record_id"),
+            record.get("timestamp"),
+            record.get("meal_type"),
+            to_json(record.get("foods", [])),
+            record.get("total_calories", 0),
+            record.get("total_protein", 0),
+            record.get("total_carbs", 0),
+            record.get("total_fat", 0),
+            record.get("total_sodium", 0),
+            record.get("total_fiber", 0),
+            record.get("total_sugar", 0),
+            record.get("total_saturated_fat", 0),
+            record.get("total_trans_fat", 0),
+            record.get("source", "camera"),
+        )
 
     def get_user(self, user_id: str):
         user_doc = None
-        if self.use_postgres:
+        if self.use_sql:
             user_doc = self._fetch_json_doc("users", "user_id", user_id)
         elif self.use_mongo:
             user_doc = self.db.users.find_one({"user_id": user_id}, {"_id": 0})
@@ -174,17 +152,16 @@ class StorageRepository:
 
 
     def upsert_user(self, user_doc: dict):
-        if self.use_postgres:
-            with self.pg_conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO users (user_id, doc, updated_at)
-                    VALUES (%s, %s, NOW())
-                    ON CONFLICT (user_id)
-                    DO UPDATE SET doc = EXCLUDED.doc, updated_at = NOW()
-                    """,
-                    (user_doc["user_id"], Json(user_doc)),
-                )
+        if self.use_sql:
+            self.sql.execute(
+                """
+                INSERT INTO users (user_id, doc, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT (user_id)
+                DO UPDATE SET doc = excluded.doc, updated_at = excluded.updated_at
+                """,
+                (user_doc["user_id"], to_json(user_doc), utc_iso()),
+            )
             return user_doc
         if self.use_mongo:
             self.db.users.update_one({"user_id": user_doc["user_id"]}, {"$set": user_doc}, upsert=True)
@@ -214,35 +191,12 @@ class StorageRepository:
             return {**self._enrich_record_totals(existing), "_deduplicated": True}
 
 
-        if self.use_postgres:
-            with self.pg_conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO records (
-                        user_id, client_record_id, timestamp, meal_type, foods,
-                        total_calories, total_protein, total_carbs,
-                        total_fat, total_sodium, total_fiber, total_sugar,
-                        total_saturated_fat, total_trans_fat, source
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        record.get("user_id"),
-                        record.get("client_record_id"),
-                        record.get("timestamp"),
-                        record.get("meal_type"),
-                        Json(record.get("foods", [])),
-                        record.get("total_calories", 0),
-                        record.get("total_protein", 0),
-                        record.get("total_carbs", 0),
-                        record.get("total_fat", 0),
-                        record.get("total_sodium", 0),
-                        record.get("total_fiber", 0),
-                        record.get("total_sugar", 0),
-                        record.get("total_saturated_fat", 0),
-                        record.get("total_trans_fat", 0),
-                        record.get("source", "camera"),
-                    ),
-                )
+        if self.use_sql:
+            placeholders = ", ".join("?" for _ in RECORD_COLUMNS)
+            self.sql.execute(
+                f"INSERT INTO records ({RECORD_SELECT}) VALUES ({placeholders})",
+                self._record_values(record),
+            )
             return self._enrich_record_totals(record)
         if self.use_mongo:
             self.db.records.insert_one(record)
@@ -256,21 +210,12 @@ class StorageRepository:
     def get_record_by_client_record_id(self, user_id: str | None, client_record_id: str | None):
         if not user_id or not client_record_id:
             return None
-        if self.use_postgres:
-            with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute(
-                    """
-                    SELECT user_id, client_record_id, timestamp, meal_type, foods, total_calories, total_protein,
-                           total_carbs, total_fat, total_sodium, total_fiber,
-                           total_sugar, total_saturated_fat, total_trans_fat, source
-                    FROM records
-                    WHERE user_id = %s AND client_record_id = %s
-                    LIMIT 1
-                    """,
-                    (user_id, client_record_id),
-                )
-                row = cursor.fetchone()
-            return self._enrich_record_totals(dict(row)) if row else None
+        if self.use_sql:
+            row = self.sql.query_one(
+                f"SELECT {RECORD_SELECT} FROM records WHERE user_id = ? AND client_record_id = ? LIMIT 1",
+                (user_id, client_record_id),
+            )
+            return self._record_from_row(row)
         if self.use_mongo:
             res = self.db.records.find_one({"user_id": user_id, "client_record_id": client_record_id}, {"_id": 0})
             return self._enrich_record_totals(res) if res else None
@@ -285,43 +230,18 @@ class StorageRepository:
         if not user_id or not client_record_id:
             return None
 
-        if self.use_postgres:
-            with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute(
-                    """
-                    UPDATE records
-                    SET timestamp = %s, meal_type = %s, foods = %s,
-                        total_calories = %s, total_protein = %s, total_carbs = %s,
-                        total_fat = %s, total_sodium = %s, total_fiber = %s,
-                        total_sugar = %s, total_saturated_fat = %s,
-                        total_trans_fat = %s,
-                        source = %s
-                    WHERE user_id = %s AND client_record_id = %s
-                    RETURNING user_id, client_record_id, timestamp, meal_type, foods,
-                              total_calories, total_protein, total_carbs, total_fat,
-                              total_sodium, total_fiber, total_sugar,
-                              total_saturated_fat, total_trans_fat, source
-                    """,
-                    (
-                        record.get("timestamp"),
-                        record.get("meal_type"),
-                        Json(record.get("foods", [])),
-                        record.get("total_calories", 0),
-                        record.get("total_protein", 0),
-                        record.get("total_carbs", 0),
-                        record.get("total_fat", 0),
-                        record.get("total_sodium", 0),
-                        record.get("total_fiber", 0),
-                        record.get("total_sugar", 0),
-                        record.get("total_saturated_fat", 0),
-                        record.get("total_trans_fat", 0),
-                        record.get("source", "camera"),
-                        user_id,
-                        client_record_id,
-                    ),
+        if self.use_sql:
+            values = self._record_values(record)
+            # 前兩個是 user_id / client_record_id，放到 WHERE
+            assignments = ", ".join(f"{column} = ?" for column in RECORD_COLUMNS[2:])
+            with self.sql.transaction():
+                changed = self.sql.execute(
+                    f"UPDATE records SET {assignments} WHERE user_id = ? AND client_record_id = ?",
+                    (*values[2:], user_id, client_record_id),
                 )
-                row = cursor.fetchone()
-            return self._enrich_record_totals(dict(row)) if row else None
+                if not changed:
+                    return None
+                return self.get_record_by_client_record_id(user_id, client_record_id)
 
         if self.use_mongo:
             result = self.db.records.update_one(
@@ -339,21 +259,15 @@ class StorageRepository:
         return None
 
     def delete_record(self, user_id: str, client_record_id: str):
-        if self.use_postgres:
-            with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute(
-                    """
-                    DELETE FROM records
-                    WHERE user_id = %s AND client_record_id = %s
-                    RETURNING user_id, client_record_id, timestamp, meal_type, foods,
-                              total_calories, total_protein, total_carbs, total_fat,
-                              total_sodium, total_fiber, total_sugar,
-                              total_saturated_fat, total_trans_fat, source
-                    """,
-                    (user_id, client_record_id),
-                )
-                row = cursor.fetchone()
-            return self._enrich_record_totals(dict(row)) if row else None
+        if self.use_sql:
+            with self.sql.transaction():
+                existing = self.get_record_by_client_record_id(user_id, client_record_id)
+                if existing:
+                    self.sql.execute(
+                        "DELETE FROM records WHERE user_id = ? AND client_record_id = ?",
+                        (user_id, client_record_id),
+                    )
+            return existing
 
         if self.use_mongo:
             record = self.db.records.find_one_and_delete(
@@ -369,24 +283,15 @@ class StorageRepository:
         return None
 
     def get_records(self, user_id: str, date_str: str | None = None, limit: int = 50, offset: int = 0):
-        if self.use_postgres:
-            sql = """
-                SELECT user_id, client_record_id, timestamp, meal_type, foods, total_calories, total_protein,
-                       total_carbs, total_fat, total_sodium, total_fiber,
-                       total_sugar, total_saturated_fat, total_trans_fat, source
-                FROM records
-                WHERE user_id = %s
-            """
+        if self.use_sql:
+            sql = f"SELECT {RECORD_SELECT} FROM records WHERE user_id = ?"
             params = [user_id]
             if date_str:
-                sql += " AND timestamp LIKE %s"
+                sql += " AND timestamp LIKE ?"
                 params.append(f"{date_str}%")
-            sql += " ORDER BY timestamp DESC LIMIT %s OFFSET %s"
+            sql += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
             params.extend([limit, offset])
-            with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute(sql, params)
-                rows = cursor.fetchall()
-            return [self._enrich_record_totals(dict(row)) for row in rows]
+            return [self._record_from_row(row) for row in self.sql.query_all(sql, params)]
 
         if self.use_mongo:
             query = {"user_id": user_id}
@@ -409,26 +314,24 @@ class StorageRepository:
         end_date = app_now().replace(tzinfo=None)
         start_date = end_date - timedelta(days=days)
 
-        if self.use_postgres:
-            nutrient_sums = ",\n                           ".join(
+        if self.use_sql:
+            nutrient_sums = ",\n                       ".join(
                 f"SUM(total_{nutrient}) AS {nutrient}" for nutrient in NUTRITION_FIELDS
             )
-            with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute(
-                    f"""
-                    SELECT SUBSTRING(timestamp, 1, 10) AS date,
-                           COUNT(*) AS record_count,
-                           {nutrient_sums}
-                    FROM records
-                    WHERE user_id = %s
-                      AND timestamp >= %s
-                      AND timestamp <= %s
-                    GROUP BY SUBSTRING(timestamp, 1, 10)
-                    ORDER BY date ASC
-                    """,
-                    (user_id, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d") + "T23:59:59"),
-                )
-                rows = cursor.fetchall()
+            rows = self.sql.query_all(
+                f"""
+                SELECT substr(timestamp, 1, 10) AS date,
+                       COUNT(*) AS record_count,
+                       {nutrient_sums}
+                FROM records
+                WHERE user_id = ?
+                  AND timestamp >= ?
+                  AND timestamp <= ?
+                GROUP BY substr(timestamp, 1, 10)
+                ORDER BY date ASC
+                """,
+                (user_id, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d") + "T23:59:59"),
+            )
             return [
                 {
                     "date": row["date"],
@@ -485,17 +388,14 @@ class StorageRepository:
         return [{"date": k, **v} for k, v in sorted(agg.items())]
 
     def get_custom_foods(self, user_id: str | None = None):
-        if self.use_postgres:
+        if self.use_sql:
             sql = "SELECT doc FROM custom_foods"
             params = []
             if user_id:
-                sql += " WHERE user_id = %s"
+                sql += " WHERE user_id = ?"
                 params.append(user_id)
             sql += " ORDER BY updated_at DESC"
-            with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute(sql, params)
-                rows = cursor.fetchall()
-            return [row["doc"] for row in rows]
+            return [from_json(row["doc"]) for row in self.sql.query_all(sql, params)]
 
         if self.use_mongo:
             query = {"user_id": user_id} if user_id else {}
@@ -511,8 +411,8 @@ class StorageRepository:
         return f"{normalized_user_id}:{food_id}"
 
     # ─── 店家菜單快取 ────────────────────────────────────────
-    # Gemini 分析一家店要 20~30 秒，Render 的檔案系統又是暫存的
-    # （寫回 restaurant_catalog.json 重啟就沒了），所以存進資料庫。
+    # Gemini 分析一家店要 20~30 秒，寫回 restaurant_catalog.json 又會跟著程式碼走，
+    # 所以存進資料庫。
     @staticmethod
     def venue_name_key(name: str) -> str:
         return str(name or "").strip().lower()
@@ -536,14 +436,13 @@ class StorageRepository:
         if not keys:
             return None
 
-        if self.use_menu_postgres:
-            with self.menu_pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute(
-                    "SELECT doc FROM restaurant_menus WHERE venue_key = ANY(%s) OR name_key = %s LIMIT 1",
-                    (keys, name_key),
-                )
-                row = cursor.fetchone()
-            return row["doc"] if row else None
+        if self.use_sql:
+            placeholders = ", ".join("?" for _ in keys)
+            row = self.sql.query_one(
+                f"SELECT doc FROM restaurant_menus WHERE venue_key IN ({placeholders}) OR name_key = ? LIMIT 1",
+                (*keys, name_key),
+            )
+            return from_json(row["doc"]) if row else None
         if self.use_mongo:
             return self.db.restaurant_menus.find_one(
                 {"$or": [{"venue_key": {"$in": keys}}, {"name_key": name_key}]}, {"_id": 0}
@@ -581,21 +480,16 @@ class StorageRepository:
 
     def list_restaurant_menus(self, limit: int = 60) -> list[dict]:
         """建檔過的店家全部拿出來。推薦讀這個來取得菜色營養。"""
-        if self.use_menu_postgres:
-            with self.menu_pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute(
-                    "SELECT doc FROM restaurant_menus ORDER BY updated_at DESC LIMIT %s", (limit,)
-                )
-                return [row["doc"] for row in cursor.fetchall()]
+        if self.use_sql:
+            rows = self.sql.query_all("SELECT doc FROM restaurant_menus ORDER BY updated_at DESC LIMIT ?", (limit,))
+            return [from_json(row["doc"]) for row in rows]
         if self.use_mongo:
             return list(self.db.restaurant_menus.find({}, {"_id": 0}).limit(limit))
         return list(self.mem_restaurant_menus.values())[:limit]
 
     def count_restaurant_menus(self) -> int:
-        if self.use_menu_postgres:
-            with self.menu_pg_conn.cursor() as cursor:
-                cursor.execute("SELECT COUNT(*) FROM restaurant_menus")
-                return int(cursor.fetchone()[0])
+        if self.use_sql:
+            return int(self.sql.query_one("SELECT COUNT(*) AS n FROM restaurant_menus")["n"])
         if self.use_mongo:
             return self.db.restaurant_menus.count_documents({})
         return len(self.mem_restaurant_menus)
@@ -604,9 +498,8 @@ class StorageRepository:
         """清空菜單快取。建檔邏輯改過之後（例如開始過濾歇業店家），
         舊資料是用舊規則建的，要重建才拿得到乾淨的結果。"""
         removed = self.count_restaurant_menus()
-        if self.use_menu_postgres:
-            with self.menu_pg_conn.cursor() as cursor:
-                cursor.execute("DELETE FROM restaurant_menus")
+        if self.use_sql:
+            self.sql.execute("DELETE FROM restaurant_menus")
         elif self.use_mongo:
             self.db.restaurant_menus.delete_many({})
         else:
@@ -625,18 +518,17 @@ class StorageRepository:
             "cached_at": datetime.now(timezone.utc).isoformat(),
             **venue,
         }
-        if self.use_menu_postgres:
-            with self.menu_pg_conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO restaurant_menus (venue_key, name, name_key, doc, updated_at)
-                    VALUES (%s, %s, %s, %s, NOW())
-                    ON CONFLICT (venue_key)
-                    DO UPDATE SET name = EXCLUDED.name, name_key = EXCLUDED.name_key,
-                                  doc = EXCLUDED.doc, updated_at = NOW()
-                    """,
-                    (key, name, name_key, Json(doc)),
-                )
+        if self.use_sql:
+            self.sql.execute(
+                """
+                INSERT INTO restaurant_menus (venue_key, name, name_key, doc, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (venue_key)
+                DO UPDATE SET name = excluded.name, name_key = excluded.name_key,
+                              doc = excluded.doc, updated_at = excluded.updated_at
+                """,
+                (key, name, name_key, to_json(doc), utc_iso()),
+            )
             return
         if self.use_mongo:
             self.db.restaurant_menus.update_one({"venue_key": key}, {"$set": doc}, upsert=True)
@@ -645,21 +537,21 @@ class StorageRepository:
 
     # ─── 問不出菜單的店家 ────────────────────────────────────
     # 模型看不出一家店賣什麼時，幾小時內再問多半還是一樣，只會把下一次建檔的
-    # 時間預算燒在同一家上。記在資料庫而不是記憶體：Render 免費方案閒置就會
-    # 休眠，重啟後記憶體裡的紀錄全部消失。
+    # 時間預算燒在同一家上。記在資料庫而不是記憶體：後端重啟後記憶體裡的紀錄
+    # 會全部消失。
     def active_restaurant_menu_failures(self, keys: list[str]) -> set[str]:
         """這些 venue key 裡，哪些還在冷卻期。"""
         keys = [key for key in keys if key]
         if not keys:
             return set()
         now = datetime.now(timezone.utc)
-        if self.use_menu_postgres:
-            with self.menu_pg_conn.cursor() as cursor:
-                cursor.execute(
-                    "SELECT venue_key FROM restaurant_menu_failures WHERE venue_key = ANY(%s) AND failed_until > NOW()",
-                    (keys,),
-                )
-                return {row[0] for row in cursor.fetchall()}
+        if self.use_sql:
+            placeholders = ", ".join("?" for _ in keys)
+            rows = self.sql.query_all(
+                f"SELECT venue_key FROM restaurant_menu_failures WHERE venue_key IN ({placeholders}) AND failed_until > ?",
+                (*keys, utc_iso(now)),
+            )
+            return {row["venue_key"] for row in rows}
         if self.use_mongo:
             docs = self.db.restaurant_menu_failures.find(
                 {"venue_key": {"$in": keys}, "failed_until": {"$gt": now}}, {"_id": 0, "venue_key": 1}
@@ -676,18 +568,18 @@ class StorageRepository:
             return
         now = datetime.now(timezone.utc)
         failed_until = now + timedelta(seconds=cooldown_seconds)
-        if self.use_menu_postgres:
-            with self.menu_pg_conn.cursor() as cursor:
+        if self.use_sql:
+            with self.sql.transaction():
                 # 過期的順手清掉，表格才不會一直長大
-                cursor.execute("DELETE FROM restaurant_menu_failures WHERE failed_until <= NOW()")
-                cursor.execute(
+                self.sql.execute("DELETE FROM restaurant_menu_failures WHERE failed_until <= ?", (utc_iso(now),))
+                self.sql.execute(
                     """
                     INSERT INTO restaurant_menu_failures (venue_key, reason, failed_until)
-                    VALUES (%s, %s, %s)
+                    VALUES (?, ?, ?)
                     ON CONFLICT (venue_key)
-                    DO UPDATE SET reason = EXCLUDED.reason, failed_until = EXCLUDED.failed_until
+                    DO UPDATE SET reason = excluded.reason, failed_until = excluded.failed_until
                     """,
-                    (key, reason, failed_until),
+                    (key, reason, utc_iso(failed_until)),
                 )
             return
         if self.use_mongo:
@@ -704,9 +596,8 @@ class StorageRepository:
 
     def clear_restaurant_menu_failures(self) -> None:
         """清除菜單檔案重建時一起清，先前問不出菜單的店也要照新規則再問一次。"""
-        if self.use_menu_postgres:
-            with self.menu_pg_conn.cursor() as cursor:
-                cursor.execute("DELETE FROM restaurant_menu_failures")
+        if self.use_sql:
+            self.sql.execute("DELETE FROM restaurant_menu_failures")
         elif self.use_mongo:
             self.db.restaurant_menu_failures.delete_many({})
         else:
@@ -715,14 +606,8 @@ class StorageRepository:
     def get_custom_food(self, food_id: str, user_id: str | None = None):
         if not user_id:
             return None
-        if self.use_postgres:
-            with self.pg_conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute(
-                    "SELECT doc FROM custom_foods WHERE owner_key = %s LIMIT 1",
-                    (self._custom_food_owner_key(user_id, food_id),),
-                )
-                row = cursor.fetchone()
-            return row["doc"] if row else None
+        if self.use_sql:
+            return self._fetch_json_doc("custom_foods", "owner_key", self._custom_food_owner_key(user_id, food_id))
         if self.use_mongo:
             return self.db.custom_foods.find_one({"food_id": food_id, "user_id": user_id}, {"_id": 0})
         for doc in self.mem_custom_foods:
@@ -733,17 +618,17 @@ class StorageRepository:
     def upsert_custom_food(self, food_doc: dict):
         owner_key = self._custom_food_owner_key(food_doc.get("user_id"), food_doc["food_id"])
         stored_doc = {**food_doc, "owner_key": owner_key}
-        if self.use_postgres:
-            with self.pg_conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO custom_foods (owner_key, food_id, user_id, doc, updated_at)
-                    VALUES (%s, %s, %s, %s, NOW())
-                    ON CONFLICT (owner_key)
-                    DO UPDATE SET food_id = EXCLUDED.food_id, user_id = EXCLUDED.user_id, doc = EXCLUDED.doc, updated_at = NOW()
-                    """,
-                    (owner_key, stored_doc["food_id"], stored_doc.get("user_id"), Json(stored_doc)),
-                )
+        if self.use_sql:
+            self.sql.execute(
+                """
+                INSERT INTO custom_foods (owner_key, food_id, user_id, doc, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (owner_key)
+                DO UPDATE SET food_id = excluded.food_id, user_id = excluded.user_id,
+                              doc = excluded.doc, updated_at = excluded.updated_at
+                """,
+                (owner_key, stored_doc["food_id"], stored_doc.get("user_id"), to_json(stored_doc), utc_iso()),
+            )
             return stored_doc
         if self.use_mongo:
             self.db.custom_foods.update_one({"owner_key": owner_key}, {"$set": stored_doc}, upsert=True)

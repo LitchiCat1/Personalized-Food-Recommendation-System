@@ -1,0 +1,143 @@
+"""從其他裝置或 tunnel 連進來時的防護。
+
+Flask 測試用戶端預設的來源是 127.0.0.1，等於「這台電腦」；要模擬別台裝置，
+就把 REMOTE_ADDR 換成區網位址，或帶上 cloudflared 會加的標頭。
+"""
+
+import os
+from unittest.mock import patch
+
+from test_api_routes import ApiTestBase
+
+LAN = {"REMOTE_ADDR": "192.168.0.50"}
+LOCAL = {"REMOTE_ADDR": "127.0.0.1"}
+TUNNEL_HEADERS = {"Cf-Connecting-Ip": "203.0.113.9"}
+
+
+class RequestOriginTests(ApiTestBase):
+    def test_client_ip_ignores_forwarding_headers_from_other_machines(self):
+        with self.app_module.app.test_request_context(
+            "/", environ_base=LAN, headers={"X-Forwarded-For": "1.2.3.4", "Cf-Connecting-Ip": "5.6.7.8"}
+        ):
+            self.assertEqual(self.app_module.client_ip(), "192.168.0.50")
+            self.assertFalse(self.app_module.is_local_request())
+
+    def test_tunnel_traffic_uses_the_address_cloudflare_reports(self):
+        with self.app_module.app.test_request_context("/", environ_base=LOCAL, headers=TUNNEL_HEADERS):
+            self.assertEqual(self.app_module.client_ip(), "203.0.113.9")
+            self.assertFalse(self.app_module.is_local_request())
+
+    def test_this_machine_is_local(self):
+        with self.app_module.app.test_request_context("/", environ_base=LOCAL):
+            self.assertTrue(self.app_module.is_local_request())
+
+
+class LoginLimitTests(ApiTestBase):
+    def setUp(self):
+        super().setUp()
+        self.client.post("/auth/signup", json={"email": "target@example.com", "password": "secret-pass"})
+        self.app_module._auth_limiter.reset()
+        self.app_module._auth_ip_limiter.reset()
+
+    def test_changing_the_forwarded_header_does_not_reset_the_limit(self):
+        statuses = [
+            self.client.post(
+                "/auth/login",
+                json={"email": "target@example.com", "password": f"wrong-{i:04d}"},
+                environ_base=LAN,
+                headers={"X-Forwarded-For": f"10.0.0.{i}"},
+            ).status_code
+            for i in range(12)
+        ]
+        self.assertIn(429, statuses)
+
+    def test_the_per_account_limit_holds_across_source_addresses(self):
+        statuses = [
+            self.client.post(
+                "/auth/login",
+                json={"email": "target@example.com", "password": f"wrong-{i:04d}"},
+                environ_base={"REMOTE_ADDR": f"192.168.0.{100 + i}"},
+            ).status_code
+            for i in range(12)
+        ]
+        self.assertIn(429, statuses)
+
+
+class SignupGateTests(ApiTestBase):
+    def signup(self, email, code=None, **kwargs):
+        payload = {"email": email, "password": "secret-pass"}
+        if code is not None:
+            payload["invite_code"] = code
+        return self.client.post("/auth/signup", json=payload, **kwargs)
+
+    def test_this_machine_can_always_sign_up(self):
+        self.assertEqual(self.client.get("/auth/config").get_json()["signup"], "open")
+        self.assertEqual(self.signup("owner@example.com").status_code, 201)
+
+    def test_other_devices_cannot_sign_up_without_a_configured_code(self):
+        with patch.dict(os.environ, {"SIGNUP_CODE": ""}):
+            self.assertEqual(self.client.get("/auth/config", environ_base=LAN).get_json()["signup"], "closed")
+            self.assertEqual(self.signup("guest@example.com", environ_base=LAN).status_code, 403)
+            self.assertEqual(self.signup("guest2@example.com", headers=TUNNEL_HEADERS).status_code, 403)
+
+    def test_other_devices_need_the_right_code(self):
+        with patch.dict(os.environ, {"SIGNUP_CODE": "nutri-2026"}):
+            self.assertEqual(self.client.get("/auth/config", headers=TUNNEL_HEADERS).get_json()["signup"], "code")
+            self.assertEqual(self.signup("a@example.com", "wrong", headers=TUNNEL_HEADERS).status_code, 403)
+            self.assertEqual(self.signup("b@example.com", "nutri-2026", headers=TUNNEL_HEADERS).status_code, 201)
+
+    def test_existing_accounts_can_still_log_in_from_other_devices(self):
+        self.signup("owner@example.com")
+        response = self.client.post(
+            "/auth/login", json={"email": "owner@example.com", "password": "secret-pass"}, environ_base=LAN
+        )
+        self.assertEqual(response.status_code, 200)
+
+
+class OwnerOnlyActionTests(ApiTestBase):
+    def test_other_devices_cannot_wipe_the_shared_menu_cache(self):
+        self.app_module.storage.save_restaurant_menu("好吃便當", [{"name": "雞腿飯"}])
+        with self.mock_auth("user-a"):
+            remote = self.client.delete("/restaurants/index/user-a", headers=self.auth_headers(), environ_base=LAN)
+            self.assertEqual(remote.status_code, 403)
+            self.assertEqual(self.app_module.storage.count_restaurant_menus(), 1)
+            local = self.client.delete("/restaurants/index/user-a", headers=self.auth_headers())
+        self.assertEqual(local.status_code, 200)
+        self.assertEqual(self.app_module.storage.count_restaurant_menus(), 0)
+
+    def test_diagnostics_are_only_shown_to_this_machine(self):
+        self.assertIsNone(self.client.get("/health", headers=TUNNEL_HEADERS).get_json()["database_path"])
+        with self.mock_auth("user-a"):
+            response = self.client.get("/health/gemini", headers={**self.auth_headers(), **TUNNEL_HEADERS})
+        self.assertEqual(response.status_code, 403)
+
+
+class RequestShapeTests(ApiTestBase):
+    def test_oversized_requests_are_rejected_before_parsing(self):
+        body = b'{"image": "' + b"A" * (13 * 1024 * 1024) + b'"}'
+        with self.mock_auth("user-a"):
+            response = self.client.post(
+                "/predict/vision-food", data=body, content_type="application/json", headers=self.auth_headers()
+            )
+        self.assertEqual(response.status_code, 413)
+        self.assertIn("太大", response.get_json()["error"])
+
+    def test_bad_coordinates_are_a_400_not_a_crash(self):
+        with self.mock_auth("user-a"):
+            for lat in ("abc", {"x": 1}, 999):
+                response = self.client.post(
+                    "/restaurant/menu", json={"name": "某某小吃", "lat": lat}, headers=self.auth_headers()
+                )
+                self.assertEqual(response.status_code, 400, lat)
+
+    def test_an_uploaded_menu_photo_does_not_enter_the_shared_cache(self):
+        recognized = {"items": [{"name": "假的低鈉便當", "price": 10, "calories": 100, "sodium": 1}]}
+        with self.mock_auth("user-a"), \
+                patch.object(self.app_module, "parse_menu_image_with_gemini", return_value=recognized):
+            response = self.client.post(
+                "/restaurant/menu",
+                json={"name": "鼎泰豐 101店", "menu_image": "data:image/png;base64,iVBORw0KGgo="},
+                headers=self.auth_headers(),
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(self.app_module.storage.get_restaurant_menu(name="鼎泰豐 101店"))

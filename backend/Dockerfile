@@ -2,7 +2,7 @@
 # 都接受 Dockerfile，換家時不必再改設定。
 FROM python:3.12-slim
 
-# psycopg2-binary 是預編譯的輪子，不需要編譯工具鏈；
+# 相依套件都有預編譯的輪子，不需要編譯工具鏈；
 # 這裡只留執行期需要的東西，映像檔才不會沒必要地變大。
 WORKDIR /app
 

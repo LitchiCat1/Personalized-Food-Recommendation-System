@@ -57,7 +57,7 @@ Preferred traits:
 - High confidence data surfaces.
 - Food imagery or food-shaped visual cues where useful.
 - Clear risk colors for sodium/allergen/condition warnings.
-- UI suitable for live demo: scanner, safety filtering, nutrition tracking, map recommendation, Supabase/Render integration should be obvious.
+- UI suitable for live demo: scanner, safety filtering, nutrition tracking, map recommendation, and the local backend/database integration should be obvious.
 
 ## UI Implementation Gates
 

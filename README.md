@@ -31,7 +31,7 @@ Personalized-Food-Recommendation-System/
 │   │   │   └── profile.tsx   # 個人檔案設定
 │   │   └── _layout.tsx       # Root layout 與驗證閘道
 │   ├── components/           # 可複用 UI 元件
-│   │   ├── AuthGate.tsx      # Supabase 登入與註冊 Gate
+│   │   ├── AuthGate.tsx      # 登入與註冊 Gate（帳號存在本機資料庫）
 │   │   ├── AppContainer.tsx  # 響應式佈局容器
 │   │   ├── maps/             # 地圖整合元件
 │   │   └── ui/               # 設計系統通用按鈕、對話框與導覽
@@ -57,23 +57,79 @@ Personalized-Food-Recommendation-System/
 - **飲食趨勢分析** — 週熱量柱狀圖 + 營養素均值 + AI 洞察
 - **飲食紀錄管理** — 日曆區間查詢 + 手動新增今日或歷史紀錄 + 編輯與刪除
 - **未知食品備援** — TFDA 搜尋 + 自訂食品 + 營養標示 OCR
-- **Supabase Auth** — 前端登入/註冊、Bearer token 傳遞、後端 user_id 權限檢查
-- **Render + Supabase 部署** — 後端已在 Render 強制 Supabase Auth，資料存於 Supabase Postgres
+- **本機登入** — Email + 密碼登入/註冊，帳號存在本機 SQLite，Bearer token 傳遞、後端 user_id 權限檢查
+- **本機資料庫** — 帳號、飲食紀錄、店家菜單快取都存在一個 SQLite 檔，不需要雲端服務
 - **跨平台響應式** — 手機/平板/桌面自適應
 
-目前 Google Places 店家搜尋、Web Google Maps、個人化 AI 店家摘要、個人檔案編輯、登出、Render + Supabase 部署、Supabase Auth 登入與後端強制 user-scoped 權限檢查均已完成驗證，GitHub Actions 已有基礎 CI。詳細狀態請以 `docs/Project_Architecture_and_Status.md` 的 roadmap 稽核表為準。
+目前 Google Places 店家搜尋、Web Google Maps、個人化 AI 店家摘要、個人檔案編輯、登出、本機登入與後端強制 user-scoped 權限檢查均已完成驗證，GitHub Actions 已有基礎 CI。詳細狀態請以 `docs/Project_Architecture_and_Status.md` 的 roadmap 稽核表為準。
 
-## 部署與驗證狀態
+## 在本機執行
 
-- Render URL：`https://personalized-food-recommendation-system-nq8t.onrender.com`
-- Render service id：`srv-d7u2qhdckfvc73ei96l0`
-- 部署分支：`v0.0.7`
-- 後端儲存：Supabase Postgres Session Pooler
-- 後端 Auth：`SUPABASE_AUTH_REQUIRED=true`
-- 權限驗證：無 token 回 `401`，正確 token 回 `200`，跨 `user_id` 回 `403`
-- CI：GitHub Actions 後端 syntax check + 前端 typecheck
+網站與資料庫都在自己的電腦上，不需要任何雲端服務，也不用安裝資料庫：
+資料存在一個 SQLite 檔（預設 `%LOCALAPPDATA%\NutriLens\nutrilens.db`）。
 
-部署驗收、環境變數、API key 輪替、工作日誌與避免重犯的操作守則記錄於 `docs/Operations_Runbook.md`。
+第一次：
+
+```bash
+pip install -r backend/requirements.txt
+cp backend/.env.local.example backend/.env.local   # 填入 GEMINI_API_KEYS、GOOGLE_PLACES_API_KEY
+npm --prefix frontend install
+```
+
+### 平常使用（推薦）
+
+先把網站打包一次（改過前端程式才需要重跑）：
+
+```bash
+npm --prefix frontend run build:local
+```
+
+之後只要開後端，網站和 API 都在同一個網址：
+
+```bash
+python backend/app.py
+```
+
+打開 http://localhost:5000 註冊帳號就能用。後端的 `/health` 會顯示資料庫檔案的位置。
+
+### 讓其他裝置連進來
+
+預設只有這台電腦連得到。要給別人用：
+
+1. 在 `backend/.env.local` 設一組邀請碼，例如 `SIGNUP_CODE=nutri-2026`。其他裝置註冊時要輸入它；
+   沒設的話其他裝置只能登入已經有的帳號、不能註冊（在這台電腦上永遠可以註冊）。
+2. 依對方在哪裡選一種：
+   - **同一個 Wi-Fi 或 VPN（例如 Radmin）**：用 `python backend/app.py --lan` 啟動，
+     後端會印出「同一個網路的手機或電腦：http://192.168.x.x:5000」，在對方的瀏覽器打開即可。
+   - **從外面的網路連（組員在家、老師評審）**：照常 `python backend/app.py`，另開一個終端機執行下面這行，
+     把印出來的 `https://….trycloudflare.com` 網址傳給對方；關掉視窗網址就失效，每次執行網址都不同。
+
+     ```bash
+     cloudflared tunnel --url http://localhost:5000
+     ```
+
+注意：
+
+- 手機的瀏覽器只有在 **https** 網址下才允許用相機拍照和定位。用 `http://192.168.x.x` 連時，請改用「相簿」上傳照片、
+  店家頁會改用預設位置；要用相機或定位，請用 cloudflared 網址。
+- 不同網址（`localhost:5000`、`192.168.x.x:5000`、cloudflared 網址、`localhost:8081`）在瀏覽器看來是不同網站，
+  各自要登入一次。同一個網址開好幾個分頁時，登入、登出會自動同步。
+- 只有在這台電腦上才能做的事：清除店家菜單檔案、查看金鑰診斷。
+- 展示完就把 cloudflared 關掉。在咖啡店、學校這類公用 Wi-Fi 上不要加 `--lan`。
+
+### 開發時（改前端程式）
+
+開兩個終端機，前端改了會即時更新：
+
+```bash
+python backend/app.py                 # 後端 http://localhost:5000
+npm --prefix frontend run web         # 網站 http://localhost:8081
+```
+
+其他工具：
+
+- 忘記密碼：`python backend/scripts/reset_password.py 某人@example.com`（不帶 Email 會列出所有帳號）。
+- 備份：後端關掉後，複製上面那個 `.db` 檔就是完整備份。
 
 ## Expo Go 測試注意事項
 
@@ -96,7 +152,7 @@ Personalized-Food-Recommendation-System/
 | Frontend | Expo (React Native) + TypeScript |
 | State | Zustand |
 | Navigation | Expo Router (file-based) |
-| Backend | Flask + PostgreSQL/Supabase + MongoDB fallback |
+| Backend | Flask + SQLite（本機檔案）+ MongoDB fallback |
 | AI Model | Gemini Vision API + TFDA/custom food DB lookup |
 | Camera | expo-camera + expo-image-picker |
 

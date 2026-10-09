@@ -1,3 +1,5 @@
+import { reportUnauthorized } from '@/lib/auth';
+
 export type HistoryDay = {
   date: string;
   record_count?: number;
@@ -394,6 +396,7 @@ function buildHeaders(auth?: ApiAuth, contentType?: string): HeadersInit {
 }
 
 async function parseJson<T>(resp: Response): Promise<T> {
+  if (resp.status === 401) reportUnauthorized();
   // 後端逾時、502、或路由不存在時回的是 HTML 或空 body，
   // 先 resp.json() 會丟出 "Unexpected token '<'"，把真正的狀態碼蓋掉。
   const raw = await resp.text();
@@ -408,9 +411,9 @@ async function parseJson<T>(resp: Response): Promise<T> {
 
   if (!resp.ok) {
     if (data?.error) throw new Error(data.error);
-    if (resp.status === 404) throw new Error(`找不到這個 API（HTTP 404）。後端可能還是舊版本，請確認 Render 部署的分支。`);
-    if (resp.status === 401 || resp.status === 403) throw new Error(`沒有權限（HTTP ${resp.status}）。請登出後重新登入，讓 access token 更新。`);
-    if (resp.status >= 500) throw new Error(`後端錯誤（HTTP ${resp.status}）。可能是處理逾時，請看 Render logs。`);
+    if (resp.status === 404) throw new Error(`找不到這個 API（HTTP 404）。後端可能還是舊版本，請重新啟動後端。`);
+    if (resp.status === 401 || resp.status === 403) throw new Error(`沒有權限（HTTP ${resp.status}）。請重新登入後再試一次。`);
+    if (resp.status >= 500) throw new Error(`後端錯誤（HTTP ${resp.status}）。可能是處理逾時，請看後端視窗的錯誤訊息。`);
     throw new Error(`API 請求失敗（HTTP ${resp.status}）${raw ? `：${raw.slice(0, 160)}` : ''}`);
   }
 
@@ -605,7 +608,7 @@ export async function fetchHealthyFoodRecommendations(
     if (err?.message?.startsWith('無法連線到後端 API')) {
       const healthReachable = await canReachBackendHealth(apiBaseUrl);
       if (healthReachable) {
-        throw new Error('後端健康檢查可連線，但推薦 API request 失敗。請重新整理頁面或登出後重新登入，讓 Supabase session token 更新後再試一次。');
+        throw new Error('後端健康檢查可連線，但推薦 API request 失敗。請重新整理頁面或登出後重新登入，讓登入狀態更新後再試一次。');
       }
     }
     throw err;

@@ -43,17 +43,17 @@ EXPO_PUBLIC_API_BASE_URL=http://你的電腦IP:5000
 
 如果沒有設定，系統會嘗試自動推導 Expo 開發主機的 IP。
 
-## Supabase Auth
+## 登入
 
-若要啟用正式登入/註冊與後端 `user_id` 權限隔離，需在 `frontend/.env.local` 設定：
+帳號存在本機後端的 SQLite 資料庫。預設就要登入；
+想跳過登入、直接用 demo_user 測試時，在 `frontend/.env.local` 設：
 
 ```env
-EXPO_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
-EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
-EXPO_PUBLIC_SUPABASE_AUTH_REQUIRED=true
+EXPO_PUBLIC_AUTH_REQUIRED=false
 ```
 
-三項皆設定後，前端會顯示 Supabase Auth 登入/註冊畫面，並在呼叫 user scoped API 時附上 `Authorization: Bearer <access_token>`。若 `EXPO_PUBLIC_SUPABASE_AUTH_REQUIRED` 不是 `true`，前端會維持 demo 模式；正式環境應與後端 `SUPABASE_AUTH_REQUIRED` 使用相同值。
+後端也要設 `AUTH_REQUIRED=false`（`backend/.env.local`），兩邊要一致。
+登入後呼叫 user scoped API 時會附上 `Authorization: Bearer <access_token>`。
 
 ## 開發原則
 

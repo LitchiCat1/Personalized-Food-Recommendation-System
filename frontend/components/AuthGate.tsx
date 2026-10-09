@@ -1,16 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import type { Session } from '@supabase/supabase-js';
 
 import { DEFAULT_DIET_TYPE, DIET_TYPES } from '@/constants/diet';
 import { PROFILE_LIMITS, describeLimit, isWithinLimit } from '@/constants/profile-defaults';
 import { Palette, Radius, Shadows, Spacing, Typography } from '@/constants/theme';
 import { fetchMedicalMetadata, fetchUserProfile, saveUserProfile, type MedicalMetadataResponse, type UserProfileResponse } from '@/lib/api';
-import { isSupabaseAuthRequired, supabase, supabaseConfigurationError } from '@/lib/supabase';
+import { clearStoredSession, fetchSignupMode, isAuthRequired, onUnauthorized, restoreSession, signIn, signUp, subscribeToSessionChanges, type AuthSession, type SignupMode } from '@/lib/auth';
 import { useStore, type UserProfile } from '@/store/useStore';
 
 
-function applySession(session: Session | null) {
+function applySession(session: AuthSession | null) {
   const store = useStore.getState();
   if (!session?.user) {
     store.setAuthSession(null);
@@ -20,7 +19,7 @@ function applySession(session: Session | null) {
   store.setAuthSession({
     userId: session.user.id,
     email: session.user.email,
-    accessToken: session.access_token,
+    accessToken: session.accessToken,
   });
 }
 
@@ -56,33 +55,15 @@ const FALLBACK_ACTIVITY_LEVELS = [
   { id: 'very_active', label_zh: '極高活動（勞力工作或每日訓練）', multiplier: 1.9 },
 ];
 
-// Supabase 回的是英文，而且斷網時只會給 "Failed to fetch"。
-// 直接照抄到畫面上，使用者不知道自己該做什麼。
+// 後端回的錯誤訊息本來就是給使用者看的中文；只有斷網時瀏覽器給的
+// "Failed to fetch" 要翻成使用者知道該做什麼的話。
 function describeAuthError(error: any, fallback: string) {
-  const raw = String(error?.message || '').toLowerCase();
+  const raw = String(error?.message || '');
   if (!raw) return fallback;
-  if (raw.includes('failed to fetch') || raw.includes('network')) {
-    return '連不到伺服器，請確認網路連線後再試一次。';
+  if (/failed to fetch|network/i.test(raw)) {
+    return '連不到伺服器，請確認後端有開著，再試一次。';
   }
-  if (raw.includes('invalid login credentials')) {
-    return 'Email 或密碼不對。忘記密碼的話可以按下面的「忘記密碼？」。';
-  }
-  if (raw.includes('email not confirmed')) {
-    return '這個 Email 還沒完成驗證，請先到信箱點開驗證信。';
-  }
-  if (raw.includes('user already registered') || raw.includes('already been registered')) {
-    return '這個 Email 已經註冊過了，請直接登入。';
-  }
-  if (raw.includes('password should be at least')) {
-    return '密碼太短了，請至少 6 個字元。';
-  }
-  if (raw.includes('unable to validate email') || raw.includes('invalid email')) {
-    return 'Email 格式不對，請再確認一次。';
-  }
-  if (raw.includes('rate limit') || raw.includes('too many')) {
-    return '嘗試次數太多，請等幾分鐘後再試。';
-  }
-  return fallback;
+  return raw;
 }
 
 function buildInitialDraft(email?: string | null) {
@@ -117,6 +98,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  // 從其他裝置或 tunnel 連進來時，註冊要邀請碼或不開放；由後端依連線來源決定
+  const [signupMode, setSignupMode] = useState<SignupMode>('open');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [profileStatus, setProfileStatus] = useState<'idle' | 'loading' | 'required' | 'ready' | 'error'>('idle');
@@ -132,41 +116,77 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!isSupabaseAuthRequired) {
-      setAuthReady(true);
-      return;
-    }
-    if (!supabase) {
-      applySession(null);
+    if (!isAuthRequired) {
       setAuthReady(true);
       return;
     }
 
     let active = true;
-    supabase.auth.getSession()
-      .then(({ data, error }) => {
+    restoreSession(useStore.getState().apiBaseUrl)
+      .then((session) => {
         if (!active) return;
-        if (error) setMessage(error.message || '無法確認 Supabase 登入狀態');
-        applySession(error ? null : data.session);
+        applySession(session);
         setAuthReady(true);
       })
-      .catch((error: Error) => {
+      .catch(() => {
         if (!active) return;
         applySession(null);
-        setMessage(error.message || '無法連線至 Supabase Auth');
         setAuthReady(true);
       });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    return () => {
+      active = false;
+    };
+  }, [setAuthReady]);
+
+  useEffect(() => {
+    if (!isAuthRequired) return;
+
+    // 另一個分頁登入、登出或換帳號：這一頁跟著變。換帳號時先登出一下，
+    // 讓畫面整個重新載入新帳號的資料，不會殘留上一個人的紀錄。
+    const stopSync = subscribeToSessionChanges((session) => {
+      const current = useStore.getState();
+      if (session && current.isAuthenticated && current.user.userId !== session.user.id) {
+        applySession(null);
+        setTimeout(() => applySession(session), 0);
+        return;
+      }
       applySession(session);
-      setAuthReady(true);
+    });
+
+    // 後端說 token 沒用了（過期、在其他分頁登出、後端換了資料庫）：回登入畫面，
+    // 而不是讓每個按鈕都跳「沒有權限」。
+    const stopUnauthorized = onUnauthorized(() => {
+      if (!useStore.getState().isAuthenticated) return;
+      void clearStoredSession();
+      applySession(null);
+      setMessage('登入已過期，請重新登入。');
     });
 
     return () => {
-      active = false;
-      listener.subscription.unsubscribe();
+      stopSync();
+      stopUnauthorized();
     };
-  }, [setAuthReady]);
+  }, []);
+
+  // 被登出（自己按、其他分頁、或 token 過期）時回到登入表單。先前會停在上次用過的
+  // 「建立帳號」，已經有帳號的人被叫去註冊。
+  useEffect(() => {
+    if (!isAuthenticated) setMode('login');
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (mode !== 'signup') return;
+    let active = true;
+    fetchSignupMode(apiBaseUrl).then((next) => {
+      if (active) setSignupMode(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, [apiBaseUrl, mode]);
+
+  const signupClosed = mode === 'signup' && signupMode === 'closed';
 
   const title = useMemo(() => mode === 'login' ? '登入 NutriLens' : '建立 NutriLens 帳號', [mode]);
 
@@ -310,44 +330,21 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const sendPasswordReset = async () => {
-    // 先前沒有這個入口，忘記密碼等於帳號永久鎖死。
-    if (!supabase) return;
-    const address = email.trim();
-    if (!address) {
-      setMessage('請先填入你的 Email，我們會寄重設連結過去。');
-      return;
-    }
-    setBusy(true);
-    setMessage(null);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(address, {
-        redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
-      });
-      if (error) throw error;
-      setMessage(`重設密碼的連結已寄到 ${address}，請到信箱點開連結。`);
-    } catch (error: any) {
-      setMessage(describeAuthError(error, '寄送重設信失敗，請稍後再試。'));
-    } finally {
-      setBusy(false);
-    }
+  const showPasswordResetHelp = () => {
+    // 先前沒有這個入口，忘記密碼等於帳號永久鎖死。本地端不會寄信，
+    // 改由跑後端的那台電腦重設。
+    const address = email.trim() || '你的 Email';
+    setMessage(`請在跑後端的電腦上執行：python backend/scripts/reset_password.py ${address}`);
   };
 
   const submit = async () => {
-    if (!supabase) return;
     setBusy(true);
     setMessage(null);
     try {
-      const credentials = { email: email.trim(), password };
-      const { data, error } = mode === 'login'
-        ? await supabase.auth.signInWithPassword(credentials)
-        : await supabase.auth.signUp(credentials);
-
-      if (error) throw error;
-      applySession(data.session);
-      if (!data.session) {
-        setMessage('請到信箱完成驗證後再登入。');
-      }
+      const session = mode === 'login'
+        ? await signIn(apiBaseUrl, email.trim(), password)
+        : await signUp(apiBaseUrl, email.trim(), password, signupMode === 'code' ? inviteCode.trim() : undefined);
+      applySession(session);
     } catch (error: any) {
       setMessage(describeAuthError(error, mode === 'login' ? '登入失敗，請稍後再試。' : '註冊失敗，請稍後再試。'));
     } finally {
@@ -355,21 +352,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     }
   };
 
-  if (!isSupabaseAuthRequired) {
+  if (!isAuthRequired) {
     return <>{children}</>;
-  }
-
-  if (supabaseConfigurationError || !supabase) {
-    return (
-      <View style={styles.screen}>
-        <View style={styles.card}>
-          <Text style={styles.kicker}>部署設定錯誤</Text>
-          <Text style={styles.title}>Supabase 尚未連接</Text>
-          <Text style={styles.subtitle}>{supabaseConfigurationError || 'Supabase client 初始化失敗。'}</Text>
-          <Text style={styles.message}>請在 Render Blueprint 建立時填入 Supabase URL 與 publishable key，然後重新部署前端與後端。</Text>
-        </View>
-      </View>
-    );
   }
 
   if (!authReady) {
@@ -382,7 +366,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (isAuthenticated && profileStatus === 'loading') {
-    // 超過 5 秒幾乎都是後端在冷啟動；超過 20 秒就給一個重試的出口。
+    // 本機後端正常是一秒內回應；超過 5 秒多半是後端沒開，超過 20 秒就給一個重試的出口。
     const slow = loadingSeconds >= 5;
     return (
       <View style={styles.centered}>
@@ -390,7 +374,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         <Text style={styles.mutedText}>正在載入你的基本資料...</Text>
         {slow ? (
           <Text style={styles.message}>
-            伺服器閒置後會休眠，第一次連線需要喚醒，通常 30~60 秒。已等待 {loadingSeconds} 秒。
+            後端回應比平常慢，請確認後端有開著。已等待 {loadingSeconds} 秒。
           </Text>
         ) : null}
         {loadingSeconds >= 20 ? (
@@ -569,7 +553,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     <View style={styles.screen}>
       <View style={styles.card}>
         <Text style={styles.title}>{title}</Text>
-        {/* 先前寫「後端會用 Supabase access token 驗證你的 user_id」——
+        {/* 先前寫「後端會用 access token 驗證你的 user_id」——
             使用者不需要知道我們用什麼登入系統。 */}
         <Text style={styles.subtitle}>
           {mode === 'login'
@@ -599,7 +583,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
           onChangeText={setPassword}
           onSubmitEditing={submit}
-          placeholder="至少 6 個字元"
+          placeholder="至少 8 個字元"
           placeholderTextColor={Palette.text.tertiary}
           returnKeyType="go"
           secureTextEntry
@@ -607,15 +591,38 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           value={password}
         />
 
+        {mode === 'signup' && signupMode === 'code' ? (
+          <>
+            <Text style={styles.inputLabel} nativeID="auth-invite-label">邀請碼</Text>
+            <TextInput
+              accessibilityLabel="邀請碼"
+              accessibilityLabelledBy="auth-invite-label"
+              autoCapitalize="none"
+              autoComplete="off"
+              onChangeText={setInviteCode}
+              onSubmitEditing={submit}
+              placeholder="向網站主人索取"
+              placeholderTextColor={Palette.text.tertiary}
+              returnKeyType="go"
+              style={styles.input}
+              value={inviteCode}
+            />
+          </>
+        ) : null}
+
+        {signupClosed ? (
+          <Text style={styles.message}>這個網址目前不開放註冊，請向網站主人索取邀請碼。已經有帳號的話可以直接登入。</Text>
+        ) : null}
+
         {message ? <Text style={styles.message} accessibilityLiveRegion="polite">{message}</Text> : null}
 
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={mode === 'login' ? '登入' : '註冊'}
-          aria-disabled={busy} aria-busy={busy}
-          disabled={busy}
+          aria-disabled={busy || signupClosed} aria-busy={busy}
+          disabled={busy || signupClosed}
           onPress={submit}
-          style={[styles.primaryButton, busy && styles.disabledButton]}
+          style={[styles.primaryButton, (busy || signupClosed) && styles.disabledButton]}
         >
           {busy ? <ActivityIndicator color={Palette.bg.primary} /> : <Text style={styles.primaryText}>{mode === 'login' ? '登入' : '註冊'}</Text>}
         </Pressable>
@@ -623,9 +630,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         {mode === 'login' ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="忘記密碼，寄送重設連結"
+            accessibilityLabel="忘記密碼，查看重設方式"
             disabled={busy}
-            onPress={sendPasswordReset}
+            onPress={showPasswordResetHelp}
             style={styles.secondaryButton}
           >
             <Text style={styles.secondaryText}>忘記密碼？</Text>

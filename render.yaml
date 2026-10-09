@@ -32,17 +32,7 @@ services:
           type: web
           name: nutrilens-backend
           envVarKey: RENDER_EXTERNAL_HOSTNAME
-      - key: EXPO_PUBLIC_SUPABASE_URL
-        fromService:
-          type: web
-          name: nutrilens-backend
-          envVarKey: SUPABASE_URL
-      - key: EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-        fromService:
-          type: web
-          name: nutrilens-backend
-          envVarKey: SUPABASE_PUBLISHABLE_KEY
-      - key: EXPO_PUBLIC_SUPABASE_AUTH_REQUIRED
+      - key: EXPO_PUBLIC_AUTH_REQUIRED
         value: "true"
       - key: GOOGLE_PLACES_API_KEY
         fromService:
@@ -59,26 +49,19 @@ services:
     branch: v0.0.9
     buildCommand: pip install -r requirements.txt
     startCommand: python -u app.py
+    # 資料存在 SQLite 檔（DATABASE_PATH）。Render 免費方案的磁碟每次部署都會清空，
+    # 帳號與紀錄會跟著消失；要長期放在 Render 得掛 persistent disk 並把 DATABASE_PATH 指過去。
     envVars:
       - key: GEMINI_API_KEYS
-        sync: false
-      - key: DATABASE_URL
-        sync: false
-      # 店家菜單快取要放另一個 Supabase 時才填；留空就跟 DATABASE_URL 同一個
-      - key: MENU_DATABASE_URL
         sync: false
       - key: FLASK_DEBUG
         value: "false"
       # 只放行自己的前端。沒設定的話後端只接受 localhost。
       - key: ALLOWED_ORIGINS
         sync: false
-      - key: SUPABASE_AUTH_REQUIRED
+      - key: AUTH_REQUIRED
         value: "true"
       - key: APP_UTC_OFFSET_HOURS
         value: "8"
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_PUBLISHABLE_KEY
-        sync: false
       - key: GOOGLE_PLACES_API_KEY
         sync: false

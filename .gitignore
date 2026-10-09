@@ -11,9 +11,6 @@ node_modules/
 dist/
 web-build/
 
-# Supabase CLI
-supabase/.temp/
-
 # IDE
 .vscode/
 .idea/
@@ -37,3 +34,8 @@ Thumbs.db
 
 # TFDA
 backend/tfda_data/20_5.json
+
+# 本機 SQLite（DATABASE_PATH 指到專案裡時）
+*.db
+*.db-wal
+*.db-shm

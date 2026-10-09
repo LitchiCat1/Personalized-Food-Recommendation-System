@@ -3,6 +3,14 @@ import type { ApiAuth } from '@/lib/api';
 import type { MealType } from '@/lib/meal';
 
 
+// 後端回 401 時通知 AuthGate 帶回登入畫面（事件名稱見 lib/auth.ts 的 UNAUTHORIZED_EVENT）。
+// 這個檔案會被 Node 的測試直接載入，不能 import 只有 App 裡才解析得到的模組。
+function reportIfUnauthorized(resp: Response) {
+  if (resp.status === 401 && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new Event('nutrilens:unauthorized'));
+  }
+}
+
 function buildHeaders(auth?: ApiAuth, contentType?: string): HeadersInit {
   const headers: Record<string, string> = {};
   if (contentType) headers['Content-Type'] = contentType;
@@ -115,6 +123,7 @@ export async function runPrediction(params: {
     headers: buildHeaders(params.auth, 'application/json'),
     body: JSON.stringify(body),
   });
+  reportIfUnauthorized(resp);
   const data = await resp.json();
   if (!resp.ok) {
     throw new Error(data.error || 'Gemini 食物辨識失敗');
@@ -218,6 +227,7 @@ async function performSaveRecord(params: SaveRecordParams): Promise<void> {
       source: params.source,
     }),
   });
+  reportIfUnauthorized(resp);
   if (!resp.ok) {
     const data = await resp.json().catch(() => ({}));
     throw new Error(data.error || '飲食紀錄同步失敗');
@@ -239,6 +249,7 @@ export async function manualSearchFood(params: {
   const resp = await fetch(`${params.apiBaseUrl}/search/food?${query.toString()}`, {
     headers: buildHeaders(params.auth),
   });
+  reportIfUnauthorized(resp);
   const data = await resp.json();
   if (!resp.ok) {
     throw new Error(data.error || '搜尋失敗');
@@ -287,6 +298,7 @@ export async function runNutritionLabelOCR(params: {
     headers: buildHeaders(params.auth, 'application/json'),
     body: JSON.stringify({ image: normalizeImageBase64(params.imageBase64) }),
   });
+  reportIfUnauthorized(resp);
   const data = await resp.json() as NutritionLabelOCRResponse;
   if (!resp.ok) {
     throw new Error(data.error || '營養標示辨識失敗');
@@ -326,6 +338,7 @@ export async function saveCustomFood(params: {
       source: 'nutrition-label-ocr',
     }),
   });
+  reportIfUnauthorized(resp);
   const data = await resp.json();
   if (!resp.ok) {
     throw new Error(data.error || '儲存自訂食品失敗');

@@ -9,6 +9,11 @@ from services.app_time_service import app_now
 from services.venue_index_service import reset_venue_index_state
 from unittest.mock import patch
 
+# 在任何測試 import app 之前：不讀 backend/.env.local（裡面是真的金鑰），
+# DATABASE_PATH 設成空字串（不設的話後端會開本機正式的 SQLite 檔），測試只寫記憶體。
+os.environ["NUTRILENS_SKIP_LOCAL_ENV"] = "1"
+os.environ["DATABASE_PATH"] = ""
+
 
 class ApiTestBase(unittest.TestCase):
     """共用的 app 啟動與登入輔助。
@@ -19,9 +24,7 @@ class ApiTestBase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        os.environ["SUPABASE_AUTH_REQUIRED"] = "true"
-        os.environ["SUPABASE_URL"] = "https://example.supabase.co"
-        os.environ["SUPABASE_PUBLISHABLE_KEY"] = "test-publishable-key"
+        os.environ["AUTH_REQUIRED"] = "true"
         sys.modules.pop("app", None)
         cls.app_module = importlib.import_module("app")
         cls.app_module.app.config["TESTING"] = True
@@ -38,13 +41,18 @@ class ApiTestBase(unittest.TestCase):
         reset_venue_index_state()
         # 付費路由的限流是跨測試累計的；建檔路由也在內，不清會被前面的測試用光
         self.app_module._paid_api_limiter.reset()
+        self.app_module._auth_limiter.reset()
+        self.app_module._auth_ip_limiter.reset()
+        # 帳號也是跨測試累計的，不清的話後面的測試會撞到「已經註冊過」
+        self.app_module.auth_repo.mem_users.clear()
+        self.app_module.auth_repo.mem_sessions.clear()
         self.app_module.storage.upsert_user({"user_id": "user-a", "name": "User A", "health_conditions": ["hypertension"], "allergens": ["egg"]})
 
     def auth_headers(self):
         return {"Authorization": "Bearer test-token"}
 
     def mock_auth(self, user_id="user-a"):
-        return patch.object(self.app_module, "verify_supabase_user", return_value={"id": user_id})
+        return patch.object(self.app_module, "verify_access_token", return_value={"id": user_id})
 
     def _seed_menu(self, name, address, text, deadline=None):
         return {
@@ -864,7 +872,7 @@ class AuthDefaultTests(unittest.TestCase):
 
     def setUp(self):
         self.saved = {
-            key: os.environ.pop(key, None) for key in ("SUPABASE_AUTH_REQUIRED", "RENDER")
+            key: os.environ.pop(key, None) for key in ("AUTH_REQUIRED", "RENDER")
         }
 
     def tearDown(self):
@@ -882,7 +890,7 @@ class AuthDefaultTests(unittest.TestCase):
     def test_it_can_still_be_turned_off_explicitly_for_local_work(self):
         from services.auth_service import is_auth_required
 
-        os.environ["SUPABASE_AUTH_REQUIRED"] = "false"
+        os.environ["AUTH_REQUIRED"] = "false"
         self.assertFalse(is_auth_required())
 
 
@@ -992,41 +1000,3 @@ class AllowedOriginNormalisationTests(unittest.TestCase):
         self.assertEqual(self.normalise("   "), "")
 
 
-class PostgresSslModeTests(unittest.TestCase):
-    """本機 Postgres 預設沒開 SSL；寫死 sslmode=require 就連不上。"""
-
-    def setUp(self):
-        import app as app_module
-
-        self.connect = app_module.connect_postgres
-        self.module = app_module
-
-    def _captured(self, url):
-        seen = {}
-
-        def fake_connect(dsn, **kwargs):
-            seen["dsn"] = dsn
-            seen["kwargs"] = kwargs
-            return object()
-
-        with patch.object(self.module.psycopg2, "connect", fake_connect):
-            self.connect(url)
-        return seen
-
-    def test_a_local_database_does_not_demand_ssl(self):
-        seen = self._captured("postgresql://user:pw@localhost:5432/nutrilens")
-        self.assertEqual(seen["kwargs"].get("sslmode"), "prefer")
-
-    def test_a_remote_database_still_requires_ssl(self):
-        seen = self._captured("postgresql://user:pw@aws-1.pooler.supabase.com:5432/postgres")
-        self.assertEqual(seen["kwargs"].get("sslmode"), "require")
-
-    def test_an_explicit_sslmode_in_the_url_wins(self):
-        seen = self._captured("postgresql://user:pw@example.com/db?sslmode=disable")
-        self.assertNotIn("sslmode", seen["kwargs"])
-
-    def test_docker_compose_hostnames_count_as_local(self):
-        for url in ("postgresql://u:p@db:5432/nutrilens",
-                    "postgresql://u:p@host.docker.internal:5432/nutrilens"):
-            with self.subTest(url=url):
-                self.assertEqual(self._captured(url)["kwargs"].get("sslmode"), "prefer")

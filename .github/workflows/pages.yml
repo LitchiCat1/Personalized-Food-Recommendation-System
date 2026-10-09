@@ -59,9 +59,6 @@ jobs:
           # 這幾個值最後都會出現在公開的 JS bundle 裡，所以用 vars 而不是 secrets——
           # 標成 secret 只會讓人誤以為它們是機密的。
           EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL }}
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
-          SUPABASE_AUTH_REQUIRED: "true"
           GOOGLE_PLACES_API_KEY: ${{ vars.GOOGLE_MAPS_BROWSER_KEY }}
         run: npm run build:web
 

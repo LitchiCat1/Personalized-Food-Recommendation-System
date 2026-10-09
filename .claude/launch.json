@@ -4,8 +4,24 @@
     {
       "name": "frontend-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "frontend", "run", "web", "--", "--port", "8083"],
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "web",
+        "--",
+        "--port",
+        "8083"
+      ],
       "port": 8083
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "backend/app.py"
+      ],
+      "port": 5000
     }
   ]
 }

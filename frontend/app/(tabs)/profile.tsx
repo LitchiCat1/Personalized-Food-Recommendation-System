@@ -23,7 +23,7 @@ import { describeCalorieTarget, describeUserTargetFallback, formatCalories } fro
 import { calculateActivityStats } from '@/lib/dietary-trends';
 import { describeLocation, resolveLocation } from '@/lib/location';
 import { describeIndexProgress, describeIndexRun, indexVenuesUntilDone, type VenueIndexProgress } from '@/lib/venue-indexing';
-import { isSupabaseAuthConfigured, supabase } from '@/lib/supabase';
+import { isAuthRequired, signOut } from '@/lib/auth';
 import { isSelected } from '@/lib/safety-selection';
 
 type MedicalMetadata = Awaited<ReturnType<typeof fetchMedicalMetadata>>;
@@ -438,16 +438,14 @@ export default function ProfileScreen() {
   };
 
   const performSignOut = async () => {
-    if (!isSupabaseAuthConfigured || !supabase) {
-      setProfileFeedback({ tone: 'error', title: 'Demo 模式', message: '目前未啟用 Supabase Auth，無法登出。' });
+    if (!isAuthRequired) {
+      setProfileFeedback({ tone: 'error', title: 'Demo 模式', message: '目前沒有啟用登入，無法登出。' });
       return;
     }
-    const supabaseClient = supabase;
 
     setSigningOut(true);
     try {
-      const { error: signOutError } = await supabaseClient.auth.signOut();
-      if (signOutError) throw signOutError;
+      await signOut(apiBaseUrl, accessToken);
       useStore.getState().setAuthSession(null);
     } catch (err: any) {
       setProfileFeedback({ tone: 'error', title: '登出失敗', message: err?.message || '無法登出。' });
@@ -569,8 +567,8 @@ export default function ProfileScreen() {
 
   const handleSignOut = () => {
     setProfileFeedback(null);
-    if (!isSupabaseAuthConfigured || !supabase) {
-      setProfileFeedback({ tone: 'error', title: 'Demo 模式', message: '目前未啟用 Supabase Auth，無法登出。' });
+    if (!isAuthRequired) {
+      setProfileFeedback({ tone: 'error', title: 'Demo 模式', message: '目前沒有啟用登入，無法登出。' });
       return;
     }
 
@@ -612,13 +610,13 @@ export default function ProfileScreen() {
 
   return (
     <AppContainer>
-      {/* 徽章先前只看「有沒有設定 Supabase」，不看有沒有真的登入：session 過期
+      {/* 徽章先前只看「有沒有設定登入」，不看有沒有真的登入：session 過期
           之後畫面照樣寫「Auth 已登入」，而下面每一次同步都會 401。 */}
       <ScreenHeader
         title="我的健康檔案"
         subtitle="管理身體資料、飲食目標、疾病條件與過敏原。"
-        badge={!isSupabaseAuthConfigured ? 'Demo 模式' : isAuthenticated ? 'Auth 已登入' : '尚未登入'}
-        badgeTone={isSupabaseAuthConfigured && isAuthenticated ? 'success' : 'warning'}
+        badge={!isAuthRequired ? 'Demo 模式' : isAuthenticated ? '已登入' : '尚未登入'}
+        badgeTone={isAuthRequired && isAuthenticated ? 'success' : 'warning'}
       />
 
       {profileFeedback ? (

@@ -3,19 +3,27 @@ NutriLens Backend — Flask API
 PRD-aligned: Gemini Vision food recognition + nutrition analysis + user management
 """
 
+import hmac
+import ipaddress
 import json
 import math
 import os
+import socket
+import sys
 import uuid
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
-import psycopg2
 import requests
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.security import safe_join
+from repositories.auth_repository import AuthRepository
+from repositories.sqlite_db import SqliteDatabase, resolve_database_path
 from repositories.storage import StorageRepository
 from services.app_time_service import app_now
-from services.auth_service import AuthError, is_auth_required, is_supabase_auth_configured, verify_supabase_user
+from services.auth_service import AuthError, is_auth_required, normalize_email, sign_in, sign_out, sign_up, verify_access_token
 from services.rate_limit_service import RateLimitExceeded, build_limiter
 from services.disease_rule_service import (
     build_disease_rules_response,
@@ -73,69 +81,100 @@ load_local_env()
 
 BASE_DIR = os.path.dirname(__file__)
 
-def connect_postgres(url: str):
-    """連 Postgres，SSL 依主機決定。
-
-    先前寫死 sslmode="require"，所以只連得上 Supabase 這種雲端資料庫；
-    本機的 Postgres 預設沒開 SSL，會直接被拒絕，等於無法在本地端建資料庫。
-    網址自己指定 sslmode 時以它為準。
-    """
-    if "sslmode=" in url:
-        return psycopg2.connect(url)
-    local = any(host in url for host in ("@localhost", "@127.0.0.1", "@host.docker.internal", "@db:"))
-    return psycopg2.connect(url, sslmode="prefer" if local else "require")
-
-
-pg_conn = None
-database_url = os.environ.get("DATABASE_URL")
-if database_url:
+# ─── 資料庫：本機的 SQLite 檔案 ───────────────────────────────
+# 帳號、健康檔案、飲食紀錄、店家菜單都存在這一個檔案。位置見 sqlite_db.py，
+# 可以用 DATABASE_PATH 改；設成空字串就不用資料庫，資料只存在記憶體。
+sql_db = None
+database_path = resolve_database_path()
+if database_path:
     try:
-        pg_conn = connect_postgres(database_url)
-        pg_conn.autocommit = True
-        print("[OK] PostgreSQL connected")
+        sql_db = SqliteDatabase(database_path)
+        print(f"[OK] SQLite database: {database_path}")
     except Exception as e:
-        pg_conn = None
-        print(f"[WARN] PostgreSQL unavailable - {e}")
+        sql_db = None
+        print(f"[WARN] SQLite unavailable ({database_path}) - {e}")
 
-# ─── Optional MongoDB (graceful fallback to in-memory) ────────
+# ─── Optional MongoDB (only when SQLite is off) ──────────────
 mongo = None
-try:
-    from pymongo import MongoClient
-    MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
-    mongo = MongoClient(MONGO_URI, serverSelectionTimeoutMS=2000)
-    mongo.server_info()  # trigger connection check
-    db = mongo["nutrilens"]
-    USE_MONGO = True
-    print("[OK] MongoDB connected")
-except Exception:
-    if mongo is not None:
-        mongo.close()
-    USE_MONGO = False
-    db = None
-    print("[WARN] MongoDB unavailable - using in-memory storage")
+USE_MONGO = False
+db = None
+if sql_db is None:
+    try:
+        from pymongo import MongoClient
+        MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
+        mongo = MongoClient(MONGO_URI, serverSelectionTimeoutMS=2000)
+        mongo.server_info()  # trigger connection check
+        db = mongo["nutrilens"]
+        USE_MONGO = True
+        print("[OK] MongoDB connected")
+    except Exception:
+        if mongo is not None:
+            mongo.close()
+        USE_MONGO = False
+        db = None
+        print("[WARN] MongoDB unavailable - using in-memory storage")
 
 # ─── In-memory fallback storage ──────────────────────────────
 _mem_users = {}
 _mem_records = []
 _mem_custom_foods = []
-# 店家菜單快取可以放另一個 Supabase／Postgres；沒設定就跟其他資料同一個
-menu_pg_conn = None
-menu_database_url = os.environ.get("MENU_DATABASE_URL")
-if menu_database_url:
-    try:
-        menu_pg_conn = connect_postgres(menu_database_url)
-        menu_pg_conn.autocommit = True
-        print("[OK] Menu cache PostgreSQL connected")
-    except Exception as e:
-        menu_pg_conn = None
-        print(f"[WARN] Menu cache PostgreSQL unavailable, falling back to main database - {e}")
 
-storage = StorageRepository(
-    db, USE_MONGO, _mem_users, _mem_records, _mem_custom_foods,
-    pg_conn=pg_conn, menu_pg_conn=menu_pg_conn,
-)
+storage = StorageRepository(db, USE_MONGO, _mem_users, _mem_records, _mem_custom_foods, sql=sql_db)
+# 帳號跟著資料庫走。沒有資料庫時帳號只存在記憶體，重啟就要重新註冊。
+auth_repo = AuthRepository(sql_db)
+if sql_db is None:
+    print("[WARN] 帳號存在記憶體裡，後端重啟後要重新註冊")
 
 app = Flask(__name__)
+
+# 一張 8 MB 的照片轉成 Base64 約 10.7 MB，再加上 JSON。先前沒有上限，
+# 一個超大的請求會整個讀進記憶體才被拒絕。
+MAX_REQUEST_BYTES = 12 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = MAX_REQUEST_BYTES
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_request_too_large(_error):
+    return jsonify({"error": "上傳的資料太大了，照片請小於 8 MB。"}), 413
+
+
+def _is_loopback(address: str | None) -> bool:
+    try:
+        ip = ipaddress.ip_address((address or "").strip())
+    except ValueError:
+        return False
+    mapped = getattr(ip, "ipv4_mapped", None)
+    return (mapped or ip).is_loopback
+
+
+# cloudflared 跑在這台電腦上，轉送進來的請求 remote_addr 也是 127.0.0.1，
+# 但一定帶著這些標頭。有它們就是從外面經 tunnel 進來的。
+_PROXY_HEADERS = ("Cf-Connecting-Ip", "X-Forwarded-For", "Forwarded")
+
+
+def is_local_request() -> bool:
+    """請求是不是從執行後端的這台電腦本身發出的。"""
+    return _is_loopback(request.remote_addr) and not any(request.headers.get(h) for h in _PROXY_HEADERS)
+
+
+def client_ip() -> str:
+    """真正的來源 IP。
+
+    先前直接採信 X-Forwarded-For，那是請求方自己可以填的：每次換一個值，
+    以 IP 計的限流就形同虛設。現在只有在請求是本機的 cloudflared 轉送時，
+    才採用 Cloudflare 填的 Cf-Connecting-Ip（Cloudflare 會覆寫請求方送的同名標頭）。
+    """
+    remote = request.remote_addr or "unknown"
+    if _is_loopback(remote):
+        forwarded = (request.headers.get("Cf-Connecting-Ip") or "").strip()
+        if forwarded:
+            return forwarded
+    return remote
+
+
+def require_local_request(action: str) -> None:
+    if not is_local_request():
+        raise AuthError(f"{action}只能在執行後端的那台電腦上操作。", 403)
 
 # CORS 先前是完全開放的：任何網站都能從瀏覽器呼叫這個後端，包括會花錢的
 # 那幾條路由。預設只允許自己的前端，要多開就用 ALLOWED_ORIGINS 明確列出。
@@ -167,16 +206,34 @@ else:
     # 「任何 onrender.com」等於誰都能在 Render 上架個網站來打這個後端。
     CORS(app, origins=[
         "http://localhost:8081",
+        "http://localhost:8083",
         "http://localhost:19006",
         "http://127.0.0.1:8081",
-        "https://nutrilens-frontend-32ob.onrender.com",
-        "https://personalized-food-recommendation-frontend-rt1v.onrender.com",
+        "http://127.0.0.1:8083",
     ])
-    print(
-        "[WARN] ALLOWED_ORIGINS 未設定，改用內建的前端清單。"
-        "新部署的前端會拿到新網址，不在清單內就會被 CORS 擋掉——"
-        "請把前端網址設進 ALLOWED_ORIGINS。"
-    )
+    print("[OK] CORS 放行本機的開發伺服器；其他網址請設 ALLOWED_ORIGINS")
+
+
+@app.after_request
+def allow_other_ports_on_this_machine(response):
+    """用區網 IP 或 VPN 位址開 8081 的開發伺服器時，網頁跟後端是同一台電腦、不同埠。
+
+    內建清單只有 localhost，換成 192.168.x.x 開網站就會被 CORS 擋掉。主機名稱
+    跟後端被連的那個一樣，就代表是同一台電腦上的網站，放行。
+    """
+    origin = request.headers.get("Origin")
+    if not origin or response.headers.get("Access-Control-Allow-Origin"):
+        return response
+    if urlparse(origin).hostname != urlparse(f"//{request.host}").hostname:
+        return response
+    response.headers["Access-Control-Allow-Origin"] = origin
+    response.headers.add("Vary", "Origin")
+    if request.method == "OPTIONS":
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = (
+            request.headers.get("Access-Control-Request-Headers") or "Authorization, Content-Type"
+        )
+    return response
 
 # 會呼叫 Gemini / Google Places 的路由要限流，那些都是按次計費的
 _paid_api_limiter = build_limiter("RATE_LIMIT_PAID_CALLS", 12)
@@ -184,8 +241,12 @@ _general_limiter = build_limiter("RATE_LIMIT_GENERAL_CALLS", 120)
 
 
 def _client_key() -> str:
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    return (forwarded.split(",")[0].strip() or request.remote_addr or "unknown")
+    # 登入過就以帳號計。學校 Wi-Fi 或 tunnel 後面整班共用同一個對外 IP，
+    # 以 IP 計的話一個人用完額度，全班都被擋。各路由都是先驗證身分再限流。
+    user = getattr(request, "_cached_auth_user", None)
+    if user and user.get("id"):
+        return f"user:{user['id']}"
+    return client_ip()
 
 
 def enforce_rate_limit(limiter, bucket: str) -> None:
@@ -214,7 +275,7 @@ def get_request_user_id():
     if not is_auth_required():
         return None
     if not hasattr(request, "_cached_auth_user"):
-        request._cached_auth_user = verify_supabase_user(request.headers.get("Authorization"))
+        request._cached_auth_user = verify_access_token(auth_repo, request.headers.get("Authorization"))
     return request._cached_auth_user["id"]
 
 
@@ -233,6 +294,67 @@ def require_user_access(user_id: str | None):
 @app.errorhandler(AuthError)
 def handle_auth_error(error):
     return jsonify({"error": str(error)}), error.status_code
+
+
+# 登入與註冊要限流，不然一個迴圈就能一直猜密碼。同一個帳號限得緊；
+# 同一個 IP 放寬一點——全班在同一個 Wi-Fi 下同時註冊時，對外是同一個 IP。
+_auth_limiter = build_limiter("RATE_LIMIT_AUTH_CALLS", 10)
+_auth_ip_limiter = build_limiter("RATE_LIMIT_AUTH_IP_CALLS", 60)
+
+
+def enforce_auth_rate_limit(email) -> None:
+    enforce_rate_limit(_auth_ip_limiter, "auth-ip")
+    # 同一個帳號不論從哪裡來都一起算，換來源 IP 也繞不過去
+    _auth_limiter.check(f"auth:{normalize_email(email)}")
+
+
+def signup_mode() -> str:
+    """open：直接註冊；code：要邀請碼；closed：不開放。
+
+    在這台電腦上永遠可以註冊。從其他裝置或 tunnel 來的，要有主人設定的
+    SIGNUP_CODE 才能註冊——不然任何拿到網址的人都能註冊、花你的 Gemini 額度。
+    """
+    if is_local_request():
+        return "open"
+    return "code" if (os.environ.get("SIGNUP_CODE") or "").strip() else "closed"
+
+
+@app.route("/auth/config", methods=["GET"])
+def auth_config():
+    return jsonify({"signup": signup_mode()})
+
+
+@app.route("/auth/signup", methods=["POST"])
+def auth_signup():
+    data = request.get_json(silent=True) or {}
+    enforce_auth_rate_limit(data.get("email"))
+    mode = signup_mode()
+    if mode == "closed":
+        raise AuthError("這個網址目前不開放註冊，請向網站主人索取邀請碼。", 403)
+    if mode == "code":
+        expected = (os.environ.get("SIGNUP_CODE") or "").strip()
+        given = str(data.get("invite_code") or "").strip()
+        if not hmac.compare_digest(given.encode("utf-8"), expected.encode("utf-8")):
+            raise AuthError("邀請碼不對，請再確認一次。", 403)
+    return jsonify(sign_up(auth_repo, data.get("email"), data.get("password"))), 201
+
+
+@app.route("/auth/login", methods=["POST"])
+def auth_login():
+    data = request.get_json(silent=True) or {}
+    enforce_auth_rate_limit(data.get("email"))
+    return jsonify(sign_in(auth_repo, data.get("email"), data.get("password")))
+
+
+@app.route("/auth/logout", methods=["POST"])
+def auth_logout():
+    sign_out(auth_repo, request.headers.get("Authorization"))
+    return jsonify({"ok": True})
+
+
+@app.route("/auth/user", methods=["GET"])
+def auth_user():
+    return jsonify({"user": verify_access_token(auth_repo, request.headers.get("Authorization"))})
 
 # ─── Load nutrition databases ────────────────────────────────
 # 1. Original hand-crafted DB (legacy fallback candidates)
@@ -271,6 +393,8 @@ STARTED_AT = app_now().isoformat()
 
 @app.route("/", methods=["GET"])
 def index():
+    if frontend_available():
+        return serve_frontend("index.html")
     return jsonify({
         "name": "Personalized Food Recommendation Backend",
         "status": "ok",
@@ -288,8 +412,9 @@ def index():
 def health():
     return jsonify({
         "status": "ok",
-        "postgres": pg_conn is not None,
-        "menu_cache_database": "separate" if menu_pg_conn is not None else ("shared" if pg_conn is not None else "memory"),
+        "database": "sqlite" if sql_db is not None else ("mongo" if USE_MONGO else "memory"),
+        # 路徑裡有 Windows 使用者名稱，只給這台電腦自己看
+        "database_path": database_path if sql_db is not None and is_local_request() else None,
         "cached_restaurant_menus": storage.count_restaurant_menus(),
         "mongo": USE_MONGO,
         "recognition_engine": "gemini-vision-db-lookup",
@@ -300,7 +425,7 @@ def health():
         "restaurants": len(RESTAURANT_CATALOG),
         "places_enabled": bool(os.environ.get("GOOGLE_PLACES_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY")),
         "auth_required": is_auth_required(),
-        "supabase_auth_configured": is_supabase_auth_configured(),
+        "auth_provider": "local-sqlite" if auth_repo.use_sql else "local-memory",
         "custom_foods": len(storage.get_custom_foods()),
         # 部署後可以直接從 /health 看出線上跑的是哪一版，不用靠路由存不存在來猜。
         # RENDER_GIT_BRANCH / RENDER_GIT_COMMIT 由 Render 自動注入。
@@ -757,6 +882,8 @@ def index_nearby_restaurants(user_id):
 
 @app.route("/health/gemini", methods=["GET"])
 def gemini_model_diagnostics():
+    # 會列出每把金鑰的開頭與權限，是給主人除錯用的，不開放給一般使用者
+    require_local_request("金鑰診斷")
     require_authenticated_user()
     enforce_rate_limit(_paid_api_limiter, "gemini-probe")
     """每把金鑰實際能用哪些模型。設定的清單對不上權限時只會看到一堆 404。"""
@@ -800,6 +927,8 @@ def list_nearby_restaurant_index(user_id):
 def clear_nearby_restaurant_index(user_id):
     """清空店家菜單快取，讓建檔可以用目前的規則重來一次。"""
     require_user_access(user_id)
+    # 菜單快取是所有人共用的；先前任何登入者都能一鍵清掉全部人的
+    require_local_request("清除菜單檔案")
     removed = storage.clear_restaurant_menus()
     # 重建就是要照新規則重來，先前問不出菜單的店也要再問一次
     storage.clear_restaurant_menu_failures()
@@ -850,6 +979,18 @@ def map_food_recommend(user_id):
     return jsonify(result)
 
 
+def _coordinate(value, default: float, low: float, high: float) -> float:
+    if value is None or value == "":
+        return default
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(value) from error
+    if not math.isfinite(number) or not low <= number <= high:
+        raise ValueError(value)
+    return number
+
+
 @app.route("/restaurant/menu", methods=["POST"])
 def get_restaurant_menu():
     """
@@ -885,6 +1026,13 @@ def get_restaurant_menu():
     
     if not name:
         return jsonify({"error": "缺少 restaurant name"}), 400
+
+    # 先前 lng 沒帶時預設成緯度 25.0338（抄錯欄位），座標不是數字時 float() 直接 500
+    try:
+        venue_lat = _coordinate(data.get("lat"), 25.0338, -90, 90)
+        venue_lng = _coordinate(data.get("lng"), 121.5645, -180, 180)
+    except ValueError:
+        return jsonify({"error": "lat / lng 必須是有效的座標"}), 400
 
     # 1. 先看資料庫裡建檔過的菜單，再退回內建目錄
     cached = storage.get_restaurant_menu(name)
@@ -927,8 +1075,8 @@ def get_restaurant_menu():
             matched = {
                 "restaurant_id": new_id,
                 "name": name,
-                "lat": float(data.get("lat") or 25.0338),
-                "lng": float(data.get("lng") or 121.5645),
+                "lat": venue_lat,
+                "lng": venue_lng,
                 "address": address or "台灣",
                 "phone": "",
                 "open_hours": ["11:00-21:00"],
@@ -936,11 +1084,9 @@ def get_restaurant_menu():
                 "price_level": 2,
                 "items": recognized_items
             }
-            storage.save_restaurant_menu(name, recognized_items, venue={
-                "address": address or "台灣",
-                "lat": float(data.get("lat") or 25.0338),
-                "lng": float(data.get("lng") or 25.0338),
-            })
+            # 照片是使用者自己上傳的，辨識結果只給這次的回應用，不寫進所有人共用的
+            # 菜單快取：先前任何人都能拿一張假菜單，替任何店家名稱「建檔」，
+            # 其他人的推薦就會照那份假資料篩選。
     elif not matched:
         # 2. 本地不存在 ➔ 呼叫爬蟲與 Gemini 即時分析
         print(f"[Scraper] 即時線上擷取並生成 {name} 的菜單")
@@ -951,8 +1097,8 @@ def get_restaurant_menu():
         matched = {
             "restaurant_id": new_id,
             "name": name,
-            "lat": float(data.get("lat") or 25.0338),
-            "lng": float(data.get("lng") or 121.5645),
+            "lat": venue_lat,
+            "lng": venue_lng,
             "address": address or "台灣",
             "phone": "",
             "open_hours": ["11:00-21:00"],
@@ -1134,19 +1280,104 @@ def calc_bmr():
     return jsonify(build_bmr_response(data))
 
 
+# ─── 網站本身（frontend/dist）─────────────────────────────────
+# 先執行 `npm --prefix frontend run build:local`，後端就把網站跟 API 放在同一個埠：
+# 手機、同一個 Wi-Fi 或 VPN 的電腦、透過 tunnel 從外面連，都只要開一個網址，
+# 也不會有跨網域（CORS）的問題。沒打包過就只提供 API。
+FRONTEND_DIST = os.path.abspath(
+    os.environ.get("FRONTEND_DIST") or os.path.join(BASE_DIR, "..", "frontend", "dist")
+)
+
+
+def frontend_available() -> bool:
+    return os.path.isfile(os.path.join(FRONTEND_DIST, "index.html"))
+
+
+def serve_frontend(path: str):
+    candidates = [path, f"{path}.html"] if path else ["index.html"]
+    found = next(
+        (name for name in candidates if (full := safe_join(FRONTEND_DIST, name)) and os.path.isfile(full)),
+        None,
+    )
+    if found is None:
+        # JS、圖片找不到就是找不到；頁面路徑交給 index.html，由前端路由處理
+        if path.startswith(("_expo/", "assets/")) or os.path.splitext(path)[1]:
+            return jsonify({"error": "找不到這個檔案"}), 404
+        found = "index.html"
+    response = send_from_directory(FRONTEND_DIST, found)
+    # 打包出來的 JS 檔名帶內容雜湊，可以放心長期快取；頁面本身每次都要重新確認
+    if found.startswith(("_expo/static/", "assets/")):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    else:
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
+@app.route("/<path:path>", methods=["GET"])
+def frontend_files(path):
+    if not frontend_available():
+        return jsonify({"error": "找不到這個 API"}), 404
+    return serve_frontend(path)
+
+
+def share_addresses() -> tuple[str | None, list[str]]:
+    """（主要網路的 IP, 其他網卡的 IP）。
+
+    電腦上常有 WSL、虛擬機、VPN 的虛擬網卡，全部列出來分不出該用哪一個。
+    主要網路 = 對外連線會走的那張網卡；用 UDP 「連」一個外部位址只是問作業系統
+    會走哪張網卡，不會真的送出封包。
+    """
+    primary = None
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.connect(("8.8.8.8", 80))
+            primary = probe.getsockname()[0]
+    except OSError:
+        pass
+    others = set()
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            others.add(info[4][0])
+    except OSError:
+        pass
+    others = sorted(ip for ip in others if ip != primary and not ip.startswith("127."))
+    return (primary if primary and not primary.startswith("127.") else None), others
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    # 預設只有這台電腦連得到。先前一律開在 0.0.0.0，加上防火牆對「公用網路」也放行
+    # python，在咖啡店的 Wi-Fi 上同一個網路的人都連得進來。要給同一個 Wi-Fi 或 VPN
+    # 的裝置用，才加 --lan。cloudflared 是從本機連進來的，不需要 --lan。
+    share_on_lan = "--lan" in sys.argv[1:] or os.environ.get("SHARE_ON_LAN", "").lower() == "true"
+    host = "0.0.0.0" if share_on_lan else "127.0.0.1"
+    if frontend_available():
+        print(f"[OK] 網站：http://localhost:{port}")
+        if share_on_lan:
+            primary, others = share_addresses()
+            if primary:
+                print(f"     同一個網路的手機或電腦：http://{primary}:{port}")
+            if others:
+                print("     其他網卡（VPN、虛擬機）：" + "、".join(f"http://{ip}:{port}" for ip in others))
+            if not (os.environ.get("SIGNUP_CODE") or "").strip():
+                print("     其他裝置只能登入、不能註冊；要開放註冊請在 backend/.env.local 設 SIGNUP_CODE")
+        else:
+            print("     只有這台電腦連得到；要給同一個 Wi-Fi 的裝置用，改用 python backend/app.py --lan")
+    else:
+        print("[INFO] 還沒打包網站，只提供 API。要讓其他裝置連，先執行 npm --prefix frontend run build:local")
     debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     if debug:
-        app.run(debug=True, host="0.0.0.0", port=port)
+        # 除錯模式的錯誤頁可以執行程式碼，絕對不能讓別台電腦連到
+        print("[WARN] FLASK_DEBUG 開啟中，只綁定 127.0.0.1")
+        app.run(debug=True, host="127.0.0.1", port=port)
     else:
         # Flask 內建伺服器是單執行緒的開發用伺服器，它自己也會警告
         # 「Do not use it in a production deployment」。正式環境用 waitress。
         try:
             from waitress import serve
 
-            print(f"[OK] Serving with waitress on port {port}")
-            serve(app, host="0.0.0.0", port=port, threads=8)
+            print(f"[OK] Serving with waitress on {host}:{port}")
+            serve(app, host=host, port=port, threads=8, max_request_body_size=MAX_REQUEST_BYTES)
         except ImportError:
             print("[WARN] waitress 未安裝，退回 Flask 開發伺服器（僅適合本機）")
-            app.run(debug=False, host="0.0.0.0", port=port)
+            app.run(debug=False, host=host, port=port)

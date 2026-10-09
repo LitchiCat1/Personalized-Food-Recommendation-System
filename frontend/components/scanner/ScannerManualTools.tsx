@@ -66,13 +66,16 @@ export default function ScannerManualTools({
         </View>
         <View style={styles.manualSearchRow}>
           <TextInput
+            accessibilityLabel="搜尋食品名稱"
             value={manualQuery}
             onChangeText={onManualQueryChange}
+            onSubmitEditing={onManualSearch}
+            returnKeyType="search"
             placeholder="輸入食品名稱，例如：白飯"
             placeholderTextColor={Palette.text.muted}
             style={styles.manualInput}
           />
-          <Pressable onPress={onManualSearch} style={styles.manualButton}>
+          <Pressable accessibilityRole="button" accessibilityLabel="搜尋" aria-busy={manualSearching} onPress={onManualSearch} style={styles.manualButton}>
             {manualSearching ? (
               <ActivityIndicator size="small" color={Palette.text.inverse} />
             ) : (
@@ -80,7 +83,7 @@ export default function ScannerManualTools({
             )}
           </Pressable>
         </View>
-        <Pressable onPress={onOCRSearch} style={styles.ocrButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel="辨識營養標示照片" aria-busy={ocrQuerying} onPress={onOCRSearch} style={styles.ocrButton}>
           {ocrQuerying ? (
             <ActivityIndicator size="small" color={Palette.accent.blue} />
           ) : (

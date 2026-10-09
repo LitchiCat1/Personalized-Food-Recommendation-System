@@ -362,6 +362,33 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertEqual(result["summary"]["total_items"], 1)
         self.assertTrue(result["detections"][0]["warnings"])
 
+    def _scan_one(self, detected_name, tfda_entry, conditions, allergens):
+        base = os.path.dirname(os.path.dirname(__file__))
+        parsed = {"items": [{"name_zh": detected_name, "confidence": 0.98, "estimated_weight_g": 50}]}
+        return build_vision_food_response(
+            parsed, FakeStorage(), {tfda_entry["name_zh"]: tfda_entry},
+            load_disease_rules(base), load_allergen_taxonomy(base),
+            conditions, allergens, "demo_user", lambda food: food,
+        )["detections"][0]["warnings"]
+
+    def test_scanned_food_is_checked_by_name_when_the_database_has_no_allergen_tags(self):
+        # TFDA 的品項沒有標過敏原。先前掃描只把營養數字送去檢查、名字沒帶過去，
+        # 對蛋過敏的人拍一顆荷包蛋，畫面上一句提醒都沒有。
+        egg = {"name_zh": "荷包蛋(不加油)", "calories": 162, "protein": 14, "fat": 11.2, "carbs": 1.4,
+               "sodium": 151, "allergens": [], "source": "TFDA"}
+
+        warnings = self._scan_one("荷包蛋", egg, [], ["egg"])
+
+        self.assertIn("含有或疑似含有過敏原：蛋", warnings)
+
+    def test_scanned_food_hits_disease_keywords_by_name(self):
+        liver = {"name_zh": "豬肝湯", "calories": 60, "protein": 9, "fat": 2, "carbs": 1,
+                 "sodium": 400, "allergens": [], "source": "TFDA"}
+
+        warnings = self._scan_one("豬肝湯", liver, ["gout"], [])
+
+        self.assertTrue(any("豬肝" in w for w in warnings), warnings)
+
     def test_profile_build_normalizes_medical_tags(self):
         rules = load_disease_rules(os.path.dirname(os.path.dirname(__file__)))
         taxonomy = load_allergen_taxonomy(os.path.dirname(os.path.dirname(__file__)))

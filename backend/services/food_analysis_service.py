@@ -55,7 +55,8 @@ def check_food_safety(
 
     risk_result = evaluate_medical_risk(
         {
-            "label": nutrients.get("name_zh") or nutrients.get("label"),
+            # 兩個名字都要比對：辨識出來的名稱跟資料庫對到的品名可能不同
+            "label": nutrients.get("label") or nutrients.get("name_zh"),
             "name_zh": nutrients.get("name_zh"),
             "gi": nutrients.get("gi"),
             "allergens": nutrients.get("allergens", []),

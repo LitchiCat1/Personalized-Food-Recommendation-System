@@ -122,6 +122,10 @@ def build_vision_food_response(
 
         needs_confirmation = confidence < 0.75 or len(food_matches) > 1
         nutrients = {
+            # 過敏原與疾病禁忌（例如痛風的豬肝）是比對名稱找出來的；TFDA 的品項
+            # 沒有標過敏原，名字沒帶進來的話，對蛋過敏的人拍荷包蛋也不會被提醒。
+            "label": name_zh,
+            "name_zh": matched_food.get("name_zh") or name_zh,
             "calories": matched_food.get("calories", 0),
             "protein": matched_food.get("protein", 0),
             "fat": matched_food.get("fat", 0),

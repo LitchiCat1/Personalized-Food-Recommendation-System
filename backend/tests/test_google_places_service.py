@@ -70,6 +70,17 @@ class GooglePlacesServiceTests(unittest.TestCase):
         self.assertEqual(places[0]["url"], "https://maps.google.com/?cid=456")
         self.assertIn("places.websiteUri", mock_post.call_args.kwargs["headers"]["X-Goog-FieldMask"])
 
+    @patch("services.google_places_service.requests.post")
+    def test_new_places_search_asks_for_traditional_chinese_names(self, mock_post):
+        # 沒指定語言時新版 API 回英文店名（Fu Hang Soy Milk 而不是阜杭豆漿）
+        mock_post.return_value = FakeResponse(200, {"places": []})
+
+        _fetch_new_places_api(25.0338, 121.5645, 3000, "test-key")
+
+        payload = mock_post.call_args.kwargs["json"]
+        self.assertEqual(payload["languageCode"], "zh-TW")
+        self.assertEqual(payload["regionCode"], "TW")
+
     @patch.dict(os.environ, {"GOOGLE_PLACES_API_KEY": "test-key", "GOOGLE_MAPS_API_KEY": ""}, clear=False)
     @patch("services.google_places_service._fetch_new_places_api")
     def test_repeated_search_reuses_cache_instead_of_billing_again(self, mock_new):

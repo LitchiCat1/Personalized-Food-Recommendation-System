@@ -329,6 +329,10 @@ def _fetch_new_places_api(lat: float, lng: float, radius_m: float, key: str, max
     payload = {
         "includedTypes": ["restaurant"],
         "maxResultCount": max(1, min(int(max_results), 20)),
+        # 沒指定的話新版 API 回英文店名與地址（Fu Hang Soy Milk 而不是阜杭豆漿），
+        # 舊版那條路有帶 language=zh-TW，這條漏了。
+        "languageCode": "zh-TW",
+        "regionCode": "TW",
         "locationRestriction": {
             "circle": {
                 "center": {

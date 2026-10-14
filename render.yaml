@@ -62,6 +62,7 @@ services:
       - key: AUTH_REQUIRED
         value: "true"
       # Render 上每個連線都算其他裝置；不開放的話沒有人能註冊。
+      # 後端在 Render 上沒設這個也會當作開放，要關掉就設 "false"。
       - key: OPEN_SIGNUP
         value: "true"
       - key: APP_UTC_OFFSET_HOURS

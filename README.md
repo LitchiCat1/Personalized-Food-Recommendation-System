@@ -99,6 +99,7 @@ python backend/app.py
 1. 在 `backend/.env.local` 設一組邀請碼，例如 `SIGNUP_CODE=nutri-2026`。其他裝置註冊時要輸入它；
    沒設的話其他裝置只能登入已經有的帳號、不能註冊（在這台電腦上永遠可以註冊）。
    要讓所有人不用邀請碼就能註冊，改設 `OPEN_SIGNUP=true`。
+   放在 Render 上時沒設就是開放註冊，要關掉請在 Render 後台設 `OPEN_SIGNUP=false`。
 2. 依對方在哪裡選一種：
    - **同一個 Wi-Fi 或 VPN（例如 Radmin）**：用 `python backend/app.py --lan` 啟動，
      後端會印出「同一個網路的手機或電腦：http://192.168.x.x:5000」，在對方的瀏覽器打開即可。

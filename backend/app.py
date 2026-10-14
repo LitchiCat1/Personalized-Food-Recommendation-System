@@ -314,8 +314,10 @@ def signup_mode() -> str:
     在這台電腦上永遠可以註冊。從其他裝置或 tunnel 來的，要有主人設定的
     SIGNUP_CODE 才能註冊——不然任何拿到網址的人都能註冊、花你的 Gemini 額度。
     主人設 OPEN_SIGNUP=true 就是明白要開放給所有人，不用邀請碼。
+    Render 上（會自動設 RENDER）沒設 OPEN_SIGNUP 就當作開放；設 OPEN_SIGNUP=false 才關。
     """
-    if is_local_request() or os.environ.get("OPEN_SIGNUP", "").lower() == "true":
+    open_signup = os.environ.get("OPEN_SIGNUP", "true" if os.environ.get("RENDER") else "").lower()
+    if is_local_request() or open_signup == "true":
         return "open"
     return "code" if (os.environ.get("SIGNUP_CODE") or "").strip() else "closed"
 

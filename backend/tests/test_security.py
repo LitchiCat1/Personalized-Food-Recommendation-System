@@ -105,6 +105,16 @@ class SignupGateTests(ApiTestBase):
             self.assertEqual(self.signup("guest@example.com", environ_base=LAN).status_code, 201)
             self.assertEqual(self.signup("guest2@example.com", headers=TUNNEL_HEADERS).status_code, 201)
 
+    def test_render_is_open_unless_turned_off(self):
+        # Render 上每個連線都算其他裝置，環境變數要到後台設；沒設就預設開放
+        with patch.dict(os.environ, {"RENDER": "true", "SIGNUP_CODE": ""}):
+            os.environ.pop("OPEN_SIGNUP", None)
+            self.assertEqual(self.client.get("/auth/config", environ_base=LAN).get_json()["signup"], "open")
+            self.assertEqual(self.signup("guest@example.com", environ_base=LAN).status_code, 201)
+        with patch.dict(os.environ, {"RENDER": "true", "OPEN_SIGNUP": "false", "SIGNUP_CODE": ""}):
+            self.assertEqual(self.client.get("/auth/config", environ_base=LAN).get_json()["signup"], "closed")
+            self.assertEqual(self.signup("guest2@example.com", environ_base=LAN).status_code, 403)
+
     def test_existing_accounts_can_still_log_in_from_other_devices(self):
         self.signup("owner@example.com")
         response = self.client.post(

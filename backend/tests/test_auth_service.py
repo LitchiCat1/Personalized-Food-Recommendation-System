@@ -39,7 +39,7 @@ class LocalAuthTests(unittest.TestCase):
             with self.assertRaises(AuthError) as caught:
                 sign_in(self.repo, email, password)
             self.assertEqual(caught.exception.status_code, 401)
-            self.assertEqual(str(caught.exception), "Email 或密碼不對。")
+            self.assertEqual(str(caught.exception), "暱稱或密碼不對。")
 
     def test_duplicate_email_is_rejected(self):
         sign_up(self.repo, "a@example.com", "secret-pass")
@@ -47,17 +47,23 @@ class LocalAuthTests(unittest.TestCase):
             sign_up(self.repo, "A@example.com", "another1")
         self.assertEqual(caught.exception.status_code, 409)
 
-    def test_short_password_and_bad_email_are_rejected(self):
-        for email, password in (("a@example.com", "1234567"), ("not-an-email", "secret-pass"), ("a@example.com", "x" * 73)):
-            with self.assertRaises(AuthError) as caught:
-                sign_up(self.repo, email, password)
-            self.assertEqual(caught.exception.status_code, 400)
+    def test_any_nickname_and_any_password_can_sign_up(self):
+        sign_up(self.repo, "  小明 ", "1")
+        self.assertTrue(sign_in(self.repo, "小明", "1")["access_token"])
+        sign_up(self.repo, "Amy", "amy")
+        self.assertEqual(sign_in(self.repo, "amy", "amy")["user"]["email"], "amy")
 
-    def test_easily_guessed_passwords_are_rejected(self):
-        for password in ("12345678", "Password", "aaaaaaaaaa", "someone1"):
+    def test_empty_or_too_long_values_are_rejected(self):
+        for nickname, password in (("", "pw"), ("   ", "pw"), ("小明", ""), ("x" * 31, "pw"), ("小明", "x" * 73)):
             with self.assertRaises(AuthError) as caught:
-                sign_up(self.repo, "someone1@example.com", password)
-            self.assertEqual(caught.exception.status_code, 400, password)
+                sign_up(self.repo, nickname, password)
+            self.assertEqual(caught.exception.status_code, 400, (nickname, password))
+
+    def test_taken_nickname_is_rejected(self):
+        sign_up(self.repo, "小明", "1")
+        with self.assertRaises(AuthError) as caught:
+            sign_up(self.repo, "小明", "2")
+        self.assertEqual(caught.exception.status_code, 409)
 
     def test_sign_out_invalidates_only_that_token(self):
         sign_up(self.repo, "a@example.com", "secret-pass")
@@ -135,7 +141,7 @@ class AuthRouteTests(ApiTestBase):
         self.signup()
         wrong = self.client.post("/auth/login", json={"email": "route@example.com", "password": "nope-nope"})
         self.assertEqual(wrong.status_code, 401)
-        self.assertEqual(wrong.get_json()["error"], "Email 或密碼不對。")
+        self.assertEqual(wrong.get_json()["error"], "暱稱或密碼不對。")
 
         duplicate = self.signup()
         self.assertEqual(duplicate.status_code, 409)

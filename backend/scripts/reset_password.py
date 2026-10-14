@@ -2,10 +2,10 @@
 
 本地端沒有寄信功能，忘記密碼時就在這台電腦上執行（在專案根目錄）：
 
-    python backend/scripts/reset_password.py someone@example.com
+    python backend/scripts/reset_password.py 小明
 
 會要求輸入兩次新密碼（輸入時畫面上不會顯示）。重設後，這個帳號在每個裝置
-上都要重新登入。不帶 Email 執行會列出所有帳號。
+上都要重新登入。不帶暱稱執行會列出所有帳號（舊帳號的暱稱就是它的 Email）。
 """
 
 import getpass
@@ -36,7 +36,7 @@ def main() -> int:
         print(f"共 {len(rows)} 個帳號：")
         for row in rows:
             print(f"  {row['email']}（{(row['created_at'] or '')[:10]} 建立）")
-        print("\n用法：python backend/scripts/reset_password.py <Email>")
+        print("\n用法：python backend/scripts/reset_password.py <暱稱>")
         return 0
 
     email = sys.argv[1]

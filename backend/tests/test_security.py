@@ -32,6 +32,19 @@ class RequestOriginTests(ApiTestBase):
             self.assertTrue(self.app_module.is_local_request())
 
 
+class BindHostTests(ApiTestBase):
+    def test_only_this_machine_by_default(self):
+        self.assertEqual(self.app_module.bind_host([], {}), "127.0.0.1")
+
+    def test_lan_flag_opens_every_network(self):
+        self.assertEqual(self.app_module.bind_host(["--lan"], {}), "0.0.0.0")
+        self.assertEqual(self.app_module.bind_host([], {"SHARE_ON_LAN": "true"}), "0.0.0.0")
+
+    def test_render_needs_every_network(self):
+        # Render 只看 0.0.0.0 上有沒有開埠；綁 127.0.0.1 會部署失敗、一直跑舊版
+        self.assertEqual(self.app_module.bind_host([], {"RENDER": "true"}), "0.0.0.0")
+
+
 class LoginLimitTests(ApiTestBase):
     def setUp(self):
         super().setUp()
@@ -85,6 +98,12 @@ class SignupGateTests(ApiTestBase):
             self.assertEqual(self.client.get("/auth/config", headers=TUNNEL_HEADERS).get_json()["signup"], "code")
             self.assertEqual(self.signup("a@example.com", "wrong", headers=TUNNEL_HEADERS).status_code, 403)
             self.assertEqual(self.signup("b@example.com", "nutri-2026", headers=TUNNEL_HEADERS).status_code, 201)
+
+    def test_open_signup_lets_every_device_sign_up_without_a_code(self):
+        with patch.dict(os.environ, {"OPEN_SIGNUP": "true", "SIGNUP_CODE": ""}):
+            self.assertEqual(self.client.get("/auth/config", headers=TUNNEL_HEADERS).get_json()["signup"], "open")
+            self.assertEqual(self.signup("guest@example.com", environ_base=LAN).status_code, 201)
+            self.assertEqual(self.signup("guest2@example.com", headers=TUNNEL_HEADERS).status_code, 201)
 
     def test_existing_accounts_can_still_log_in_from_other_devices(self):
         self.signup("owner@example.com")

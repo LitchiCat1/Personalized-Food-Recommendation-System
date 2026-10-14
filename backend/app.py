@@ -313,8 +313,9 @@ def signup_mode() -> str:
 
     在這台電腦上永遠可以註冊。從其他裝置或 tunnel 來的，要有主人設定的
     SIGNUP_CODE 才能註冊——不然任何拿到網址的人都能註冊、花你的 Gemini 額度。
+    主人設 OPEN_SIGNUP=true 就是明白要開放給所有人，不用邀請碼。
     """
-    if is_local_request():
+    if is_local_request() or os.environ.get("OPEN_SIGNUP", "").lower() == "true":
         return "open"
     return "code" if (os.environ.get("SIGNUP_CODE") or "").strip() else "closed"
 
@@ -1344,13 +1345,27 @@ def share_addresses() -> tuple[str | None, list[str]]:
     return (primary if primary and not primary.startswith("127.") else None), others
 
 
+def wants_lan(argv, environ) -> bool:
+    return "--lan" in argv or environ.get("SHARE_ON_LAN", "").lower() == "true"
+
+
+def bind_host(argv, environ) -> str:
+    """預設只有這台電腦連得到。
+
+    先前一律開在 0.0.0.0，加上防火牆對「公用網路」也放行 python，在咖啡店的 Wi-Fi 上
+    同一個網路的人都連得進來。要給同一個 Wi-Fi 或 VPN 的裝置用，才加 --lan。
+    cloudflared 是從本機連進來的，不需要 --lan。
+    Render 會自動設 RENDER，而且只認 0.0.0.0 上的埠；綁 127.0.0.1 部署會失敗。
+    """
+    if wants_lan(argv, environ) or environ.get("RENDER"):
+        return "0.0.0.0"
+    return "127.0.0.1"
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    # 預設只有這台電腦連得到。先前一律開在 0.0.0.0，加上防火牆對「公用網路」也放行
-    # python，在咖啡店的 Wi-Fi 上同一個網路的人都連得進來。要給同一個 Wi-Fi 或 VPN
-    # 的裝置用，才加 --lan。cloudflared 是從本機連進來的，不需要 --lan。
-    share_on_lan = "--lan" in sys.argv[1:] or os.environ.get("SHARE_ON_LAN", "").lower() == "true"
-    host = "0.0.0.0" if share_on_lan else "127.0.0.1"
+    share_on_lan = wants_lan(sys.argv[1:], os.environ)
+    host = bind_host(sys.argv[1:], os.environ)
     if frontend_available():
         print(f"[OK] 網站：http://localhost:{port}")
         if share_on_lan:
@@ -1359,8 +1374,10 @@ if __name__ == "__main__":
                 print(f"     同一個網路的手機或電腦：http://{primary}:{port}")
             if others:
                 print("     其他網卡（VPN、虛擬機）：" + "、".join(f"http://{ip}:{port}" for ip in others))
-            if not (os.environ.get("SIGNUP_CODE") or "").strip():
-                print("     其他裝置只能登入、不能註冊；要開放註冊請在 backend/.env.local 設 SIGNUP_CODE")
+            if os.environ.get("OPEN_SIGNUP", "").lower() == "true":
+                print("     所有人都可以直接註冊（OPEN_SIGNUP=true）")
+            elif not (os.environ.get("SIGNUP_CODE") or "").strip():
+                print("     其他裝置只能登入、不能註冊；要開放註冊請在 backend/.env.local 設 SIGNUP_CODE 或 OPEN_SIGNUP=true")
         else:
             print("     只有這台電腦連得到；要給同一個 Wi-Fi 的裝置用，改用 python backend/app.py --lan")
     else:

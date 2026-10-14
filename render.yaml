@@ -61,6 +61,9 @@ services:
         sync: false
       - key: AUTH_REQUIRED
         value: "true"
+      # Render 上每個連線都算其他裝置；不開放的話沒有人能註冊。
+      - key: OPEN_SIGNUP
+        value: "true"
       - key: APP_UTC_OFFSET_HOURS
         value: "8"
       - key: GOOGLE_PLACES_API_KEY

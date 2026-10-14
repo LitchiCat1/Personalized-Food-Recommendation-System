@@ -96,7 +96,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const replaceUser = useStore((state) => state.replaceUser);
   const resetDashboard = useStore((state) => state.resetDashboard);
   const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [email, setEmail] = useState('');
+  const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   // 從其他裝置或 tunnel 連進來時，註冊要邀請碼或不開放；由後端依連線來源決定
@@ -333,8 +333,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const showPasswordResetHelp = () => {
     // 先前沒有這個入口，忘記密碼等於帳號永久鎖死。本地端不會寄信，
     // 改由跑後端的那台電腦重設。
-    const address = email.trim() || '你的 Email';
-    setMessage(`請在跑後端的電腦上執行：python backend/scripts/reset_password.py ${address}`);
+    const name = nickname.trim() || '你的暱稱';
+    setMessage(`請在跑後端的電腦上執行：python backend/scripts/reset_password.py "${name}"`);
   };
 
   const submit = async () => {
@@ -342,8 +342,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setMessage(null);
     try {
       const session = mode === 'login'
-        ? await signIn(apiBaseUrl, email.trim(), password)
-        : await signUp(apiBaseUrl, email.trim(), password, signupMode === 'code' ? inviteCode.trim() : undefined);
+        ? await signIn(apiBaseUrl, nickname.trim(), password)
+        : await signUp(apiBaseUrl, nickname.trim(), password, signupMode === 'code' ? inviteCode.trim() : undefined);
       applySession(session);
     } catch (error: any) {
       setMessage(describeAuthError(error, mode === 'login' ? '登入失敗，請稍後再試。' : '註冊失敗，請稍後再試。'));
@@ -562,18 +562,19 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         </Text>
 
         {/* placeholder 不是 label：螢幕閱讀器在欄位有輸入後就讀不到提示 */}
-        <Text style={styles.inputLabel} nativeID="auth-email-label">Email</Text>
+        <Text style={styles.inputLabel} nativeID="auth-nickname-label">暱稱</Text>
         <TextInput
-          accessibilityLabel="Email"
-          accessibilityLabelledBy="auth-email-label"
+          accessibilityLabel="暱稱"
+          accessibilityLabelledBy="auth-nickname-label"
           autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-          onChangeText={setEmail}
-          placeholder="email@example.com"
+          autoComplete="username"
+          autoCorrect={false}
+          maxLength={30}
+          onChangeText={setNickname}
+          placeholder="例如：小明"
           placeholderTextColor={Palette.text.tertiary}
           style={styles.input}
-          value={email}
+          value={nickname}
         />
         <Text style={styles.inputLabel} nativeID="auth-password-label">密碼</Text>
         <TextInput
@@ -583,7 +584,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
           onChangeText={setPassword}
           onSubmitEditing={submit}
-          placeholder="至少 8 個字元"
+          placeholder="自己記得住就好"
           placeholderTextColor={Palette.text.tertiary}
           returnKeyType="go"
           secureTextEntry

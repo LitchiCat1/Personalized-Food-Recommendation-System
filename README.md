@@ -57,7 +57,7 @@ Personalized-Food-Recommendation-System/
 - **飲食趨勢分析** — 週熱量柱狀圖 + 營養素均值 + AI 洞察
 - **飲食紀錄管理** — 日曆區間查詢 + 手動新增今日或歷史紀錄 + 編輯與刪除
 - **未知食品備援** — TFDA 搜尋 + 自訂食品 + 營養標示 OCR
-- **本機登入** — Email + 密碼登入/註冊，帳號存在本機 SQLite，Bearer token 傳遞、後端 user_id 權限檢查
+- **本機登入** — 暱稱 + 密碼登入/註冊，帳號存在本機 SQLite，Bearer token 傳遞、後端 user_id 權限檢查
 - **本機資料庫** — 帳號、飲食紀錄、店家菜單快取都存在一個 SQLite 檔，不需要雲端服務
 - **跨平台響應式** — 手機/平板/桌面自適應
 
@@ -98,6 +98,7 @@ python backend/app.py
 
 1. 在 `backend/.env.local` 設一組邀請碼，例如 `SIGNUP_CODE=nutri-2026`。其他裝置註冊時要輸入它；
    沒設的話其他裝置只能登入已經有的帳號、不能註冊（在這台電腦上永遠可以註冊）。
+   要讓所有人不用邀請碼就能註冊，改設 `OPEN_SIGNUP=true`。
 2. 依對方在哪裡選一種：
    - **同一個 Wi-Fi 或 VPN（例如 Radmin）**：用 `python backend/app.py --lan` 啟動，
      後端會印出「同一個網路的手機或電腦：http://192.168.x.x:5000」，在對方的瀏覽器打開即可。
@@ -128,7 +129,7 @@ npm --prefix frontend run web         # 網站 http://localhost:8081
 
 其他工具：
 
-- 忘記密碼：`python backend/scripts/reset_password.py 某人@example.com`（不帶 Email 會列出所有帳號）。
+- 忘記密碼：`python backend/scripts/reset_password.py 小明`（不帶暱稱會列出所有帳號）。
 - 備份：後端關掉後，複製上面那個 `.db` 檔就是完整備份。
 
 ## Expo Go 測試注意事項

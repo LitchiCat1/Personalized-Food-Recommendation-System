@@ -1,6 +1,34 @@
 const { spawnSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 
-function exposeFrontendBuildEnvironment(env, { sameOriginApi = false } = {}) {
+// 跟後端 env_service.py 一樣的寫法：KEY=VALUE、# 開頭是註解、去掉前後引號
+function readEnvFile(filePath) {
+  let text;
+  try {
+    text = fs.readFileSync(filePath, 'utf8');
+  } catch {
+    return {};
+  }
+
+  const values = {};
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#') || !line.includes('=')) continue;
+    const separator = line.indexOf('=');
+    const key = line.slice(0, separator).trim();
+    const value = line.slice(separator + 1).trim().replace(/^["']+|["']+$/g, '');
+    if (key) values[key] = value;
+  }
+  return values;
+}
+
+// frontendEnv：frontend/.env*，Expo 打包時自己會讀，裡面寫了就照它的。
+// backendEnv：本機的金鑰只放在 backend/.env.local（後端也讀這份），不用再抄一份到前端。
+function exposeFrontendBuildEnvironment(
+  env,
+  { sameOriginApi = false, frontendEnv = {}, backendEnv = {} } = {},
+) {
   // build:local：網站由後端一起提供，API 就在同一個網址。蓋過 .env.local 的
   // 127.0.0.1——那個位址在別人的手機上指的是手機自己。
   if (sameOriginApi) env.EXPO_PUBLIC_API_BASE_URL = 'same-origin';
@@ -12,12 +40,30 @@ function exposeFrontendBuildEnvironment(env, { sameOriginApi = false } = {}) {
   ];
 
   for (const [publicKey, sourceKeys] of mappings) {
-    if (env[publicKey]) continue;
-    const sourceValue = sourceKeys.map((key) => env[key]).find(Boolean);
+    if (env[publicKey] || frontendEnv[publicKey]) continue;
+    const sourceValue = [env, backendEnv]
+      .flatMap((source) => sourceKeys.map((key) => source[key]))
+      .find(Boolean);
     if (sourceValue) env[publicKey] = sourceValue;
   }
 
   return env;
+}
+
+function readLocalEnvFiles() {
+  const frontendDir = path.resolve(__dirname, '..');
+  const repoRoot = path.resolve(frontendDir, '..');
+  return {
+    frontendEnv: {
+      ...readEnvFile(path.join(frontendDir, '.env')),
+      ...readEnvFile(path.join(frontendDir, '.env.local')),
+    },
+    // 後端是根目錄的 .env.local 優先
+    backendEnv: {
+      ...readEnvFile(path.join(repoRoot, 'backend', '.env.local')),
+      ...readEnvFile(path.join(repoRoot, '.env.local')),
+    },
+  };
 }
 
 function run() {
@@ -30,7 +76,7 @@ function run() {
     process.exit(1);
   }
 
-  exposeFrontendBuildEnvironment(process.env, { sameOriginApi });
+  exposeFrontendBuildEnvironment(process.env, { sameOriginApi, ...readLocalEnvFiles() });
 
   const result = spawnSync(args[0], args.slice(1), {
     stdio: 'inherit',

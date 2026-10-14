@@ -28,6 +28,38 @@ test('explicit Expo public variables are not overwritten', () => {
   assert.equal(env.EXPO_PUBLIC_AUTH_REQUIRED, 'true');
 });
 
+test('the key in backend/.env.local reaches the Expo build', () => {
+  const env = {};
+
+  exposeFrontendBuildEnvironment(env, {
+    backendEnv: { GOOGLE_PLACES_API_KEY: 'local-places-key', AUTH_REQUIRED: 'true' },
+  });
+
+  assert.equal(env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY, 'local-places-key');
+  assert.equal(env.EXPO_PUBLIC_AUTH_REQUIRED, 'true');
+});
+
+test('the shell environment wins over backend/.env.local', () => {
+  const env = { GOOGLE_PLACES_API_KEY: 'shell-key' };
+
+  exposeFrontendBuildEnvironment(env, {
+    backendEnv: { GOOGLE_PLACES_API_KEY: 'local-places-key' },
+  });
+
+  assert.equal(env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY, 'shell-key');
+});
+
+test('a key set in frontend/.env.local is left for Expo to read', () => {
+  const env = {};
+
+  exposeFrontendBuildEnvironment(env, {
+    frontendEnv: { EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: 'browser-key' },
+    backendEnv: { GOOGLE_PLACES_API_KEY: 'local-places-key' },
+  });
+
+  assert.equal(env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY, undefined);
+});
+
 test('nothing is invented when nothing is set', () => {
   const env = {};
 

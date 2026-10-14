@@ -59,12 +59,14 @@ async function postAuth(apiBaseUrl: string, path: string, body: object): Promise
   return session;
 }
 
-export function signIn(apiBaseUrl: string, email: string, password: string) {
-  return postAuth(apiBaseUrl, '/auth/login', { email, password });
+// 帳號用暱稱，沿用 API 原本的 email 欄位傳送；舊帳號的 Email 就是它的暱稱
+export function signIn(apiBaseUrl: string, nickname: string, password: string) {
+  return postAuth(apiBaseUrl, '/auth/login', { email: nickname, password });
 }
 
-export function signUp(apiBaseUrl: string, email: string, password: string, inviteCode?: string) {
-  return postAuth(apiBaseUrl, '/auth/signup', inviteCode ? { email, password, invite_code: inviteCode } : { email, password });
+export function signUp(apiBaseUrl: string, nickname: string, password: string, inviteCode?: string) {
+  const body = { email: nickname, password };
+  return postAuth(apiBaseUrl, '/auth/signup', inviteCode ? { ...body, invite_code: inviteCode } : body);
 }
 
 /** open：直接註冊；code：要邀請碼（從其他裝置或 tunnel 連進來時）；closed：不開放註冊。 */

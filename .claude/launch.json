@@ -22,14 +22,6 @@
         "backend/app.py"
       ],
       "port": 5000
-    },
-    {
-      "name": "experiment-backend",
-      "runtimeExecutable": "python",
-      "runtimeArgs": [
-        "C:/Users/jimmy/AppData/Local/Temp/claude/C--Users-jimmy-OneDrive----GitHub-Personalized-Food-Recommendation-System/eba3da94-5045-48d0-a1c0-5df417d58a08/scratchpad/live/v2/run_backend.py"
-      ],
-      "port": 5077
     }
   ]
 }

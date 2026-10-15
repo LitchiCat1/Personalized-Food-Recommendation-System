@@ -4,6 +4,7 @@ import contextlib
 import importlib
 import io
 import os
+import subprocess
 import sys
 import unittest
 from unittest.mock import patch
@@ -19,6 +20,8 @@ from test_postgres_db import URL, FakeConnector
 
 # 密碼是 pa/ss，/ 沒有編碼成 %2F，網址就拆錯了
 MALFORMED_URL = "postgresql://postgres.abc:pa/ss@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres"
+BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 STORAGE_TABLES = ("users", "records", "custom_foods", "restaurant_menus", "restaurant_menu_failures")
 
 
@@ -77,7 +80,28 @@ class OpenDatabaseTests(unittest.TestCase):
     def test_unreachable_postgres_raises_instead_of_falling_back(self):
         with patch.dict(os.environ, {"DATABASE_URL": URL}, clear=True):
             with self.assertRaises(DatabaseUnavailable):
-                open_database(connect=FakeConnector(failures=1))
+                open_database(connect=FakeConnector(failures=3), sleep=lambda seconds: None)
+
+    def test_local_sqlite_works_without_psycopg2_installed(self):
+        # 本機只用 SQLite：pull 之後還沒重裝套件（沒有 psycopg2）也要能照常啟動
+        code = (
+            "import sys\n"
+            "sys.modules['psycopg2'] = None\n"
+            "from repositories.database import open_database\n"
+            "db, label = open_database()\n"
+            "print('selected', db.dialect, label)\n"
+            "import app\n"
+            "print('app imported')\n"
+        )
+        env = {**os.environ, "DATABASE_PATH": ":memory:", "NUTRILENS_SKIP_LOCAL_ENV": "1", "PYTHONIOENCODING": "utf-8"}
+        env.pop("DATABASE_URL", None)
+        result = subprocess.run(
+            [sys.executable, "-c", code], cwd=BACKEND_DIR, env=env,
+            capture_output=True, text=True, encoding="utf-8", timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[-2000:])
+        self.assertIn("selected sqlite SQLite :memory:", result.stdout)
+        self.assertIn("app imported", result.stdout)
 
     def test_malformed_url_raises_without_echoing_the_password(self):
         # 密碼裡有沒編碼的 /：網址拆不開，Python 的錯誤訊息會夾著密碼的片段
@@ -98,6 +122,7 @@ class AppStartupTests(unittest.TestCase):
         failure = psycopg2.OperationalError(f'invalid dsn: "{URL}"')
         with patch.dict(os.environ, {"DATABASE_URL": URL, "NUTRILENS_SKIP_LOCAL_ENV": "1"}), \
                 patch("repositories.postgres_db.psycopg2.connect", side_effect=failure), \
+                patch("repositories.postgres_db.time.sleep"), \
                 contextlib.redirect_stdout(output):
             sys.modules.pop("app", None)
             with self.assertRaises(SystemExit) as ctx:

@@ -15,7 +15,15 @@ from repositories.auth_repository import AuthRepository
 from repositories.postgres_db import PostgresDatabase
 from repositories.storage import StorageRepository
 from services.app_time_service import app_now
-from services.auth_service import AuthError, hash_token, sign_in, sign_up, verify_access_token
+from services.auth_service import (
+    AuthError,
+    hash_token,
+    reset_password,
+    sign_in,
+    sign_out,
+    sign_up,
+    verify_access_token,
+)
 
 TEST_URL = os.environ.get("NUTRILENS_TEST_DATABASE_URL", "").strip()
 
@@ -120,6 +128,55 @@ class PostgresIntegrationTests(unittest.TestCase):
         self.auth.create_user(email, legacy_hash, user_id="6f1c2d3e-0000-4000-8000-000000000001")
         session = sign_in(self.auth, email.upper(), "old-password")
         self.assertEqual(session["user"]["id"], "6f1c2d3e-0000-4000-8000-000000000001")
+
+
+    def test_reconnects_after_the_server_drops_the_connection(self):
+        # 模擬 Supabase 把閒置連線關掉：從另一條連線把這條砍掉，下一句要能自動重連
+        pid = self.db.query_one("SELECT pg_backend_pid() AS pid")["pid"]
+        other = PostgresDatabase(TEST_URL)
+        try:
+            other.execute("SELECT pg_terminate_backend(?)", (pid,))
+        finally:
+            other.close()
+        self.assertEqual(self.db.query_one("SELECT 1 AS one"), {"one": 1})
+        self.assertNotEqual(self.db.query_one("SELECT pg_backend_pid() AS pid")["pid"], pid)
+
+    def test_records_for_one_day_use_like_with_a_percent_param(self):
+        # 首頁的「今天」是用 timestamp LIKE '2026-10-15%' 查的
+        self.storage.insert_record(self.meal("today", 500))
+        yesterday = (app_now() - timedelta(days=1)).replace(tzinfo=None).strftime("%Y-%m-%dT12:00:00")
+        self.storage.insert_record({**self.meal("yesterday", 300), "timestamp": yesterday})
+        today = self.storage.get_today_records("user-a")
+        self.assertEqual([record["client_record_id"] for record in today], ["today"])
+        self.assertEqual(len(self.storage.get_records("user-a", yesterday[:10])), 1)
+
+    def test_custom_foods_round_trip(self):
+        food = {"food_id": "f1", "user_id": "user-a", "name": "阿嬤的滷蛋", "calories": 80}
+        self.storage.upsert_custom_food(food)
+        self.storage.upsert_custom_food({**food, "calories": 90})
+        self.assertEqual(self.storage.get_custom_food("f1", "user-a")["calories"], 90)
+        self.assertEqual([doc["food_id"] for doc in self.storage.get_custom_foods("user-a")], ["f1"])
+        self.assertEqual(self.storage.get_custom_foods("someone-else"), [])
+
+    def test_password_reset_signs_out_everywhere(self):
+        sign_up(self.auth, "小華", "old")
+        session = sign_in(self.auth, "小華", "old")
+        reset_password(self.auth, "小華", "new")
+        with self.assertRaises(AuthError):
+            verify_access_token(self.auth, f"Bearer {session['access_token']}")
+        with self.assertRaises(AuthError):
+            sign_in(self.auth, "小華", "old")
+        fresh = sign_in(self.auth, "小華", "new")
+        sign_out(self.auth, f"Bearer {fresh['access_token']}")
+        with self.assertRaises(AuthError):
+            verify_access_token(self.auth, f"Bearer {fresh['access_token']}")
+
+    def test_menus_can_be_listed_and_cleared(self):
+        self.storage.save_restaurant_menu("阿明小吃", [{"name": "滷肉飯"}], {"google_place_id": "p1"})
+        self.storage.save_restaurant_menu("阿華麵店", [{"name": "陽春麵"}], {"google_place_id": "p2"})
+        self.assertEqual({menu["name"] for menu in self.storage.list_restaurant_menus()}, {"阿明小吃", "阿華麵店"})
+        self.storage.clear_restaurant_menus()
+        self.assertEqual(self.storage.count_restaurant_menus(), 0)
 
 
 if __name__ == "__main__":

@@ -7,42 +7,69 @@
 jsonb 讀回來已經是 dict，時間讀回來是 datetime；時間轉回跟 SQLite 版一樣的
 utc_iso() 字串，JSON 交給 from_json() 原樣放行。
 
-整個後端只開一條連線，用鎖排隊，跟 SQLite 版一樣。Render 休眠醒來、或 Supabase
-關掉閒置連線時，第一句會失敗；這時重連一次再試同一句。
+整個後端只開一條連線，用鎖排隊，跟 SQLite 版一樣。Supabase 關掉閒置連線時，
+第一句會失敗；這時重連一次再試同一句。Render 免費方案休眠醒來是整個重新啟動，
+所以第一次連線失敗會隔幾秒再試，不會一失敗就結束。
 """
 
 from contextlib import contextmanager
 from datetime import datetime
 import threading
+import time
 from urllib.parse import unquote, urlsplit
 
 import psycopg2
 import psycopg2.extras
+from psycopg2.extensions import parse_dsn
 
+from repositories.database import MALFORMED_URL_MESSAGE, DatabaseUnavailable
 from repositories.sqlite_db import utc_iso
 
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
-CONNECTION_ERRORS = (psycopg2.OperationalError, psycopg2.InterfaceError)
+LOCAL_HOSTS = {"", "localhost", "127.0.0.1", "::1"}
+# 閒置的連線被中間的網路設備默默丟掉時，下一句不會卡好幾分鐘（還佔著全後端共用的鎖）
+KEEPALIVES = {"keepalives": 1, "keepalives_idle": 30, "keepalives_interval": 10, "keepalives_count": 3}
+# 第一次連線失敗後隔幾秒再試：共試 3 次
+CONNECT_RETRY_DELAYS = (2, 5)
 
 
-class DatabaseUnavailable(Exception):
-    """設了 DATABASE_URL 卻連不上。訊息裡不會有密碼。"""
+def parse_database_url(url: str) -> dict:
+    """用 libpq 自己的拆法（psycopg2 的 parse_dsn，不會連線）拆連線字串。
+
+    網址和 host=... 這種寫法都可以。密碼裡有沒編碼的 @ 或 / 時，libpq 拆出來的主機、
+    埠、資料庫名稱會跟看起來的不一樣（例如密碼的後半段變成主機名稱），連不上的錯誤
+    訊息就會印出密碼的片段，所以直接拒絕。
+    """
+    try:
+        parts = parse_dsn(url)
+    except psycopg2.Error:
+        raise DatabaseUnavailable(MALFORMED_URL_MESSAGE) from None
+    host = parts.get("host") or ""
+    port = parts.get("port") or ""
+    dbname = parts.get("dbname") or ""
+    if "@" in host or "@" in dbname or "/" in dbname or (port and not port.isdigit()):
+        raise DatabaseUnavailable(MALFORMED_URL_MESSAGE)
+    return parts
+
+
+def _describe(parts: dict) -> str:
+    port = f":{parts['port']}" if parts.get("port") else ""
+    return f"{parts.get('host') or '?'}{port}/{parts.get('dbname') or 'postgres'}"
 
 
 def describe_database_url(url: str) -> str:
     """給 log 看的「主機:埠/資料庫」，不含帳號密碼。"""
-    parts = urlsplit(url)
-    port = f":{parts.port}" if parts.port else ""
-    name = parts.path.lstrip("/") or "postgres"
-    return f"{parts.hostname or '?'}{port}/{name}"
+    return _describe(parse_database_url(url))
+
+
+def _ssl_mode(parts: dict) -> str | None:
+    if parts.get("sslmode"):
+        return None
+    return "prefer" if (parts.get("host") or "").lower() in LOCAL_HOSTS else "require"
 
 
 def ssl_mode_for(url: str) -> str | None:
-    """網址自己寫了 sslmode 就回 None（照網址的）；本機 prefer，其他一律 require。"""
-    if "sslmode=" in url:
-        return None
-    host = (urlsplit(url).hostname or "").lower()
-    return "prefer" if host in LOCAL_HOSTS else "require"
+    """自己寫了 sslmode 就回 None（照寫的）；本機 prefer，其他一律 require。"""
+    return _ssl_mode(parse_database_url(url))
 
 
 def to_pyformat(sql: str) -> str:
@@ -57,24 +84,36 @@ def _normalize_row(row) -> dict:
 class PostgresDatabase:
     dialect = "postgres"
 
-    def __init__(self, url: str, connect=None):
+    def __init__(self, url: str, connect=None, sleep=None):
         self.url = url
-        self.label = describe_database_url(url)
+        self._parts = parse_database_url(url)
+        self.label = _describe(self._parts)
         self._connect = connect or psycopg2.connect
+        self._sleep = sleep or time.sleep
         self._lock = threading.RLock()
         self._in_transaction = False
-        self._conn = self._open()
+        self._conn = self._open_with_retries()
 
     def _redact(self, text: str) -> str:
-        password = urlsplit(self.url).password
-        if password:
-            for secret in {password, unquote(password)}:
+        # libpq 拆出來的密碼（已解碼）和網址裡原本的寫法（可能還是 %40 這種編碼）都要遮
+        raw = urlsplit(self.url).password if "://" in self.url else None
+        for secret in {self._parts.get("password"), raw, unquote(raw) if raw else None}:
+            if secret:
                 text = text.replace(secret, "***")
         return text
 
+    def _open_with_retries(self):
+        for delay in (*CONNECT_RETRY_DELAYS, None):
+            try:
+                return self._open()
+            except DatabaseUnavailable:
+                if delay is None:
+                    raise
+                self._sleep(delay)
+
     def _open(self):
-        kwargs = {"connect_timeout": 10}
-        sslmode = ssl_mode_for(self.url)
+        kwargs: dict[str, object] = {"connect_timeout": 10, **KEEPALIVES}
+        sslmode = _ssl_mode(self._parts)
         if sslmode:
             kwargs["sslmode"] = sslmode
         try:
@@ -112,9 +151,11 @@ class PostgresDatabase:
         with self._lock:
             try:
                 return self._run_once(sql, params, fetch)
-            except CONNECTION_ERRORS:
-                # 交易做到一半斷線不能重試：重連後只會做到後半段
-                if self._in_transaction:
+            except psycopg2.Error:
+                # 只有連線真的斷了才重連再試（psycopg2 會把 closed 設成非 0）。逾時、死結
+                # 這類錯誤連線還好好的，重跑只會再做一次，照常往外丟。
+                # 交易做到一半斷線也不能重試：重連後只會做到後半段。
+                if self._in_transaction or not self._conn.closed:
                     raise
                 self._reconnect()
                 return self._run_once(sql, params, fetch)

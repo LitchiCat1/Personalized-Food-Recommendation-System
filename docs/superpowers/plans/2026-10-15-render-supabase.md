@@ -1219,34 +1219,25 @@ git commit -m "test: run storage and login against a real Postgres when one is p
 
 這個 task 沒有程式碼，是部署檢查表。每個「問使用者」都要等到明確同意才做。
 
+（最後審查後改過順序：先建登入表、搬帳號，再 push。原本是部署後才搬，Render 預設開放註冊，那段空檔裡舊使用者用同一個 Email 重新註冊的話，舊帳號會被默默略過。）
+
 - [ ] **Step 1: 交給使用者設 `DATABASE_URL`**
 
-請使用者到 Render 後台 → `pfrs` 服務 → Environment，設 `DATABASE_URL` = Supabase `nutrilens` 專案 → Connect → **Session pooler** 的連線字串（埠 5432，密碼自己填）。如果那裡已經有 Supabase 時期留下的 `DATABASE_URL`，確認它是 `nutrilens` 專案、是 pooler 網址。Claude 不輸入密碼。
+請使用者到 Render 後台 → `pfrs` 服務 → Environment，設 `DATABASE_URL` = Supabase `nutrilens` 專案 → Connect → **Session pooler** 的連線字串（埠 5432，密碼自己填；密碼裡有特殊字元要網址編碼，否則後端會拒絕啟動）。如果那裡已經有 Supabase 時期留下的 `DATABASE_URL`，確認它是 `nutrilens` 專案、是 pooler 網址。現在線上那版還不認得這個變數，設了不影響。Claude 不輸入密碼。
 
-- [ ] **Step 2: 問使用者能不能 push**
+- [ ] **Step 2: 問使用者能不能建登入表、搬舊帳號**
+
+同意後，對 `nutrilens` 專案（`jtvdvkvdckbunjkhzsbu`）執行 spec 第 4 節的 SQL（建 `auth_users` / `auth_sessions`＋開 RLS＋把 `auth.users` 的帳號搬進去）。可以透過 Supabase MCP 執行，或請使用者貼到 Supabase 的 SQL Editor。然後用 spec 第 4 節的三句回報：搬了幾個、沒搬幾個（含 `encrypted_password` 是 NULL 的）、有沒有撞名。
+
+- [ ] **Step 3: 問使用者能不能 push**
 
 同意後：`git push origin refs/heads/v0.0.9:refs/heads/v0.0.9`。
 
-- [ ] **Step 3: 等部署完成後確認**
+- [ ] **Step 4: 等部署完成後確認**
 
-約 10 分鐘內（之前的經驗）：`curl -s https://pfrs.onrender.com/health`，確認 `"database": "postgres"`、`"auth_provider": "local-postgres"`、`deployed_commit` 是新的 commit。還是舊 commit 或 `sqlite`：回頭看 Step 1 有沒有設好，或 Render 的部署 log（使用者看）有沒有 `[ERROR] 連不上 Postgres`。
+約 10 分鐘內（之前的經驗）：`curl -s https://pfrs.onrender.com/health`，確認 `"database": "postgres"`、`"auth_provider": "local-postgres"`、`deployed_commit` 是新的 commit。還是舊 commit 或 `sqlite`：回頭看 Step 1 有沒有設好，或請使用者看 Render 的部署 log 有沒有 `[ERROR]`（連不上或網址格式不對）。
 
-用 Supabase MCP 的 `list_tables`（唯讀）確認 `public.auth_users`、`public.auth_sessions` 已建立、`rls_enabled` 是 true。
-
-- [ ] **Step 4: 問使用者能不能搬舊帳號**
-
-同意後，對 `nutrilens` 專案（`jtvdvkvdckbunjkhzsbu`）執行：
-
-```sql
-INSERT INTO public.auth_users (id, email, password_hash, created_at)
-SELECT id::text, lower(email), encrypted_password, created_at
-FROM auth.users
-WHERE email IS NOT NULL
-  AND encrypted_password LIKE '$2%'
-ON CONFLICT DO NOTHING;
-```
-
-可以透過 Supabase MCP 執行，或請使用者貼到 Supabase 的 SQL Editor。然後回報：`SELECT count(*) FROM public.auth_users`（搬了幾個）和 `SELECT count(*) FROM auth.users WHERE email IS NULL OR encrypted_password NOT LIKE '$2%'`（沒搬的幾個、為什麼）。
+用 Supabase MCP 的 `list_tables`（唯讀）確認七張表都在、`rls_enabled` 都是 true。
 
 - [ ] **Step 5: 實際登入**
 

@@ -70,9 +70,27 @@
 
 ### 4. 舊帳號搬進新的登入表
 
-第一次部署、後端建好 `auth_users` 之後，在 `nutrilens` 專案執行一次：
+**在第一次部署之前**，在 `nutrilens` 專案執行一次。先建登入表（和後端 `POSTGRES_AUTH_TABLES` 一模一樣，後端啟動時 `IF NOT EXISTS` 就什麼都不做），再把帳號搬進去：
+
+（先前的順序是部署之後才搬。Render 上預設開放註冊，部署到搬帳號之間，舊使用者登入失敗、用同一個 Email 重新註冊的話，搬帳號時 `ON CONFLICT DO NOTHING` 會默默略過他的舊帳號，他就再也看不到以前的紀錄。先搬再部署就沒有這段空檔。）
 
 ```sql
+CREATE TABLE IF NOT EXISTS public.auth_users (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS public.auth_sessions (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES public.auth_users (id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON public.auth_sessions (user_id);
+ALTER TABLE public.auth_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.auth_sessions ENABLE ROW LEVEL SECURITY;
+
 INSERT INTO public.auth_users (id, email, password_hash, created_at)
 SELECT id::text, lower(email), encrypted_password, created_at
 FROM auth.users
@@ -85,7 +103,16 @@ ON CONFLICT DO NOTHING;
 - Supabase 存的是 bcrypt（`$2a$...`），Python 的 `bcrypt.checkpw` 認得，原密碼能登入。
 - `sign_in()` 不檢查暱稱長度，Email 超過 30 個字也能登入。
 - 這句會寫入正式資料庫，執行前要再問一次使用者。可以透過 Supabase MCP 執行，或由使用者貼到 Supabase 的 SQL Editor。
-- 執行後回報搬了幾個帳號、有幾個沒搬（沒有密碼或不是 bcrypt 的，例如用第三方登入的）。
+- 執行後用下面三句回報：搬了幾個、沒搬幾個（沒有 Email、沒有密碼或不是 bcrypt 的，例如用第三方登入的；`encrypted_password` 是 NULL 的也要算進去）、有沒有撞名（同一個 Email 在 `auth_users` 裡是別的 id）。
+
+```sql
+SELECT count(*) FROM public.auth_users a JOIN auth.users u ON u.id::text = a.id;
+SELECT count(*) FROM auth.users
+WHERE email IS NULL OR encrypted_password IS NULL OR encrypted_password NOT LIKE '$2%';
+SELECT lower(u.email) AS email FROM auth.users u
+JOIN public.auth_users a ON a.email = lower(u.email)
+WHERE a.id <> u.id::text;
+```
 
 ### 5. Render 設定
 
@@ -127,10 +154,10 @@ ON CONFLICT DO NOTHING;
 ## 上線順序
 
 1. 程式改好、測試通過、commit（先不 push）。
-2. 使用者在 Render 設好 `DATABASE_URL`。
-3. 經使用者同意後 push 到 `v0.0.9`（`git push origin refs/heads/v0.0.9:refs/heads/v0.0.9`），Render 自動部署。
-4. `/health` 確認 `database: postgres`，`auth_users` / `auth_sessions` 已建立。
-5. 經使用者同意後執行第 4 節的搬帳號 SQL。
+2. 使用者在 Render 設好 `DATABASE_URL`（現在線上那版還不認得這個變數，設了也不影響）。
+3. 經使用者同意後執行第 4 節的建表＋搬帳號 SQL，並回報那三個數字。
+4. 經使用者同意後 push 到 `v0.0.9`（`git push origin refs/heads/v0.0.9:refs/heads/v0.0.9`），Render 自動部署。
+5. `/health` 確認 `database: postgres`、`auth_provider: local-postgres`。
 6. 用舊帳號和新帳號各登入一次確認。
 
 順序要先設 `DATABASE_URL` 再 push：反過來的話，新版程式沒有 `DATABASE_URL` 會照舊用 Render 上暫時的 SQLite，不會壞，但要等設好後再部署一次才會切過去。

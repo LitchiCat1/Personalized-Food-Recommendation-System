@@ -17,6 +17,64 @@ RECORD_COLUMNS = (
 RECORD_SELECT = ", ".join(RECORD_COLUMNS)
 
 
+# Render 用的 Supabase（Postgres）。型別跟 nutrilens 專案現有的表一致：
+# 表已經存在時 CREATE ... IF NOT EXISTS 什麼都不做，舊資料原封不動。
+# 每張表都開 RLS：後端是表的擁有者不受影響，但 Supabase 的公開 API（anon key）就讀不到。
+POSTGRES_TABLES = """
+CREATE TABLE IF NOT EXISTS users (
+    user_id TEXT PRIMARY KEY,
+    doc JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS records (
+    id BIGSERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    client_record_id TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    meal_type TEXT,
+    foods JSONB,
+    total_calories DOUBLE PRECISION DEFAULT 0,
+    total_protein DOUBLE PRECISION DEFAULT 0,
+    total_carbs DOUBLE PRECISION DEFAULT 0,
+    total_fat DOUBLE PRECISION DEFAULT 0,
+    total_sodium DOUBLE PRECISION DEFAULT 0,
+    total_fiber DOUBLE PRECISION DEFAULT 0,
+    total_sugar DOUBLE PRECISION DEFAULT 0,
+    total_saturated_fat DOUBLE PRECISION DEFAULT 0,
+    total_trans_fat DOUBLE PRECISION DEFAULT 0,
+    source TEXT DEFAULT 'camera'
+);
+CREATE INDEX IF NOT EXISTS idx_records_user_timestamp ON records (user_id, timestamp DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_records_user_client_record ON records (user_id, client_record_id);
+CREATE TABLE IF NOT EXISTS custom_foods (
+    owner_key TEXT PRIMARY KEY,
+    food_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    doc JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_custom_foods_user_id ON custom_foods (user_id);
+CREATE TABLE IF NOT EXISTS restaurant_menus (
+    venue_key TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    name_key TEXT,
+    doc JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_restaurant_menus_name ON restaurant_menus (name_key);
+CREATE TABLE IF NOT EXISTS restaurant_menu_failures (
+    venue_key TEXT PRIMARY KEY,
+    reason TEXT NOT NULL,
+    failed_until TIMESTAMPTZ NOT NULL
+);
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE custom_foods ENABLE ROW LEVEL SECURITY;
+ALTER TABLE restaurant_menus ENABLE ROW LEVEL SECURITY;
+ALTER TABLE restaurant_menu_failures ENABLE ROW LEVEL SECURITY;
+"""
+
+
 class StorageRepository:
     def __init__(self, db, use_mongo: bool, mem_users: dict, mem_records: list, mem_custom_foods: list, sql: SqliteDatabase | None = None):
         self.db = db
@@ -32,6 +90,9 @@ class StorageRepository:
             self._init_tables()
 
     def _init_tables(self):
+        if self.sql.dialect == "postgres":
+            self.sql.executescript(POSTGRES_TABLES)
+            return
         # SQLite 沒有 JSON 與時間型別：doc / foods 存 JSON 字串，時間存 utc_iso() 的字串
         self.sql.executescript(
             """

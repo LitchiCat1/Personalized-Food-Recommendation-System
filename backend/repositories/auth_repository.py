@@ -1,7 +1,7 @@
 """帳號與登入 session 的存取。
 
-帳號、密碼雜湊與登入 token 都放在本機的 SQLite 裡，不依賴任何雲端服務。
-沒有資料庫時退回記憶體，只適合跑測試——重啟後帳號就不見了。
+帳號、密碼雜湊與登入 token 存在資料庫裡：本機是 SQLite，Render 是 Supabase 的 Postgres。
+不依賴任何雲端登入服務。沒有資料庫時退回記憶體，只適合跑測試——重啟後帳號就不見了。
 """
 
 from datetime import datetime, timezone
@@ -9,6 +9,26 @@ import threading
 import uuid
 
 from repositories.sqlite_db import SqliteDatabase, utc_iso
+
+
+# Render 用的 Supabase（Postgres）。開 RLS：密碼雜湊和 token 雜湊不能被公開 API 讀到。
+POSTGRES_AUTH_TABLES = """
+CREATE TABLE IF NOT EXISTS auth_users (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES auth_users (id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions (user_id);
+ALTER TABLE auth_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth_sessions ENABLE ROW LEVEL SECURITY;
+"""
 
 
 class EmailAlreadyRegistered(Exception):
@@ -26,6 +46,9 @@ class AuthRepository:
             self._init_tables()
 
     def _init_tables(self):
+        if self.sql.dialect == "postgres":
+            self.sql.executescript(POSTGRES_AUTH_TABLES)
+            return
         # 只存 token 的 SHA-256，資料庫檔案外流也拿不到能用的 token
         self.sql.executescript(
             """

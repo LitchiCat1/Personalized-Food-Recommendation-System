@@ -50,12 +50,17 @@ def to_json(value) -> str:
 
 
 def from_json(text):
+    """SQLite 存的是 JSON 字串；Postgres 的 jsonb 讀回來已經是 dict / list，原樣回傳。"""
     if text is None or text == "":
         return None
+    if not isinstance(text, (str, bytes, bytearray)):
+        return text
     return json.loads(text)
 
 
 class SqliteDatabase:
+    dialect = "sqlite"
+
     def __init__(self, path: str):
         self.path = path
         if path != ":memory:":

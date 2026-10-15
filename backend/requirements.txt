@@ -6,3 +6,4 @@ beautifulsoup4
 
 waitress
 bcrypt
+psycopg2-binary

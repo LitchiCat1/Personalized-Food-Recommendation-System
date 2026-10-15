@@ -20,7 +20,8 @@ from flask_cors import CORS
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.security import safe_join
 from repositories.auth_repository import AuthRepository
-from repositories.sqlite_db import SqliteDatabase, resolve_database_path
+from repositories.database import DatabaseUnavailable, open_database
+from repositories.sqlite_db import resolve_database_path
 from repositories.storage import StorageRepository
 from services.app_time_service import app_now
 from services.auth_service import AuthError, is_auth_required, normalize_email, sign_in, sign_out, sign_up, verify_access_token
@@ -81,18 +82,24 @@ load_local_env()
 
 BASE_DIR = os.path.dirname(__file__)
 
-# ─── 資料庫：本機的 SQLite 檔案 ───────────────────────────────
-# 帳號、健康檔案、飲食紀錄、店家菜單都存在這一個檔案。位置見 sqlite_db.py，
-# 可以用 DATABASE_PATH 改；設成空字串就不用資料庫，資料只存在記憶體。
+# ─── 資料庫 ──────────────────────────────────────────────────
+# Render 設了 DATABASE_URL：用 Supabase 的 Postgres，部署和休眠都不會清空資料。
+# 本機沒設：帳號、健康檔案、飲食紀錄、店家菜單都存在一個 SQLite 檔。位置見
+# sqlite_db.py，可以用 DATABASE_PATH 改；設成空字串就不用資料庫，資料只存在記憶體。
 sql_db = None
-database_path = resolve_database_path()
-if database_path:
-    try:
-        sql_db = SqliteDatabase(database_path)
-        print(f"[OK] SQLite database: {database_path}")
-    except Exception as e:
-        sql_db = None
-        print(f"[WARN] SQLite unavailable ({database_path}) - {e}")
+try:
+    sql_db, database_label = open_database()
+    if sql_db is not None:
+        print(f"[OK] Database: {database_label}")
+except DatabaseUnavailable as e:
+    # 設了雲端資料庫卻連不上：不能退回記憶體，不然看起來正常、資料其實沒存。
+    # Render 的部署會失敗，繼續跑上一版。
+    print(f"[ERROR] {e}")
+    sys.exit(1)
+except Exception as e:
+    print(f"[WARN] SQLite unavailable ({resolve_database_path()}) - {e}")
+# 路徑裡有 Windows 使用者名稱，/health 只給這台電腦自己看
+database_path = sql_db.path if sql_db is not None and sql_db.dialect == "sqlite" else None
 
 # ─── Optional MongoDB (only when SQLite is off) ──────────────
 mongo = None
@@ -415,9 +422,9 @@ def index():
 def health():
     return jsonify({
         "status": "ok",
-        "database": "sqlite" if sql_db is not None else ("mongo" if USE_MONGO else "memory"),
-        # 路徑裡有 Windows 使用者名稱，只給這台電腦自己看
-        "database_path": database_path if sql_db is not None and is_local_request() else None,
+        "database": sql_db.dialect if sql_db is not None else ("mongo" if USE_MONGO else "memory"),
+        # 路徑裡有 Windows 使用者名稱，只給這台電腦自己看；Postgres 不回傳主機
+        "database_path": database_path if database_path and is_local_request() else None,
         "cached_restaurant_menus": storage.count_restaurant_menus(),
         "mongo": USE_MONGO,
         "recognition_engine": "gemini-vision-db-lookup",
@@ -428,7 +435,7 @@ def health():
         "restaurants": len(RESTAURANT_CATALOG),
         "places_enabled": bool(os.environ.get("GOOGLE_PLACES_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY")),
         "auth_required": is_auth_required(),
-        "auth_provider": "local-sqlite" if auth_repo.use_sql else "local-memory",
+        "auth_provider": f"local-{sql_db.dialect}" if auth_repo.use_sql else "local-memory",
         "custom_foods": len(storage.get_custom_foods()),
         # 部署後可以直接從 /health 看出線上跑的是哪一版，不用靠路由存不存在來猜。
         # RENDER_GIT_BRANCH / RENDER_GIT_COMMIT 由 Render 自動注入。

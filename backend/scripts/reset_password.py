@@ -6,6 +6,8 @@
 
 會要求輸入兩次新密碼（輸入時畫面上不會顯示）。重設後，這個帳號在每個裝置
 上都要重新登入。不帶暱稱執行會列出所有帳號（舊帳號的暱稱就是它的 Email）。
+
+要重設 Render 上（Supabase）的帳號：先把 DATABASE_URL 設成 Supabase 的連線字串再執行。
 """
 
 import getpass
@@ -16,19 +18,26 @@ BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BACKEND_DIR)
 
 from repositories.auth_repository import AuthRepository  # noqa: E402
-from repositories.sqlite_db import SqliteDatabase, resolve_database_path  # noqa: E402
+from repositories.database import DatabaseUnavailable, open_database  # noqa: E402
+from repositories.sqlite_db import resolve_database_path  # noqa: E402
 from services.auth_service import AuthError, reset_password  # noqa: E402
 from services.env_service import load_local_env  # noqa: E402
 
 
 def main() -> int:
     load_local_env()
-    database_path = resolve_database_path()
-    if not database_path or database_path == ":memory:" or not os.path.exists(database_path):
-        print(f"找不到資料庫檔案：{database_path}")
+    if not os.environ.get("DATABASE_URL", "").strip():
+        # 本機：資料庫檔不存在就停下來，不要建一個新的空檔
+        database_path = resolve_database_path()
+        if not database_path or database_path == ":memory:" or not os.path.exists(database_path):
+            print(f"找不到資料庫檔案：{database_path}")
+            return 1
+    try:
+        sql, label = open_database()
+    except DatabaseUnavailable as error:
+        print(error)
         return 1
-
-    sql = SqliteDatabase(database_path)
+    print(f"資料庫：{label}")
     repo = AuthRepository(sql)
 
     if len(sys.argv) < 2:

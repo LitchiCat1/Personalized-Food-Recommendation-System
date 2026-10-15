@@ -49,9 +49,12 @@ services:
     branch: v0.0.9
     buildCommand: pip install -r requirements.txt
     startCommand: python -u app.py
-    # 資料存在 SQLite 檔（DATABASE_PATH）。Render 免費方案的磁碟每次部署都會清空，
-    # 帳號與紀錄會跟著消失；要長期放在 Render 得掛 persistent disk 並把 DATABASE_PATH 指過去。
+    # 資料存在 Supabase 的 Postgres：DATABASE_URL 填 Supabase → Connect → Session pooler
+    # 的連線字串（Render 只走 IPv4，db.<ref>.supabase.co 那個直連網址連不上）。
+    # 沒設的話會用 Render 磁碟上的 SQLite，每次部署都會清空。
     envVars:
+      - key: DATABASE_URL
+        sync: false
       - key: GEMINI_API_KEYS
         sync: false
       - key: FLASK_DEBUG

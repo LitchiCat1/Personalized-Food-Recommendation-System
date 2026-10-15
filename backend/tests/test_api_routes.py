@@ -10,9 +10,11 @@ from services.venue_index_service import reset_venue_index_state
 from unittest.mock import patch
 
 # 在任何測試 import app 之前：不讀 backend/.env.local（裡面是真的金鑰），
-# DATABASE_PATH 設成空字串（不設的話後端會開本機正式的 SQLite 檔），測試只寫記憶體。
+# DATABASE_PATH 設成空字串（不設的話後端會開本機正式的 SQLite 檔），
+# 拿掉 DATABASE_URL（有的話後端會連 Supabase），測試只寫記憶體。
 os.environ["NUTRILENS_SKIP_LOCAL_ENV"] = "1"
 os.environ["DATABASE_PATH"] = ""
+os.environ.pop("DATABASE_URL", None)
 
 
 class ApiTestBase(unittest.TestCase):

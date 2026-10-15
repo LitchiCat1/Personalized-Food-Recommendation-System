@@ -17,6 +17,8 @@ from repositories.sqlite_db import SqliteDatabase
 from repositories.storage import StorageRepository
 from test_postgres_db import URL, FakeConnector
 
+# 密碼是 pa/ss，/ 沒有編碼成 %2F，網址就拆錯了
+MALFORMED_URL = "postgresql://postgres.abc:pa/ss@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres"
 STORAGE_TABLES = ("users", "records", "custom_foods", "restaurant_menus", "restaurant_menu_failures")
 
 
@@ -77,6 +79,15 @@ class OpenDatabaseTests(unittest.TestCase):
             with self.assertRaises(DatabaseUnavailable):
                 open_database(connect=FakeConnector(failures=1))
 
+    def test_malformed_url_raises_without_echoing_the_password(self):
+        # 密碼裡有沒編碼的 /：網址拆不開，Python 的錯誤訊息會夾著密碼的片段
+        with patch.dict(os.environ, {"DATABASE_URL": MALFORMED_URL}, clear=True):
+            with self.assertRaises(DatabaseUnavailable) as ctx:
+                open_database(connect=FakeConnector())
+        self.assertNotIn("pa/ss", str(ctx.exception))
+        self.assertNotIn("pa", str(ctx.exception).replace("Supabase", ""))
+        self.assertIsNone(ctx.exception.__cause__)
+
 
 class AppStartupTests(unittest.TestCase):
     def tearDown(self):
@@ -94,6 +105,17 @@ class AppStartupTests(unittest.TestCase):
         self.assertEqual(ctx.exception.code, 1)
         self.assertIn("pooler.supabase.com", output.getvalue())
         self.assertNotIn("s3cr", output.getvalue())
+
+    def test_app_refuses_to_start_when_database_url_is_malformed(self):
+        # 先前會掉進「SQLite unavailable」的 except，退回記憶體照常啟動，還印出密碼片段
+        output = io.StringIO()
+        with patch.dict(os.environ, {"DATABASE_URL": MALFORMED_URL, "NUTRILENS_SKIP_LOCAL_ENV": "1"}),                 patch("repositories.postgres_db.psycopg2.connect") as connect,                 contextlib.redirect_stdout(output):
+            sys.modules.pop("app", None)
+            with self.assertRaises(SystemExit) as ctx:
+                importlib.import_module("app")
+        self.assertEqual(ctx.exception.code, 1)
+        self.assertNotIn("pa/ss", output.getvalue())
+        connect.assert_not_called()
 
 
 if __name__ == "__main__":

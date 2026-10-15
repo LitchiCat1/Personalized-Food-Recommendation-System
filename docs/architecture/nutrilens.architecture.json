@@ -1,0 +1,413 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "NutriLens 系統架構",
+    "subtitle": "個人化飲食推薦：從瀏覽器到疾病門檻與外部服務",
+    "output": "docs/architecture/nutrilens-architecture.html",
+    "visual_preset": "blueprint",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/LitchiCat1/Personalized-Food-Recommendation-System",
+      "provider": "github",
+      "revision": "f48ac702610d32e3b3eeb0289ad530d90e2a00ae"
+    },
+    "views": [
+      {
+        "id": "login-path",
+        "label": "登入與初次設定",
+        "focus": [
+          "user",
+          "web",
+          "authgate",
+          "api",
+          "accounts"
+        ],
+        "note": "AuthGate 擋住所有子畫面，直到健康檔案載入完成。"
+      },
+      {
+        "id": "medical-path",
+        "label": "疾病門檻怎麼生效",
+        "focus": [
+          "api",
+          "rules",
+          "db",
+          "store"
+        ],
+        "note": "單餐上限由後端算出後隨 /records 下發，前端只比大小。"
+      },
+      {
+        "id": "paid-path",
+        "label": "會花錢的外部呼叫",
+        "focus": [
+          "api",
+          "gemini",
+          "places",
+          "menu"
+        ],
+        "note": "辨識與店家菜單建檔都會計費，結果寫進菜單快取。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "使用者",
+      "sublabel": "瀏覽器 / 行動裝置",
+      "pos": [
+        40,
+        350
+      ],
+      "size": [
+        124,
+        60
+      ]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "NutriLens Web",
+      "sublabel": "Expo Router + RN Web",
+      "tag": "由 Flask 提供",
+      "pos": [
+        230,
+        350
+      ],
+      "size": [
+        148,
+        62
+      ],
+      "sources": [
+        {
+          "path": "frontend/app/(tabs)/index.tsx",
+          "label": "今日營養狀態"
+        }
+      ]
+    },
+    {
+      "id": "authgate",
+      "type": "security",
+      "label": "AuthGate",
+      "sublabel": "登入 + 初次設定",
+      "pos": [
+        450,
+        180
+      ],
+      "size": [
+        148,
+        62
+      ],
+      "sources": [
+        {
+          "path": "frontend/components/AuthGate.tsx",
+          "label": "登入與健康檔案建立"
+        },
+        {
+          "path": "frontend/lib/auth.ts",
+          "label": "暱稱登入與 token"
+        }
+      ]
+    },
+    {
+      "id": "store",
+      "type": "frontend",
+      "label": "Zustand Store",
+      "sublabel": "目標 / 警示的單一來源",
+      "pos": [
+        450,
+        520
+      ],
+      "size": [
+        148,
+        62
+      ],
+      "sources": [
+        {
+          "path": "frontend/store/useStore.ts",
+          "label": "buildHealthAlerts"
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Flask API",
+      "sublabel": "python app.py",
+      "tag": "網站與 API 同一個埠",
+      "pos": [
+        700,
+        350
+      ],
+      "size": [
+        148,
+        62
+      ],
+      "sources": [
+        {
+          "path": "backend/app.py",
+          "label": "路由、授權與網站檔案"
+        }
+      ]
+    },
+    {
+      "id": "rules",
+      "type": "security",
+      "label": "疾病門檻引擎",
+      "sublabel": "單餐上限 / 禁忌 / 過敏原",
+      "pos": [
+        500,
+        620
+      ],
+      "size": [
+        148,
+        62
+      ],
+      "sources": [
+        {
+          "path": "backend/config/disease_rules.json",
+          "label": "規則檔（含裁決）"
+        },
+        {
+          "path": "backend/services/medical_risk_service.py",
+          "label": "求值與一致性檢查"
+        }
+      ]
+    },
+    {
+      "id": "tfda",
+      "type": "database",
+      "label": "TFDA 營養庫",
+      "sublabel": "2,181 筆・食材樣本",
+      "pos": [
+        880,
+        620
+      ],
+      "size": [
+        148,
+        62
+      ]
+    },
+    {
+      "id": "accounts",
+      "type": "database",
+      "label": "帳號與登入",
+      "sublabel": "auth_users / sessions",
+      "pos": [
+        1120,
+        60
+      ],
+      "size": [
+        150,
+        62
+      ],
+      "sources": [
+        {
+          "path": "backend/services/auth_service.py",
+          "label": "暱稱 + bcrypt、發 token"
+        },
+        {
+          "path": "backend/repositories/auth_repository.py",
+          "label": "auth_users / auth_sessions"
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "健康檔案與紀錄",
+      "sublabel": "users / records",
+      "pos": [
+        1120,
+        350
+      ],
+      "size": [
+        150,
+        62
+      ],
+      "sources": [
+        {
+          "path": "backend/repositories/sqlite_db.py",
+          "label": "檔案位置與連線"
+        },
+        {
+          "path": "backend/repositories/storage.py",
+          "label": "資料表"
+        }
+      ]
+    },
+    {
+      "id": "menu",
+      "type": "database",
+      "label": "店家菜單快取",
+      "sublabel": "restaurant_menus",
+      "pos": [
+        1120,
+        200
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "gemini",
+      "type": "external",
+      "label": "Gemini",
+      "sublabel": "食物辨識 / 菜單解析",
+      "tag": "計費",
+      "pos": [
+        1120,
+        500
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "places",
+      "type": "external",
+      "label": "Google Places",
+      "sublabel": "附近真實店家",
+      "tag": "計費",
+      "pos": [
+        1120,
+        640
+      ],
+      "size": [
+        150,
+        62
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "使用者的瀏覽器",
+      "wraps": [
+        "web",
+        "authgate",
+        "store"
+      ],
+      "pad": 20
+    },
+    {
+      "kind": "region",
+      "label": "本機後端",
+      "wraps": [
+        "api",
+        "rules",
+        "tfda"
+      ],
+      "pad": 20
+    },
+    {
+      "kind": "security-group",
+      "label": "nutrilens.db（SQLite）",
+      "wraps": [
+        "accounts",
+        "db",
+        "menu"
+      ],
+      "pad": 16
+    }
+  ],
+  "connections": [
+    {
+      "from": "user",
+      "to": "web",
+      "label": "HTTP(S)",
+      "variant": "emphasis"
+    },
+    {
+      "from": "web",
+      "to": "authgate"
+    },
+    {
+      "from": "web",
+      "to": "store"
+    },
+    {
+      "from": "authgate",
+      "to": "api",
+      "label": "註冊 / 登入",
+      "variant": "security"
+    },
+    {
+      "from": "web",
+      "to": "api",
+      "label": "Bearer token",
+      "variant": "emphasis",
+      "labelAt": [
+        540,
+        381
+      ]
+    },
+    {
+      "from": "api",
+      "to": "accounts",
+      "label": "驗證 token",
+      "variant": "security"
+    },
+    {
+      "from": "api",
+      "to": "rules",
+      "label": "單餐上限",
+      "route": "orthogonal-v"
+    },
+    {
+      "from": "api",
+      "to": "db"
+    },
+    {
+      "from": "api",
+      "to": "menu"
+    },
+    {
+      "from": "api",
+      "to": "tfda",
+      "route": "orthogonal-v"
+    },
+    {
+      "from": "api",
+      "to": "gemini",
+      "variant": "dashed"
+    },
+    {
+      "from": "api",
+      "to": "places",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "資料流的單一方向",
+      "items": [
+        "疾病門檻的數字只從後端出去，前端只負責比大小",
+        "每日目標與單餐上限隨 /records 一起下發",
+        "store 是畫面唯一的資料來源，不再有第二套預設值"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "需要注意的邊界",
+      "items": [
+        "後端預設只讓這台電腦連，其他裝置要加 --lan 或走 cloudflared",
+        "AuthGate 擋住所有子畫面，後端沒開整個 App 就不能用",
+        "Gemini 與 Google Places 每次呼叫都計費"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "資料的真實狀況",
+      "items": [
+        "資料庫檔放在 %LOCALAPPDATA%\\NutriLens，避開 OneDrive 同步",
+        "Render 上的版本磁碟每次部署都會清空，帳號與紀錄跟著消失",
+        "TFDA 是食材樣本庫，查不到便當與滷肉飯這類菜色"
+      ]
+    }
+  ]
+}

@@ -39,3 +39,6 @@ backend/tfda_data/20_5.json
 *.db
 *.db-wal
 *.db-shm
+
+# graphify 產生的知識圖譜與快取（本機用，不進版控）
+graphify-out/

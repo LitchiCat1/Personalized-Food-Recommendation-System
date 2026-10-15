@@ -1,0 +1,259 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "從拍照到警示",
+    "subtitle": "一次掃描如何走完辨識、疾病篩選與記錄",
+    "output": "docs/architecture/scan-to-alert.html",
+    "viewBox": [
+      1040,
+      700
+    ],
+    "column_fit": "spread",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "recognise",
+        "label": "辨識這一餐",
+        "focus": [
+          "user",
+          "web",
+          "api",
+          "gemini"
+        ],
+        "note": "Gemini 每次呼叫都計費，所以只在使用者主動拍照時發生。"
+      },
+      {
+        "id": "screen",
+        "label": "套用疾病條件",
+        "focus": [
+          "api",
+          "rules"
+        ],
+        "note": "擋下、警告或通過都在後端決定，前端不重算門檻。"
+      },
+      {
+        "id": "record",
+        "label": "寫入與回饋",
+        "focus": [
+          "api",
+          "db",
+          "web",
+          "user"
+        ],
+        "note": "每日目標與單餐上限跟著紀錄一起回傳，畫面只負責比大小。"
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "使用者",
+      "sublabel": "拍照記錄"
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "辨識頁",
+      "sublabel": "Expo Web"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Flask API",
+      "sublabel": "python app.py"
+    },
+    {
+      "id": "auth",
+      "type": "security",
+      "label": "本機登入",
+      "sublabel": "查 auth_sessions"
+    },
+    {
+      "id": "gemini",
+      "type": "external",
+      "label": "Gemini",
+      "sublabel": "影像辨識・計費"
+    },
+    {
+      "id": "rules",
+      "type": "security",
+      "label": "疾病門檻",
+      "sublabel": "禁忌與過敏原"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "SQLite",
+      "sublabel": "records"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 300,
+      "label": "辨識"
+    },
+    {
+      "from": 310,
+      "to": 430,
+      "label": "疾病篩選"
+    },
+    {
+      "from": 440,
+      "to": 610,
+      "label": "記錄與警示"
+    }
+  ],
+  "messages": [
+    {
+      "id": "shoot",
+      "from": "user",
+      "to": "web",
+      "y": 165,
+      "label": "拍攝餐盤"
+    },
+    {
+      "id": "post-image",
+      "from": "web",
+      "to": "api",
+      "y": 195,
+      "label": "POST /predict/vision-food",
+      "variant": "emphasis"
+    },
+    {
+      "id": "verify",
+      "from": "api",
+      "to": "auth",
+      "y": 225,
+      "label": "驗證 Bearer token",
+      "variant": "security"
+    },
+    {
+      "id": "claims",
+      "from": "auth",
+      "to": "api",
+      "y": 255,
+      "label": "身分確認",
+      "variant": "return"
+    },
+    {
+      "id": "vision",
+      "from": "api",
+      "to": "gemini",
+      "y": 288,
+      "label": "影像辨識",
+      "variant": "dashed"
+    },
+    {
+      "id": "foods",
+      "from": "gemini",
+      "to": "api",
+      "y": 325,
+      "label": "食物與營養估算",
+      "variant": "return"
+    },
+    {
+      "id": "screen",
+      "from": "api",
+      "to": "rules",
+      "y": 360,
+      "label": "套用疾病條件與過敏原"
+    },
+    {
+      "id": "verdict",
+      "from": "rules",
+      "to": "api",
+      "y": 395,
+      "label": "擋下 / 警告 / 通過",
+      "variant": "return"
+    },
+    {
+      "id": "result",
+      "from": "api",
+      "to": "web",
+      "y": 416,
+      "label": "辨識結果 + 風險說明",
+      "variant": "emphasis"
+    },
+    {
+      "id": "confirm",
+      "from": "user",
+      "to": "web",
+      "y": 470,
+      "label": "確認後加入今日紀錄"
+    },
+    {
+      "id": "post-record",
+      "from": "web",
+      "to": "api",
+      "y": 500,
+      "label": "POST /record",
+      "variant": "emphasis"
+    },
+    {
+      "id": "write",
+      "from": "api",
+      "to": "db",
+      "y": 532,
+      "label": "寫入 records"
+    },
+    {
+      "id": "targets",
+      "from": "api",
+      "to": "web",
+      "y": 570,
+      "label": "每日目標 + 單餐上限",
+      "variant": "return"
+    },
+    {
+      "id": "alert",
+      "from": "web",
+      "to": "user",
+      "y": 600,
+      "label": "顯示超標警示"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "api",
+      "from": 190,
+      "to": 545,
+      "type": "backend"
+    },
+    {
+      "participant": "gemini",
+      "from": 283,
+      "to": 330,
+      "type": "external"
+    },
+    {
+      "participant": "rules",
+      "from": 355,
+      "to": 400,
+      "type": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "只有一處判定風險",
+      "items": [
+        "疾病條件與過敏原一律在後端比對",
+        "前端收到的是結論，不是重算一次的門檻",
+        "單餐上限與每日目標隨回應一起下發"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "會計費的那一段",
+      "items": [
+        "只有影像辨識那一跳會呼叫 Gemini",
+        "使用者沒拍照就不會產生費用",
+        "辨識失敗時仍可用手動新增補上紀錄"
+      ]
+    }
+  ]
+}

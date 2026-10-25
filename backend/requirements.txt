@@ -3,6 +3,9 @@
 # 換電腦或 Render 重新部署時才不會裝到沒測過的大版本。不鎖死小版本：
 # Python 換小版本時，鎖死的舊版可能沒有對應的安裝檔。
 flask>=3.1,<4
+# Flask 會順帶裝 Werkzeug；3.1.9 起 safe_join() 才擋 Windows 的裝置名稱（CVE-2026-102598），
+# 後端在 Windows 上用它提供網站檔案
+werkzeug>=3.1.9,<4
 flask-cors>=6.0,<7
 pymongo>=4,<5
 requests>=2.32,<3

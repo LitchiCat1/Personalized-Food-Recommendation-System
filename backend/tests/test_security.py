@@ -12,6 +12,7 @@ from test_api_routes import ApiTestBase
 LAN = {"REMOTE_ADDR": "192.168.0.50"}
 LOCAL = {"REMOTE_ADDR": "127.0.0.1"}
 TUNNEL_HEADERS = {"Cf-Connecting-Ip": "203.0.113.9"}
+FUNNEL_URL = "https://my-pc.tail1234.ts.net/"
 
 
 class RequestOriginTests(ApiTestBase):
@@ -30,6 +31,26 @@ class RequestOriginTests(ApiTestBase):
     def test_this_machine_is_local(self):
         with self.app_module.app.test_request_context("/", environ_base=LOCAL):
             self.assertTrue(self.app_module.is_local_request())
+
+    def test_this_machine_by_ip_address_is_local(self):
+        for base_url in ("http://127.0.0.1:5000/", "http://[::1]:5000/"):
+            with self.subTest(base_url=base_url):
+                with self.app_module.app.test_request_context("/", base_url=base_url, environ_base=LOCAL):
+                    self.assertTrue(self.app_module.is_local_request())
+
+    def test_a_tunnel_that_adds_no_forwarding_headers_is_still_not_local(self):
+        # Tailscale Funnel 跑在這台電腦上，轉進來的請求來源也是 127.0.0.1，
+        # 而且不保證會加轉送標頭。外面的人打的是 tunnel 的網域，看 Host 就分得出來。
+        with self.app_module.app.test_request_context("/", base_url=FUNNEL_URL, environ_base=LOCAL):
+            self.assertFalse(self.app_module.is_local_request())
+
+    def test_a_tunnel_forwarded_address_is_used_for_rate_limits(self):
+        # 請求方自己塞的 X-Forwarded-For 排在前面，本機 tunnel 加的是最後一個
+        with self.app_module.app.test_request_context(
+            "/", base_url=FUNNEL_URL, environ_base=LOCAL, headers={"X-Forwarded-For": "1.1.1.1, 203.0.113.7"}
+        ):
+            self.assertEqual(self.app_module.client_ip(), "203.0.113.7")
+            self.assertFalse(self.app_module.is_local_request())
 
 
 class BindHostTests(ApiTestBase):
@@ -139,6 +160,16 @@ class OwnerOnlyActionTests(ApiTestBase):
         with self.mock_auth("user-a"):
             response = self.client.get("/health/gemini", headers={**self.auth_headers(), **TUNNEL_HEADERS})
         self.assertEqual(response.status_code, 403)
+
+    def test_visitors_through_a_funnel_cannot_use_owner_only_actions(self):
+        self.app_module.storage.save_restaurant_menu("好吃便當", [{"name": "雞腿飯"}])
+        self.assertIsNone(self.client.get("/health", base_url=FUNNEL_URL).get_json()["database_path"])
+        with self.mock_auth("user-a"):
+            wipe = self.client.delete("/restaurants/index/user-a", headers=self.auth_headers(), base_url=FUNNEL_URL)
+            probe = self.client.get("/health/gemini", headers=self.auth_headers(), base_url=FUNNEL_URL)
+        self.assertEqual(wipe.status_code, 403)
+        self.assertEqual(probe.status_code, 403)
+        self.assertEqual(self.app_module.storage.count_restaurant_menus(), 1)
 
 
 class RequestShapeTests(ApiTestBase):

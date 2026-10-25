@@ -169,11 +169,22 @@ def _is_loopback(address: str | None) -> bool:
 # cloudflared 跑在這台電腦上，轉送進來的請求 remote_addr 也是 127.0.0.1，
 # 但一定帶著這些標頭。有它們就是從外面經 tunnel 進來的。
 _PROXY_HEADERS = ("Cf-Connecting-Ip", "X-Forwarded-For", "Forwarded")
+_LOCAL_HOSTNAMES = {"localhost", "127.0.0.1", "::1"}
 
 
 def is_local_request() -> bool:
-    """請求是不是從執行後端的這台電腦本身發出的。"""
-    return _is_loopback(request.remote_addr) and not any(request.headers.get(h) for h in _PROXY_HEADERS)
+    """請求是不是從執行後端的這台電腦本身發出的。
+
+    只看來源位址和轉送標頭還不夠：Tailscale Funnel 也跑在這台電腦上，轉進來的
+    請求來源一樣是 127.0.0.1，卻不保證會加轉送標頭。外面的人打的一定是 tunnel
+    的網域（例如 *.ts.net），所以 Host 也要是這台電腦自己的名字才算。
+    """
+    host = (urlparse(f"//{request.host}").hostname or "").lower()
+    return (
+        _is_loopback(request.remote_addr)
+        and not any(request.headers.get(h) for h in _PROXY_HEADERS)
+        and host in _LOCAL_HOSTNAMES
+    )
 
 
 def client_ip() -> str:
@@ -186,6 +197,10 @@ def client_ip() -> str:
     remote = request.remote_addr or "unknown"
     if _is_loopback(remote):
         forwarded = (request.headers.get("Cf-Connecting-Ip") or "").strip()
+        if not forwarded:
+            # 其他 tunnel（例如 Tailscale Funnel）用 X-Forwarded-For。請求方自己塞的值
+            # 排在前面，只取最後一個，也就是本機 tunnel 加上的那個。
+            forwarded = (request.headers.get("X-Forwarded-For") or "").split(",")[-1].strip()
         if forwarded:
             return forwarded
     return remote

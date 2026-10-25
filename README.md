@@ -119,6 +119,36 @@ python backend/app.py
 - 只有在這台電腦上才能做的事：清除店家菜單檔案、查看金鑰診斷。
 - 展示完就把 cloudflared 關掉。在咖啡店、學校這類公用 Wi-Fi 上不要加 `--lan`。
 
+### 固定網址（Tailscale Funnel）
+
+cloudflared 的網址每次都不同。要一個不會變的網址，用 Tailscale Funnel（免費）：
+網址是 `https://電腦名稱.你的-tailnet.ts.net`，轉到這台電腦的 5000 埠。
+
+1. 安裝 Tailscale 並登入，在 Tailscale 後台（登入的那個 tailnet）開啟 HTTPS 憑證與 Funnel 權限。
+2. 開啟 Funnel（加 `--bg` 會在背景執行，重開機後設定還在）：
+
+   ```bash
+   tailscale funnel --bg 5000
+   ```
+
+   關掉：`tailscale funnel --https=443 off`。
+3. 後端要開著，網址才連得到。可以設成登入 Windows 時在背景自動啟動：
+   排程工作執行 `pythonw backend/scripts/run_in_background.py`（沒有視窗），
+   輸出寫到 `%LOCALAPPDATA%\NutriLens\logs\backend.log`。手動停止或重新啟動：
+
+   ```powershell
+   Stop-ScheduledTask -TaskName "NutriLens Backend"
+   ```
+
+   ```powershell
+   Start-ScheduledTask -TaskName "NutriLens Backend"
+   ```
+
+   背景的後端開著時，不要再另外執行 `python backend/app.py`（5000 埠已經被占用）。
+
+電腦關機或睡眠時網站就連不上。從 Funnel 進來的人一律算「其他裝置」，
+不能清除菜單檔案或看金鑰診斷；他們以 IP 計的登入／註冊次數合併計算。
+
 ### 開發時（改前端程式）
 
 開兩個終端機，前端改了會即時更新：

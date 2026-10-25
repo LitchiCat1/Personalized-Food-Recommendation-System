@@ -254,10 +254,17 @@ class StorageRepository:
 
         if self.use_sql:
             placeholders = ", ".join("?" for _ in RECORD_COLUMNS)
-            self.sql.execute(
-                f"INSERT INTO records ({RECORD_SELECT}) VALUES ({placeholders})",
+            # 同一筆同時送兩次（離線補傳加上手動重按）時，上面兩邊都查不到。唯一索引
+            # 擋得住重複，但後到的那個會撞 IntegrityError 變成 500；讓資料庫直接略過，
+            # 再查回先寫進去的那筆。SQLite 和 Postgres 都支援這個寫法。
+            inserted = self.sql.execute(
+                f"INSERT INTO records ({RECORD_SELECT}) VALUES ({placeholders}) "
+                "ON CONFLICT (user_id, client_record_id) DO NOTHING",
                 self._record_values(record),
             )
+            if not inserted:
+                existing = self.get_record_by_client_record_id(record.get("user_id"), record.get("client_record_id"))
+                return {**existing, "_deduplicated": True}
             return self._enrich_record_totals(record)
         if self.use_mongo:
             self.db.records.insert_one(record)

@@ -8,6 +8,7 @@ import os
 import unittest
 import uuid
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 import bcrypt
 
@@ -91,6 +92,21 @@ class PostgresIntegrationTests(unittest.TestCase):
         self.assertTrue(updated)
         self.assertEqual(self.storage.get_record_by_client_record_id("user-a", "m2")["meal_type"], "晚餐")
         self.storage.delete_record("user-a", "m1")
+        self.assertEqual(len(self.storage.get_records("user-a")), 1)
+
+    def test_two_saves_of_the_same_record_at_once_do_not_fail(self):
+        self.storage.insert_record(self.meal("same", 500))
+        real_lookup = self.storage.get_record_by_client_record_id
+        calls = []
+
+        def lookup_before_the_other_write_landed(user_id, client_record_id):
+            calls.append(client_record_id)
+            return None if len(calls) == 1 else real_lookup(user_id, client_record_id)
+
+        with patch.object(self.storage, "get_record_by_client_record_id", lookup_before_the_other_write_landed):
+            again = self.storage.insert_record(self.meal("same", 999))
+
+        self.assertTrue(again["_deduplicated"])
         self.assertEqual(len(self.storage.get_records("user-a")), 1)
 
     def test_restaurant_menu_and_failure_cooldown(self):

@@ -92,6 +92,24 @@ class SqliteStorageTests(unittest.TestCase):
         self.assertEqual(len(self.storage.get_today_records("user-a")), 1)
         self.assertEqual(len(self.storage.get_records("user-a", limit=1, offset=1)), 1)
 
+    def test_two_saves_of_the_same_record_at_once_do_not_fail(self):
+        # 離線補傳和手動重按同時送出：兩邊都先查過、都沒查到，才各自寫入。
+        # 先前後到的那個撞到唯一索引，變成 IntegrityError（500）。
+        self.storage.insert_record(meal("same"))
+        real_lookup = self.storage.get_record_by_client_record_id
+        calls = []
+
+        def lookup_before_the_other_write_landed(user_id, client_record_id):
+            calls.append(client_record_id)
+            return None if len(calls) == 1 else real_lookup(user_id, client_record_id)
+
+        with patch.object(self.storage, "get_record_by_client_record_id", lookup_before_the_other_write_landed):
+            again = self.storage.insert_record(meal("same", calories=999))
+
+        self.assertTrue(again["_deduplicated"])
+        self.assertEqual(again["total_calories"], 500, "回傳的是先寫進去的那筆")
+        self.assertEqual(len(self.storage.get_records("user-a")), 1)
+
     def test_update_and_delete_return_the_record(self):
         self.storage.insert_record(meal("r1"))
 

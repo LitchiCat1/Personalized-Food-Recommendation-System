@@ -389,7 +389,7 @@ def _fetch_new_places_api(lat: float, lng: float, radius_m: float, key: str, max
                 })
             return results
     except Exception as e:
-        print(f"[!] Places API (New) fallback failed: {e}")
+        print(f"[!] Places API (New) fallback failed: {type(e).__name__}: {str(e).replace(key, '***')}")
     return []
 
 
@@ -432,7 +432,8 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
                 else:
                     results = payload.get("results", [])
         except Exception as exc:
-            print(f"[Google Places] 舊版 Nearby Search 例外：{exc}")
+            # 舊版 API 的金鑰在網址參數裡，requests 連不上時的錯誤訊息會印出整串網址
+            print(f"[Google Places] 舊版 Nearby Search 例外：{type(exc).__name__}: {str(exc).replace(key, '***')}")
         if not results:
             raise GooglePlacesAPIError(
                 "Google Places 兩種 API 都沒有回傳結果，請確認金鑰權限與 Billing 設定。"

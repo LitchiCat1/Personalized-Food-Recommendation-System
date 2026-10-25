@@ -1048,6 +1048,141 @@ class JsonErrorTests(ApiTestBase):
         self.assertIn("error", response.get_json())
 
 
+def fake_response(status, body=b"", url="https://example.test/"):
+    response = requests.Response()
+    response.status_code = status
+    response._content = body if isinstance(body, bytes) else body.encode("utf-8")
+    response.url = url
+    response.reason = "test"
+    return response
+
+
+class ExternalApiFailureTests(ApiTestBase):
+    """Gemini 與 Google Places 失敗時：回什麼、重試幾次、金鑰會不會跑出去。全部是模擬的回應。"""
+
+    KEY = "AIzaFAKE_GEMINI_KEY_FOR_TESTS"
+    PLACES_KEY = "AIzaFAKE_PLACES_KEY_FOR_TESTS"
+    IMAGE = base64.b64encode(b"\x89PNG\r\n\x1a\nmock-image").decode("ascii")
+    SCAN_ROUTES = ("/predict/vision-food", "/ocr/nutrition-label")
+
+    def setUp(self):
+        super().setUp()
+        from services.google_places_service import clear_search_cache
+        from services.nutrition_label_service import forget_forbidden_gemini_models
+
+        clear_search_cache()
+        forget_forbidden_gemini_models()
+        self.addCleanup(clear_search_cache)
+        self.addCleanup(forget_forbidden_gemini_models)
+
+    def scan(self, path, post):
+        with self.mock_auth("user-a"), \
+             patch.object(self.app_module, "get_gemini_api_keys", return_value=[self.KEY]), \
+             patch("requests.post", side_effect=post):
+            return self.client.post(path, json={"image": self.IMAGE, "user_id": "user-a"}, headers=self.auth_headers())
+
+    def test_a_gemini_timeout_is_a_502_that_says_to_try_again(self):
+        for path in self.SCAN_ROUTES:
+            with self.subTest(path=path):
+                response = self.scan(path, requests.Timeout("read timed out"))
+                self.assertEqual(response.status_code, 502)
+                self.assertIn("稍後再試", response.get_json()["error"])
+
+    def test_a_used_up_quota_is_explained_without_echoing_googles_reply(self):
+        body = '{"error": {"code": 429, "message": "Quota exceeded for quota metric, project_number:987654321"}}'
+        for path in self.SCAN_ROUTES:
+            with self.subTest(path=path):
+                response = self.scan(path, lambda *a, **k: fake_response(429, body))
+                self.assertEqual(response.status_code, 502)
+                self.assertIn("額度", response.get_json()["error"])
+                self.assertNotIn("987654321", response.get_data(as_text=True))
+
+    def test_a_rejected_key_is_reported_as_a_key_problem(self):
+        body = '{"error": {"code": 403, "message": "API key not valid. Please pass a valid API key."}}'
+        for path in self.SCAN_ROUTES:
+            with self.subTest(path=path):
+                response = self.scan(path, lambda *a, **k: fake_response(403, body))
+                self.assertEqual(response.status_code, 502)
+                self.assertIn("金鑰", response.get_json()["error"])
+                self.assertNotIn("Please pass", response.get_data(as_text=True))
+
+    def test_an_unreadable_gemini_reply_is_a_500_without_details(self):
+        for path in self.SCAN_ROUTES:
+            with self.subTest(path=path):
+                response = self.scan(path, lambda *a, **k: fake_response(200, '{"candidates": []}'))
+                self.assertEqual(response.status_code, 500)
+                self.assertNotIn("list index", response.get_data(as_text=True))
+
+    def test_retries_stop_after_each_key_and_model_was_tried_once(self):
+        # 不會無限重試：每一組（金鑰, 模型）最多一次，然後回錯誤
+        calls = []
+
+        def busy(*args, **kwargs):
+            calls.append(kwargs.get("headers", {}).get("x-goog-api-key"))
+            return fake_response(503, '{"error": {"code": 503}}')
+
+        keys = ["key-1", "key-2", "key-3"]
+        with self.mock_auth("user-a"), \
+             patch.object(self.app_module, "get_gemini_api_keys", return_value=keys), \
+             patch("services.nutrition_label_service.get_gemini_models", return_value=["m-1", "m-2"]), \
+             patch("requests.post", side_effect=busy):
+            response = self.client.post(
+                "/predict/vision-food", json={"image": self.IMAGE, "user_id": "user-a"}, headers=self.auth_headers()
+            )
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(len(calls), 6)
+        self.assertEqual(sorted(set(calls)), keys)
+
+    def test_a_store_summary_timeout_is_a_502(self):
+        with self.mock_auth("user-a"), \
+             patch("services.restaurant_ai_service.get_gemini_api_keys", return_value=[self.KEY]), \
+             patch("requests.post", side_effect=requests.Timeout("read timed out")):
+            response = self.client.post(
+                "/map-food-recommend/user-a/restaurant-summary",
+                json={"restaurant": {"name": "Healthy Bento"}, "budget": 150},
+                headers=self.auth_headers(),
+            )
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("稍後再試", response.get_json()["error"])
+
+    def places_search(self, post, get):
+        with self.mock_auth("user-a"), \
+             patch.dict(os.environ, {"GOOGLE_PLACES_API_KEY": self.PLACES_KEY}), \
+             patch("services.google_places_service.requests.post", side_effect=post), \
+             patch("services.google_places_service.requests.get", side_effect=get):
+            return self.client.get(
+                "/map-food-recommend/user-a?budget=150&lat=24.9890&lng=121.3443&radius_km=3&category=all",
+                headers=self.auth_headers(),
+            )
+
+    def test_places_refusing_both_apis_falls_back_to_labelled_demo_stores(self):
+        # 既有設計：兩種 Places API 都失敗時改用內建示範店家，並明白標示不是真的店
+        denied = '{"status": "REQUEST_DENIED", "error_message": "The provided API key is invalid."}'
+        response = self.places_search(
+            lambda *a, **k: fake_response(403, '{"error": {"status": "PERMISSION_DENIED"}}'),
+            lambda *a, **k: fake_response(200, denied),
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["data_source"], "google_places_fallback")
+        self.assertIn("示範資料", data["data_source_warning"])
+        self.assertNotIn(self.PLACES_KEY, response.get_data(as_text=True))
+
+    def test_a_places_connection_error_does_not_write_the_key_to_the_log(self):
+        # 舊版 Places API 只收網址上的 key=；requests 連不上時的錯誤訊息會印出整串網址
+        def unreachable(url, params=None, **kwargs):
+            query = "&".join(f"{name}={value}" for name, value in (params or {}).items())
+            raise requests.ConnectionError(f"Max retries exceeded with url: {url}?{query}")
+
+        with patch("builtins.print") as printed:
+            response = self.places_search(lambda *a, **k: fake_response(500), unreachable)
+        self.assertEqual(response.get_json()["data_source"], "google_places_fallback")
+        self.assertNotIn(self.PLACES_KEY, response.get_data(as_text=True))
+        logged = "\n".join(" ".join(str(arg) for arg in call.args) for call in printed.call_args_list)
+        self.assertIn("ConnectionError", logged)
+        self.assertNotIn(self.PLACES_KEY, logged)
+
+
 class AuthDefaultTests(unittest.TestCase):
     """預設就要驗證。先前只有偵測到 RENDER 才驗證，其他部署方式全部不設防。"""
 

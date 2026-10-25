@@ -323,6 +323,22 @@ def gemini_unreachable_response(feature: str, error: Exception):
     return jsonify({"error": f"{feature}服務暫時連不上，請稍後再試。"}), 502
 
 
+def gemini_http_error_response(feature: str, error: requests.HTTPError):
+    # Google 的錯誤原文可能帶著專案編號、模型名稱這類內部資訊，只寫進後端 log
+    status = error.response.status_code if error.response is not None else None
+    detail = error.response.text[:300] if error.response is not None else ""
+    print(f"[WARN] {feature}：Gemini 回 HTTP {status}：{_redact_gemini_keys(detail)}")
+    if status == 429:
+        message = f"{feature}的 AI 額度暫時用完了，請稍後再試。"
+    elif status in (401, 403):
+        message = f"{feature}服務的金鑰無效或沒有權限，請通知網站管理者。"
+    elif status == 400:
+        message = f"AI 服務無法處理這次的{feature}，請換一張照片或稍後再試。"
+    else:
+        message = f"{feature}服務暫時不可用（HTTP {status}），請稍後再試。"
+    return jsonify({"error": message}), 502
+
+
 def gemini_failure_response(feature: str, error: Exception):
     print(f"[ERROR] {feature}失敗：{type(error).__name__}: {_redact_gemini_keys(str(error))}")
     return jsonify({"error": f"{feature}失敗，請稍後再試。"}), 500
@@ -661,7 +677,7 @@ def ocr_nutrition_label():
             }
         )
     except requests.HTTPError as e:
-        return jsonify({"error": f"Gemini API 呼叫失敗: {e.response.text[:500]}"}), 502
+        return gemini_http_error_response("營養標示辨識", e)
     except requests.RequestException as e:
         return gemini_unreachable_response("營養標示辨識", e)
     except Exception as e:
@@ -708,7 +724,7 @@ def predict_vision_food():
             )
         )
     except requests.HTTPError as e:
-        return jsonify({"error": f"Gemini Vision 食物辨識呼叫失敗: {e.response.text[:500]}"}), 502
+        return gemini_http_error_response("食物辨識", e)
     except requests.RequestException as e:
         return gemini_unreachable_response("食物辨識", e)
     except Exception as e:
@@ -1370,8 +1386,10 @@ def map_food_restaurant_summary(user_id):
     except ValueError as e:
         return jsonify({"error": str(e)}), 503
     except requests.HTTPError as e:
-        status_code = e.response.status_code if e.response is not None else "unknown"
-        return jsonify({"error": f"Gemini 店家摘要失敗: HTTP {status_code}"}), 502
+        return gemini_http_error_response("店家摘要", e)
+    except requests.RequestException as e:
+        # 逾時、連不上：先前沒接住，變成 500
+        return gemini_unreachable_response("店家摘要", e)
     return jsonify({"summary": summary}), 200
 
 

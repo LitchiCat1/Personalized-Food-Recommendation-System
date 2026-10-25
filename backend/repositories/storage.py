@@ -92,6 +92,7 @@ class StorageRepository:
     def _init_tables(self):
         if self.sql.dialect == "postgres":
             self.sql.executescript(POSTGRES_TABLES)
+            self._require_record_dedupe_index()
             return
         # SQLite 沒有 JSON 與時間型別：doc / foods 存 JSON 字串，時間存 utc_iso() 的字串
         self.sql.executescript(
@@ -144,6 +145,40 @@ class StorageRepository:
             );
             """
         )
+        self._require_record_dedupe_index()
+
+    def _require_record_dedupe_index(self):
+        """存紀錄的 ON CONFLICT (user_id, client_record_id) 要靠這個唯一索引。
+
+        CREATE UNIQUE INDEX IF NOT EXISTS 只看名字：舊資料庫若已有同名的一般索引，
+        它會直接跳過，之後每一次存紀錄都失敗。在啟動時就停下來說清楚。
+        """
+        wanted = {"user_id", "client_record_id"}
+        if self.sql.dialect == "postgres":
+            rows = self.sql.query_all(
+                """
+                SELECT array_agg(a.attname::text) AS columns
+                FROM pg_index i
+                JOIN pg_class t ON t.oid = i.indrelid
+                JOIN pg_namespace n ON n.oid = t.relnamespace
+                JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(i.indkey)
+                WHERE t.relname = 'records' AND n.nspname = current_schema() AND i.indisunique
+                GROUP BY i.indexrelid
+                """
+            )
+            found = any(set(row["columns"]) == wanted for row in rows)
+        else:
+            found = any(
+                {info["name"] for info in self.sql.query_all(f"PRAGMA index_info('{index['name']}')")} == wanted
+                for index in self.sql.query_all("PRAGMA index_list('records')")
+                if index["unique"]
+            )
+        if not found:
+            raise RuntimeError(
+                "records 表缺少 (user_id, client_record_id) 的唯一索引，存紀錄會失敗。"
+                "通常是舊資料庫已有同名的一般索引 idx_records_user_client_record："
+                "確認沒有重複資料後，刪掉那個索引再重新啟動，後端會自動建立唯一索引。"
+            )
 
     def _fetch_json_doc(self, table: str, key_field: str, key_value: str):
         row = self.sql.query_one(f"SELECT doc FROM {table} WHERE {key_field} = ?", (key_value,))

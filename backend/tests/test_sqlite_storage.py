@@ -92,6 +92,21 @@ class SqliteStorageTests(unittest.TestCase):
         self.assertEqual(len(self.storage.get_today_records("user-a")), 1)
         self.assertEqual(len(self.storage.get_records("user-a", limit=1, offset=1)), 1)
 
+    def test_an_old_non_unique_index_with_the_same_name_stops_startup(self):
+        # CREATE UNIQUE INDEX IF NOT EXISTS 只看名字；同名的一般索引會讓它跳過，
+        # 存紀錄的 ON CONFLICT 就沒有唯一索引可用，每一次儲存都會失敗
+        db = SqliteDatabase(":memory:")
+        db.executescript(
+            """
+            CREATE TABLE records (id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, client_record_id TEXT NOT NULL,
+                                  timestamp TEXT NOT NULL);
+            CREATE INDEX idx_records_user_client_record ON records (user_id, client_record_id);
+            """
+        )
+        with self.assertRaises(RuntimeError) as ctx:
+            StorageRepository(None, False, {}, [], [], sql=db)
+        self.assertIn("唯一索引", str(ctx.exception))
+
     def test_two_saves_of_the_same_record_at_once_do_not_fail(self):
         # 離線補傳和手動重按同時送出：兩邊都先查過、都沒查到，才各自寫入。
         # 先前後到的那個撞到唯一索引，變成 IntegrityError（500）。

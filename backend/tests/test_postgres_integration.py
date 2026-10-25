@@ -194,6 +194,114 @@ class PostgresIntegrationTests(unittest.TestCase):
         self.storage.clear_restaurant_menus()
         self.assertEqual(self.storage.count_restaurant_menus(), 0)
 
+    # ─── 交易、唯一性、並行、遷移 ───────────────────────────────
+
+    def count(self, table):
+        return self.db.query_one(f"SELECT COUNT(*) AS n FROM {table}")["n"]
+
+    def test_a_failed_transaction_leaves_nothing_behind(self):
+        with self.assertRaises(RuntimeError):
+            with self.db.transaction():
+                self.storage.upsert_user({"user_id": "user-a", "name": "半途"})
+                self.db.execute(
+                    "INSERT INTO restaurant_menu_failures (venue_key, reason, failed_until) VALUES (?, ?, NOW())",
+                    ("k1", "x"),
+                )
+                raise RuntimeError("中途出錯")
+        self.assertEqual(self.count("users"), 0)
+        self.assertEqual(self.count("restaurant_menu_failures"), 0)
+        # 退回之後連線照常可用
+        self.storage.upsert_user({"user_id": "user-a", "name": "之後"})
+        self.assertEqual(self.storage.get_user("user-a")["name"], "之後")
+
+    def test_a_statement_error_inside_a_transaction_rolls_back_the_earlier_writes(self):
+        import psycopg2
+
+        with self.assertRaises(psycopg2.Error):
+            with self.db.transaction():
+                self.storage.upsert_user({"user_id": "user-a", "name": "先寫"})
+                self.db.execute("INSERT INTO no_such_table VALUES (1)")
+        self.assertEqual(self.count("users"), 0)
+
+    def test_the_database_itself_rejects_a_duplicate_nickname(self):
+        # 不只靠程式先查：直接寫兩次，第二次要被唯一性限制擋下
+        from repositories.auth_repository import EmailAlreadyRegistered
+
+        self.auth.create_user("same", "hash-1")
+        with self.assertRaises(EmailAlreadyRegistered):
+            self.auth.create_user("same", "hash-2")
+        self.assertEqual(self.count("auth_users"), 1)
+
+    def test_many_threads_saving_the_same_record_store_it_once(self):
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(lambda _: self.storage.insert_record(self.meal("tap-twice", 500)), range(8)))
+        self.assertEqual(self.count("records"), 1)
+        self.assertEqual(sum(1 for result in results if not result.get("_deduplicated")), 1)
+
+    def test_many_threads_writing_different_records_lose_nothing(self):
+        from concurrent.futures import ThreadPoolExecutor
+
+        def save(index):
+            self.storage.insert_record(self.meal(f"r{index}", 100 + index))
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(save, range(40)))
+        self.assertEqual(self.count("records"), 40)
+        self.assertEqual(self.storage.get_history("user-a", 1)[-1]["record_count"], 40)
+
+    def test_a_redeploy_on_existing_tables_keeps_the_data(self):
+        # Render 每次部署都會重新建表：CREATE ... IF NOT EXISTS 不能動到既有資料
+        sign_up(self.auth, "老用戶", "pw")
+        self.storage.upsert_user({"user_id": "user-a", "name": "小明"})
+        self.storage.insert_record(self.meal("m1"))
+        StorageRepository(None, False, {}, [], [], sql=self.db)
+        AuthRepository(self.db)
+        self.assertEqual(self.count("auth_users"), 1)
+        self.assertEqual(self.storage.get_user("user-a")["name"], "小明")
+        self.assertEqual(self.count("records"), 1)
+        sign_in(self.auth, "老用戶", "pw")
+
+    def test_an_old_records_table_without_the_unique_index_gets_it(self):
+        self.db.execute("DROP INDEX idx_records_user_client_record")
+        self.db.execute(
+            "INSERT INTO records (user_id, client_record_id, timestamp) VALUES (?, ?, ?)",
+            ("user-a", "old", "2026-10-01T12:00:00"),
+        )
+        storage = StorageRepository(None, False, {}, [], [], sql=self.db)
+        indexes = {row["indexname"] for row in self.db.query_all(
+            "SELECT indexname FROM pg_indexes WHERE schemaname = ? AND tablename = 'records'", (self.schema,)
+        )}
+        self.assertIn("idx_records_user_client_record", indexes)
+        # 存紀錄用的 ON CONFLICT 要靠這個唯一索引
+        self.assertTrue(storage.insert_record({**self.meal("old"), "timestamp": "2026-10-01T12:00:00"})["_deduplicated"])
+        self.assertEqual(self.count("records"), 1)
+
+    def test_an_old_non_unique_index_with_the_same_name_stops_startup(self):
+        # CREATE UNIQUE INDEX IF NOT EXISTS 只看名字：同名的一般索引會讓它直接跳過，
+        # 之後每一次存紀錄都撞 "no unique or exclusion constraint"。要在啟動時就擋下來。
+        self.db.execute("DROP INDEX idx_records_user_client_record")
+        self.db.execute("CREATE INDEX idx_records_user_client_record ON records (user_id, client_record_id)")
+        with self.assertRaises(RuntimeError) as ctx:
+            StorageRepository(None, False, {}, [], [], sql=self.db)
+        self.assertIn("唯一索引", str(ctx.exception))
+
+    def test_duplicate_rows_in_an_old_table_stop_startup_instead_of_being_dropped(self):
+        # 舊表裡如果已經有重複的 (user_id, client_record_id)，唯一索引建不起來。
+        # 現在的行為是啟動失敗（Render 會留著上一版），不會偷偷刪資料——部署前要先查。
+        import psycopg2
+
+        self.db.execute("DROP INDEX idx_records_user_client_record")
+        for _ in range(2):
+            self.db.execute(
+                "INSERT INTO records (user_id, client_record_id, timestamp) VALUES (?, ?, ?)",
+                ("user-a", "dup", "2026-10-25T12:00:00"),
+            )
+        with self.assertRaises(psycopg2.Error):
+            StorageRepository(None, False, {}, [], [], sql=self.db)
+        self.assertEqual(self.count("records"), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

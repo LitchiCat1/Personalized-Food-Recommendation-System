@@ -37,6 +37,10 @@ class RecordingDatabase:
     def executescript(self, sql):
         self.scripts.append(sql)
 
+    def query_all(self, sql, params=()):
+        # 啟動時檢查 records 的唯一索引；假資料庫照建表語法回答「有」
+        return [{"columns": ["user_id", "client_record_id"]}]
+
 
 class PostgresTableTests(unittest.TestCase):
     def test_storage_tables_match_supabase_types_and_enable_rls(self):

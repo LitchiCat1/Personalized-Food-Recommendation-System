@@ -42,6 +42,15 @@ class FrontendServingTests(ApiTestBase):
         self.assertEqual(self.get("/").headers["Cache-Control"], "no-cache")
         self.assertEqual(self.get("/health").get_json()["status"], "ok")
 
+    def test_pages_and_scripts_cannot_be_framed_or_sniffed(self):
+        for path in ("/", "/scanner", "/_expo/static/js/entry-abc.js"):
+            with self.subTest(path=path):
+                response = self.get(path)
+                self.assertEqual(response.headers["X-Frame-Options"], "DENY")
+                self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
+        # nosniff 之下，腳本的類型一定要是 JavaScript，不然瀏覽器會拒絕執行
+        self.assertIn("javascript", self.get("/_expo/static/js/entry-abc.js").headers["Content-Type"])
+
     def test_missing_files_and_escapes_are_not_served(self):
         self.assertEqual(self.get("/_expo/static/js/missing.js").status_code, 404)
         self.assertEqual(self.get("/logo.png").status_code, 404)

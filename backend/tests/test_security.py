@@ -265,6 +265,15 @@ class RequestShapeTests(ApiTestBase):
         self.assertIsNone(self.app_module.storage.get_restaurant_menu("老王牛肉麵", "place-real"))
 
 
+class SecurityHeaderTests(ApiTestBase):
+    def test_api_and_error_responses_cannot_be_framed_or_sniffed(self):
+        for response in (self.client.get("/health"), self.client.get("/history/user-a")):
+            with self.subTest(status=response.status_code):
+                self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
+                self.assertEqual(response.headers["X-Frame-Options"], "DENY")
+                self.assertIn("frame-ancestors 'none'", response.headers["Content-Security-Policy"])
+
+
 class WriteLimitTests(ApiTestBase):
     """飲食紀錄、自訂食品、健康檔案這幾條會寫進資料庫的路由。
 

@@ -321,6 +321,22 @@ def allow_other_ports_on_this_machine(response):
         )
     return response
 
+
+@app.after_request
+def add_security_headers(response):
+    """不讓別的網站把這裡嵌進 iframe 騙人點擊，也不讓瀏覽器自己猜檔案類型。
+
+    登入 token 存在瀏覽器的 localStorage，頁面一旦被插進別人的程式就讀得走，
+    所以這幾個不影響功能的標頭先加上。沒有設限制腳本來源的完整 CSP：
+    Expo 打包的網站和 Google 地圖要用的來源還沒逐一確認，設錯整個網站會打不開。
+    """
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault(
+        "Content-Security-Policy", "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+    )
+    return response
+
 # 會呼叫 Gemini / Google Places 的路由要限流，那些都是按次計費的
 _paid_api_limiter = build_limiter("RATE_LIMIT_PAID_CALLS", 12)
 # 會寫進資料庫的路由（飲食紀錄、自訂食品、健康檔案）。先前這個限流器建了卻沒有

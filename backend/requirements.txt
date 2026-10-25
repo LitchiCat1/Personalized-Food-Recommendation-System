@@ -1,9 +1,13 @@
-flask
-flask-cors
-pymongo
-requests
-beautifulsoup4
+# 版本範圍：下限是測試通過的版本，上限擋住下一個大改版。
+# 大改版常常改行為（例如 bcrypt 5.0 起，超過 72 bytes 的密碼直接丟錯），
+# 換電腦或 Render 重新部署時才不會裝到沒測過的大版本。不鎖死小版本：
+# Python 換小版本時，鎖死的舊版可能沒有對應的安裝檔。
+flask>=3.1,<4
+flask-cors>=6.0,<7
+pymongo>=4,<5
+requests>=2.32,<3
+beautifulsoup4>=4.12,<5
 
-waitress
-bcrypt
-psycopg2-binary
+waitress>=3.0,<4
+bcrypt>=5.0,<6
+psycopg2-binary>=2.9,<3

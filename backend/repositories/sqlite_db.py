@@ -69,10 +69,20 @@ class SqliteDatabase:
         # isolation_level=None：每句自己提交，要多句一起成功時用 transaction()
         self._conn = sqlite3.connect(path, check_same_thread=False, isolation_level=None, timeout=10)
         self._conn.row_factory = sqlite3.Row
-        with self._lock:
-            # WAL：寫入時讀取不會被擋，斷電時也比較不容易壞檔
-            self._conn.execute("PRAGMA journal_mode=WAL")
-            self._conn.execute("PRAGMA foreign_keys=ON")
+        try:
+            with self._lock:
+                # WAL：寫入時讀取不會被擋，斷電時也比較不容易壞檔
+                self._conn.execute("PRAGMA journal_mode=WAL")
+                self._conn.execute("PRAGMA foreign_keys=ON")
+                # 檔頭完好、中間的資料頁壞掉時，連線照樣成功，要等查到那一頁才出錯。
+                # 開檔時整份檢查一次（資料量小，不到一秒），壞了就不要開始收資料。
+                result = self._conn.execute("PRAGMA quick_check").fetchone()[0]
+                if result != "ok":
+                    raise sqlite3.DatabaseError(f"資料庫檔案損毀：{result}")
+        except Exception:
+            # 不關的話檔案一直被鎖著，連要搬走或還原都不行
+            self._conn.close()
+            raise
 
     def execute(self, sql: str, params=()) -> int:
         """回傳受影響的筆數。"""

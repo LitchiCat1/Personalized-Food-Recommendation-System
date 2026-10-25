@@ -6,6 +6,7 @@ import io
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -141,6 +142,53 @@ class AppStartupTests(unittest.TestCase):
         self.assertEqual(ctx.exception.code, 1)
         self.assertNotIn("pa/ss", output.getvalue())
         connect.assert_not_called()
+
+    def _start_app_with_sqlite_file(self, path):
+        output = io.StringIO()
+        with patch.dict(os.environ, {"DATABASE_PATH": path, "NUTRILENS_SKIP_LOCAL_ENV": "1"}), \
+                contextlib.redirect_stdout(output):
+            os.environ.pop("DATABASE_URL", None)
+            sys.modules.pop("app", None)
+            with self.assertRaises(SystemExit) as ctx:
+                importlib.import_module("app")
+        return ctx.exception.code, output.getvalue()
+
+    def test_app_refuses_to_start_when_the_sqlite_file_is_not_a_database(self):
+        # 先前印一行 WARN 就退回記憶體照常啟動：註冊、記錄看起來都正常，重開後全部消失
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "nutrilens.db")
+            with open(path, "w", encoding="utf-8") as broken:
+                broken.write("this is not a sqlite database " * 200)
+            code, output = self._start_app_with_sqlite_file(path)
+        self.assertEqual(code, 1)
+        self.assertIn(path, output)
+        self.assertIn("備份", output)
+        self.assertNotIn("in-memory storage", output)
+
+    def test_app_refuses_to_start_when_the_sqlite_file_is_damaged_inside(self):
+        # 檔頭完好、中間的資料頁壞掉：連得上，查到那一頁才會出錯，要在啟動時就發現
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "nutrilens.db")
+            db = SqliteDatabase(path)
+            db.executescript("PRAGMA journal_mode=DELETE; CREATE TABLE notes (body TEXT);")
+            for index in range(400):
+                db.execute("INSERT INTO notes (body) VALUES (?)", (f"note {index} " * 20,))
+            db.close()
+            with open(path, "r+b") as damaged:
+                damaged.seek(4096 * 3)
+                damaged.write(b"\xff" * 4096)
+            code, output = self._start_app_with_sqlite_file(path)
+        self.assertEqual(code, 1)
+        self.assertIn(path, output)
+
+    def test_an_explicitly_empty_path_still_means_memory_only(self):
+        output = io.StringIO()
+        with patch.dict(os.environ, {"DATABASE_PATH": "", "NUTRILENS_SKIP_LOCAL_ENV": "1"}), \
+                contextlib.redirect_stdout(output):
+            os.environ.pop("DATABASE_URL", None)
+            sys.modules.pop("app", None)
+            app_module = importlib.import_module("app")
+        self.assertIsNone(app_module.sql_db)
 
 
 if __name__ == "__main__":

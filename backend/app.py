@@ -97,7 +97,12 @@ except DatabaseUnavailable as e:
     print(f"[ERROR] {e}")
     sys.exit(1)
 except Exception as e:
-    print(f"[WARN] SQLite unavailable ({resolve_database_path()}) - {e}")
+    # SQLite 開不起來也要停下，跟 Postgres 連不上一樣。先前印一行 WARN 就退回記憶體：
+    # 註冊、記錄看起來都正常，後端一重開就全部消失。真的只要記憶體就明確設 DATABASE_PATH=。
+    print(f"[ERROR] 打不開 SQLite 資料庫 {resolve_database_path()}：{e}")
+    print("        檔案可能損毀或沒有寫入權限。請從備份還原這個檔案（見 backend/scripts/backup_db.py），")
+    print("        或用 DATABASE_PATH 指到其他位置；只想暫時存在記憶體（重開就清空）請設 DATABASE_PATH= 空字串。")
+    sys.exit(1)
 # 路徑裡有 Windows 使用者名稱，/health 只給這台電腦自己看
 database_path = sql_db.path if sql_db is not None and sql_db.dialect == "sqlite" else None
 

@@ -34,11 +34,10 @@ services:
           envVarKey: RENDER_EXTERNAL_HOSTNAME
       - key: EXPO_PUBLIC_AUTH_REQUIRED
         value: "true"
-      - key: GOOGLE_PLACES_API_KEY
-        fromService:
-          type: web
-          name: nutrilens-backend
-          envVarKey: GOOGLE_PLACES_API_KEY
+      # 靜態網站打包時會把地圖金鑰寫進公開的 JS：只能放限制過網域的瀏覽器金鑰，
+      # 不能從後端拿 GOOGLE_PLACES_API_KEY（那把是後端按次計費用的）。
+      - key: GOOGLE_MAPS_BROWSER_KEY
+        sync: false
 
   - type: web
     name: nutrilens-backend

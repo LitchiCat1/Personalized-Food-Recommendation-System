@@ -34,7 +34,10 @@ function exposeFrontendBuildEnvironment(
   if (sameOriginApi) env.EXPO_PUBLIC_API_BASE_URL = 'same-origin';
 
   const mappings = [
-    ['EXPO_PUBLIC_GOOGLE_MAPS_API_KEY', ['GOOGLE_PLACES_API_KEY', 'GOOGLE_MAPS_API_KEY']],
+    // EXPO_PUBLIC_* 會原樣寫進網站的 JS，任何開網站的人都讀得到。先前這裡拿後端呼叫
+    // Places（按次計費）的 GOOGLE_PLACES_API_KEY 頂替，伺服器金鑰就跟著公開了。
+    // 地圖只用另外建、限制網域與 API 的瀏覽器金鑰。
+    ['EXPO_PUBLIC_GOOGLE_MAPS_API_KEY', ['GOOGLE_MAPS_BROWSER_KEY']],
     // 前後端用同一個開關：後端設 AUTH_REQUIRED=false 時，前端也跳過登入畫面
     ['EXPO_PUBLIC_AUTH_REQUIRED', ['AUTH_REQUIRED']],
   ];

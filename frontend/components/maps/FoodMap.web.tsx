@@ -28,7 +28,7 @@ export default function FoodMap({ location, restaurants, selectedRestaurantId, o
     return (
       <View style={[styles.container, styles.missingKeyContainer]}>
         <Text style={styles.missingKeyTitle}>尚未設定 Google Maps API Key</Text>
-        <Text style={styles.missingKeyText}>請在 frontend/.env.local 設定 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY，再重新啟動網站。</Text>
+        <Text style={styles.missingKeyText}>請在 backend/.env.local 設定只給瀏覽器用的 GOOGLE_MAPS_BROWSER_KEY，再重新打包網站。</Text>
       </View>
     );
   }

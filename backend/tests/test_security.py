@@ -44,6 +44,30 @@ class RequestOriginTests(ApiTestBase):
         with self.app_module.app.test_request_context("/", base_url=FUNNEL_URL, environ_base=LOCAL):
             self.assertFalse(self.app_module.is_local_request())
 
+    def test_a_funnel_visitor_is_counted_by_the_address_tailscale_reports(self):
+        # tailscaled（ipn/ipnlocal/serve.go）會先刪掉請求方帶的 Tailscale-Funnel-Request，
+        # 再對 Funnel 流量設成 ?1，並用 Header.Set 覆寫 X-Forwarded-For 為連線的來源位址。
+        with self.app_module.app.test_request_context(
+            "/", base_url=FUNNEL_URL, environ_base=LOCAL,
+            headers={"Tailscale-Funnel-Request": "?1", "X-Forwarded-For": "203.0.113.50"},
+        ):
+            self.assertEqual(self.app_module.client_ip(), "203.0.113.50")
+            self.assertFalse(self.app_module.is_local_request())
+
+    def test_cloudflares_address_still_wins_over_a_forged_funnel_marker(self):
+        # cloudflared 會把請求方的標頭原樣轉過來，所以它的訪客可以自己塞 Funnel 標記
+        with self.app_module.app.test_request_context(
+            "/", environ_base=LOCAL,
+            headers={**TUNNEL_HEADERS, "Tailscale-Funnel-Request": "?1", "X-Forwarded-For": "1.1.1.1"},
+        ):
+            self.assertEqual(self.app_module.client_ip(), "203.0.113.9")
+
+    def test_the_funnel_marker_from_another_machine_is_ignored(self):
+        with self.app_module.app.test_request_context(
+            "/", environ_base=LAN, headers={"Tailscale-Funnel-Request": "?1", "X-Forwarded-For": "1.1.1.1"},
+        ):
+            self.assertEqual(self.app_module.client_ip(), "192.168.0.50")
+
     def test_a_forwarded_address_through_another_tunnel_does_not_change_the_rate_limit_key(self):
         # 沒辦法確定 tunnel 會不會把請求方自己填的 X-Forwarded-For 原樣轉過來，
         # 採用它的話，每次換一個值就能繞過以 IP 計的限流
@@ -87,6 +111,22 @@ class LoginLimitTests(ApiTestBase):
             for i in range(12)
         ]
         self.assertIn(429, statuses)
+
+    def test_one_funnel_visitor_hitting_the_limit_does_not_lock_out_the_others(self):
+        # 先前所有 Funnel 訪客都算成 127.0.0.1，一個人連打就讓全部人登入不了
+        self.app_module._auth_ip_limiter.max_calls = 2
+        self.addCleanup(setattr, self.app_module._auth_ip_limiter, "max_calls", 60)
+
+        def login(address, nickname):
+            return self.client.post(
+                "/auth/login", json={"email": nickname, "password": "wrong"},
+                base_url="https://my-pc.tail1234.ts.net/", environ_base=LOCAL,
+                headers={"Tailscale-Funnel-Request": "?1", "X-Forwarded-For": address},
+            ).status_code
+
+        noisy = [login("203.0.113.66", f"noisy{i}") for i in range(3)]
+        self.assertEqual(noisy[-1], 429)
+        self.assertNotEqual(login("198.51.100.7", "someone-else"), 429)
 
     def test_the_per_account_limit_holds_across_source_addresses(self):
         statuses = [

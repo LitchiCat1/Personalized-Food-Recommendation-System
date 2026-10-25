@@ -224,8 +224,16 @@ def client_ip() -> str:
         forwarded = (request.headers.get("Cf-Connecting-Ip") or "").strip()
         if forwarded:
             return forwarded
-        # X-Forwarded-For 不採用：要是 tunnel 只是把請求方自己填的值原樣轉過來，
-        # 每次換一個值就能繞過以 IP 計的限流。其他 tunnel 的訪客一起算在 127.0.0.1。
+        # Tailscale Funnel：tailscaled（1.104 的 ipn/ipnlocal/serve.go）先刪掉請求方帶的
+        # Tailscale-Funnel-Request 再設成 ?1，並用 Header.Set 把 X-Forwarded-For 覆寫成
+        # 連線的來源位址，請求方填的值傳不進來。不採用的話，所有 Funnel 訪客共用
+        # 127.0.0.1 的額度，一個人連打就讓全部人登入不了。
+        if request.headers.get("Tailscale-Funnel-Request") == "?1":
+            forwarded = (request.headers.get("X-Forwarded-For") or "").strip()
+            if forwarded and "," not in forwarded:
+                return forwarded
+        # 其他情況的 X-Forwarded-For 不採用：要是 tunnel 只是把請求方自己填的值原樣
+        # 轉過來，每次換一個值就能繞過以 IP 計的限流。
     return remote
 
 

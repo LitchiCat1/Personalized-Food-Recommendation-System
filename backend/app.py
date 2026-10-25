@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 import requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.exceptions import InternalServerError, RequestEntityTooLarge
 from werkzeug.security import safe_join
 from repositories.auth_repository import AuthRepository
 from repositories.database import DatabaseUnavailable, open_database
@@ -148,6 +148,13 @@ app.config["MAX_CONTENT_LENGTH"] = MAX_REQUEST_BYTES
 @app.errorhandler(RequestEntityTooLarge)
 def handle_request_too_large(_error):
     return jsonify({"error": "上傳的資料太大了，照片請小於 8 MB。"}), 413
+
+
+@app.errorhandler(InternalServerError)
+def handle_internal_error(_error):
+    # 沒接住的例外。先前回的是 Flask 的 HTML 錯誤頁，前端解析不了；
+    # 完整的 traceback 照樣會印在後端視窗，這裡不把細節回給前端。
+    return jsonify({"error": "伺服器發生錯誤，請稍後再試。"}), 500
 
 
 def _is_loopback(address: str | None) -> bool:
@@ -514,7 +521,10 @@ def search_food():
     """
     q = request.args.get("q", "").strip()
     q_lower = q.lower()
-    limit = min(int(request.args.get("limit", 20)), 100)
+    try:
+        limit = min(max(int(request.args.get("limit", 20)), 1), 100)
+    except (TypeError, ValueError):
+        return jsonify({"error": "limit 必須是有效數字"}), 400
 
     if not q:
         return jsonify({"error": "缺少 q 參數"}), 400
@@ -977,7 +987,10 @@ def clear_nearby_restaurant_index(user_id):
 @app.route("/history/<user_id>", methods=["GET"])
 def get_history(user_id):
     require_user_access(user_id)
-    days = int(request.args.get("days", 7))
+    try:
+        days = min(max(int(request.args.get("days", 7)), 1), 365)
+    except (TypeError, ValueError):
+        return jsonify({"error": "days 必須是有效數字"}), 400
     return jsonify(build_history_response(storage, user_id, days))
 
 
@@ -1074,6 +1087,11 @@ def get_restaurant_menu():
         venue_lng = _coordinate(data.get("lng"), 121.5645, -180, 180)
     except ValueError:
         return jsonify({"error": "lat / lng 必須是有效的座標"}), 400
+    # 在呼叫 Gemini 之前就檢查：先前放在後面，菜單都分析完了才 500
+    try:
+        budget = int(data.get("budget", 150))
+    except (TypeError, ValueError):
+        return jsonify({"error": "budget 必須是有效數字"}), 400
 
     # 1. 先看資料庫裡建檔過的菜單，再退回內建目錄
     cached = storage.get_restaurant_menu(name)
@@ -1168,7 +1186,6 @@ def get_restaurant_menu():
         return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
     conditions = user.get("health_conditions", []) or []
     allergens = user.get("allergens", []) or []
-    budget = int(data.get("budget", 150))
     # 先前這裡直接讀 profile 存的 daily_calorie_target，沒有就退回寫死的 2100。
     # 但「我的」頁面顯示的每日目標是依疾病與活動量重算過的，兩個數字對不起來：
     # 畫面說每天 1900 kcal，這條路徑卻拿 2100÷3=700 kcal 當單餐目標。

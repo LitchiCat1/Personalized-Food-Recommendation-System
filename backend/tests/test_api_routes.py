@@ -955,6 +955,46 @@ class GeminiErrorMessageTests(ApiTestBase):
                 self.assertNotIn(self.KEY, response.get_data(as_text=True))
 
 
+class JsonErrorTests(ApiTestBase):
+    """查詢參數寫錯或後端出錯，都要回 JSON。
+
+    先前回的是 Flask 的 HTML 錯誤頁，前端解析不了，只能顯示一句看不懂的錯。
+    """
+
+    def test_a_non_numeric_query_number_is_a_400_with_a_message(self):
+        with self.mock_auth("user-a"):
+            for path in ("/history/user-a?days=abc", "/search/food?q=rice&limit=abc"):
+                with self.subTest(path=path):
+                    response = self.client.get(path, headers=self.auth_headers())
+                    self.assertEqual(response.status_code, 400)
+                    self.assertIn("有效數字", response.get_json()["error"])
+
+    def test_a_non_numeric_budget_is_a_400(self):
+        with self.mock_auth("user-a"):
+            response = self.client.post(
+                "/restaurant/menu",
+                json={"name": "測試店", "user_id": "user-a", "budget": "abc"},
+                headers=self.auth_headers(),
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("budget", response.get_json()["error"])
+
+    def test_out_of_range_history_days_are_clamped_like_record_limits(self):
+        with self.mock_auth("user-a"):
+            data = self.client.get("/history/user-a?days=99999", headers=self.auth_headers()).get_json()
+        self.assertEqual(data["days"], 365)
+
+    def test_an_unexpected_error_is_a_json_500_without_the_details(self):
+        self.app_module.app.config["PROPAGATE_EXCEPTIONS"] = False
+        self.addCleanup(self.app_module.app.config.__setitem__, "PROPAGATE_EXCEPTIONS", None)
+        with self.mock_auth("user-a"), \
+             patch.object(self.app_module, "build_history_response", side_effect=RuntimeError("internal detail")):
+            response = self.client.get("/history/user-a", headers=self.auth_headers())
+        self.assertEqual(response.status_code, 500)
+        self.assertNotIn("internal detail", response.get_data(as_text=True))
+        self.assertIn("error", response.get_json())
+
+
 class AuthDefaultTests(unittest.TestCase):
     """預設就要驗證。先前只有偵測到 RENDER 才驗證，其他部署方式全部不設防。"""
 

@@ -18,6 +18,16 @@ function buildHeaders(auth?: ApiAuth, contentType?: string): HeadersInit {
   return headers;
 }
 
+// 後端逾時、502 時回的是 HTML，直接 resp.json() 會丟出 "Unexpected token '<'"，
+// 畫面上只剩一句看不懂的英文。讀不到 JSON 就當作沒有內容，改用狀態碼說明。
+async function readJson(resp: Response): Promise<any> {
+  return resp.json().catch(() => ({}));
+}
+
+function failureMessage(resp: Response, data: any, fallback: string): string {
+  return data?.error || `${fallback}（HTTP ${resp.status}）`;
+}
+
 export function normalizeImageBase64(value: string): string {
   const trimmed = value.trim();
   const dataUri = trimmed.match(/^data:image\/(?:png|jpe?g|gif|webp);base64,([\s\S]*)$/i);
@@ -124,9 +134,9 @@ export async function runPrediction(params: {
     body: JSON.stringify(body),
   });
   reportIfUnauthorized(resp);
-  const data = await resp.json();
+  const data = await readJson(resp);
   if (!resp.ok) {
-    throw new Error(data.error || 'Gemini 食物辨識失敗');
+    throw new Error(failureMessage(resp, data, 'Gemini 食物辨識失敗'));
   }
   return {
     detections: mapApiDetections(data.detections || []),
@@ -250,9 +260,9 @@ export async function manualSearchFood(params: {
     headers: buildHeaders(params.auth),
   });
   reportIfUnauthorized(resp);
-  const data = await resp.json();
+  const data = await readJson(resp);
   if (!resp.ok) {
-    throw new Error(data.error || '搜尋失敗');
+    throw new Error(failureMessage(resp, data, '搜尋失敗'));
   }
   return (data.results || []).map((food: any, index: number) => ({
     id: `manual_${Date.now()}_${index}`,
@@ -299,9 +309,9 @@ export async function runNutritionLabelOCR(params: {
     body: JSON.stringify({ image: normalizeImageBase64(params.imageBase64) }),
   });
   reportIfUnauthorized(resp);
-  const data = await resp.json() as NutritionLabelOCRResponse;
+  const data = await readJson(resp) as NutritionLabelOCRResponse;
   if (!resp.ok) {
-    throw new Error(data.error || '營養標示辨識失敗');
+    throw new Error(failureMessage(resp, data, '營養標示辨識失敗'));
   }
   const suggestedFood = data.suggested_custom_food;
   const draft = suggestedFood || data;
@@ -339,9 +349,9 @@ export async function saveCustomFood(params: {
     }),
   });
   reportIfUnauthorized(resp);
-  const data = await resp.json();
+  const data = await readJson(resp);
   if (!resp.ok) {
-    throw new Error(data.error || '儲存自訂食品失敗');
+    throw new Error(failureMessage(resp, data, '儲存自訂食品失敗'));
   }
   return data;
 }

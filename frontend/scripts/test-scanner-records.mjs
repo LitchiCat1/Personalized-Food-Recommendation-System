@@ -3,7 +3,10 @@ import test from 'node:test';
 import {
   buildOCRDetectedFood,
   FOOD_NAME_REQUIRED_MESSAGE,
+  manualSearchFood,
   normalizeFoodName,
+  runNutritionLabelOCR,
+  runPrediction,
   saveRecord,
 } from '../lib/scanner.ts';
 import { getAutoMealType, normalizeMealType, perMealBudget } from '../lib/meal.ts';
@@ -141,6 +144,33 @@ test('sends the meal type the record actually belongs to, not a fixed 點心', a
       mealType: getAutoMealType(new Date('2026-09-10T08:30:00')),
     });
     assert.equal(captured[1].meal_type, '早餐');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('a non-JSON error page becomes a readable message instead of a parse error', async () => {
+  // 後端逾時或 502 時回的是 HTML，直接 resp.json() 會丟出 "Unexpected token '<'"
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 502,
+    json: async () => { throw new SyntaxError("Unexpected token '<', \"<!doctype \"... is not valid JSON"); },
+  });
+  const image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  try {
+    await assert.rejects(
+      () => runPrediction({ apiBaseUrl: 'https://api.example.test', imageBase64: image, healthConditions: [], allergens: [] }),
+      (error) => !/Unexpected token/.test(error.message) && /HTTP 502/.test(error.message),
+    );
+    await assert.rejects(
+      () => manualSearchFood({ apiBaseUrl: 'https://api.example.test', keyword: '白飯' }),
+      (error) => !/Unexpected token/.test(error.message) && /HTTP 502/.test(error.message),
+    );
+    await assert.rejects(
+      () => runNutritionLabelOCR({ apiBaseUrl: 'https://api.example.test', imageBase64: image }),
+      (error) => !/Unexpected token/.test(error.message),
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

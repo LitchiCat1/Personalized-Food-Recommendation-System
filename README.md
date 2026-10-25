@@ -131,7 +131,10 @@ npm --prefix frontend run web         # 網站 http://localhost:8081
 其他工具：
 
 - 忘記密碼：`python backend/scripts/reset_password.py 小明`（不帶暱稱會列出所有帳號）。
-- 備份：後端關掉後，複製上面那個 `.db` 檔就是完整備份。
+- 備份：`python backend/scripts/backup_db.py`（後端開著也可以），備份存在資料庫旁邊的 `backups` 資料夾；
+  `--list` 列出備份，`--restore 檔名` 還原（要先關掉後端，原本的檔案會改名留著）。
+  不要在後端開著時直接複製 `.db` 檔：剛寫的資料可能還在旁邊的 `-wal` 檔裡。
+- 資料庫檔案損毀或打不開時，後端會停下來並印出檔案位置，不會改用記憶體繼續跑（那樣資料重開就不見了）。
 
 ## Expo Go 測試注意事項
 

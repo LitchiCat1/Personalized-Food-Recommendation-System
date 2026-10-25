@@ -1245,15 +1245,10 @@ def get_restaurant_menu():
             "price_level": 2,
             "items": enriched.get("items", [])
         }
-        
-        # 存進資料庫的菜單快取，不要改動載入時的目錄。
-        # 那個目錄是共用的模組層級 list，一邊被請求讀一邊被 append 是資料競爭
-        # （伺服器現在是多執行緒的），而寫回 JSON 檔在 Render 上重啟就沒了。
-        storage.save_restaurant_menu(name, matched["items"], venue={
-            "address": matched["address"],
-            "lat": matched["lat"],
-            "lng": matched["lng"],
-        })
+        # 跟上面的菜單照片一樣，結果只給這次的回應用，不寫進所有人共用的菜單快取：
+        # 店名和地址是請求方自己填的，會原樣進 Gemini 的提示。先前在地址裡寫一段話，
+        # 就能讓模型回一份假的低鈉菜單、用真實店名存進快取，其他人的推薦照它篩選，
+        # 建檔也會把它當成新的而跳過這家店。共用快取只由建檔寫入，店名和地址來自 Google。
 
     # 3. 對所有菜單項目進行醫學過濾與個人化偏好契合度評分（user 在上面已經確認存在）
     conditions = user.get("health_conditions", []) or []

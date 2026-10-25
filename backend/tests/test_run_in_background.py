@@ -18,12 +18,27 @@ class BackgroundLogTests(unittest.TestCase):
         self.addCleanup(folder.cleanup)
         self.folder = folder.name
 
-    def test_the_log_sits_next_to_the_database(self):
+    def test_the_log_sits_next_to_the_default_database(self):
         with patch.dict(os.environ, {"LOCALAPPDATA": self.folder}):
+            os.environ.pop("DATABASE_PATH", None)
             self.assertEqual(
                 run_in_background.log_path(),
                 os.path.join(self.folder, "NutriLens", "logs", "backend.log"),
             )
+
+    def test_the_log_follows_a_configured_database_path(self):
+        # 資料庫搬到 AppData 以外時，log 也跟著搬，不要留在會被 Windows 導向的 AppData
+        database = os.path.join(self.folder, "NutriLensData", "nutrilens.db")
+        with patch.dict(os.environ, {"DATABASE_PATH": database}):
+            self.assertEqual(run_in_background.log_path(), os.path.join(self.folder, "NutriLensData", "logs", "backend.log"))
+
+    def test_the_backend_env_file_is_read_before_the_log_path_is_chosen(self):
+        # 排程工作的環境裡沒有 DATABASE_PATH，它寫在 backend/.env.local
+        with patch.object(run_in_background, "load_local_env") as load, \
+             patch.object(run_in_background, "open_log", side_effect=RuntimeError("stop here")):
+            with self.assertRaises(RuntimeError):
+                run_in_background.main()
+        load.assert_called_once()
 
     def test_a_new_log_folder_is_created_and_lines_are_appended(self):
         path = os.path.join(self.folder, "logs", "backend.log")

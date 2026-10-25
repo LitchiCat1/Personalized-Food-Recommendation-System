@@ -21,7 +21,7 @@ from werkzeug.exceptions import BadRequest, HTTPException, InternalServerError, 
 from werkzeug.security import safe_join
 from repositories.auth_repository import AuthRepository
 from repositories.database import DatabaseUnavailable, open_database
-from repositories.sqlite_db import resolve_database_path
+from repositories.sqlite_db import resolve_database_path, virtualized_appdata_problem
 from repositories.storage import StorageRepository
 from services.app_time_service import app_now
 from services.auth_service import AuthError, is_auth_required, normalize_email, sign_in, sign_out, sign_up, verify_access_token
@@ -87,6 +87,12 @@ BASE_DIR = os.path.dirname(__file__)
 # 本機沒設：帳號、健康檔案、飲食紀錄、店家菜單都存在一個 SQLite 檔。位置見
 # sqlite_db.py，可以用 DATABASE_PATH 改；設成空字串就不用資料庫，資料只存在記憶體。
 sql_db = None
+if not os.environ.get("DATABASE_URL", "").strip():
+    # 開檔之前就檢查：開了就會在錯的那一邊先建出一個空資料庫
+    _appdata_problem = virtualized_appdata_problem(resolve_database_path())
+    if _appdata_problem:
+        print(f"[ERROR] {_appdata_problem}")
+        sys.exit(1)
 try:
     sql_db, database_label = open_database()
     if sql_db is not None:

@@ -68,6 +68,11 @@ Personalized-Food-Recommendation-System/
 網站與資料庫都在自己的電腦上，不需要任何雲端服務，也不用安裝資料庫：
 資料存在一個 SQLite 檔（預設 `%LOCALAPPDATA%\NutriLens\nutrilens.db`）。
 
+> 如果後端有時從 Claude 桌面版啟動、有時從工作排程器或一般終端機啟動，請在 `backend/.env.local`
+> 把 `DATABASE_PATH` 設到 AppData 以外（例如 `C:\Users\<你的帳號>\NutriLensData\nutrilens.db`）。
+> Claude 桌面版是 MSIX 套件，從它啟動的程式寫進 AppData 的檔案會被 Windows 導到它自己的資料夾，
+> 兩邊會各用一個資料庫。後端與備份、重設密碼的腳本偵測到這種情況會停下來說明，不會繼續執行。
+
 第一次：
 
 ```bash

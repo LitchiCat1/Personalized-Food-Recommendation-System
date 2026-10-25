@@ -19,7 +19,7 @@ sys.path.insert(0, BACKEND_DIR)
 
 from repositories.auth_repository import AuthRepository  # noqa: E402
 from repositories.database import DatabaseUnavailable, open_database  # noqa: E402
-from repositories.sqlite_db import resolve_database_path  # noqa: E402
+from repositories.sqlite_db import resolve_database_path, virtualized_appdata_problem  # noqa: E402
 from services.auth_service import AuthError, reset_password  # noqa: E402
 from services.env_service import load_local_env  # noqa: E402
 
@@ -31,6 +31,10 @@ def main() -> int:
         database_path = resolve_database_path()
         if not database_path or database_path == ":memory:" or not os.path.exists(database_path):
             print(f"找不到資料庫檔案：{database_path}")
+            return 1
+        problem = virtualized_appdata_problem(database_path)
+        if problem:
+            print(problem)
             return 1
     try:
         sql, label = open_database()

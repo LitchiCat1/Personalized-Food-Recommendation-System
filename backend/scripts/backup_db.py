@@ -24,7 +24,7 @@ from datetime import datetime
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BACKEND_DIR)
 
-from repositories.sqlite_db import resolve_database_path  # noqa: E402
+from repositories.sqlite_db import resolve_database_path, virtualized_appdata_problem  # noqa: E402
 from services.env_service import load_local_env  # noqa: E402
 
 
@@ -120,6 +120,12 @@ def main() -> int:
     database_path = resolve_database_path()
     if not database_path or database_path == ":memory:":
         print("DATABASE_PATH 設成只用記憶體，沒有資料庫檔案可以備份。")
+        return 1
+    # 在 Claude 這類套件裡執行時，AppData 底下的資料庫跟排程工作用的不是同一份，
+    # 備份或還原都可能拿錯那一份（2026-10-25 就是這樣把資料蓋掉的）
+    problem = virtualized_appdata_problem(database_path)
+    if problem:
+        print(problem)
         return 1
     backup_dir = os.path.join(os.path.dirname(database_path), "backups")
 

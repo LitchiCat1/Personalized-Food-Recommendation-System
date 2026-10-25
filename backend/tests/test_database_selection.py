@@ -185,6 +185,23 @@ class AppStartupTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn(path, output)
 
+    def test_app_refuses_to_start_on_a_virtualized_appdata_database(self):
+        from repositories import sqlite_db
+
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "nutrilens.db")
+            with patch.object(sqlite_db, "virtualized_appdata_problem", return_value="兩邊各用一個資料庫，請設 DATABASE_PATH"), \
+                    patch.dict(os.environ, {"DATABASE_PATH": path, "NUTRILENS_SKIP_LOCAL_ENV": "1"}), \
+                    contextlib.redirect_stdout(output):
+                os.environ.pop("DATABASE_URL", None)
+                sys.modules.pop("app", None)
+                with self.assertRaises(SystemExit) as ctx:
+                    importlib.import_module("app")
+            self.assertFalse(os.path.exists(path), "不能先建一個空資料庫")
+        self.assertEqual(ctx.exception.code, 1)
+        self.assertIn("DATABASE_PATH", output.getvalue())
+
     def test_an_explicitly_empty_path_still_means_memory_only(self):
         output = io.StringIO()
         with patch.dict(os.environ, {"DATABASE_PATH": "", "NUTRILENS_SKIP_LOCAL_ENV": "1"}), \

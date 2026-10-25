@@ -66,6 +66,64 @@ class SqliteDatabasePathTests(unittest.TestCase):
             reopened.sql.close()
 
 
+class PackagedAppDataTests(unittest.TestCase):
+    """Claude 桌面版是 MSIX 套件：從它啟動的程式寫 %LOCALAPPDATA% 會被導到套件的私有資料夾，
+    工作排程器等其他程式看到的是另一份。資料庫放在那裡，兩邊就各用一個資料庫。"""
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.home = folder.name
+        self.local = os.path.join(self.home, "AppData", "Local")
+        self.roaming = os.path.join(self.home, "AppData", "Roaming")
+        self.db = os.path.join(self.local, "NutriLens", "nutrilens.db")
+
+    def redirect(self, *relative):
+        os.makedirs(os.path.join(self.local, "Packages", "Claude_test", "LocalCache", *relative))
+
+    def reason(self, path, packaged=False):
+        from repositories import sqlite_db
+
+        with patch.dict(os.environ, {"LOCALAPPDATA": self.local, "APPDATA": self.roaming}), \
+             patch.object(sqlite_db, "running_in_windows_package", return_value=packaged), \
+             patch.object(sqlite_db.tempfile, "gettempdir", return_value=os.path.join(self.local, "Temp")):
+            return sqlite_db.virtualized_appdata_problem(path)
+
+    def test_a_redirected_copy_of_the_database_folder_is_refused_from_either_side(self):
+        # 2026-10-25 的情況：從 Claude 啟動的程式查不到自己的套件身分，但檔案照樣被導向。
+        # 工作排程器那邊也要擋：兩邊都看得到 Packages 資料夾裡的副本。
+        self.redirect("Local", "NutriLens")
+        message = self.reason(self.db)
+        self.assertIsNotNone(message)
+        self.assertIn("DATABASE_PATH", message)
+        self.assertIn("Claude_test", message)
+
+    def test_a_redirected_roaming_folder_is_refused_too(self):
+        self.redirect("Roaming", "NutriLens")
+        self.assertIsNotNone(self.reason(os.path.join(self.roaming, "NutriLens", "db.sqlite")))
+
+    def test_a_process_that_knows_it_is_packaged_is_refused_before_any_copy_exists(self):
+        self.assertIsNotNone(self.reason(self.db, packaged=True))
+
+    def test_outside_appdata_or_without_any_redirection_is_fine(self):
+        self.redirect("Local", "NutriLens")
+        self.assertIsNone(self.reason(os.path.join(self.home, "NutriLensData", "nutrilens.db"), packaged=True))
+        self.assertIsNone(self.reason(os.path.join(self.local, "OtherApp", "x.db")))
+        self.assertIsNone(self.reason(":memory:", packaged=True))
+        self.assertIsNone(self.reason(None, packaged=True))
+
+    def test_throwaway_databases_in_the_temp_folder_are_left_alone(self):
+        # 暫存資料夾不會被導向；測試開在那裡的資料庫用完就刪
+        self.redirect("Local", "Temp", "tmpabc")
+        self.assertIsNone(self.reason(os.path.join(self.local, "Temp", "tmpabc", "nutrilens.db"), packaged=True))
+
+    def test_outside_windows_nothing_is_packaged(self):
+        from repositories import sqlite_db
+
+        with patch.object(sqlite_db.os, "name", "posix"):
+            self.assertFalse(sqlite_db.running_in_windows_package())
+
+
 class SqliteStorageTests(unittest.TestCase):
     def setUp(self):
         self.storage = sqlite_storage()

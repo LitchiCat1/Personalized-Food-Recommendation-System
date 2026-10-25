@@ -263,3 +263,95 @@ class RequestShapeTests(ApiTestBase):
         shown = [item["item_name"] for item in body["recommended_items"] + body["filtered_items"]]
         self.assertEqual(shown, ["招牌紅燒牛肉麵"])
         self.assertIsNone(self.app_module.storage.get_restaurant_menu("老王牛肉麵", "place-real"))
+
+
+class WriteLimitTests(ApiTestBase):
+    """飲食紀錄、自訂食品、健康檔案這幾條會寫進資料庫的路由。
+
+    先前沒有限流，能收多大又只看全站給照片用的 12 MB：一筆 8 MB 的紀錄原樣
+    存進資料庫，一分鐘送幾百筆也照收，幾十次就能塞滿 Supabase 免費的 500 MB。
+    """
+
+    FOOD = {"name": "雞腿便當", "calories": 700}
+
+    def _seed_record(self):
+        self.app_module.storage.insert_record({
+            "user_id": "user-a", "client_record_id": "r1",
+            "timestamp": "2026-10-01T12:00:00+08:00", "foods": [self.FOOD],
+        })
+
+    def test_a_write_far_larger_than_a_form_is_a_413_and_nothing_is_saved(self):
+        self._seed_record()
+        padding = "A" * (200 * 1024)
+        big_food = {**self.FOOD, "note": padding}
+        sends = {
+            "新增紀錄": lambda: self.client.post(
+                "/record", json={"user_id": "user-a", "client_record_id": "big", "foods": [big_food]},
+                headers=self.auth_headers(),
+            ),
+            "修改紀錄": lambda: self.client.patch(
+                "/records/user-a/r1", json={"foods": [big_food]}, headers=self.auth_headers(),
+            ),
+            "自訂食品": lambda: self.client.post(
+                "/custom-food",
+                json={"user_id": "user-a", "name_zh": "大餅", "nutrition_per_serving": {"calories": 100}, "ocr_text": padding},
+                headers=self.auth_headers(),
+            ),
+            "健康檔案": lambda: self.client.post(
+                "/user", json={"user_id": "user-a", "name": padding}, headers=self.auth_headers(),
+            ),
+        }
+        with self.mock_auth("user-a"):
+            for route, send in sends.items():
+                with self.subTest(route=route):
+                    response = send()
+                    self.assertEqual(response.status_code, 413)
+                    self.assertIn("太大", response.get_json()["error"])
+        storage = self.app_module.storage
+        self.assertIsNone(storage.get_record_by_client_record_id("user-a", "big"))
+        self.assertNotIn("note", storage.get_record_by_client_record_id("user-a", "r1")["foods"][0])
+        self.assertEqual(storage.get_custom_foods("user-a"), [])
+        self.assertEqual(storage.get_user("user-a")["name"], "User A")
+
+    def test_every_write_route_is_rate_limited(self):
+        self._seed_record()
+        self.app_module._general_limiter.max_calls = 1
+        self.addCleanup(setattr, self.app_module._general_limiter, "max_calls", 120)
+        sends = {
+            "新增紀錄": lambda: self.client.post(
+                "/record", json={"user_id": "user-a", "foods": [self.FOOD]}, headers=self.auth_headers(),
+            ),
+            "修改紀錄": lambda: self.client.patch(
+                "/records/user-a/r1", json={"foods": [self.FOOD]}, headers=self.auth_headers(),
+            ),
+            "刪除紀錄": lambda: self.client.delete("/records/user-a/r1", headers=self.auth_headers()),
+            "自訂食品": lambda: self.client.post(
+                "/custom-food",
+                json={"user_id": "user-a", "name_zh": "豆漿", "nutrition_per_serving": {"calories": 100}},
+                headers=self.auth_headers(),
+            ),
+            "健康檔案": lambda: self.client.post("/user", json={"user_id": "user-a"}, headers=self.auth_headers()),
+        }
+        with self.mock_auth("user-a"):
+            for route, send in sends.items():
+                with self.subTest(route=route):
+                    self.app_module._general_limiter.reset()
+                    self.assertIn(send().status_code, (200, 201))
+                    throttled = send()
+                    self.assertEqual(throttled.status_code, 429)
+                    self.assertIn("Retry-After", throttled.headers)
+
+    def test_the_write_limit_is_counted_per_account(self):
+        self.app_module._general_limiter.max_calls = 2
+        self.addCleanup(setattr, self.app_module._general_limiter, "max_calls", 120)
+        self.app_module.storage.upsert_user({"user_id": "user-b", "name": "User B"})
+
+        def save(user_id):
+            with self.mock_auth(user_id):
+                return self.client.post(
+                    "/record", json={"user_id": user_id, "foods": [self.FOOD]}, headers=self.auth_headers()
+                ).status_code
+
+        self.assertEqual([save("user-a") for _ in range(3)], [201, 201, 429])
+        # 學校 Wi-Fi 後面大家共用一個對外 IP，一個人用完不能擋到別人
+        self.assertEqual(save("user-b"), 201)

@@ -150,6 +150,15 @@ app = Flask(__name__)
 MAX_REQUEST_BYTES = 12 * 1024 * 1024
 app.config["MAX_CONTENT_LENGTH"] = MAX_REQUEST_BYTES
 
+# 飲食紀錄、自訂食品、健康檔案只有文字和數字，正常一筆只有幾 KB。先前它們也照收
+# 給照片用的 12 MB：食物裡多塞的欄位原樣存下，一筆 8 MB 的紀錄就進了資料庫。
+MAX_FORM_BYTES = 64 * 1024
+
+
+class PayloadTooLarge(HTTPException):
+    code = 413
+    description = "這筆資料太大了，請減少食物項目或文字長度後再試。"
+
 
 @app.errorhandler(RequestEntityTooLarge)
 def handle_request_too_large(_error):
@@ -174,14 +183,20 @@ def handle_http_error(error):
     return response
 
 
-def json_body() -> dict:
+def json_body(max_bytes: int | None = None) -> dict:
     """請求內容的 JSON 物件，沒有內容就是空物件。
 
     先前各路由各自 request.get_json()：送陣列或字串時 data.get() 直接 500，
     沒帶 JSON 時 Flask 回 415 的 HTML 錯誤頁。
+    max_bytes 給不收照片的路由用，比全站的上限小得多。
     """
-    if not request.get_data(cache=True):
+    if max_bytes is not None and (request.content_length or 0) > max_bytes:
+        raise PayloadTooLarge()
+    raw = request.get_data(cache=True)
+    if not raw:
         return {}
+    if max_bytes is not None and len(raw) > max_bytes:
+        raise PayloadTooLarge()
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         raise BadRequest("請求內容必須是 JSON 物件。")
@@ -308,6 +323,8 @@ def allow_other_ports_on_this_machine(response):
 
 # 會呼叫 Gemini / Google Places 的路由要限流，那些都是按次計費的
 _paid_api_limiter = build_limiter("RATE_LIMIT_PAID_CALLS", 12)
+# 會寫進資料庫的路由（飲食紀錄、自訂食品、健康檔案）。先前這個限流器建了卻沒有
+# 任何路由用：一分鐘送幾百筆也照收，幾十次就能塞滿 Supabase 免費的 500 MB。
 _general_limiter = build_limiter("RATE_LIMIT_GENERAL_CALLS", 120)
 
 
@@ -627,9 +644,10 @@ def get_food_detail(food_key):
 
 @app.route("/custom-food", methods=["POST"])
 def create_custom_food():
-    data = json_body()
+    data = json_body(MAX_FORM_BYTES)
     if is_auth_required():
         data["user_id"] = require_user_access(data.get("user_id"))
+    enforce_rate_limit(_general_limiter, "write")
     try:
         food_doc = build_custom_food_doc(
             data,
@@ -765,11 +783,12 @@ def get_user(user_id):
 
 @app.route("/user", methods=["POST"])
 def create_or_update_user():
-    data = json_body()
+    data = json_body(MAX_FORM_BYTES)
     if not data or "user_id" not in data:
         return jsonify({"error": "缺少 user_id"}), 400
     if is_auth_required():
         data["user_id"] = require_user_access(data.get("user_id"))
+    enforce_rate_limit(_general_limiter, "write")
 
     # profile_complete 沒送的話，不能當成 False。
     #
@@ -856,13 +875,14 @@ def normalize_record_timestamp(value):
 
 @app.route("/record", methods=["POST"])
 def add_record():
-    data = json_body()
+    data = json_body(MAX_FORM_BYTES)
     if not isinstance(data, dict):
         return jsonify({"error": "缺少資料"}), 400
     if not data.get("user_id"):
         return jsonify({"error": "缺少 user_id"}), 400
     if is_auth_required():
         data["user_id"] = require_user_access(data.get("user_id"))
+    enforce_rate_limit(_general_limiter, "write")
     if not data.get("client_record_id"):
         data["client_record_id"] = f"server_record_{uuid.uuid4().hex}"
 
@@ -932,11 +952,12 @@ def get_records(user_id):
 @app.route("/records/<user_id>/<client_record_id>", methods=["PATCH"])
 def update_record(user_id, client_record_id):
     require_user_access(user_id)
+    enforce_rate_limit(_general_limiter, "write")
     existing = storage.get_record_by_client_record_id(user_id, client_record_id)
     if not existing:
         return jsonify({"error": "找不到飲食紀錄"}), 404
 
-    data = json_body()
+    data = json_body(MAX_FORM_BYTES)
     if not isinstance(data, dict):
         return jsonify({"error": "缺少資料"}), 400
     try:
@@ -961,6 +982,7 @@ def update_record(user_id, client_record_id):
 @app.route("/records/<user_id>/<client_record_id>", methods=["DELETE"])
 def delete_record(user_id, client_record_id):
     require_user_access(user_id)
+    enforce_rate_limit(_general_limiter, "write")
     deleted = storage.delete_record(user_id, client_record_id)
     if not deleted:
         return jsonify({"error": "找不到飲食紀錄"}), 404

@@ -45,6 +45,7 @@ class ApiTestBase(unittest.TestCase):
         reset_venue_index_state()
         # 付費路由的限流是跨測試累計的；建檔路由也在內，不清會被前面的測試用光
         self.app_module._paid_api_limiter.reset()
+        self.app_module._general_limiter.reset()
         self.app_module._auth_limiter.reset()
         self.app_module._auth_ip_limiter.reset()
         # 帳號也是跨測試累計的，不清的話後面的測試會撞到「已經註冊過」

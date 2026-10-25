@@ -5,6 +5,8 @@ import sys
 import unittest
 from datetime import datetime, timedelta, timezone
 
+import requests
+
 from services.app_time_service import app_now
 from services.venue_index_service import reset_venue_index_state
 from unittest.mock import patch
@@ -867,6 +869,90 @@ class PaidRouteProtectionTests(ApiTestBase):
                     break
         self.assertEqual(last.status_code, 429)
         self.assertIn("Retry-After", last.headers)
+
+
+class PaidRouteRateLimitTests(ApiTestBase):
+    """掃描、附近店家、店家摘要也是按次計費的，先前這三條沒有限流。"""
+
+    IMAGE = base64.b64encode(b"\x89PNG\r\n\x1a\nmock-image").decode("ascii")
+
+    def setUp(self):
+        super().setUp()
+        self.app_module._paid_api_limiter.max_calls = 2
+        self.addCleanup(setattr, self.app_module._paid_api_limiter, "max_calls", 12)
+
+    def _three_calls(self, send):
+        with self.mock_auth("user-a"):
+            statuses = [send().status_code for _ in range(3)]
+        self.assertNotIn(429, statuses[:2], statuses)
+        self.assertEqual(statuses[2], 429, statuses)
+
+    def test_scanning_is_rate_limited(self):
+        with patch.object(self.app_module, "get_gemini_api_keys", return_value=["test-key"]), \
+             patch.object(self.app_module, "call_gemini_food_recognition_with_rotation", return_value={"items": []}):
+            self._three_calls(lambda: self.client.post(
+                "/predict/vision-food", json={"image": self.IMAGE, "user_id": "user-a"}, headers=self.auth_headers()
+            ))
+
+    def test_the_nearby_store_search_is_rate_limited(self):
+        with patch("services.healthy_food_service.fetch_google_places_restaurants", return_value=[]):
+            self._three_calls(lambda: self.client.get(
+                "/map-food-recommend/user-a?budget=150&lat=24.9890&lng=121.3443&radius_km=3&category=all",
+                headers=self.auth_headers(),
+            ))
+
+    def test_the_store_summary_is_rate_limited(self):
+        with patch.object(self.app_module, "build_restaurant_ai_summary", return_value={"restaurant_type": "便當店"}):
+            self._three_calls(lambda: self.client.post(
+                "/map-food-recommend/user-a/restaurant-summary",
+                json={"restaurant": {"name": "Healthy Bento"}, "budget": 150},
+                headers=self.auth_headers(),
+            ))
+
+
+class GeminiErrorMessageTests(ApiTestBase):
+    """Gemini 連不上時，回給前端的錯誤不能夾帶金鑰。
+
+    掃描頁會把後端的錯誤原文直接顯示在畫面上，先前回的是 str(e)，
+    而 requests 的連線錯誤會印出整串網址。
+    """
+
+    KEY = "AIzaFAKE_SECRET_KEY"
+    IMAGE = base64.b64encode(b"\x89PNG\r\n\x1a\nmock-image").decode("ascii")
+
+    def test_a_connection_failure_does_not_echo_the_key(self):
+        error = requests.ConnectionError(
+            "HTTPSConnectionPool(host='generativelanguage.googleapis.com', port=443): "
+            f"Max retries exceeded with url: /v1beta/models/m:generateContent?key={self.KEY}"
+        )
+        for path in ("/predict/vision-food", "/ocr/nutrition-label"):
+            with self.subTest(path=path):
+                with self.mock_auth("user-a"), \
+                     patch.object(self.app_module, "get_gemini_api_keys", return_value=[self.KEY]), \
+                     patch("requests.post", side_effect=error):
+                    response = self.client.post(
+                        path, json={"image": self.IMAGE, "user_id": "user-a"}, headers=self.auth_headers()
+                    )
+
+                self.assertEqual(response.status_code, 502)
+                self.assertNotIn(self.KEY, response.get_data(as_text=True))
+                self.assertIn("請稍後再試", response.get_json()["error"])
+
+    def test_an_unexpected_failure_does_not_echo_its_message(self):
+        for path, target in (
+            ("/predict/vision-food", "call_gemini_food_recognition_with_rotation"),
+            ("/ocr/nutrition-label", "call_gemini_nutrition_ocr_with_rotation"),
+        ):
+            with self.subTest(path=path):
+                with self.mock_auth("user-a"), \
+                     patch.object(self.app_module, "get_gemini_api_keys", return_value=[self.KEY]), \
+                     patch.object(self.app_module, target, side_effect=KeyError(f"key={self.KEY}")):
+                    response = self.client.post(
+                        path, json={"image": self.IMAGE, "user_id": "user-a"}, headers=self.auth_headers()
+                    )
+
+                self.assertEqual(response.status_code, 500)
+                self.assertNotIn(self.KEY, response.get_data(as_text=True))
 
 
 class AuthDefaultTests(unittest.TestCase):

@@ -25,6 +25,20 @@ DEFAULT_GEMINI_MODELS = [
     "gemini-3.6-flash",
 ]
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
+GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
+
+
+def gemini_generate_url(model: str) -> str:
+    return f"{GEMINI_API_BASE}/models/{model}:generateContent"
+
+
+def gemini_headers(api_key: str) -> dict:
+    """金鑰放在標頭，不放在網址的 ?key=。
+
+    requests 連不上時的錯誤訊息會印出整串網址；金鑰在網址裡的話，
+    就跟著錯誤訊息進了 log，先前還一路回到使用者的畫面上。
+    """
+    return {"x-goog-api-key": api_key}
 
 
 
@@ -275,8 +289,8 @@ def _try_generate(key: str, model: str, timeout: float) -> tuple[int, str]:
     """實際打一次最小的 generateContent，回 (status, 訊息)。"""
     try:
         res = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-            params={"key": key},
+            gemini_generate_url(model),
+            headers=gemini_headers(key),
             json={"contents": [{"parts": [{"text": "ping"}]}],
                   "generationConfig": {"maxOutputTokens": 1}},
             timeout=timeout,
@@ -306,11 +320,7 @@ def probe_gemini_models(timeout: float = 10.0, generate: bool = False) -> dict:
     for key in get_gemini_api_keys():
         entry = {"key": f"{key[:8]}...", "available": [], "error": None}
         try:
-            res = requests.get(
-                "https://generativelanguage.googleapis.com/v1beta/models",
-                params={"key": key},
-                timeout=timeout,
-            )
+            res = requests.get(f"{GEMINI_API_BASE}/models", headers=gemini_headers(key), timeout=timeout)
             if res.status_code != 200:
                 entry["error"] = f"HTTP {res.status_code}"
             else:
@@ -400,7 +410,6 @@ def call_gemini_nutrition_ocr(image_b64: str, mime_type: str, api_key: str, gemi
         '"sodium":null,"fiber":null},'
         '"ocr_text":"","confidence_note":""}'
     )
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
     payload = {
         "contents": [
             {
@@ -411,7 +420,7 @@ def call_gemini_nutrition_ocr(image_b64: str, mime_type: str, api_key: str, gemi
             }
         ]
     }
-    resp = requests.post(url, json=payload, timeout=60)
+    resp = requests.post(gemini_generate_url(gemini_model), headers=gemini_headers(api_key), json=payload, timeout=60)
     resp.raise_for_status()
     data = resp.json()
     text = data["candidates"][0]["content"]["parts"][0]["text"]

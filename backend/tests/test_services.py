@@ -772,7 +772,7 @@ class GeminiKeyRotationTests(unittest.TestCase):
         calls = []
 
         def fake_post(url, **kwargs):
-            key = url.split("key=")[1]
+            key = self._key_of(kwargs)
             calls.append((key, url.split("/models/")[1].split(":")[0]))
             if key == "key-a":
                 return self._reply(429)
@@ -793,7 +793,7 @@ class GeminiKeyRotationTests(unittest.TestCase):
         tried = []
 
         def fake_post(url, **kwargs):
-            key = url.split("key=")[1]
+            key = self._key_of(kwargs)
             model = url.split("/models/")[1].split(":")[0]
             tried.append((key, model))
             if key in {"key-a", "key-b"}:
@@ -811,6 +811,10 @@ class GeminiKeyRotationTests(unittest.TestCase):
     def _model_of(url):
         return url.split("/models/")[1].split(":")[0]
 
+    @staticmethod
+    def _key_of(kwargs):
+        return kwargs["headers"]["x-goog-api-key"]
+
     def test_a_model_that_404d_is_not_asked_again_by_the_next_venue(self):
         """建檔時每一家店都把同樣的 404 重打一遍，分析預算就這樣被吃掉。"""
         from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
@@ -819,7 +823,7 @@ class GeminiKeyRotationTests(unittest.TestCase):
         tried = []
 
         def fake_post(url, **kwargs):
-            key, model = url.split("key=")[1], self._model_of(url)
+            key, model = self._key_of(kwargs), self._model_of(url)
             tried.append((key, model))
             if model == "m-lite":
                 return self._reply(404)
@@ -845,7 +849,7 @@ class GeminiKeyRotationTests(unittest.TestCase):
         tried = []
 
         def fake_post(url, **kwargs):
-            key, model = url.split("key=")[1], self._model_of(url)
+            key, model = self._key_of(kwargs), self._model_of(url)
             tried.append((key, model))
             if key == "key-a":
                 return self._reply(404)
@@ -906,7 +910,7 @@ class GeminiKeyRotationTests(unittest.TestCase):
         tried = []
 
         def fake_post(url, **kwargs):
-            key, model = url.split("key=")[1], self._model_of(url)
+            key, model = self._key_of(kwargs), self._model_of(url)
             tried.append((key, model))
             if key == "key-a":
                 return self._reply(429)
@@ -928,7 +932,7 @@ class GeminiKeyRotationTests(unittest.TestCase):
         tried = []
 
         def fake_post(url, **kwargs):
-            tried.append((url.split("key=")[1], self._model_of(url)))
+            tried.append((self._key_of(kwargs), self._model_of(url)))
             return self._reply(200, [])
 
         with patch("services.robust_restaurant_scraper_service.requests.post", fake_post):
@@ -1124,6 +1128,102 @@ class GeminiModelDefaultsTests(unittest.TestCase):
 
         for retired in ("gemini-2.5-flash", "gemini-2.5-flash-lite"):
             self.assertNotIn(retired, DEFAULT_GEMINI_MODELS)
+
+
+class GeminiKeyStaysOutOfTheUrlTests(unittest.TestCase):
+    """金鑰只能放在標頭。
+
+    放在 ?key= 的話，requests 連不上時的錯誤訊息會把整串網址印出來，
+    金鑰就跟著錯誤訊息進了 log，先前還一路回到使用者的畫面上。
+    """
+
+    KEY = "AIzaFAKE_SECRET_KEY"
+    MENU = [{"name": "餐點", "calories": 500, "protein": 20, "carbs": 60, "fat": 15, "sodium": 500}]
+
+    def setUp(self):
+        from services.nutrition_label_service import forget_forbidden_gemini_models
+
+        forget_forbidden_gemini_models()
+        self.addCleanup(forget_forbidden_gemini_models)
+        self.calls = []
+        for target, value in (
+            ("services.nutrition_label_service.get_gemini_api_keys", [self.KEY]),
+            ("services.robust_restaurant_scraper_service.get_gemini_api_keys", [self.KEY]),
+            ("services.nutrition_label_service.get_gemini_models", ["m-lite"]),
+            ("services.robust_restaurant_scraper_service.get_gemini_models", ["m-lite"]),
+        ):
+            patcher = patch(target, return_value=value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        for method in ("get", "post"):
+            patcher = patch(f"requests.{method}", self._reply)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def _reply(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        menu_text = json.dumps({"items": self.MENU}, ensure_ascii=False)
+
+        class Reply:
+            status_code = 200
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {
+                    "candidates": [{"finishReason": "STOP", "content": {"parts": [{"text": menu_text}]}}],
+                    "models": [{"name": "models/m-lite", "supportedGenerationMethods": ["generateContent"]}],
+                }
+
+        return Reply()
+
+    def assert_key_only_in_header(self):
+        self.assertTrue(self.calls, "沒有送出任何請求")
+        for url, kwargs in self.calls:
+            self.assertNotIn(self.KEY, url)
+            self.assertNotIn("key", kwargs.get("params") or {})
+            self.assertEqual(kwargs["headers"]["x-goog-api-key"], self.KEY)
+
+    def test_food_recognition(self):
+        from services.vision_food_service import call_gemini_food_recognition
+
+        call_gemini_food_recognition("img", "image/png", self.KEY, "m-lite")
+        self.assert_key_only_in_header()
+
+    def test_nutrition_label_ocr(self):
+        from services.nutrition_label_service import call_gemini_nutrition_ocr
+
+        call_gemini_nutrition_ocr("img", "image/png", self.KEY, "m-lite")
+        self.assert_key_only_in_header()
+
+    def test_restaurant_summary(self):
+        from services.restaurant_ai_service import call_gemini_restaurant_summary
+
+        call_gemini_restaurant_summary({"name": "測試店"}, 150, "all", [], self.KEY, "m-lite")
+        self.assert_key_only_in_header()
+
+    def test_menu_from_the_store_name(self):
+        from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini
+
+        enrich_restaurant_with_gemini("測試店", "台北")
+        self.assert_key_only_in_header()
+
+    def test_menu_from_a_photo(self):
+        import base64
+
+        from services.robust_restaurant_scraper_service import parse_menu_image_with_gemini
+
+        photo = base64.b64encode(b"\x89PNG\r\n\x1a\nmenu-image").decode("ascii")
+        parse_menu_image_with_gemini(photo, "測試店")
+        self.assert_key_only_in_header()
+
+    def test_the_key_diagnostics(self):
+        from services.nutrition_label_service import probe_gemini_models
+
+        probe_gemini_models(generate=True)
+        self.assertEqual(len(self.calls), 2, "列模型與試生成各一次")
+        self.assert_key_only_in_header()
 
 
 class GeminiJsonShapeTests(unittest.TestCase):

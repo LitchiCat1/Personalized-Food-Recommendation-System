@@ -5,7 +5,14 @@ import requests
 from services.food_service import search_foods
 from services.medical_risk_service import evaluate_meal_medical_risk
 from services.food_analysis_service import build_detection_reliability, build_portion_range, check_food_safety
-from services.nutrition_label_service import call_gemini_with_rotation, extract_json_block, extract_number, get_gemini_models
+from services.nutrition_label_service import (
+    call_gemini_with_rotation,
+    extract_json_block,
+    extract_number,
+    gemini_generate_url,
+    gemini_headers,
+    get_gemini_models,
+)
 from services.nutrient_service import is_fried_food_name
 
 
@@ -35,7 +42,6 @@ def call_gemini_food_recognition(image_b64: str, mime_type: str, api_key: str, g
         '"visual_evidence":"","alternatives":[""]}],'
         '"uncertainty_notes":[""]}'
     )
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
     payload = {
         "contents": [
             {
@@ -46,7 +52,7 @@ def call_gemini_food_recognition(image_b64: str, mime_type: str, api_key: str, g
             }
         ]
     }
-    resp = requests.post(url, json=payload, timeout=60)
+    resp = requests.post(gemini_generate_url(gemini_model), headers=gemini_headers(api_key), json=payload, timeout=60)
     resp.raise_for_status()
     data = resp.json()
     text = data["candidates"][0]["content"]["parts"][0]["text"]

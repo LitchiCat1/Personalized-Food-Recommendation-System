@@ -11,6 +11,8 @@ from services.nutrition_label_service import (
     extract_json_block,
     extract_json_items,
     extract_number,
+    gemini_generate_url,
+    gemini_headers,
     gemini_key_model_pairs,
     get_gemini_api_keys,
     get_gemini_models,
@@ -312,13 +314,17 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
                 out_of_budget = True
                 break
             try:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
                 payload = {
                     "contents": [{"parts": [{"text": prompt}]}],
                     # 輸出封頂，模型才不會慢慢寫到逾時
                     "generationConfig": {"response_mime_type": "application/json", "maxOutputTokens": 1500},
                 }
-                res = requests.post(url, json=payload, timeout=MENU_GENERATION_TIMEOUT_SECONDS)
+                res = requests.post(
+                    gemini_generate_url(model_name),
+                    headers=gemini_headers(gemini_key),
+                    json=payload,
+                    timeout=MENU_GENERATION_TIMEOUT_SECONDS,
+                )
                 if res.status_code == 200:
                     parsed_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
                     items = extract_json_items(parsed_text)
@@ -523,7 +529,6 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
             if (gemini_key, model_name) not in usable_pairs:
                 continue
             try:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
                 payload = {
                     "contents": [
                         {
@@ -540,7 +545,7 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
                     ],
                     "generationConfig": {"responseMimeType": "application/json", "maxOutputTokens": 8192}
                 }
-                res = requests.post(url, json=payload, timeout=25)
+                res = requests.post(gemini_generate_url(model_name), headers=gemini_headers(gemini_key), json=payload, timeout=25)
                 if res.status_code == 200:
                     body = res.json()
                     items, finish_reason = _extract_menu_items_from_response(body)

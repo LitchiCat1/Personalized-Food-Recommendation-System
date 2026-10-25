@@ -2,7 +2,13 @@ import json
 
 import requests
 
-from services.nutrition_label_service import call_gemini_with_rotation, extract_json_block, get_gemini_api_keys
+from services.nutrition_label_service import (
+    call_gemini_with_rotation,
+    extract_json_block,
+    gemini_generate_url,
+    gemini_headers,
+    get_gemini_api_keys,
+)
 
 
 def validate_restaurant_summary_input(restaurant: dict, budget: int, category: str, health_conditions: list[str]) -> tuple[dict, int, str, list[str]]:
@@ -147,8 +153,12 @@ def call_gemini_restaurant_summary(
         nutrition_progress,
         disease_rules,
     )
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-    resp = requests.post("" + url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
+    resp = requests.post(
+        gemini_generate_url(model),
+        headers=gemini_headers(api_key),
+        json={"contents": [{"parts": [{"text": prompt}]}]},
+        timeout=30,
+    )
     resp.raise_for_status()
     text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
     return extract_json_block(text)

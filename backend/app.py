@@ -260,6 +260,24 @@ def enforce_rate_limit(limiter, bucket: str) -> None:
     limiter.check(f"{bucket}:{_client_key()}")
 
 
+# Gemini 呼叫失敗時，錯誤原文不回給前端：掃描頁會把它直接顯示在畫面上，
+# 先前 requests 連線錯誤的原文帶著整串網址，連金鑰一起回去了。細節只留在後端 log。
+def _redact_gemini_keys(text: str) -> str:
+    for key in get_gemini_api_keys():
+        text = text.replace(key, "***")
+    return text
+
+
+def gemini_unreachable_response(feature: str, error: Exception):
+    print(f"[WARN] {feature}連不上 Gemini：{type(error).__name__}: {_redact_gemini_keys(str(error))}")
+    return jsonify({"error": f"{feature}服務暫時連不上，請稍後再試。"}), 502
+
+
+def gemini_failure_response(feature: str, error: Exception):
+    print(f"[ERROR] {feature}失敗：{type(error).__name__}: {_redact_gemini_keys(str(error))}")
+    return jsonify({"error": f"{feature}失敗，請稍後再試。"}), 500
+
+
 @app.errorhandler(RateLimitExceeded)
 def handle_rate_limit(error):
     response = jsonify({"error": str(error)})
@@ -591,8 +609,10 @@ def ocr_nutrition_label():
         )
     except requests.HTTPError as e:
         return jsonify({"error": f"Gemini API 呼叫失敗: {e.response.text[:500]}"}), 502
+    except requests.RequestException as e:
+        return gemini_unreachable_response("營養標示辨識", e)
     except Exception as e:
-        return jsonify({"error": f"營養標示辨識失敗: {str(e)}"}), 500
+        return gemini_failure_response("營養標示辨識", e)
 
 
 @app.route("/predict/vision-food", methods=["POST"])
@@ -616,6 +636,8 @@ def predict_vision_food():
     if is_auth_required():
         user_id = user_id or get_request_user_id()
         require_user_access(user_id)
+    # 每掃一次就打一次 Gemini Vision，跟其他付費路由一樣要限流
+    enforce_rate_limit(_paid_api_limiter, "vision")
 
     try:
         parsed = call_gemini_food_recognition_with_rotation(image_base64, mime_type, api_keys)
@@ -634,8 +656,10 @@ def predict_vision_food():
         )
     except requests.HTTPError as e:
         return jsonify({"error": f"Gemini Vision 食物辨識呼叫失敗: {e.response.text[:500]}"}), 502
+    except requests.RequestException as e:
+        return gemini_unreachable_response("食物辨識", e)
     except Exception as e:
-        return jsonify({"error": f"Gemini Vision 食物辨識失敗: {str(e)}"}), 500
+        return gemini_failure_response("食物辨識", e)
 
 
 # ─── 2. User Profile CRUD (PRD: 健康檔案與疾病管理) ──────────
@@ -971,6 +995,8 @@ def healthy_food_recommend(user_id):
 @app.route("/map-food-recommend/<user_id>", methods=["GET"])
 def map_food_recommend(user_id):
     require_user_access(user_id)
+    # 每次都會打 Google Places
+    enforce_rate_limit(_paid_api_limiter, "places")
     params = {
         "budget": request.args.get("budget", 150),
         "lat": request.args.get("lat", 25.0338),
@@ -1255,6 +1281,8 @@ def get_restaurant_menu():
 @app.route("/map-food-recommend/<user_id>/restaurant-summary", methods=["POST"])
 def map_food_restaurant_summary(user_id):
     require_user_access(user_id)
+    # 每點一家店就打一次 Gemini
+    enforce_rate_limit(_paid_api_limiter, "summary")
     user = storage.get_user(user_id)
     if not user:
         return jsonify({"error": "使用者不存在，請先建立 profile"}), 404

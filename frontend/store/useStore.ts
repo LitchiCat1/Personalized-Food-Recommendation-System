@@ -142,13 +142,12 @@ function computeBMI(weight: number, height: number): number {
 }
 
 // ─── Store ──────────────────────────────────────────────────
-export const useStore = create<NutriLensState>((set, get) => ({
-  // ── User Profile ──
-  // 先前這裡整份抄 constants/mock-data.ts 的 USER_PROFILE（示範用的「王小明」），
-  // 而「我的」頁會把它 POST 上去當成新帳號的健康檔案——包含一個沒人說過的
-  // 高血壓診斷與兩項過敏原。疾病與過敏原現在一律留空，只能由使用者自己勾。
-  // 詳見 constants/profile-defaults.ts。
-  user: {
+// 先前這裡整份抄 constants/mock-data.ts 的 USER_PROFILE（示範用的「王小明」），
+// 而「我的」頁會把它 POST 上去當成新帳號的健康檔案——包含一個沒人說過的
+// 高血壓診斷與兩項過敏原。疾病與過敏原現在一律留空，只能由使用者自己勾。
+// 詳見 constants/profile-defaults.ts。
+function newUserProfile(): UserProfile {
+  return {
     userId: 'demo_user',
     name: '',
     email: '',
@@ -176,7 +175,29 @@ export const useStore = create<NutriLensState>((set, get) => ({
     targetWeight: NEW_USER_PROFILE.targetWeight,
     dietType: NEW_USER_PROFILE.dietType,
     profileComplete: false,
-  },
+  };
+}
+
+/** 跟帳號有關的狀態。登出或換帳號時整組回到這裡，不留上一個人的資料。 */
+function signedOutState() {
+  return {
+    user: newUserProfile(),
+    // 初始值先前是 constants/mock-data.ts 的 DAILY_NUTRITION / TODAY_MEALS /
+    // HEALTH_ALERTS——也就是 1450 kcal、1800 mg 鈉、四筆假餐點與一則假的
+    // 「鈉含量接近上限」警示。那些在後端紀錄回來之前會直接顯示給使用者看。
+    dailyNutrition: { ...EMPTY_DAILY_NUTRITION },
+    todayMeals: [] as MealEntry[],
+    healthAlerts: [] as HealthAlert[],
+    dashboardReady: false,
+    nutritionTargetsReady: false,
+    nutritionGoalTypes: {} as NutritionGoalTypes,
+    nutritionTargetBasis: null as NutritionTargetBasis | null,
+    scanResult: { isScanning: false, detections: [], timestamp: null } as ScanResult,
+  };
+}
+
+export const useStore = create<NutriLensState>((set, get) => ({
+  ...signedOutState(),
 
   accessToken: null,
   authReady: false,
@@ -184,19 +205,34 @@ export const useStore = create<NutriLensState>((set, get) => ({
 
   setAuthReady: (ready) => set({ authReady: ready }),
 
+  // 登出（自己按、token 過期、其他分頁登出）與換帳號，都把帳號相關的狀態整組清掉。
+  // 先前登出只清 token：同一個分頁換人登入時，首頁先顯示上一個人的餐點與健康警示
+  // （dashboardReady 還是 true），新帳號的紀錄讀不到就一直留著；掃描頁也留著上一個人的結果。
+  // revision 加一，還在路上的上一個人的請求回來時就會被丟掉，不會再把資料寫回來。
   setAuthSession: (session) =>
     set((state) => {
       if (!session) {
-        return { accessToken: null, isAuthenticated: false };
+        return {
+          ...signedOutState(),
+          accessToken: null,
+          isAuthenticated: false,
+          dietaryRecordsRevision: state.dietaryRecordsRevision + 1,
+        };
       }
+      if (session.userId === state.user.userId) {
+        return {
+          accessToken: session.accessToken,
+          isAuthenticated: true,
+          user: { ...state.user, email: session.email || state.user.email },
+        };
+      }
+      const fresh = signedOutState();
       return {
+        ...fresh,
         accessToken: session.accessToken,
         isAuthenticated: true,
-        user: {
-          ...state.user,
-          userId: session.userId,
-          email: session.email || state.user.email,
-        },
+        dietaryRecordsRevision: state.dietaryRecordsRevision + 1,
+        user: { ...fresh.user, userId: session.userId, email: session.email || '' },
       };
     }),
 
@@ -224,19 +260,8 @@ export const useStore = create<NutriLensState>((set, get) => ({
       return { user: { ...state.user, bmr, tdee, bmi } };
     }),
 
-  // ── Dashboard ──
-  //
-  // 初始值先前是 constants/mock-data.ts 的 DAILY_NUTRITION / TODAY_MEALS /
-  // HEALTH_ALERTS——也就是 1450 kcal、1800 mg 鈉、四筆假餐點與一則假的
-  // 「鈉含量接近上限」警示。那些在後端紀錄回來之前會直接顯示給使用者看。
-  dailyNutrition: { ...EMPTY_DAILY_NUTRITION },
-  todayMeals: [],
-  healthAlerts: [],
-  dashboardReady: false,
-  nutritionTargetsReady: false,
+  // ── Dashboard ──（初始值在 signedOutState）
   dietaryRecordsRevision: 0,
-  nutritionGoalTypes: {},
-  nutritionTargetBasis: null,
   invalidateDietaryRecords: () => set((state) => ({ dietaryRecordsRevision: state.dietaryRecordsRevision + 1 })),
 
   resetDashboard: () =>
@@ -413,9 +438,7 @@ export const useStore = create<NutriLensState>((set, get) => ({
       };
     }),
 
-  // ── Scanner ──
-  scanResult: { isScanning: false, detections: [], timestamp: null },
-
+  // ── Scanner ──（初始值在 signedOutState）
   setScanResult: (detections) =>
     set({
       scanResult: {

@@ -44,13 +44,16 @@ class RequestOriginTests(ApiTestBase):
         with self.app_module.app.test_request_context("/", base_url=FUNNEL_URL, environ_base=LOCAL):
             self.assertFalse(self.app_module.is_local_request())
 
-    def test_a_tunnel_forwarded_address_is_used_for_rate_limits(self):
-        # 請求方自己塞的 X-Forwarded-For 排在前面，本機 tunnel 加的是最後一個
-        with self.app_module.app.test_request_context(
-            "/", base_url=FUNNEL_URL, environ_base=LOCAL, headers={"X-Forwarded-For": "1.1.1.1, 203.0.113.7"}
-        ):
-            self.assertEqual(self.app_module.client_ip(), "203.0.113.7")
-            self.assertFalse(self.app_module.is_local_request())
+    def test_a_forwarded_address_through_another_tunnel_does_not_change_the_rate_limit_key(self):
+        # 沒辦法確定 tunnel 會不會把請求方自己填的 X-Forwarded-For 原樣轉過來，
+        # 採用它的話，每次換一個值就能繞過以 IP 計的限流
+        for spoofed in ("1.1.1.1", "2.2.2.2, 203.0.113.7"):
+            with self.subTest(spoofed=spoofed):
+                with self.app_module.app.test_request_context(
+                    "/", base_url=FUNNEL_URL, environ_base=LOCAL, headers={"X-Forwarded-For": spoofed}
+                ):
+                    self.assertEqual(self.app_module.client_ip(), "127.0.0.1")
+                    self.assertFalse(self.app_module.is_local_request())
 
 
 class BindHostTests(ApiTestBase):

@@ -197,12 +197,10 @@ def client_ip() -> str:
     remote = request.remote_addr or "unknown"
     if _is_loopback(remote):
         forwarded = (request.headers.get("Cf-Connecting-Ip") or "").strip()
-        if not forwarded:
-            # 其他 tunnel（例如 Tailscale Funnel）用 X-Forwarded-For。請求方自己塞的值
-            # 排在前面，只取最後一個，也就是本機 tunnel 加上的那個。
-            forwarded = (request.headers.get("X-Forwarded-For") or "").split(",")[-1].strip()
         if forwarded:
             return forwarded
+        # X-Forwarded-For 不採用：要是 tunnel 只是把請求方自己填的值原樣轉過來，
+        # 每次換一個值就能繞過以 IP 計的限流。其他 tunnel 的訪客一起算在 127.0.0.1。
     return remote
 
 

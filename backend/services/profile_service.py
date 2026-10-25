@@ -210,9 +210,10 @@ def build_user_profile(data: dict, disease_rules: dict | None = None, allergen_t
 
 def build_bmr_response(data: dict) -> dict:
     gender = data.get("gender", "male")
-    weight = data.get("weight", 70)
-    height = data.get("height", 170)
-    age = data.get("age", 25)
+    # 跟健康檔案同一套範圍檢查。先前直接拿去算，身高送字串就 500、送 1 就算出負的 BMI。
+    weight = _validate_range("weight", data.get("weight", 70))
+    height = _validate_range("height", data.get("height", 170))
+    age = int(_validate_range("age", data.get("age", 25)))
     activity = resolve_activity_multiplier(data)
 
     bmr = compute_bmr(gender, weight, height, age)

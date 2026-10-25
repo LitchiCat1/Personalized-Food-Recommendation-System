@@ -474,6 +474,14 @@ class StorageRepository:
             docs = [doc for doc in docs if doc.get("user_id") == user_id]
         return docs
 
+    def count_custom_foods(self) -> int:
+        """/health 用。只要筆數，不必把每個人的自訂食品整份讀出來再解析。"""
+        if self.use_sql:
+            return int(self.sql.query_one("SELECT COUNT(*) AS n FROM custom_foods")["n"])
+        if self.use_mongo:
+            return self.db.custom_foods.count_documents({})
+        return len(self.mem_custom_foods)
+
     def _custom_food_owner_key(self, user_id: str | None, food_id: str) -> str:
         normalized_user_id = user_id or "demo_user"
         return f"{normalized_user_id}:{food_id}"

@@ -144,6 +144,13 @@ class SqliteStorageTests(unittest.TestCase):
         self.assertEqual(self.storage.get_custom_food("f1", "user-a")["calories"], 650)
         self.assertIsNone(self.storage.get_custom_food("f1", "user-b"))
 
+    def test_custom_foods_are_counted_without_loading_them(self):
+        # /health 先前把每個人的自訂食品整份讀出來、解析 JSON，只為了數筆數
+        for owner, food_id in (("user-a", "f1"), ("user-a", "f2"), ("user-b", "f1")):
+            self.storage.upsert_custom_food({"food_id": food_id, "user_id": owner, "name": "便當"})
+        with patch.object(self.storage, "get_custom_foods", side_effect=AssertionError("不該整份讀出來")):
+            self.assertEqual(self.storage.count_custom_foods(), 3)
+
     def test_restaurant_menu_cache(self):
         items = [{"name": "雞腿便當", "price": 120}]
         self.storage.save_restaurant_menu("好吃便當", items, {"google_place_id": "abc"})

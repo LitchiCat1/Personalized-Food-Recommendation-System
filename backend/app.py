@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 import requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from werkzeug.exceptions import InternalServerError, RequestEntityTooLarge
+from werkzeug.exceptions import BadRequest, HTTPException, InternalServerError, RequestEntityTooLarge
 from werkzeug.security import safe_join
 from repositories.auth_repository import AuthRepository
 from repositories.database import DatabaseUnavailable, open_database
@@ -155,6 +155,31 @@ def handle_internal_error(_error):
     # 沒接住的例外。先前回的是 Flask 的 HTML 錯誤頁，前端解析不了；
     # 完整的 traceback 照樣會印在後端視窗，這裡不把細節回給前端。
     return jsonify({"error": "伺服器發生錯誤，請稍後再試。"}), 500
+
+
+@app.errorhandler(HTTPException)
+def handle_http_error(error):
+    # 405、415、壞掉的 JSON 這類 Flask 自己丟的錯誤，原本也是 HTML 錯誤頁
+    response = jsonify({"error": error.description})
+    response.status_code = error.code or 500
+    for name, value in error.get_headers():
+        if name.lower() != "content-type":
+            response.headers[name] = value  # 例如 405 的 Allow
+    return response
+
+
+def json_body() -> dict:
+    """請求內容的 JSON 物件，沒有內容就是空物件。
+
+    先前各路由各自 request.get_json()：送陣列或字串時 data.get() 直接 500，
+    沒帶 JSON 時 Flask 回 415 的 HTML 錯誤頁。
+    """
+    if not request.get_data(cache=True):
+        return {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        raise BadRequest("請求內容必須是 JSON 物件。")
+    return data
 
 
 def _is_loopback(address: str | None) -> bool:
@@ -379,7 +404,7 @@ def auth_config():
 
 @app.route("/auth/signup", methods=["POST"])
 def auth_signup():
-    data = request.get_json(silent=True) or {}
+    data = json_body()
     enforce_auth_rate_limit(data.get("email"))
     mode = signup_mode()
     if mode == "closed":
@@ -394,7 +419,7 @@ def auth_signup():
 
 @app.route("/auth/login", methods=["POST"])
 def auth_login():
-    data = request.get_json(silent=True) or {}
+    data = json_body()
     enforce_auth_rate_limit(data.get("email"))
     return jsonify(sign_in(auth_repo, data.get("email"), data.get("password")))
 
@@ -479,7 +504,7 @@ def health():
         "places_enabled": bool(os.environ.get("GOOGLE_PLACES_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY")),
         "auth_required": is_auth_required(),
         "auth_provider": f"local-{sql_db.dialect}" if auth_repo.use_sql else "local-memory",
-        "custom_foods": len(storage.get_custom_foods()),
+        "custom_foods": storage.count_custom_foods(),
         # 部署後可以直接從 /health 看出線上跑的是哪一版，不用靠路由存不存在來猜。
         # RENDER_GIT_BRANCH / RENDER_GIT_COMMIT 由 Render 自動注入。
         "deployed_branch": os.environ.get("RENDER_GIT_BRANCH") or "local",
@@ -572,7 +597,7 @@ def get_food_detail(food_key):
 
 @app.route("/custom-food", methods=["POST"])
 def create_custom_food():
-    data = request.get_json(silent=True) or {}
+    data = json_body()
     if is_auth_required():
         data["user_id"] = require_user_access(data.get("user_id"))
     try:
@@ -603,7 +628,7 @@ def list_custom_foods():
 def ocr_nutrition_label():
     require_authenticated_user()
     enforce_rate_limit(_paid_api_limiter, "ocr")
-    data = request.get_json(silent=True) or {}
+    data = json_body()
     if "image" not in data:
         return jsonify({"error": "缺少 image 欄位（Base64）"}), 400
 
@@ -645,7 +670,7 @@ def ocr_nutrition_label():
 
 @app.route("/predict/vision-food", methods=["POST"])
 def predict_vision_food():
-    data = request.get_json(silent=True) or {}
+    data = json_body()
     if "image" not in data:
         return jsonify({"error": "缺少 image 欄位（Base64）"}), 400
 
@@ -710,7 +735,7 @@ def get_user(user_id):
 
 @app.route("/user", methods=["POST"])
 def create_or_update_user():
-    data = request.get_json()
+    data = json_body()
     if not data or "user_id" not in data:
         return jsonify({"error": "缺少 user_id"}), 400
     if is_auth_required():
@@ -801,7 +826,7 @@ def normalize_record_timestamp(value):
 
 @app.route("/record", methods=["POST"])
 def add_record():
-    data = request.get_json()
+    data = json_body()
     if not isinstance(data, dict):
         return jsonify({"error": "缺少資料"}), 400
     if not data.get("user_id"):
@@ -881,7 +906,7 @@ def update_record(user_id, client_record_id):
     if not existing:
         return jsonify({"error": "找不到飲食紀錄"}), 404
 
-    data = request.get_json()
+    data = json_body()
     if not isinstance(data, dict):
         return jsonify({"error": "缺少資料"}), 400
     try:
@@ -929,7 +954,7 @@ def index_nearby_restaurants(user_id):
     require_user_access(user_id)
     # 一次會打 Google Places 和好幾家店的 Gemini 分析，都是按次計費的
     enforce_rate_limit(_paid_api_limiter, "venue-index")
-    data = request.get_json(silent=True) or {}
+    data = json_body()
     try:
         summary = index_nearby_venues(
             storage,
@@ -1063,7 +1088,7 @@ def get_restaurant_menu():
     """
     動態獲取餐廳詳細菜單。如果本地資料庫不存在，則調用爬蟲與 Gemini 動態分析。
     """
-    data = request.get_json(silent=True) or {}
+    data = json_body()
     # 先擋未登入（401），再限流（429），最後才檢查身分歸屬——順序反了會讓
     # 匿名呼叫拿到 400、限流也永遠輪不到。
     require_authenticated_user()
@@ -1074,8 +1099,11 @@ def get_restaurant_menu():
     if data.get("user_id"):
         require_user_access(data["user_id"])
     restaurant_id = data.get("restaurant_id", "")
-    name = data.get("name", "").strip()
-    address = data.get("address", "").strip()
+    name = data.get("name") or ""
+    address = data.get("address") or ""
+    if not isinstance(name, str) or not isinstance(address, str):
+        return jsonify({"error": "name 與 address 必須是文字"}), 400
+    name, address = name.strip(), address.strip()
     # 這條路徑收到的 lat/lng 是「店家」的座標，不是使用者的，算不出距離。
     # 之前寫死 0.1 km，等於對每一家店都謊報「就在附近」。呼叫端已經從
     # 推薦清單拿到真實距離，有帶就照實回傳，沒帶就不給這個欄位。
@@ -1105,6 +1133,15 @@ def get_restaurant_menu():
         budget = int(data.get("budget", 150))
     except (TypeError, ValueError):
         return jsonify({"error": "budget 必須是有效數字"}), 400
+
+    # 沒有 profile 就不能篩。先前這裡退回共用的 "demo_user"（storage 還會在
+    # 正式資料庫自動建一個 0 疾病 0 過敏的帳號），等於把安全過濾靜默關掉，
+    # 而畫面上看起來一切正常。寧可回錯誤，也不要回一份沒篩過的推薦。
+    # 也要在分析菜單之前檢查：先前放在後面，先花一次 Gemini、寫進共用快取才回 404。
+    user_id = data.get("user_id") or get_request_user_id() or ""
+    user = storage.get_user(user_id)
+    if not user:
+        return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
 
     # 1. 先看資料庫裡建檔過的菜單，再退回內建目錄
     cached = storage.get_restaurant_menu(name)
@@ -1188,15 +1225,7 @@ def get_restaurant_menu():
             "lng": matched["lng"],
         })
 
-    # 3. 對所有菜單項目進行醫學過濾與個人化偏好契合度評分
-    #
-    # 沒有 profile 就不能篩。先前這裡退回共用的 "demo_user"（storage 還會在
-    # 正式資料庫自動建一個 0 疾病 0 過敏的帳號），等於把安全過濾靜默關掉，
-    # 而畫面上看起來一切正常。寧可回錯誤，也不要回一份沒篩過的推薦。
-    user_id = data.get("user_id") or get_request_user_id() or ""
-    user = storage.get_user(user_id)
-    if not user:
-        return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
+    # 3. 對所有菜單項目進行醫學過濾與個人化偏好契合度評分（user 在上面已經確認存在）
     conditions = user.get("health_conditions", []) or []
     allergens = user.get("allergens", []) or []
     # 先前這裡直接讀 profile 存的 daily_calorie_target，沒有就退回寫死的 2100。
@@ -1322,7 +1351,7 @@ def map_food_restaurant_summary(user_id):
     if not user:
         return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
 
-    data = request.get_json(silent=True) or {}
+    data = json_body()
     restaurant = data.get("restaurant") or {}
     if not restaurant.get("name"):
         return jsonify({"error": "缺少 restaurant.name"}), 400
@@ -1349,8 +1378,10 @@ def map_food_restaurant_summary(user_id):
 # ─── 6. BMR/TDEE Calculator (PRD: 動態計算) ─────────────────
 @app.route("/calculate/bmr", methods=["POST"])
 def calc_bmr():
-    data = request.get_json()
-    return jsonify(build_bmr_response(data))
+    try:
+        return jsonify(build_bmr_response(json_body()))
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
 
 
 # ─── 網站本身（frontend/dist）─────────────────────────────────

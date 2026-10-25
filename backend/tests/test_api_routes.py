@@ -979,10 +979,63 @@ class JsonErrorTests(ApiTestBase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("budget", response.get_json()["error"])
 
+    def test_a_non_text_store_name_or_address_is_a_400(self):
+        with self.mock_auth("user-a"):
+            for body in ({"name": 3}, {"name": "測試店", "address": 5}):
+                with self.subTest(body=body):
+                    response = self.client.post("/restaurant/menu", json=body, headers=self.auth_headers())
+                    self.assertEqual(response.status_code, 400)
+                    self.assertIn("文字", response.get_json()["error"])
+
+    def test_a_menu_is_not_analysed_for_someone_without_a_profile(self):
+        # 先前先花一次 Gemini 分析菜單、寫進共用快取，最後才回「使用者不存在」
+        with self.mock_auth("user-without-profile"), \
+             patch.object(self.app_module, "enrich_restaurant_with_gemini") as analyse:
+            response = self.client.post("/restaurant/menu", json={"name": "沒看過的店"}, headers=self.auth_headers())
+        self.assertEqual(response.status_code, 404)
+        analyse.assert_not_called()
+        self.assertIsNone(self.app_module.storage.get_restaurant_menu("沒看過的店"))
+
     def test_out_of_range_history_days_are_clamped_like_record_limits(self):
         with self.mock_auth("user-a"):
             data = self.client.get("/history/user-a?days=99999", headers=self.auth_headers()).get_json()
         self.assertEqual(data["days"], 365)
+
+    def test_a_body_that_is_not_a_json_object_is_a_400_not_a_crash(self):
+        # 先前送 JSON 陣列或字串時 data.get() 直接 AttributeError（500）
+        with self.mock_auth("user-a"):
+            for path in ("/auth/signup", "/auth/login", "/custom-food", "/user", "/record"):
+                for body in ([1, 2], "text"):
+                    with self.subTest(path=path, body=body):
+                        response = self.client.post(path, json=body, headers=self.auth_headers())
+                        self.assertEqual(response.status_code, 400)
+                        self.assertIn("JSON 物件", response.get_json()["error"])
+
+    def test_a_missing_or_broken_json_body_is_a_json_400(self):
+        # 先前沒帶 JSON 是 415、壞掉的 JSON 是 400，兩個都是 Flask 的 HTML 錯誤頁
+        with self.mock_auth("user-a"):
+            for path in ("/user", "/record"):
+                for kwargs in ({}, {"data": "{", "content_type": "application/json"}):
+                    with self.subTest(path=path, kwargs=kwargs):
+                        response = self.client.post(path, headers=self.auth_headers(), **kwargs)
+                        self.assertEqual(response.status_code, 400)
+                        self.assertIn("error", response.get_json())
+
+    def test_a_wrong_method_is_a_json_405_that_lists_the_allowed_ones(self):
+        response = self.client.put("/record", json={})
+        self.assertEqual(response.status_code, 405)
+        self.assertIn("error", response.get_json())
+        self.assertIn("POST", response.headers["Allow"])
+
+    def test_the_bmr_calculator_checks_its_numbers_like_the_profile_does(self):
+        ok = self.client.post("/calculate/bmr", json={"gender": "female", "weight": 55, "height": 160, "age": 22})
+        self.assertEqual(ok.status_code, 200)
+        self.assertEqual(ok.get_json()["bmr"], 1279)
+        for body in ('{"height": "abc"}', '{"weight": null}', '{"height": 1}', "null", "[1]"):
+            with self.subTest(body=body):
+                response = self.client.post("/calculate/bmr", data=body, content_type="application/json")
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("error", response.get_json())
 
     def test_an_unexpected_error_is_a_json_500_without_the_details(self):
         self.app_module.app.config["PROPAGATE_EXCEPTIONS"] = False

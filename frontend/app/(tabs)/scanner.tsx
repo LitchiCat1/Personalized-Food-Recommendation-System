@@ -33,6 +33,7 @@ import {
   type OCRDraft,
   type RejectedDetection,
 } from '@/lib/scanner';
+import { formatLocalTimestamp } from '@/lib/dietary-records';
 import { getAutoMealType } from '@/lib/meal';
 import {
   canRetryPendingRecordSync,
@@ -522,8 +523,10 @@ export default function ScannerScreen() {
     try {
       for (const item of retryableQueue) {
         try {
-          // 餐別要用當初入列的時間，不是補送的時間：早上排隊的早餐
-          // 如果晚上才連上線，用「現在」判會變成晚餐。
+          // 餐別和時間都要用當初入列的時間，不是補送的時間：早上排隊的早餐
+          // 如果晚上才連上線，用「現在」判會變成晚餐；半夜排隊的隔天才送，
+          // 不帶時間的話後端會把它存成隔天。
+          const queuedAt = new Date(item.createdAt);
           await saveRecord({
             apiBaseUrl,
             userId: item.userId,
@@ -531,7 +534,8 @@ export default function ScannerScreen() {
             foods: item.foods,
             source: item.source,
             auth: { accessToken },
-            mealType: getAutoMealType(new Date(item.createdAt)),
+            mealType: getAutoMealType(queuedAt),
+            timestamp: formatLocalTimestamp(queuedAt),
           });
           invalidateDietaryRecords();
           const nextQueue = await removePendingRecordSync(item.id);

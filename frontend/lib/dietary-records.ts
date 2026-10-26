@@ -79,7 +79,7 @@ export function buildLocalTimestampForDate(value: string, now = new Date()): str
   const dateKey = parseDateInput(value);
   if (!dateKey) throw new Error('請選擇有效的紀錄日期');
   const [year, month, day] = dateKey.split('-').map(Number);
-  const localDateTime = new Date(
+  return formatLocalTimestamp(new Date(
     year,
     month - 1,
     day,
@@ -87,19 +87,31 @@ export function buildLocalTimestampForDate(value: string, now = new Date()): str
     now.getMinutes(),
     now.getSeconds(),
     now.getMilliseconds()
-  );
-  const offsetMinutes = localDateTime.getTimezoneOffset();
+  ));
+}
+
+/**
+ * 這台裝置的當地時間，帶時區偏移，例如 2026-10-26T23:50:00.000+08:00。
+ *
+ * 後端用 timestamp 開頭的日期決定這筆紀錄算哪一天，所以不能用 toISOString()：
+ * 那是 UTC，台灣早上 8 點前的紀錄會被算到前一天。
+ */
+export function formatLocalTimestamp(at: Date): string {
+  const offsetMinutes = at.getTimezoneOffset();
   const offsetSign = offsetMinutes <= 0 ? '+' : '-';
   const absoluteOffset = Math.abs(offsetMinutes);
   const offsetHours = String(Math.floor(absoluteOffset / 60)).padStart(2, '0');
   const offsetRemainder = String(absoluteOffset % 60).padStart(2, '0');
-  const time = [
-    localDateTime.getHours(),
-    localDateTime.getMinutes(),
-    localDateTime.getSeconds(),
-  ].map((part) => String(part).padStart(2, '0')).join(':');
-  const milliseconds = String(localDateTime.getMilliseconds()).padStart(3, '0');
-  return `${dateKey}T${time}.${milliseconds}${offsetSign}${offsetHours}:${offsetRemainder}`;
+  const date = [
+    String(at.getFullYear()).padStart(4, '0'),
+    String(at.getMonth() + 1).padStart(2, '0'),
+    String(at.getDate()).padStart(2, '0'),
+  ].join('-');
+  const time = [at.getHours(), at.getMinutes(), at.getSeconds()]
+    .map((part) => String(part).padStart(2, '0'))
+    .join(':');
+  const milliseconds = String(at.getMilliseconds()).padStart(3, '0');
+  return `${date}T${time}.${milliseconds}${offsetSign}${offsetHours}:${offsetRemainder}`;
 }
 
 export function createManualRecordFoodDraft(): RecordFoodDraft {

@@ -161,6 +161,13 @@ type SaveRecordParams = {
    * 知道：離線佇列補送時要用當初入列的時間，不是送出的時間。
    */
   mealType: MealType;
+  /**
+   * 這一餐吃的時間（帶時區偏移）。不帶就由後端用收到的時間。
+   *
+   * 離線佇列補送時一定要帶：23:50 排隊的晚餐隔天早上才送出，不帶的話會被存成
+   * 隔天早上，算進隔天的熱量與鈉。
+   */
+  timestamp?: string;
 };
 
 const inFlightRecordRequests = new Map<string, Promise<void>>();
@@ -210,6 +217,7 @@ async function performSaveRecord(params: SaveRecordParams): Promise<void> {
       user_id: params.userId,
       client_record_id: params.clientRecordId,
       meal_type: params.mealType,
+      ...(params.timestamp ? { timestamp: params.timestamp } : {}),
       foods: normalizedFoods.map((food) => ({
         name: food.foodName,
         calories: food.nutrition.calories,

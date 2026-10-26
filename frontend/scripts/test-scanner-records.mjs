@@ -149,6 +149,32 @@ test('sends the meal type the record actually belongs to, not a fixed 點心', a
   }
 });
 
+test('a replayed record carries the time it was queued; a live save lets the backend stamp it', async () => {
+  const originalFetch = globalThis.fetch;
+  const captured = [];
+  globalThis.fetch = async (_url, init) => {
+    captured.push(JSON.parse(init.body));
+    return { ok: true, json: async () => ({}) };
+  };
+  const base = {
+    apiBaseUrl: 'https://api.example.test',
+    userId: 'user-a',
+    foods: [detectedFood('滷肉飯')],
+    source: 'camera',
+    mealType: '晚餐',
+  };
+  try {
+    await saveRecord({ ...base, clientRecordId: 'live-record' });
+    assert.equal('timestamp' in captured[0], false);
+
+    // 23:50 排隊的晚餐隔天早上才補送，要存成當晚，不是隔天早上
+    await saveRecord({ ...base, clientRecordId: 'queued-record', timestamp: '2026-10-25T23:50:00.000+08:00' });
+    assert.equal(captured[1].timestamp, '2026-10-25T23:50:00.000+08:00');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('a non-JSON error page becomes a readable message instead of a parse error', async () => {
   // 後端逾時或 502 時回的是 HTML，直接 resp.json() 會丟出 "Unexpected token '<'"
   const originalFetch = globalThis.fetch;

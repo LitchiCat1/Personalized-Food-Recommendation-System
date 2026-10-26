@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildLocalTimestampForDate,
+  formatLocalTimestamp,
   calculateRecordFoodTotals,
   createManualRecordFoodDraft,
   createRecordFoodDrafts,
@@ -73,6 +74,19 @@ test('builds timezone-aware local timestamps without moving the selected calenda
     assert.equal(filterAndSortRecords([
       record('user-a', dateKey, timestamp),
     ], 'user-a', dateKey, dateKey).length, 1);
+  }
+});
+
+test('formats a moment as local time with its offset, keeping the local calendar date', () => {
+  // 半夜與清晨：toISOString() 在台灣會把這兩個時間算到前一天
+  for (const moment of [new Date(2026, 9, 25, 23, 50, 0, 5), new Date(2026, 9, 26, 0, 30, 0, 0), new Date(2024, 1, 29, 7, 59, 59, 999)]) {
+    const timestamp = formatLocalTimestamp(moment);
+    const localDate = [moment.getFullYear(), moment.getMonth() + 1, moment.getDate()]
+      .map((part, index) => String(part).padStart(index === 0 ? 4 : 2, '0'))
+      .join('-');
+    assert.ok(timestamp.startsWith(`${localDate}T`), timestamp);
+    assert.match(timestamp, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}$/);
+    assert.equal(new Date(timestamp).getTime(), moment.getTime());
   }
 });
 

@@ -22,6 +22,9 @@ DEFAULT_AUTO_HOURS = 24
 DEFAULT_AUTO_KEEP = 30
 # 備份失敗（例如硬碟滿了）時隔多久再試；不能馬上重試，不然會一直空轉
 RETRY_SECONDS = 3600
+# 多久看一次時鐘。不一口氣等滿一個週期：Windows 8 以後，等待的倒數在電腦睡眠時會暫停，
+# 筆電每天闔上十幾個小時的話，「24 小時後」會拖到好幾天後。到期與否改看檔名上的時間。
+CHECK_SECONDS = 600
 
 
 class BackupError(Exception):
@@ -177,9 +180,12 @@ class AutoBackup:
         return target
 
     def _loop(self) -> None:
-        delay = self.seconds_until_due()
-        while not self._stop.wait(delay):
-            delay = self.interval.total_seconds() if self.run_once() else min(RETRY_SECONDS, self.interval.total_seconds())
+        retry_after = None
+        while True:
+            if self.seconds_until_due() <= 0 and (retry_after is None or self.clock() >= retry_after):
+                retry_after = None if self.run_once() else self.clock() + timedelta(seconds=RETRY_SECONDS)
+            if self._stop.wait(CHECK_SECONDS):
+                return
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._loop, name="sqlite-auto-backup", daemon=True)

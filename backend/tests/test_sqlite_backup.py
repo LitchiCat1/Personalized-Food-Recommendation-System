@@ -10,6 +10,7 @@ import unittest
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
+from repositories import sqlite_backup
 from repositories.sqlite_backup import AutoBackup, auto_backup_from_env, auto_backups, backup_database
 from repositories.sqlite_db import SqliteDatabase
 from test_api_routes import ApiTestBase
@@ -152,6 +153,44 @@ class AutoBackupTests(unittest.TestCase):
         finally:
             auto.stop()
         self.assertEqual(len(auto_backups(self.path, self.backups)), 1)
+
+    def test_a_backup_is_taken_when_the_wall_clock_says_so_even_after_sleep(self):
+        # Windows 的等待倒數在睡眠時會暫停；一天後要不要備份，要看時鐘，不是看等了多久
+        self._open_database_with("早餐")
+        now = [NOON]
+        auto = AutoBackup(self.path, self.backups, clock=lambda: now[0])
+        with patch.object(sqlite_backup, "CHECK_SECONDS", 0.02):
+            auto.start()
+            try:
+                self._wait_for_backups(1)
+                now[0] = NOON + timedelta(hours=25)
+                self._wait_for_backups(2)
+            finally:
+                auto.stop()
+        self.assertEqual(len(auto_backups(self.path, self.backups)), 2)
+
+    def test_a_failed_backup_is_retried_an_hour_later_not_in_a_tight_loop(self):
+        now = [NOON]
+        auto = AutoBackup(self.path, self.backups, clock=lambda: now[0])
+        with patch.object(sqlite_backup, "CHECK_SECONDS", 0.02), \
+                patch.object(auto, "run_once", wraps=auto.run_once) as attempts:
+            auto.start()
+            try:
+                time.sleep(0.3)
+                self.assertEqual(attempts.call_count, 1, "資料庫不存在：試一次就等")
+                now[0] = NOON + timedelta(hours=1, seconds=1)
+                deadline = time.monotonic() + 5
+                while attempts.call_count < 2 and time.monotonic() < deadline:
+                    time.sleep(0.02)
+            finally:
+                auto.stop()
+        self.assertEqual(attempts.call_count, 2)
+
+    def _wait_for_backups(self, count):
+        deadline = time.monotonic() + 10
+        while len(auto_backups(self.path, self.backups)) < count and time.monotonic() < deadline:
+            time.sleep(0.02)
+        self.assertEqual(len(auto_backups(self.path, self.backups)), count)
 
 
 class AutoBackupSettingsTests(unittest.TestCase):

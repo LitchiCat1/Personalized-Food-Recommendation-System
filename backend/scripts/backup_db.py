@@ -7,8 +7,8 @@
     python backend/scripts/backup_db.py --restore 備份檔名  # 還原（要先關掉後端）
 
 備份放在資料庫旁邊的 backups 資料夾（預設 %LOCALAPPDATA%\\NutriLens\\backups），
-檔名帶日期時間。用 SQLite 自己的備份功能複製：後端開著時剛寫的資料還在 -wal 檔裡，
-直接複製 .db 檔會漏掉那些資料，這個方式不會。
+檔名帶日期時間。後端開著時也會自己定時備份到同一個資料夾（檔名有 -auto-），
+見 repositories/sqlite_backup.py。
 
 還原前先檢查備份檔沒有損毀，再把目前的檔案改名留著（nutrilens.db.before-restore-日期時間），
 不會刪掉任何檔案。只處理本機的 SQLite；Render 上的 Supabase 請用 Supabase 後台的備份。
@@ -17,60 +17,23 @@
 import argparse
 import os
 import shutil
-import sqlite3
 import sys
 from datetime import datetime
 
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BACKEND_DIR)
 
+from repositories.sqlite_backup import (  # noqa: E402
+    BackupError,
+    backup_database,
+    check_database,
+    list_backups,
+    stamp,
+)
 from repositories.sqlite_db import resolve_database_path, virtualized_appdata_problem  # noqa: E402
 from services.env_service import load_local_env  # noqa: E402
 
-
-class BackupError(Exception):
-    pass
-
-
-def check_database(path: str) -> str:
-    """PRAGMA quick_check 的結果：完好是 "ok"，其他就是哪裡壞了。"""
-    try:
-        conn = sqlite3.connect(path)
-    except sqlite3.Error as error:
-        return str(error)
-    try:
-        return conn.execute("PRAGMA quick_check").fetchone()[0]
-    except sqlite3.DatabaseError as error:
-        return str(error)
-    finally:
-        conn.close()
-
-
-def _stamp(now: datetime | None) -> str:
-    return (now or datetime.now()).strftime("%Y%m%d-%H%M%S")
-
-
-def backup_database(source: str, backup_dir: str, now: datetime | None = None) -> str:
-    """把 source 完整複製一份到 backup_dir，回傳備份檔的路徑。"""
-    # sqlite3.connect 遇到不存在的檔案會建一個空的，所以先檢查
-    if not os.path.isfile(source):
-        raise BackupError(f"找不到資料庫檔案：{source}")
-    os.makedirs(backup_dir, exist_ok=True)
-    name = os.path.splitext(os.path.basename(source))[0]
-    target = os.path.join(backup_dir, f"{name}-{_stamp(now)}.db")
-
-    src = sqlite3.connect(source)
-    dst = sqlite3.connect(target)
-    try:
-        src.backup(dst)
-    finally:
-        dst.close()
-        src.close()
-
-    result = check_database(target)
-    if result != "ok":
-        raise BackupError(f"備份檔檢查沒通過（{result}），原本的資料庫可能已經損毀：{target}")
-    return target
+__all__ = ["BackupError", "backup_database", "check_database", "restore_database"]
 
 
 def restore_database(backup: str, target: str, now: datetime | None = None) -> str | None:
@@ -83,7 +46,7 @@ def restore_database(backup: str, target: str, now: datetime | None = None) -> s
 
     previous = None
     if os.path.exists(target):
-        previous = f"{target}.before-restore-{_stamp(now)}"
+        previous = f"{target}.before-restore-{stamp(now)}"
         try:
             os.rename(target, previous)
         except PermissionError:
@@ -96,14 +59,6 @@ def restore_database(backup: str, target: str, now: datetime | None = None) -> s
 
     shutil.copy2(backup, target)
     return previous
-
-
-def _list_backups(backup_dir: str) -> list[str]:
-    if not os.path.isdir(backup_dir):
-        return []
-    return sorted(
-        os.path.join(backup_dir, name) for name in os.listdir(backup_dir) if name.endswith(".db")
-    )
 
 
 def main() -> int:
@@ -131,7 +86,7 @@ def main() -> int:
 
     try:
         if args.list:
-            backups = _list_backups(backup_dir)
+            backups = list_backups(backup_dir)
             print(f"備份資料夾：{backup_dir}")
             for path in backups:
                 print(f"  {os.path.basename(path)}（{os.path.getsize(path) / 1024:.0f} KB）")

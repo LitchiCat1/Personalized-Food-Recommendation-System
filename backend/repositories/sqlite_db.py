@@ -148,6 +148,10 @@ class SqliteDatabase:
                 result = self._conn.execute("PRAGMA quick_check").fetchone()[0]
                 if result != "ok":
                     raise sqlite3.DatabaseError(f"資料庫檔案損毀：{result}")
+                # 建資料表之前先記下來：空檔建出來就是最新結構，舊檔才需要升級（sqlite_schema.py）
+                self.was_empty = self._conn.execute(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'"
+                ).fetchone()[0] == 0
         except Exception:
             # 不關的話檔案一直被鎖著，連要搬走或還原都不行
             self._conn.close()
@@ -171,6 +175,15 @@ class SqliteDatabase:
         with self._lock:
             rows = self._conn.execute(sql, params).fetchall()
         return [dict(row) for row in rows]
+
+    def user_version(self) -> int:
+        with self._lock:
+            return int(self._conn.execute("PRAGMA user_version").fetchone()[0])
+
+    def set_user_version(self, version: int) -> None:
+        # PRAGMA 不能用 ? 帶參數，先確定是整數再組字串
+        with self._lock:
+            self._conn.execute(f"PRAGMA user_version = {int(version)}")
 
     def column_names(self, table: str) -> list[str]:
         with self._lock:

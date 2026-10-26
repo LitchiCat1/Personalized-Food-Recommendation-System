@@ -9,6 +9,7 @@ import json
 import math
 import os
 import socket
+import sqlite3
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -21,6 +22,8 @@ from werkzeug.exceptions import BadRequest, HTTPException, InternalServerError, 
 from werkzeug.security import safe_join
 from repositories.auth_repository import AuthRepository
 from repositories.database import DatabaseUnavailable, open_database
+from repositories.sqlite_backup import BackupError, auto_backup_from_env, backup_database
+from repositories.sqlite_schema import SchemaVersionError, check_schema_version, upgrade_schema
 from repositories.sqlite_db import resolve_database_path, virtualized_appdata_problem
 from repositories.storage import StorageRepository
 from services.app_time_service import app_now
@@ -111,6 +114,15 @@ except Exception as e:
     sys.exit(1)
 # 路徑裡有 Windows 使用者名稱，/health 只給這台電腦自己看
 database_path = sql_db.path if sql_db is not None and sql_db.dialect == "sqlite" else None
+if database_path:
+    # 建資料表之前就檢查：比程式新的資料庫，連 CREATE TABLE 都不該碰
+    try:
+        check_schema_version(sql_db)
+    except SchemaVersionError as e:
+        print(f"[ERROR] {e}")
+        # 先關掉，檔案才不會被鎖著，要搬走或還原都可以
+        sql_db.close()
+        sys.exit(1)
 
 # ─── Optional MongoDB (only when SQLite is off) ──────────────
 mongo = None
@@ -142,6 +154,21 @@ storage = StorageRepository(db, USE_MONGO, _mem_users, _mem_records, _mem_custom
 auth_repo = AuthRepository(sql_db)
 if sql_db is None:
     print("[WARN] 帳號存在記憶體裡，後端重啟後要重新註冊")
+if database_path:
+    def _backup_before_upgrade(label):
+        if database_path != ":memory:":
+            path = backup_database(database_path, os.path.join(os.path.dirname(database_path), "backups"), label=label)
+            print(f"[OK] 升級資料庫結構前先備份：{path}")
+
+    try:
+        _upgraded = upgrade_schema(sql_db, backup=_backup_before_upgrade)
+    except (SchemaVersionError, BackupError, sqlite3.Error) as e:
+        # 每一版在自己的交易裡做，失敗的那一版已經退回；資料庫停在上一個完整的版本
+        print(f"[ERROR] 資料庫結構升級失敗，後端沒有啟動：{e}")
+        sql_db.close()
+        sys.exit(1)
+    if _upgraded:
+        print(f"[OK] 資料庫結構已升級到第 {_upgraded[-1]} 版")
 
 app = Flask(__name__)
 
@@ -1530,6 +1557,25 @@ def bind_host(argv, environ) -> str:
     return "127.0.0.1"
 
 
+def start_auto_backup():
+    """後端開著時定時備份本機的 SQLite 檔。
+
+    Postgres 由 Supabase 自己備份；只用記憶體時沒有檔案可以備份。
+    """
+    if not database_path or database_path == ":memory:":
+        return None
+    backup = auto_backup_from_env(database_path)
+    if backup is None:
+        print("[INFO] 自動備份已關閉（AUTO_BACKUP_HOURS=0），要備份請手動執行 backend/scripts/backup_db.py")
+        return None
+    hours = backup.interval.total_seconds() / 3600
+    print(f"[OK] 自動備份：每 {hours:g} 小時一次，留最近 {backup.keep} 份，放在 {backup.backup_dir}")
+    if backup.copy_dir:
+        print(f"     另外複製一份到 {backup.copy_dir}")
+    backup.start()
+    return backup
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     share_on_lan = wants_lan(sys.argv[1:], os.environ)
@@ -1551,6 +1597,9 @@ if __name__ == "__main__":
     else:
         print("[INFO] 還沒打包網站，只提供 API。要讓其他裝置連，先執行 npm --prefix frontend run build:local")
     debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    # 除錯模式會另開一個子程序來自動重新載入，只在那個子程序裡備份，不然每次都備兩份
+    if not debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        start_auto_backup()
     if debug:
         # 除錯模式的錯誤頁可以執行程式碼，絕對不能讓別台電腦連到
         print("[WARN] FLASK_DEBUG 開啟中，只綁定 127.0.0.1")

@@ -20,6 +20,7 @@ sys.path.insert(0, BACKEND_DIR)
 from repositories.auth_repository import AuthRepository  # noqa: E402
 from repositories.database import DatabaseUnavailable, open_database  # noqa: E402
 from repositories.sqlite_db import resolve_database_path, virtualized_appdata_problem  # noqa: E402
+from repositories.sqlite_schema import SchemaVersionError, check_schema_version  # noqa: E402
 from services.auth_service import AuthError, reset_password  # noqa: E402
 from services.env_service import load_local_env  # noqa: E402
 
@@ -42,6 +43,12 @@ def main() -> int:
         print(error)
         return 1
     print(f"資料庫：{label}")
+    if sql is not None and sql.dialect == "sqlite":
+        try:
+            check_schema_version(sql)
+        except SchemaVersionError as error:
+            print(error)
+            return 1
     repo = AuthRepository(sql)
 
     if len(sys.argv) < 2:

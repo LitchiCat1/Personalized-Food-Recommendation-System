@@ -416,6 +416,10 @@ class StorageRepository:
     def get_history(self, user_id: str, days: int):
         end_date = app_now().replace(tzinfo=None)
         start_date = end_date - timedelta(days=days)
+        # 上限用「明天」且不含：紀錄的時間後面還有微秒和時區（+08:00），先前用字串
+        # "今天T23:59:59" 當上限，按字串比較，23:59:59 那一秒的紀錄會被排除
+        start_key = start_date.strftime("%Y-%m-%d")
+        end_key = (end_date + timedelta(days=1)).strftime("%Y-%m-%d")
 
         if self.use_sql:
             nutrient_sums = ",\n                       ".join(
@@ -429,11 +433,11 @@ class StorageRepository:
                 FROM records
                 WHERE user_id = ?
                   AND timestamp >= ?
-                  AND timestamp <= ?
+                  AND timestamp < ?
                 GROUP BY substr(timestamp, 1, 10)
                 ORDER BY date ASC
                 """,
-                (user_id, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d") + "T23:59:59"),
+                (user_id, start_key, end_key),
             )
             return [
                 {
@@ -449,10 +453,7 @@ class StorageRepository:
                 {
                     "$match": {
                         "user_id": user_id,
-                        "timestamp": {
-                            "$gte": start_date.strftime("%Y-%m-%d"),
-                            "$lte": end_date.strftime("%Y-%m-%d") + "T23:59:59",
-                        },
+                        "timestamp": {"$gte": start_key, "$lt": end_key},
                     }
                 },
                 {

@@ -208,6 +208,18 @@ class SqliteStorageTests(unittest.TestCase):
         self.assertEqual(history[-1]["calories"], 800)
         self.assertEqual(history[-1]["sodium"], 1600)
 
+    def test_history_includes_the_last_second_of_today(self):
+        # 上限先前是字串 "今天T23:59:59"：存的紀錄後面還有時區（+08:00）或微秒，
+        # 按字串比較比上限大，23:59:59 那一秒的紀錄就不算進今天
+        today = app_now().strftime("%Y-%m-%d")
+        for client_id, clock in (("late", "23:59:59+08:00"), ("later", "23:59:59.900000+08:00")):
+            self.storage.insert_record({**meal(client_id), "timestamp": f"{today}T{clock}"})
+
+        history = self.storage.get_history("user-a", 7)
+
+        self.assertEqual(history[-1]["date"], today)
+        self.assertEqual(history[-1]["record_count"], 2)
+
     def test_custom_foods_upsert_by_owner(self):
         food = {"food_id": "f1", "user_id": "user-a", "name": "自製便當", "calories": 600}
         self.storage.upsert_custom_food(food)

@@ -341,7 +341,7 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalLayer}
         >
-          <Pressable accessibilityLabel="關閉修改飲食紀錄" style={styles.backdrop} onPress={closeManager} />
+          <Pressable accessibilityLabel="關閉飲食紀錄" style={styles.backdrop} onPress={closeManager} />
           <View style={[styles.managerPanel, isNarrow && styles.managerPanelNarrow]}>
             {viewMode === 'edit' ? (
               <RecordFormHeader title="編輯飲食內容" subtitle="名稱與營養數值會寫回原紀錄。" onBack={returnToList} />
@@ -493,8 +493,8 @@ function ManagerHeader({ onClose }: { onClose: () => void }) {
   return (
     <View style={styles.modalHeader}>
       <View style={styles.modalTitleWrap}>
-        <Text style={styles.modalTitle}>修改飲食紀錄</Text>
-        <Text style={styles.modalSubtitle}>依日期查找已儲存的餐點，修改營養內容或刪除紀錄。</Text>
+        <Text style={styles.modalTitle}>飲食紀錄</Text>
+        <Text style={styles.modalSubtitle}>依日期查看吃過的餐點，也可以修改營養內容或刪除紀錄。</Text>
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel="關閉" onPress={onClose} style={styles.iconButton}>
         <Ionicons name="close" size={22} color={Palette.text.secondary} />

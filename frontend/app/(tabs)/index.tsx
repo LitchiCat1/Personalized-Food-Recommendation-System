@@ -247,9 +247,9 @@ export default function DashboardScreen() {
           </Link>
           <PrimaryButton
             tone="ghost"
-            label="修改飲食紀錄"
+            label="查看／修改紀錄"
             onPress={() => setRecordManagerVisible(true)}
-            icon={<Ionicons name="create-outline" size={18} color={Palette.accent.green} />}
+            icon={<Ionicons name="receipt-outline" size={18} color={Palette.accent.green} />}
           />
         </View>
       </View>

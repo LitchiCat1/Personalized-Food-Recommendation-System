@@ -86,7 +86,6 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
     if not user:
         return None
 
-    budget = int(params.get("budget", 150))
     lat = float(params.get("lat", 25.0338))
     lng = float(params.get("lng", 121.5645))
     radius_km = min(max(float(params.get("radius_km", 5)), 0.5), 10)
@@ -135,8 +134,7 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                 "is_fried": item.get("is_fried"),
             }
             medical_risk = evaluate_medical_risk(candidate, conditions, allergens, disease_rules, taxonomy, user_profile=user)
-            reasons = [f"超出預算 {budget} 元"] if item["price"] > budget else []
-            reasons.extend(medical_risk["block_reasons"])
+            reasons = list(medical_risk["block_reasons"])
 
             if reasons:
                 filtered_item = {
@@ -151,12 +149,11 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                 restaurant_filtered_items.append(filtered_item)
                 continue
 
-            budget_score = max(0, 30 - abs(budget - item["price"]))
             distance_score = max(0, 25 - int(distance_km * 6))
             calorie_fit = max(0, 35 - abs(remaining["calories"] - item["calories"]) // 15)
             sodium_score = max(0, 15 - int(item["sodium"] / 80))
             protein_bonus = 8 if item["protein"] >= 25 else 0
-            total_score = min(99, budget_score + distance_score + calorie_fit + sodium_score + protein_bonus)
+            total_score = min(99, distance_score + calorie_fit + sodium_score + protein_bonus)
 
             recommended_item = {
                 "restaurant_id": restaurant["restaurant_id"],
@@ -180,7 +177,6 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                 # 判定「應極力避免」也照樣顯示相符——caution 全被吞掉。
                 # 有提醒就列提醒，沒有才說相符。
                 "reasons": [
-                    f"符合預算 {budget} 元",
                     f"距離約 {round(distance_km, 2)} km",
                     *(medical_risk.get("caution_reasons") or ["營養與安全條件相符"]),
                 ],
@@ -237,7 +233,7 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                     "label": item.get("item_id", item["name"]),
                     "name_zh": item["name"],
                     "gi": item.get("gi"),
-                    "allergens": item.get("allergens", []),
+                    "allergens": item.get("allergens", []), "calories": item.get("calories"),
                     "sodium": item.get("sodium"),
                     "carbs": item.get("carbs"),
                     "protein": item.get("protein"),
@@ -249,8 +245,7 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
                     "is_fried": item.get("is_fried"),
                 }
                 medical_risk = evaluate_medical_risk(candidate, conditions, allergens, disease_rules, taxonomy, user_profile=user)
-                reasons = [f"超出預算 {budget} 元"] if item["price"] > budget else []
-                reasons.extend(medical_risk["block_reasons"])
+                reasons = list(medical_risk["block_reasons"])
 
                 if reasons:
                     filtered_item = {
@@ -323,7 +318,6 @@ def build_healthy_food_recommendations(storage, disease_rules: dict, restaurant_
     restaurants.sort(key=lambda item: (-item["match_score"], item["distance_km"]))
     return {
         "user_id": user_id,
-        "budget": budget,
         "radius_km": radius_km,
         "category": category or "all",
         "location": {"lat": lat, "lng": lng},
@@ -404,7 +398,7 @@ def _fit_penalty(item: dict, remaining: dict) -> int:
 
 
 def _items_from_indexed_menu(
-    storage, restaurant: dict, budget: int, conditions, allergens,
+    storage, restaurant: dict, conditions, allergens,
     disease_rules: dict, taxonomy: dict, user: dict, remaining: dict,
 ):
     """用建檔好的真實菜單挑出這家店可以吃的餐點。
@@ -444,16 +438,6 @@ def _items_from_indexed_menu(
             "gi": menu_item.get("gi"),
             "nutrition_available": True,
         }
-
-        if price > budget:
-            blocked.append({
-                "restaurant_id": restaurant["restaurant_id"],
-                "restaurant_name": restaurant["name"],
-                "item_name": name,
-                "price": price,
-                "reasons": [f"超過預算 {budget} 元"],
-            })
-            continue
 
         # 吃下去會超過今天剩餘熱量的就不推薦。remaining 已經是
         # max(0, 目標 - 已攝取)，所以 0 代表今天的額度用完了。
@@ -528,7 +512,6 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
     if not user:
         return None
 
-    budget = int(params.get("budget", 150))
     lat = float(params.get("lat", 25.0338))
     lng = float(params.get("lng", 121.5645))
     radius_km = min(max(float(params.get("radius_km", 3)), 0.5), 10)
@@ -546,7 +529,7 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
 
     from services.google_places_service import GooglePlacesConfigError
     try:
-        restaurants = fetch_google_places_restaurants(lat, lng, radius_km, category, budget, limit=12)
+        restaurants = fetch_google_places_restaurants(lat, lng, radius_km, category, limit=12)
     except GooglePlacesConfigError:
         raise
     except Exception as e:
@@ -557,7 +540,6 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
         )
         return {
             "user_id": user_id,
-            "budget": budget,
             "radius_km": radius_km,
             "category": category or "all",
             "location": {"lat": lat, "lng": lng},
@@ -589,7 +571,7 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
     for restaurant in restaurants:
         # 有建檔菜單的店逐道菜篩，沒有的才退回「靠店名猜」的舊行為
         from_menu = _items_from_indexed_menu(
-            storage, restaurant, budget, conditions, allergens, disease_rules, taxonomy, user, remaining
+            storage, restaurant, conditions, allergens, disease_rules, taxonomy, user, remaining
         )
         if from_menu is not None:
             restaurant_allowed, restaurant_blocked = from_menu
@@ -656,7 +638,6 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
     recommendations.sort(key=lambda item: item["match_score"], reverse=True)
     return {
         "user_id": user_id,
-        "budget": budget,
         "radius_km": radius_km,
         "category": category or "all",
         "location": {"lat": lat, "lng": lng},
@@ -675,7 +656,7 @@ def build_google_places_food_recommendations(storage, user_id: str, params: dict
             "其餘店家 Google Places 只給店名與類型，僅能用店名比對，到店後請用掃描確認。"
             if venues_with_menu
             else "附近店家都還沒建檔菜單，這裡只用店名與店家類型比對疾病禁忌與過敏原；"
-                 "到「我的 → ① 建立附近店家菜單檔案」建檔後才會逐道菜過濾。"
+                 "到「我的 → 建立附近店家菜單檔案」建檔後才會逐道菜過濾。"
         ),
         "recommended": recommendations[:12],
         "restaurants": restaurants,

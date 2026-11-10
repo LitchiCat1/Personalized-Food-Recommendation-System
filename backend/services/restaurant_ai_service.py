@@ -11,7 +11,7 @@ from services.nutrition_label_service import (
 )
 
 
-def validate_restaurant_summary_input(restaurant: dict, budget: int, category: str, health_conditions: list[str]) -> tuple[dict, int, str, list[str]]:
+def validate_restaurant_summary_input(restaurant: dict, category: str, health_conditions: list[str]) -> tuple[dict, str, list[str]]:
     if not isinstance(restaurant, dict):
         raise ValueError("restaurant must be an object")
 
@@ -21,10 +21,6 @@ def validate_restaurant_summary_input(restaurant: dict, budget: int, category: s
         raise ValueError("缺少 restaurant.name")
 
     normalized["name"] = name
-    try:
-        normalized_budget = int(budget)
-    except (TypeError, ValueError):
-        normalized_budget = 0
     normalized_category = str(category or "all").strip() or "all"
     normalized_health_conditions = []
     for item in health_conditions or []:
@@ -33,7 +29,7 @@ def validate_restaurant_summary_input(restaurant: dict, budget: int, category: s
         value = str(item).strip()
         if value:
             normalized_health_conditions.append(value)
-    return normalized, normalized_budget, normalized_category, normalized_health_conditions
+    return normalized, normalized_category, normalized_health_conditions
 
 
 def build_health_condition_context(health_conditions: list[str], disease_rules: dict | None) -> list[dict]:
@@ -55,7 +51,7 @@ def build_health_condition_context(health_conditions: list[str], disease_rules: 
     return context
 
 
-def normalize_restaurant_summary(parsed: dict, budget: int) -> dict:
+def normalize_restaurant_summary(parsed: dict) -> dict:
     price = parsed.get("price_range_twd") or {}
     try:
         min_price = int(price.get("min") or 0)
@@ -67,7 +63,6 @@ def normalize_restaurant_summary(parsed: dict, budget: int) -> dict:
         max_price = 0
 
     confidence = parsed.get("confidence") if parsed.get("confidence") in {"low", "medium", "high"} else "low"
-    budget_fit = parsed.get("budget_fit") if parsed.get("budget_fit") in {"適合", "可能超出", "不確定"} else "不確定"
     likely_foods = [str(item).strip() for item in (parsed.get("likely_foods") or []) if str(item).strip()]
     health_tips = [str(item).strip() for item in (parsed.get("health_tips") or []) if str(item).strip()]
     # 這些品項是模型從店名推測的，這家店沒有菜單資料。prompt 本身就寫明
@@ -85,17 +80,11 @@ def normalize_restaurant_summary(parsed: dict, budget: int) -> dict:
         if str((item.get("name") if isinstance(item, dict) else item) or "").strip()
     ]
 
-    if max_price and max_price <= budget:
-        budget_fit = "適合"
-    elif min_price and min_price > budget:
-        budget_fit = "可能超出"
-
     return {
         "restaurant_type": str(parsed.get("restaurant_type") or "餐廳").strip()[:30],
         "likely_foods": likely_foods[:6],
         "recommended_foods": recommended_foods[:4],
         "price_range_twd": {"min": min_price, "max": max_price},
-        "budget_fit": budget_fit,
         "health_tips": health_tips[:4],
         "confidence": confidence,
         "source_note": "Google Places + Gemini 推測，非店家正式菜單；實際品項與價格請以店家現場為準。",
@@ -104,7 +93,6 @@ def normalize_restaurant_summary(parsed: dict, budget: int) -> dict:
 
 def build_restaurant_summary_prompt(
     restaurant: dict,
-    budget: int,
     category: str,
     health_conditions: list[str],
     nutrition_progress: dict | None = None,
@@ -124,10 +112,9 @@ def build_restaurant_summary_prompt(
         '{"restaurant_type":"","likely_foods":[""],'
         '"recommended_foods":[{"name":"","reason":""}],'
         '"price_range_twd":{"min":0,"max":0},'
-        '"budget_fit":"適合|可能超出|不確定","health_tips":[""],"confidence":"low|medium|high"}'
+        '"health_tips":[""],"confidence":"low|medium|high"}'
         "\nrecommended_foods 請提供 1 至 4 項；reason 必須明確連結疾病限制、已超標/接近上限項目，"
         "或在安全前提下尚需補足的營養進度。若多項關鍵營養素已超標，可建議小份量、無糖飲品或延後進食。"
-        f"\n使用者預算: {budget} TWD"
         f"\n搜尋類型: {category or 'all'}"
         f"\n使用者目前設定疾病: {json.dumps(condition_context, ensure_ascii=False)}"
         f"\n今日營養目標與進度: {json.dumps(nutrition_progress or {}, ensure_ascii=False)}"
@@ -137,7 +124,6 @@ def build_restaurant_summary_prompt(
 
 def call_gemini_restaurant_summary(
     restaurant: dict,
-    budget: int,
     category: str,
     health_conditions: list[str],
     api_key: str,
@@ -147,7 +133,6 @@ def call_gemini_restaurant_summary(
 ) -> dict:
     prompt = build_restaurant_summary_prompt(
         restaurant,
-        budget,
         category,
         health_conditions,
         nutrition_progress,
@@ -166,14 +151,13 @@ def call_gemini_restaurant_summary(
 
 def build_restaurant_ai_summary(
     restaurant: dict,
-    budget: int,
     category: str,
     health_conditions: list[str],
     nutrition_progress: dict | None = None,
     disease_rules: dict | None = None,
 ) -> dict:
-    restaurant, budget, category, health_conditions = validate_restaurant_summary_input(
-        restaurant, budget, category, health_conditions
+    restaurant, category, health_conditions = validate_restaurant_summary_input(
+        restaurant, category, health_conditions
     )
     api_keys = get_gemini_api_keys()
     if not api_keys:
@@ -183,7 +167,6 @@ def build_restaurant_ai_summary(
         api_keys,
         lambda api_key, model: call_gemini_restaurant_summary(
             restaurant,
-            budget,
             category,
             health_conditions,
             api_key,
@@ -193,4 +176,4 @@ def build_restaurant_ai_summary(
         ),
         "restaurant",
     )
-    return normalize_restaurant_summary(parsed, budget)
+    return normalize_restaurant_summary(parsed)

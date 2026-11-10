@@ -124,8 +124,11 @@ export const DEFAULT_NUTRITION_GOAL_TYPES = {
  * 有了 basis 才能只顯示一個生效值，並說明另外兩個為什麼沒被採用。
  */
 export type NutritionTargetBasis = {
-  /** disease = 疾病指引算出來的；user = 直接採用使用者填的數字。 */
-  source: 'disease' | 'user';
+  /**
+   * disease = 疾病指引算出來的；weight_goal = 依目標體重從 TDEE 加減；
+   * user = 直接採用使用者填的數字。
+   */
+  source: 'disease' | 'weight_goal' | 'user';
   conditions: string[];
   ideal_body_weight: number;
   /** 實際算出目標的每公斤大卡數（多個疾病取最小者）；source 為 user 時是 null。 */
@@ -141,6 +144,22 @@ export type NutritionTargetBasis = {
    * 高血脂會減量，高血壓、痛風、腎病不會。舊版後端沒有這個欄位。
    */
   weight_reduced?: boolean;
+  /** source 為 weight_goal 時才有。舊版後端沒有這個欄位。 */
+  weight_goal?: WeightGoalBasis | null;
+};
+
+export type WeightGoalBasis = {
+  direction: 'lose' | 'gain' | 'maintain';
+  target_weight: number;
+  tdee: number;
+  /** 實際套用的加減量（kcal）；被抬到 BMR 時比 -500 小。 */
+  adjustment: number;
+  floored_at_bmr: boolean;
+  /**
+   * 不開熱量赤字的原因：underweight = 現在的 BMI 已低於 18.5；
+   * target_underweight = 目標體重換算的 BMI 低於 18.5。
+   */
+  blocked: 'underweight' | 'target_underweight' | null;
 };
 
 export type RecordsResponse = {
@@ -246,7 +265,6 @@ export type HealthyFoodRestaurant = {
 
 export type HealthyFoodResponse = {
   user_id: string;
-  budget: number;
   radius_km?: number;
   category?: string;
   location: { lat: number; lng: number };
@@ -278,7 +296,6 @@ export type RestaurantAiSummary = {
   likely_foods: string[];
   recommended_foods?: { name: string; reason: string }[];
   price_range_twd: { min: number; max: number };
-  budget_fit: '適合' | '可能超出' | '不確定';
   health_tips: string[];
   confidence: 'low' | 'medium' | 'high';
   source_note: string;
@@ -582,7 +599,7 @@ export async function saveUserProfile(apiBaseUrl: string, payload: Record<string
 export async function fetchHealthyFoodRecommendations(
   apiBaseUrl: string,
   userId: string,
-  params: { budget: number; lat: number; lng: number; radiusKm?: number; category?: string },
+  params: { lat: number; lng: number; radiusKm?: number; category?: string },
   auth?: ApiAuth
 ): Promise<HealthyFoodResponse> {
   if (!auth?.accessToken && !isLocalApiBaseUrl(apiBaseUrl)) {
@@ -590,7 +607,6 @@ export async function fetchHealthyFoodRecommendations(
   }
 
   const query = new URLSearchParams({
-    budget: String(params.budget),
     lat: String(params.lat),
     lng: String(params.lng),
     radius_km: String(params.radiusKm || 5),
@@ -670,14 +686,13 @@ export async function clearNearbyVenueIndex(
 export async function indexNearbyVenues(
   apiBaseUrl: string,
   userId: string,
-  params: { budget?: number; lat?: number; lng?: number; radiusKm?: number; category?: string; limit?: number },
+  params: { lat?: number; lng?: number; radiusKm?: number; category?: string; limit?: number },
   auth?: ApiAuth
 ): Promise<VenueIndexSummary> {
   return fetchJsonWithNetworkMessage<VenueIndexSummary>(`${apiBaseUrl}/restaurants/index/${encodeURIComponent(userId)}`, {
     method: 'POST',
     headers: buildHeaders(auth, 'application/json'),
     body: JSON.stringify({
-      budget: params.budget ?? 150,
       lat: params.lat,
       lng: params.lng,
       radius_km: params.radiusKm,
@@ -691,7 +706,7 @@ export async function indexNearbyVenues(
 export async function fetchRestaurantAiSummary(
   apiBaseUrl: string,
   userId: string,
-  params: { restaurant: HealthyFoodRestaurant; budget: number; category: string },
+  params: { restaurant: HealthyFoodRestaurant; category: string },
   auth?: ApiAuth
 ): Promise<RestaurantAiSummaryResponse> {
   if (!auth?.accessToken && !isLocalApiBaseUrl(apiBaseUrl)) {
@@ -707,7 +722,7 @@ export async function fetchRestaurantAiSummary(
 
 export async function fetchRestaurantDetailedMenu(
   apiBaseUrl: string,
-  params: { restaurant_id: string; name: string; address?: string; budget?: number; user_id?: string; lat?: number; lng?: number; distance_km?: number; menu_image?: string },
+  params: { restaurant_id: string; name: string; address?: string; user_id?: string; lat?: number; lng?: number; distance_km?: number; menu_image?: string },
   auth?: ApiAuth
 ): Promise<{
   restaurant_id: string;
@@ -722,5 +737,40 @@ export async function fetchRestaurantDetailedMenu(
     body: JSON.stringify(params),
   });
   return parseJson(resp);
+}
+
+export type MenuPhotoCheckItem = HealthyFoodRecommendation & {
+  medical_risk?: { has_caution?: boolean; caution_reasons?: string[] };
+};
+
+export type MenuPhotoBlockedItem = {
+  item_name: string;
+  price?: number;
+  reasons: string[];
+};
+
+export type MenuPhotoCheckResponse = {
+  /** 可以吃，沒有任何提醒 */
+  safe_items: MenuPhotoCheckItem[];
+  /** 可以吃，但有提醒（例如鈉偏高） */
+  caution_items: MenuPhotoCheckItem[];
+  /** 不建議吃，附原因 */
+  not_recommended_items: MenuPhotoBlockedItem[];
+  total_items: number;
+  disclaimer: string;
+};
+
+/** 拍任何一張菜單，不用先選店家：列出上面每道菜能不能吃。 */
+export async function checkMenuPhoto(
+  apiBaseUrl: string,
+  params: { menuImage: string; userId: string },
+  auth?: ApiAuth
+): Promise<MenuPhotoCheckResponse> {
+  const resp = await fetch(`${apiBaseUrl}/menu/photo-check`, {
+    method: 'POST',
+    headers: buildHeaders(auth, 'application/json'),
+    body: JSON.stringify({ menu_image: params.menuImage, user_id: params.userId }),
+  });
+  return parseJson<MenuPhotoCheckResponse>(resp);
 }
 

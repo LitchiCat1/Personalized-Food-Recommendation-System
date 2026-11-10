@@ -129,6 +129,94 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertIsNone(result["basis"]["kcal_per_kg"])
         self.assertFalse(result["basis"]["weight_reduced"])
 
+    # 170 cm／70 kg／22 歲男性／中等活動：BMR 1658，TDEE 2570。
+    WEIGHT_GOAL_BASE = {
+        "height": 170,
+        "weight": 70,
+        "age": 22,
+        "gender": "male",
+        "activity_multiplier": 1.55,
+        "bmr": 1658,
+        "tdee": 2570,
+        "daily_calorie_target": 2570,
+        "health_conditions": [],
+    }
+
+    def test_lose_weight_goal_sets_a_deficit_below_tdee(self):
+        """先前目標體重沒有任何計算用到，想減重的人拿到的每日目標還是 TDEE。"""
+        result = calculate_daily_targets_with_basis({**self.WEIGHT_GOAL_BASE, "target_weight": 65})
+        self.assertEqual(result["targets"]["calories"], 2570 - 500)
+        basis = result["basis"]
+        self.assertEqual(basis["source"], "weight_goal")
+        self.assertEqual(basis["weight_goal"]["direction"], "lose")
+        self.assertEqual(basis["weight_goal"]["adjustment"], -500)
+        self.assertEqual(basis["weight_goal"]["tdee"], 2570)
+        self.assertFalse(basis["floored_at_bmr"])
+
+    def test_gain_weight_goal_sets_a_surplus(self):
+        result = calculate_daily_targets_with_basis({**self.WEIGHT_GOAL_BASE, "target_weight": 75})
+        self.assertEqual(result["targets"]["calories"], 2570 + 300)
+        self.assertEqual(result["basis"]["weight_goal"]["direction"], "gain")
+
+    def test_weight_goal_within_one_kg_is_maintenance(self):
+        result = calculate_daily_targets_with_basis({**self.WEIGHT_GOAL_BASE, "target_weight": 70.5})
+        self.assertEqual(result["targets"]["calories"], 2570)
+        self.assertEqual(result["basis"]["weight_goal"]["direction"], "maintain")
+
+    def test_weight_goal_overrides_the_manual_daily_target(self):
+        """有設目標體重時「每日熱量基準」不採用，basis 仍回報那個數字讓畫面說明。"""
+        result = calculate_daily_targets_with_basis({
+            **self.WEIGHT_GOAL_BASE, "daily_calorie_target": 3000, "target_weight": 65,
+        })
+        self.assertEqual(result["targets"]["calories"], 2070)
+        self.assertEqual(result["basis"]["user_target"], 3000)
+
+    def test_weight_goal_deficit_never_drops_below_bmr(self):
+        # 久坐：TDEE 1990，減 500 會是 1490，低於 BMR 1658。
+        result = calculate_daily_targets_with_basis({
+            **self.WEIGHT_GOAL_BASE, "activity_multiplier": 1.2, "tdee": 1990, "target_weight": 60,
+        })
+        self.assertEqual(result["targets"]["calories"], 1658)
+        self.assertTrue(result["basis"]["floored_at_bmr"])
+        self.assertEqual(result["basis"]["weight_goal"]["adjustment"], 1658 - 1990)
+
+    def test_underweight_user_gets_no_deficit(self):
+        """BMI 已經低於 18.5 還設更輕的目標，不幫他開熱量赤字。"""
+        result = calculate_daily_targets_with_basis({
+            **self.WEIGHT_GOAL_BASE, "weight": 50, "bmr": 1458, "tdee": 2260, "target_weight": 45,
+        })
+        self.assertEqual(result["targets"]["calories"], 2260)
+        self.assertEqual(result["basis"]["weight_goal"]["blocked"], "underweight")
+
+    def test_underweight_target_gets_no_deficit(self):
+        """線上真的有人 50 kg 填目標 20 kg：目標本身 BMI 低於 18.5 就不開赤字。"""
+        result = calculate_daily_targets_with_basis({**self.WEIGHT_GOAL_BASE, "target_weight": 50})
+        self.assertEqual(result["targets"]["calories"], 2570)
+        self.assertEqual(result["basis"]["weight_goal"]["blocked"], "target_underweight")
+
+    def test_disease_target_still_wins_over_weight_goal(self):
+        result = calculate_daily_targets_with_basis({
+            **self.WEIGHT_GOAL_BASE, "health_conditions": ["高血壓"], "target_weight": 60,
+        })
+        self.assertEqual(result["basis"]["source"], "disease")
+        self.assertIsNone(result["basis"]["weight_goal"])
+        self.assertAlmostEqual(result["targets"]["calories"], 22 * (1.7 ** 2) * 35)
+
+    def test_meal_limits_use_the_same_weight_goal_energy(self):
+        """單餐上限與店家推薦的每日熱量要跟「我的」頁的每日目標同一個數字。"""
+        from services.medical_risk_service import resolve_user_energy_and_weight
+
+        profile = {**self.WEIGHT_GOAL_BASE, "target_weight": 65}
+        energy, _ = resolve_user_energy_and_weight([], profile)
+        self.assertEqual(energy, calculate_daily_targets_with_basis(profile)["targets"]["calories"])
+
+    def test_weight_goal_without_stored_tdee_is_computed(self):
+        """舊資料或精簡 dict 沒有 tdee 時，用 BMR × 活動係數補算。"""
+        profile = {key: value for key, value in self.WEIGHT_GOAL_BASE.items() if key not in ("bmr", "tdee")}
+        result = calculate_daily_targets_with_basis({**profile, "target_weight": 65})
+        # BMR round(1657.5) = 1658，TDEE round(1658 × 1.55) = 2570。
+        self.assertEqual(result["targets"]["calories"], 2570 - 500)
+
     # 線上重現的個案：158 cm／60 kg（BMI 24.0，剛好算過重）／62 歲女性／輕度活動。
     # BMR 1116，三種組合算出來都比它高，不會被抬到 BMR。
     OVERWEIGHT_LIGHT_ACTIVITY = {
@@ -257,7 +345,7 @@ class ServiceSmokeTests(unittest.TestCase):
             {"hypertension": load_disease_rules(os.path.dirname(os.path.dirname(__file__)))["hypertension"]},
             catalog,
             "demo_user",
-            {"budget": 150, "lat": 25.0338, "lng": 121.5645, "radius_km": 1, "category": "bento"},
+            {"lat": 25.0338, "lng": 121.5645, "radius_km": 1, "category": "bento"},
             {"groups": load_allergen_taxonomy(os.path.dirname(os.path.dirname(__file__)))["groups"]},
         )
 
@@ -408,16 +496,15 @@ class ServiceSmokeTests(unittest.TestCase):
 
     def test_validate_restaurant_summary_input_smoke(self):
         with self.assertRaises(ValueError):
-            validate_restaurant_summary_input(None, 120, "bento", ["hypertension"])
+            validate_restaurant_summary_input(None, "bento", ["hypertension"])
 
         with self.assertRaises(ValueError):
-            validate_restaurant_summary_input({"budget": 120}, 120, "bento", ["hypertension"])
+            validate_restaurant_summary_input({"address": "台北"}, "bento", ["hypertension"])
 
-        restaurant, budget, category, health_conditions = validate_restaurant_summary_input(
-            {"name": "Taiwan Bento"}, "not-a-number", "bento", ["hypertension", "", None]
+        restaurant, category, health_conditions = validate_restaurant_summary_input(
+            {"name": "Taiwan Bento"}, "bento", ["hypertension", "", None]
         )
         self.assertEqual(restaurant["name"], "Taiwan Bento")
-        self.assertEqual(budget, 0)
         self.assertEqual(category, "bento")
         self.assertEqual(health_conditions, ["hypertension"])
 
@@ -555,10 +642,10 @@ class ServiceSmokeTests(unittest.TestCase):
             lambda *args, **kwargs: [places(name) for name in venues],
         ):
             blocked = build_google_places_food_recommendations(
-                PlacesStorage(["hyperlipidemia"], ["shellfish"]), "user-a", {"budget": 150}
+                PlacesStorage(["hyperlipidemia"], ["shellfish"]), "user-a", {}
             )
             unrestricted = build_google_places_food_recommendations(
-                PlacesStorage([], []), "user-a", {"budget": 150}
+                PlacesStorage([], []), "user-a", {}
             )
 
         recommended_names = [item["restaurant_name"] for item in blocked["recommended"]]
@@ -663,7 +750,6 @@ class ServiceSmokeTests(unittest.TestCase):
 
         prompt = build_restaurant_summary_prompt(
             {"name": "Taiwan Bento", "tags": ["bento"]},
-            150,
             "bento",
             ["hypertension"],
             progress,
@@ -689,11 +775,10 @@ class ServiceSmokeTests(unittest.TestCase):
                 "health_tips": ["醬汁另外放"],
                 "confidence": "medium",
             },
-            150,
         )
 
         self.assertEqual(summary["recommended_foods"][0]["name"], "烤雞蔬菜便當")
-        self.assertEqual(summary["budget_fit"], "適合")
+        self.assertNotIn("budget_fit", summary)
 
 
 if __name__ == "__main__":
@@ -1200,7 +1285,7 @@ class GeminiKeyStaysOutOfTheUrlTests(unittest.TestCase):
     def test_restaurant_summary(self):
         from services.restaurant_ai_service import call_gemini_restaurant_summary
 
-        call_gemini_restaurant_summary({"name": "測試店"}, 150, "all", [], self.KEY, "m-lite")
+        call_gemini_restaurant_summary({"name": "測試店"}, "all", [], self.KEY, "m-lite")
         self.assert_key_only_in_header()
 
     def test_menu_from_the_store_name(self):
@@ -1283,7 +1368,7 @@ class OpenNowRecommendationTests(unittest.TestCase):
         storage.upsert_user({"user_id": "u1", "name": "U", "height": 170, "weight": 65, "age": 30})
         with patch.object(healthy_food_service_module, "fetch_google_places_restaurants",
                           return_value=venues):
-            return build_google_places_food_recommendations(storage, "u1", {"budget": 150})
+            return build_google_places_food_recommendations(storage, "u1", {})
 
     def test_a_venue_that_is_closed_right_now_is_not_recommended(self):
         result = self._build([self._venue("開著的店", True), self._venue("打烊的店", False)])
@@ -1335,10 +1420,10 @@ class IndexedMenuRecommendationTests(unittest.TestCase):
             }],
         }
 
-    def _build(self, storage, budget=150):
+    def _build(self, storage):
         with patch.object(healthy_food_service_module, "fetch_google_places_restaurants",
                           return_value=[self._venue()]):
-            return build_google_places_food_recommendations(storage, "u1", {"budget": budget})
+            return build_google_places_food_recommendations(storage, "u1", {})
 
     MENU = [
         {"name": "清蒸鱈魚定食", "price": 130, "calories": 450, "protein": 30, "carbs": 45,
@@ -1366,11 +1451,12 @@ class IndexedMenuRecommendationTests(unittest.TestCase):
         self.assertIn("重鹹滷肉飯", blocked)
         self.assertTrue(any("鈉" in reason for reason in blocked["重鹹滷肉飯"]))
 
-    def test_dishes_over_budget_are_filtered_out(self):
+    def test_price_no_longer_filters_a_dish_out(self):
         result = self._build(self._storage(menu=self.MENU))
         blocked = {entry["item_name"]: entry["reasons"] for entry in result["filtered_out"]}
-        self.assertIn("頂級和牛套餐", blocked)
-        self.assertTrue(any("預算" in reason for reason in blocked["頂級和牛套餐"]))
+        self.assertNotIn("頂級和牛套餐", blocked)
+        self.assertIn("頂級和牛套餐", [item["item_name"] for item in result["recommended"]])
+        self.assertNotIn("budget", result)
 
     def test_a_venue_without_an_indexed_menu_keeps_the_old_behaviour(self):
         result = self._build(self._storage())
@@ -1414,7 +1500,7 @@ class RemainingCalorieRecommendationTests(unittest.TestCase):
         }
         with patch.object(healthy_food_service_module, "fetch_google_places_restaurants",
                           return_value=[venue]):
-            return build_google_places_food_recommendations(storage, "u1", {"budget": 150})
+            return build_google_places_food_recommendations(storage, "u1", {})
 
     def test_a_dish_bigger_than_the_remaining_allowance_is_not_recommended(self):
         # 已吃 1200 kcal，目標約 1950，剩下約 750 → 900 kcal 的炒飯要被擋
@@ -1675,10 +1761,9 @@ class RecommendationHonestyTests(unittest.TestCase):
             "likely_foods": ["蛋餅"],
             "recommended_foods": [{"name": "排骨飯", "reason": "蛋白質足夠"}],
             "price_range_twd": {"min": 60, "max": 120},
-            "budget_fit": "適合",
             "health_tips": [],
             "confidence": "low",
-        }, budget=150)
+        })
 
         dish = result["recommended_foods"][0]
         self.assertEqual(dish["name"], "排骨飯")
@@ -1692,7 +1777,7 @@ class RecommendationHonestyTests(unittest.TestCase):
         result = normalize_restaurant_summary({
             "recommended_foods": [{"name": "  ", "reason": "x"}, {"name": "滷肉飯", "reason": "y"}],
             "price_range_twd": {"min": 0, "max": 0},
-        }, budget=150)
+        })
         self.assertEqual([d["name"] for d in result["recommended_foods"]], ["滷肉飯"])
 
     def test_a_cautioned_dish_does_not_claim_to_be_compliant(self):
@@ -1708,7 +1793,7 @@ class RecommendationHonestyTests(unittest.TestCase):
             "health_conditions": ["diabetes"],
         })
         result = build_healthy_food_recommendations(
-            storage, rules, catalog, "u1", {"budget": 500, "radius_km": 10}, taxonomy
+            storage, rules, catalog, "u1", {"radius_km": 10}, taxonomy
         )
         for item in result["recommended"]:
             cautions = item.get("medical_risk", {}).get("caution_reasons") or []

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased - 2026-11-04 (菜單分析先問 ChatGPT)
+
+### Added
+
+- **菜單分析可以用 ChatGPT（OpenAI API）**：在 `backend/.env.local` 設 `OPENAI_API_KEY` 後，依店名估菜單（店家建檔）與菜單照片辨識都會先問 ChatGPT；它出錯、逾時、額度用完、餘額不足或說看不出這家店賣什麼時，才照原本的方式輪替 Gemini 金鑰與模型。沒設就跟原本一樣只用 Gemini。模型預設 `gpt-4.1-mini`，帳號沒有時換 `gpt-4o-mini`，可用 `OPENAI_MODELS` 覆寫。建檔的失敗分類（`no_items`／`rate_limited`／`inconclusive`／`unavailable`）把 ChatGPT 當成多一個模型計算：兩邊都說看不出來才算問不出菜單。照片兩邊都失敗時，兩邊的原因都顯示給使用者。`/health` 新增 `openai_enabled`。
+
+## Unreleased - 2026-10-29 (目標體重決定每日熱量)
+
+### Changed
+
+- **目標體重先前沒有任何計算用到**：後端只是存進去再讀出來，想減 5 公斤的人拿到的每日目標還是 TDEE，只能自己去改「每日熱量基準」。新增 `resolve_weight_goal_energy()`（`profile_service.py`）：沒有疾病條件、又設了目標體重時，每日目標改為 TDEE − 500 kcal（減重，約每週 0.5 kg）／TDEE + 300 kcal（增重）／TDEE（與目前體重差不到 1 kg），並以 BMR 為下限。疾病指引的目標仍然優先；「每日熱量基準」只在沒設目標體重時採用。每日目標（`nutrition_progress_service`）與單餐上限、店家推薦（`medical_risk_service`）共用同一個函式，兩邊是同一個數字。`nutrition_target_basis.source` 新增 `weight_goal`，並附 `weight_goal`（方向、TDEE、實際加減量、是否被 BMR 抬升）讓「我的 → 飲食目標」說明數字怎麼來的。
+- **不幫過輕的人開熱量赤字**：目前 BMI 已低於 18.5，或目標體重換算的 BMI 低於 18.5（線上有 50 kg 的帳號填目標 20 kg，範圍檢查 20~400 kg 擋不住）時，每日目標維持在 TDEE，畫面上說明原因。
+
 ## v0.0.9 - 2026-09-10 (每日熱量目標統一、深色模式、無障礙與前端體積)
 
 依線上版（`personalized-food-recommendation-frontend-rt1v`）的一輪實機測試逐項修正。

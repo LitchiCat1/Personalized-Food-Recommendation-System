@@ -21,6 +21,9 @@ import FeedbackBanner from '@/components/ui/feedback-banner';
 import ScannerCameraView from '@/components/scanner/ScannerCameraView';
 import ScannerManualTools from '@/components/scanner/ScannerManualTools';
 import ScannerResults from '@/components/scanner/ScannerResults';
+import MenuCheckResults from '@/components/scanner/MenuCheckResults';
+import { checkMenuPhoto, type MenuPhotoCheckResponse } from '@/lib/api';
+import { resolveImageBase64 } from '@/lib/image';
 import {
   buildOCRDetectedFood,
   FOOD_NAME_REQUIRED_MESSAGE,
@@ -47,7 +50,7 @@ import {
   type RecordSource,
 } from '@/lib/recordSyncQueue';
 
-type ScanMode = 'camera' | 'gallery' | 'label' | 'manual';
+type ScanMode = 'camera' | 'gallery' | 'label' | 'menu' | 'manual';
 
 type RecordFeedback = {
   tone: 'success' | 'error';
@@ -64,6 +67,7 @@ const SCAN_MODE_OPTIONS = [
   { value: 'camera', label: '拍照' },
   { value: 'gallery', label: '相簿' },
   { value: 'label', label: '營養標示' },
+  { value: 'menu', label: '菜單' },
   { value: 'manual', label: '手動搜尋' },
 ];
 
@@ -234,6 +238,8 @@ export default function ScannerScreen() {
   const [ocrQuerying, setOcrQuerying] = useState(false);
   const [ocrDraft, setOcrDraft] = useState<OCRDraft | null>(null);
   const [ocrNameError, setOcrNameError] = useState<string | null>(null);
+  const [menuChecking, setMenuChecking] = useState(false);
+  const [menuCheck, setMenuCheck] = useState<MenuPhotoCheckResponse | null>(null);
   const [scanMode, setScanMode] = useState<ScanMode>('camera');
   const [syncingRecord, setSyncingRecord] = useState(false);
   const [activeRecordSubmission, setActiveRecordSubmission] = useState<ActiveRecordSubmission | null>(null);
@@ -400,6 +406,49 @@ export default function ScannerScreen() {
       setRecordFeedback({ tone: 'error', title: '營養標示辨識失敗', message: error?.message || '請確認後端已設定 Gemini API key' });
     } finally {
       setOcrQuerying(false);
+    }
+  };
+
+  /** 拍任何一張菜單，不用先選店家：AI 讀出每道菜，再依疾病與過敏原分成可以吃／要注意／不建議。 */
+  const handleMenuCheck = async (source: 'camera' | 'library') => {
+    if (menuChecking) return;
+    setRecordFeedback(null);
+    try {
+      let picked: ImagePicker.ImagePickerResult;
+      if (source === 'camera') {
+        const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!cameraPermission.granted) {
+          setRecordFeedback({ tone: 'error', title: '需要相機權限', message: '請允許 NutriLens 使用相機，或改從相簿選擇菜單照片。' });
+          return;
+        }
+        picked = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.8 });
+      } else {
+        picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.8 });
+      }
+      if (picked.canceled) return;
+      const imageBase64 = await resolveImageBase64(picked.assets?.[0]);
+      if (!imageBase64) {
+        setRecordFeedback({ tone: 'error', title: '圖片無法讀取', message: '請重新拍攝，或改選另一張菜單照片。' });
+        return;
+      }
+
+      setMenuChecking(true);
+      setMenuCheck(null);
+      const result = await checkMenuPhoto(apiBaseUrl, { menuImage: imageBase64, userId: user.userId }, { accessToken });
+      if (result.total_items === 0) {
+        setRecordFeedback({ tone: 'error', title: '沒有讀到菜名', message: '請拍清楚一點、讓菜單佔滿畫面，光線充足再試一次。' });
+        return;
+      }
+      setMenuCheck(result);
+      setRecordFeedback({
+        tone: 'success',
+        title: '菜單分析完成',
+        message: `${result.total_items} 道菜：可以吃 ${result.safe_items.length}、要注意 ${result.caution_items.length}、不建議 ${result.not_recommended_items.length}。`,
+      });
+    } catch (error: any) {
+      setRecordFeedback({ tone: 'error', title: '菜單辨識失敗', message: error?.message || '請稍後再試一次。' });
+    } finally {
+      setMenuChecking(false);
     }
   };
 
@@ -713,6 +762,7 @@ export default function ScannerScreen() {
     camera: { icon: 'camera-outline' as const, title: '拍攝完整餐盤', hint: '保持光線充足並避免遮擋，拍攝後會立即送出 AI 分析。', action: '啟動相機', onPress: handleCamera },
     gallery: { icon: 'images-outline' as const, title: '從相簿選擇餐點', hint: '可使用已拍攝的餐點照片，不需要重新開啟相機。', action: '選擇餐點照片', onPress: handleGallery },
     label: { icon: 'document-text-outline' as const, title: '辨識包裝營養標示', hint: '選擇清晰的營養標示照片，可建立自訂食品或直接加入紀錄。', action: ocrQuerying ? '辨識中' : '選擇標示照片', onPress: handleLabelOCRFromGallery },
+    menu: { icon: 'restaurant-outline' as const, title: '拍菜單看能不能吃', hint: '拍下任何一張菜單，AI 會讀出每道菜，依你的疾病與過敏原分成可以吃、要注意、不建議。大約需要 20~40 秒。', action: menuChecking ? '分析中' : '拍攝菜單', onPress: () => handleMenuCheck('camera') },
     manual: { icon: 'search-outline' as const, title: '從食品資料庫搜尋', hint: '辨識結果不確定時，可直接從 TFDA 與自訂食品中補上餐點。', action: '', onPress: handleManualSearch },
   }[scanMode];
 
@@ -721,27 +771,39 @@ export default function ScannerScreen() {
       <SegmentedControl options={SCAN_MODE_OPTIONS} value={scanMode} onChange={(value) => setScanMode(value as ScanMode)} />
       <View style={styles.scanHero}>
         <View style={styles.scanIcon}>
-          {scanResult.isScanning || ocrQuerying ? (
+          {scanResult.isScanning || ocrQuerying || menuChecking ? (
             <ActivityIndicator size="large" color={Palette.accent.green} />
-          ) : results.length > 0 ? (
+          ) : results.length > 0 && scanMode !== 'menu' ? (
             <Ionicons name="checkmark-circle-outline" size={42} color={Palette.accent.green} />
           ) : (
             <Ionicons name={modeConfig.icon} size={42} color={Palette.accent.green} />
           )}
         </View>
-        <Text style={styles.scanTitle}>{scanResult.isScanning ? '正在分析照片' : results.length > 0 ? `已辨識 ${results.length} 項食物` : modeConfig.title}</Text>
-        <Text style={styles.scanHint}>{results.length > 0 ? `合計 ${totalCal} kcal，鈉 ${totalSodium}mg。請確認份量後加入。` : modeConfig.hint}</Text>
+        <Text style={styles.scanTitle}>
+          {menuChecking ? '正在用 AI 分析菜單' : scanResult.isScanning ? '正在分析照片' : results.length > 0 && scanMode !== 'menu' ? `已辨識 ${results.length} 項食物` : modeConfig.title}
+        </Text>
+        <Text style={styles.scanHint}>{results.length > 0 && scanMode !== 'menu' ? `合計 ${totalCal} kcal，鈉 ${totalSodium}mg。請確認份量後加入。` : modeConfig.hint}</Text>
         {scanMode !== 'manual' ? (
-          <PrimaryButton label={modeConfig.action} onPress={modeConfig.onPress} disabled={scanResult.isScanning || ocrQuerying} icon={<Ionicons name={modeConfig.icon} size={18} color={Palette.text.inverse} />} />
+          <PrimaryButton label={modeConfig.action} onPress={modeConfig.onPress} disabled={scanResult.isScanning || ocrQuerying || menuChecking} icon={<Ionicons name={modeConfig.icon} size={18} color={Palette.text.inverse} />} />
         ) : null}
-        {results.length > 0 ? (
+        {scanMode === 'menu' ? (
+          <SecondaryButton label="從相簿選擇菜單照片" onPress={() => handleMenuCheck('library')} disabled={menuChecking} icon={<Ionicons name="images-outline" size={16} color={Palette.accent.green} />} />
+        ) : null}
+        {scanMode === 'menu' && menuCheck ? (
+          <SecondaryButton label="清除菜單結果" onPress={() => setMenuCheck(null)} disabled={menuChecking} icon={<Ionicons name="trash-outline" size={16} color={Palette.text.secondary} />} />
+        ) : null}
+        {results.length > 0 && scanMode !== 'menu' ? (
           <SecondaryButton label="清除辨識結果" onPress={clearScan} icon={<Ionicons name="trash-outline" size={16} color={Palette.text.secondary} />} />
         ) : null}
       </View>
     </>
   );
 
-  const resultWorkspace = (
+  const resultWorkspace = scanMode === 'menu' ? (
+    <View style={styles.resultWorkspace}>
+      {menuCheck ? <MenuCheckResults result={menuCheck} /> : null}
+    </View>
+  ) : (
     <View style={styles.resultWorkspace}>
       <View style={styles.resultHeader}>
         <Text style={styles.sectionTitle}>辨識結果</Text>

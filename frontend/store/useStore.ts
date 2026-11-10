@@ -292,7 +292,7 @@ export const useStore = create<NutriLensState>((set, get) => ({
         id: `scan_${Date.now()}_${i}`,
         name: d.foodName,
         calories: d.nutrition.calories,
-        time: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }),
+        time: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false }),
         mealType: getAutoMealType(),
         emoji: '📸',
         protein: d.nutrition.protein,

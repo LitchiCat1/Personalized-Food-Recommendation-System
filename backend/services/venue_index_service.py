@@ -102,11 +102,10 @@ def index_nearby_venues(
     lng = float(params.get("lng", 121.5645))
     radius_km = min(max(float(params.get("radius_km", 3)), 0.5), 10)
     category = str(params.get("category", "all") or "all").strip().lower()
-    budget = int(params.get("budget", 150))
     limit = min(max(int(params.get("limit", 20)), 1), 20)
 
     try:
-        places = fetch_places(lat, lng, radius_km, category, budget, limit=limit)
+        places = fetch_places(lat, lng, radius_km, category, limit=limit)
     except Exception as error:
         raise VenueIndexUnavailable(f"店家搜尋失敗：{error}") from error
     if not places:

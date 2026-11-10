@@ -1,6 +1,6 @@
 from services.disease_rule_service import normalize_allergen_ids, normalize_condition_ids
 from services.nutrient_service import get_nutrient_value, is_fried_food_name
-from services.profile_service import compute_bmr, resolve_energy_factor
+from services.profile_service import compute_bmr, compute_tdee, resolve_energy_factor, resolve_weight_goal_energy
 
 
 # 一天切成幾餐。disease_rules.json 的 personalized_limits 用它把每日總量
@@ -403,7 +403,20 @@ def resolve_user_energy_and_weight(conditions: list, user_profile: dict | None) 
         if bmr > 0 and E < bmr:
             E = bmr
     else:
-        E = daily_calorie_target
+        # 跟每日目標同一條規則：有設目標體重就用 TDEE ± 調整量。
+        profile = user_profile or {}
+        bmr = _profile_bmr(user_profile, weight_kg, height_cm)
+        tdee = normalize_number(profile.get("tdee"))
+        if tdee <= 0 and bmr > 0:
+            tdee = compute_tdee(bmr, activity_multiplier)
+        weight_goal = resolve_weight_goal_energy(
+            profile.get("target_weight") or profile.get("targetWeight"),
+            weight_kg,
+            height_cm,
+            tdee,
+            bmr,
+        )
+        E = weight_goal["calories"] if weight_goal else daily_calorie_target
 
     if E <= 0:
         E = W * energy_factor

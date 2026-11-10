@@ -148,6 +148,77 @@ def resolve_energy_factor(activity_multiplier: float) -> int:
     return 40  # 高度／極高活動
 
 
+# 目標體重換算成每日熱量的調整量。減 500 kcal 大約每週 0.5 kg；
+# 增重用較小的盈餘，避免增加的大多是脂肪。
+WEIGHT_GOAL_DEFICIT_KCAL = 500
+WEIGHT_GOAL_SURPLUS_KCAL = 300
+# 跟前端 body-metrics.ts 的 MAINTAIN_TOLERANCE_KG 一致：差不到 1 公斤當成維持。
+WEIGHT_GOAL_MAINTAIN_KG = 1.0
+UNDERWEIGHT_BMI = 18.5
+
+
+def resolve_weight_goal_energy(
+    target_weight,
+    weight_kg: float,
+    height_cm: float,
+    tdee: float,
+    bmr: float,
+) -> dict | None:
+    """有設目標體重時，用 TDEE 加減一個固定量當每日熱量；沒設就回 None。
+
+    先前目標體重只是存進去再讀出來，沒有任何計算用到它：想減 5 公斤的人
+    拿到的每日目標還是 TDEE，只能自己去改「每日熱量基準」。
+
+    每日目標（nutrition_progress_service）與單餐上限（medical_risk_service）
+    都從這裡拿，兩邊才會是同一個數字。
+    """
+    try:
+        target = float(target_weight)
+    except (TypeError, ValueError):
+        return None
+    if target <= 0 or tdee <= 0 or weight_kg <= 0:
+        return None
+
+    delta = target - weight_kg
+    if abs(delta) < WEIGHT_GOAL_MAINTAIN_KG:
+        direction, adjustment = "maintain", 0.0
+    elif delta > 0:
+        direction, adjustment = "gain", float(WEIGHT_GOAL_SURPLUS_KCAL)
+    else:
+        direction, adjustment = "lose", -float(WEIGHT_GOAL_DEFICIT_KCAL)
+
+    # 已經過輕、或目標本身就是過輕，不幫他開熱量赤字。
+    # 目標體重的合理範圍是 20~400 kg，50 kg 的人填 20 kg 也存得進去。
+    blocked = None
+    height_m = height_cm / 100.0
+    bmi = weight_kg / (height_m ** 2) if height_m > 0 else 22.0
+    target_bmi = target / (height_m ** 2) if height_m > 0 else 22.0
+    if direction == "lose" and bmi < UNDERWEIGHT_BMI:
+        adjustment = 0.0
+        blocked = "underweight"
+    elif direction == "lose" and target_bmi < UNDERWEIGHT_BMI:
+        adjustment = 0.0
+        blocked = "target_underweight"
+
+    calories = tdee + adjustment
+    # 跟疾病目標同一條底線：App 幫人算的數字不低於基礎代謝。
+    floored_at_bmr = False
+    if bmr > 0 and calories < bmr:
+        calories = float(bmr)
+        floored_at_bmr = True
+
+    return {
+        "direction": direction,
+        "target_weight": target,
+        "tdee": round(tdee),
+        # 實際套用的調整量；被抬到 BMR 時會比 -500 小。
+        "adjustment": round(calories - tdee),
+        "calories": calories,
+        "floored_at_bmr": floored_at_bmr,
+        "blocked": blocked,
+    }
+
+
 def build_user_profile(data: dict, disease_rules: dict | None = None, allergen_taxonomy: dict | None = None) -> dict:
     user_id = data["user_id"]
     gender = data.get("gender", "male")

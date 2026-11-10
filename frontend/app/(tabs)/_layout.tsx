@@ -47,8 +47,9 @@ export default function TabLayout() {
           healthConditions: data.health_conditions,
           allergens: data.allergens,
           dailyCalorieTarget: data.daily_calorie_target,
-          targetWeight: data.target_weight || latestUser.targetWeight,
+          targetWeight: data.target_weight ?? undefined,
           dietType: data.diet_type,
+          profileComplete: data.profile_complete !== false,
         });
       })
       .catch(() => {

@@ -483,7 +483,7 @@ class StorageRepository:
             if record.get("user_id") != user_id:
                 continue
             day = str(record.get("timestamp", ""))[:10]
-            if not day:
+            if not day or not (start_key <= day < end_key):
                 continue
             agg[day]["record_count"] += 1
             record = self._enrich_record_totals(record)

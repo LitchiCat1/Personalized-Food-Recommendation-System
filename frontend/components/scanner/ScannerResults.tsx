@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import DataPill from '@/components/ui/data-pill';
 import PrimaryButton from '@/components/ui/primary-button';
 import type { DetectedFood } from '@/constants/mock-data';
+import { formatFoodSourceLabel } from '@/lib/dietary-records';
 import { perMealBudget } from '@/lib/meal';
 
 type Props = {
@@ -28,6 +29,23 @@ type Props = {
 export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightChange, submitting = false, disabled = false, sodiumDailyTarget, mealWarnings = [] }: Props) {
   const controlsDisabled = submitting || disabled;
   const sodiumMealBudget = perMealBudget(sodiumDailyTarget, 2000);
+  const [weightDrafts, setWeightDrafts] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setWeightDrafts((prev) => {
+      const next: Record<string, string> = {};
+      for (const food of results) {
+        const currentWeightText = String(Math.round(food.estimatedWeight));
+        const draft = prev[food.id];
+        if (draft !== undefined && Number(draft) === Math.round(food.estimatedWeight)) {
+          next[food.id] = draft;
+        } else {
+          next[food.id] = currentWeightText;
+        }
+      }
+      return next;
+    });
+  }, [results]);
 
   if (results.length === 0) {
     return (
@@ -45,112 +63,126 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
 
   return (
     <>
-      {results.map((food) => (
-        <View key={food.id} style={styles.foodCard}>
-          <View style={styles.foodTop}>
-            <View style={styles.foodInfo}>
-              <Text style={styles.foodName}>{food.foodName}</Text>
-              <Text style={styles.foodWeight}>
-                {food.portionAdjusted ? '已校正份量' : '估算份量'} {food.estimatedWeight}g
-              </Text>
-            </View>
-            <DataPill tone={food.confidence >= 80 ? 'success' : 'warning'}>{food.confidence}%</DataPill>
-          </View>
-
-          <View style={styles.portionCard}>
-            <View style={styles.portionHeader}>
-              <Ionicons name="scale-outline" size={14} color={Palette.accent.green} />
-              <Text style={styles.portionTitle}>份量校正</Text>
-              {food.portionAdjusted ? <Text style={styles.portionAdjustedText}>已重算營養</Text> : null}
-            </View>
-            <View style={styles.portionControls}>
-              <Pressable
-                onPress={() => onWeightChange(food.id, food.estimatedWeight - 10)}
-                disabled={controlsDisabled}
-                accessibilityRole="button"
-                accessibilityLabel={`${food.foodName} 減少 10 克`}
-                aria-disabled={controlsDisabled}
-                style={[styles.portionButton, controlsDisabled && styles.controlDisabled]}
-              >
-                <Text style={styles.portionButtonText}>-10g</Text>
-              </Pressable>
-              <TextInput
-                value={String(Math.round(food.estimatedWeight))}
-                onChangeText={(value) => {
-                  const next = Number(value.replace(/[^0-9]/g, ''));
-                  if (Number.isFinite(next) && next > 0) onWeightChange(food.id, next);
-                }}
-                keyboardType="numeric"
-                selectTextOnFocus
-                editable={!controlsDisabled}
-                style={[styles.portionInput, controlsDisabled && styles.controlDisabled]}
-              />
-              <Text style={styles.portionUnit}>g</Text>
-              <Pressable
-                onPress={() => onWeightChange(food.id, food.estimatedWeight + 10)}
-                disabled={controlsDisabled}
-                accessibilityRole="button"
-                accessibilityLabel={`${food.foodName} 增加 10 克`}
-                aria-disabled={controlsDisabled}
-                style={[styles.portionButton, controlsDisabled && styles.controlDisabled]}
-              >
-                <Text style={styles.portionButtonText}>+10g</Text>
-              </Pressable>
-              {food.portionAdjusted ? (
-                <Pressable
-                  onPress={() => onWeightChange(food.id, food.originalEstimatedWeight || food.estimatedWeight)}
-                  disabled={controlsDisabled}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${food.foodName} 還原估算份量`}
-                  aria-disabled={controlsDisabled}
-                  style={[styles.resetButton, controlsDisabled && styles.controlDisabled]}
-                >
-                  <Text style={styles.resetButtonText}>還原</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          </View>
-
-          <View style={styles.tagsRow}>
-            <DataPill tone={food.gi === 'high' ? 'danger' : food.gi === 'medium' ? 'warning' : 'success'}>
-              GI {food.gi === 'high' ? '高' : food.gi === 'medium' ? '中' : '低'}
-            </DataPill>
-            {food.source ? <DataPill tone="info">{food.source}</DataPill> : null}
-            {food.nutrition.is_fried ? <DataPill tone="danger">油炸食物</DataPill> : null}
-            {food.needsConfirmation ? <DataPill tone="warning">需人工確認</DataPill> : null}
-            {food.allergens.map((a) => <DataPill key={a} tone="warning">{a}</DataPill>)}
-          </View>
-
-          {food.warnings.length > 0 ? (
-            <View style={styles.warningBanner}>
-              <Ionicons name="warning-outline" size={15} color={Palette.status.warning} />
-              <Text style={styles.warningText}>{food.warnings.join('；')}</Text>
-            </View>
-          ) : null}
-
-          <View style={styles.nutritionGrid}>
-            {[
-              { label: '熱量', value: food.nutrition.calories, unit: 'kcal', color: Palette.accent.green },
-              { label: '蛋白質', value: food.nutrition.protein, unit: 'g', color: Palette.accent.blue },
-              { label: '總碳水化合物', value: food.nutrition.carbs, unit: 'g', color: Palette.accent.orange },
-              { label: '精緻糖', value: food.nutrition.sugar ?? 0, unit: 'g', color: Palette.accent.orange },
-              { label: '總脂肪', value: food.nutrition.fat, unit: 'g', color: Palette.accent.purple },
-              { label: '飽和脂肪', value: food.nutrition.saturated_fat ?? 0, unit: 'g', color: Palette.accent.purple },
-              { label: '反式脂肪', value: food.nutrition.trans_fat ?? 0, unit: 'g', color: Palette.accent.purple },
-              { label: '膳食纖維', value: food.nutrition.fiber, unit: 'g', color: Palette.accent.cyan },
-              { label: '鈉 (Sodium)', value: food.nutrition.sodium, unit: 'mg', color: food.nutrition.sodium > sodiumMealBudget ? Palette.status.warning : Palette.accent.pink },
-            ].map((item) => (
-              <View key={item.label} style={[styles.nutritionItem, { minWidth: wp(26) }]}>
-                <Text style={styles.nutritionLabel}>{item.label}</Text>
-                <Text style={[styles.nutritionValue, { color: item.color }]}>
-                  {item.value}
-                  <Text style={styles.nutritionUnit}> {item.unit}</Text>
+      {results.map((food) => {
+        const sourceLabel = formatFoodSourceLabel(food.source);
+        return (
+          <View key={food.id} style={styles.foodCard}>
+            <View style={styles.foodTop}>
+              <View style={styles.foodInfo}>
+                <Text style={styles.foodName}>{food.foodName}</Text>
+                <Text style={styles.foodWeight}>
+                  {food.portionAdjusted ? '已校正份量' : '估算份量'} {food.estimatedWeight}g
                 </Text>
               </View>
-            ))}
+              <DataPill tone={food.confidence >= 80 ? 'success' : 'warning'}>{food.confidence}%</DataPill>
+            </View>
+
+            <View style={styles.portionCard}>
+              <View style={styles.portionHeader}>
+                <Ionicons name="scale-outline" size={14} color={Palette.accent.green} />
+                <Text style={styles.portionTitle}>份量校正</Text>
+                {food.portionAdjusted ? <Text style={styles.portionAdjustedText}>已重算營養</Text> : null}
+              </View>
+              <View style={styles.portionControls}>
+                <Pressable
+                  onPress={() => onWeightChange(food.id, food.estimatedWeight - 10)}
+                  disabled={controlsDisabled}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${food.foodName} 減少 10 克`}
+                  aria-disabled={controlsDisabled}
+                  style={[styles.portionButton, controlsDisabled && styles.controlDisabled]}
+                >
+                  <Text style={styles.portionButtonText}>-10g</Text>
+                </Pressable>
+                <TextInput
+                  value={weightDrafts[food.id] ?? String(Math.round(food.estimatedWeight))}
+                  onChangeText={(value) => {
+                    const digits = value.replace(/[^0-9]/g, '');
+                    setWeightDrafts((prev) => ({ ...prev, [food.id]: digits }));
+                    const next = Number(digits);
+                    if (digits.length > 0 && Number.isFinite(next) && next > 0) {
+                      onWeightChange(food.id, next);
+                    }
+                  }}
+                  onBlur={() => {
+                    const digits = (weightDrafts[food.id] ?? '').trim();
+                    const next = Number(digits);
+                    if (!digits || !Number.isFinite(next) || next <= 0) {
+                      setWeightDrafts((prev) => ({ ...prev, [food.id]: String(Math.round(food.estimatedWeight)) }));
+                    }
+                  }}
+                  keyboardType="numeric"
+                  selectTextOnFocus
+                  editable={!controlsDisabled}
+                  style={[styles.portionInput, controlsDisabled && styles.controlDisabled]}
+                />
+                <Text style={styles.portionUnit}>g</Text>
+                <Pressable
+                  onPress={() => onWeightChange(food.id, food.estimatedWeight + 10)}
+                  disabled={controlsDisabled}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${food.foodName} 增加 10 克`}
+                  aria-disabled={controlsDisabled}
+                  style={[styles.portionButton, controlsDisabled && styles.controlDisabled]}
+                >
+                  <Text style={styles.portionButtonText}>+10g</Text>
+                </Pressable>
+                {food.portionAdjusted ? (
+                  <Pressable
+                    onPress={() => onWeightChange(food.id, food.originalEstimatedWeight || food.estimatedWeight)}
+                    disabled={controlsDisabled}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${food.foodName} 還原估算份量`}
+                    aria-disabled={controlsDisabled}
+                    style={[styles.resetButton, controlsDisabled && styles.controlDisabled]}
+                  >
+                    <Text style={styles.resetButtonText}>還原</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+
+            <View style={styles.tagsRow}>
+              <DataPill tone={food.gi === 'high' ? 'danger' : food.gi === 'medium' ? 'warning' : 'success'}>
+                GI {food.gi === 'high' ? '高' : food.gi === 'medium' ? '中' : '低'}
+              </DataPill>
+              {sourceLabel ? <DataPill tone="info">{sourceLabel}</DataPill> : null}
+              {food.nutrition.is_fried ? <DataPill tone="danger">油炸食物</DataPill> : null}
+              {food.needsConfirmation ? <DataPill tone="warning">需人工確認</DataPill> : null}
+              {food.allergens.map((a) => <DataPill key={a} tone="warning">{a}</DataPill>)}
+            </View>
+
+            {food.warnings.length > 0 ? (
+              <View style={styles.warningBanner}>
+                <Ionicons name="warning-outline" size={15} color={Palette.status.warning} />
+                <Text style={styles.warningText}>{food.warnings.join('；')}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.nutritionGrid}>
+              {[
+                { label: '熱量', value: food.nutrition.calories, unit: 'kcal', color: Palette.accent.green },
+                { label: '蛋白質', value: food.nutrition.protein, unit: 'g', color: Palette.accent.blue },
+                { label: '總碳水化合物', value: food.nutrition.carbs, unit: 'g', color: Palette.accent.orange },
+                { label: '精緻糖', value: food.nutrition.sugar ?? 0, unit: 'g', color: Palette.accent.orange },
+                { label: '總脂肪', value: food.nutrition.fat, unit: 'g', color: Palette.accent.purple },
+                { label: '飽和脂肪', value: food.nutrition.saturated_fat ?? 0, unit: 'g', color: Palette.accent.purple },
+                { label: '反式脂肪', value: food.nutrition.trans_fat ?? 0, unit: 'g', color: Palette.status.error },
+                { label: '膳食纖維', value: food.nutrition.fiber, unit: 'g', color: Palette.accent.cyan },
+                { label: '鈉 (Sodium)', value: food.nutrition.sodium, unit: 'mg', color: food.nutrition.sodium > sodiumMealBudget ? Palette.status.warning : Palette.accent.pink },
+              ].map((item) => (
+                <View key={item.label} style={[styles.nutritionItem, { minWidth: wp(26) }]}>
+                  <Text style={styles.nutritionLabel}>{item.label}</Text>
+                  <Text style={[styles.nutritionValue, { color: item.color }]}>
+                    {item.value}
+                    <Text style={styles.nutritionUnit}> {item.unit}</Text>
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
-        </View>
-      ))}
+        );
+      })}
 
       {mealWarnings.length > 0 ? (
         <View style={styles.mealWarningCard}>

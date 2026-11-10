@@ -142,7 +142,7 @@ export default function HistoryScreen() {
 
           <SectionBlock title="營養素區段均值" subtitle="比對連續紀錄均值與建議目標，找出長期偏差。">
             <View style={styles.progressStack}>
-              <ProgressBar label="蛋白質" current={summary.avg_protein || 0} target={targets?.protein ?? 130} unit="g" color={Palette.accent.blue} />
+              <ProgressBar label="蛋白質" current={summary.avg_protein || 0} target={targets?.protein ?? 130} unit="g" color={Palette.accent.blue} goalType={goalTypes['protein'] ?? DEFAULT_NUTRITION_GOAL_TYPES['protein']} />
               <ProgressBar label="總碳水化合物" current={summary.avg_carbs || 0} target={targets?.carbs ?? 250} unit="g" color={Palette.accent.orange} goalType={goalTypes['carbs'] ?? DEFAULT_NUTRITION_GOAL_TYPES['carbs']} />
               <ProgressBar label="精緻糖" current={summary.avg_sugar || 0} target={targets?.sugar ?? 25} unit="g" color={Palette.accent.orange} goalType={goalTypes['sugar'] ?? DEFAULT_NUTRITION_GOAL_TYPES['sugar']} />
               <ProgressBar label="總脂肪" current={summary.avg_fat || 0} target={targets?.fat ?? 70} unit="g" color={Palette.accent.purple} goalType={goalTypes['fat'] ?? DEFAULT_NUTRITION_GOAL_TYPES['fat']} />

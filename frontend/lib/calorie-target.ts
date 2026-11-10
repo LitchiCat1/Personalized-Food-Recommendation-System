@@ -1,4 +1,4 @@
-import type { NutritionTargetBasis } from '@/lib/api';
+import type { NutritionTargetBasis, WeightGoalBasis } from '@/lib/api';
 import { conditionLabels } from '@/lib/medical-labels';
 
 /**
@@ -33,6 +33,10 @@ export function describeCalorieTarget(basis: NutritionTargetBasis | null | undef
     return '目前採用你在「編輯資料」填寫的每日熱量。你沒有勾選任何慢性疾病，所以不套用疾病指引的熱量上限。';
   }
 
+  if (basis.source === 'weight_goal' && basis.weight_goal) {
+    return describeWeightGoalTarget(basis.weight_goal);
+  }
+
   const conditions = conditionLabels(basis.conditions, '慢性疾病');
   // 看 weight_reduced 而不是 is_overweight：過重的高血壓患者並沒有減量，
   // 先前這裡照樣寫「BMI 偏高再下調一級」。
@@ -53,8 +57,39 @@ export function describeCalorieTarget(basis: NutritionTargetBasis | null | undef
  * 沒有這一句，「編輯資料」裡那個可以改、改了卻沒有任何效果的欄位就是個陷阱。
  */
 export function describeUserTargetFallback(basis: NutritionTargetBasis | null | undefined): string | null {
-  if (!basis || basis.source !== 'disease' || !basis.user_target) return null;
-  return `你填的 ${basis.user_target.toLocaleString()} kcal 是沒有疾病條件時才會採用的基準值。`;
+  if (!basis || !basis.user_target) return null;
+  if (basis.source === 'disease') {
+    return `你填的 ${basis.user_target.toLocaleString()} kcal 是沒有疾病條件時才會採用的基準值。`;
+  }
+  if (basis.source === 'weight_goal') {
+    return `你填的每日熱量基準 ${basis.user_target.toLocaleString()} kcal 只在沒設目標體重時採用。`;
+  }
+  return null;
+}
+
+/** 依目標體重算出的每日熱量：TDEE 加減多少、為什麼。 */
+function describeWeightGoalTarget(goal: WeightGoalBasis): string {
+  const tdee = goal.tdee.toLocaleString();
+  if (goal.blocked === 'underweight') {
+    return `你的 BMI 已低於 18.5，不建議再減重，每日目標維持在 TDEE ${tdee} kcal，不開熱量赤字。`;
+  }
+  if (goal.blocked === 'target_underweight') {
+    return `目標體重 ${goal.target_weight} kg 換算的 BMI 低於 18.5（過輕），App 不依這個目標減少熱量，每日目標維持在 TDEE ${tdee} kcal。建議調整目標體重。`;
+  }
+  if (goal.direction === 'maintain') {
+    return `依目標體重 ${goal.target_weight} kg（維持）：每日目標等於 TDEE ${tdee} kcal。`;
+  }
+  const verb = goal.direction === 'lose' ? '減重' : '增重';
+  const sign = goal.adjustment >= 0 ? '+' : '−';
+  const parts = [
+    `依目標體重 ${goal.target_weight} kg（${verb}）：TDEE ${tdee} kcal ${sign} ${Math.abs(goal.adjustment).toLocaleString()} kcal。`,
+  ];
+  if (goal.floored_at_bmr) {
+    parts.push('減 500 kcal 會低於你的基礎代謝率，已提高到 BMR。');
+  } else if (goal.direction === 'lose') {
+    parts.push('大約每週減 0.5 kg。');
+  }
+  return parts.join('');
 }
 
 /** 熱量一律顯示整數：先前首頁同時出現「1,590 kcal」與「目標 1,589.5 kcal」。 */

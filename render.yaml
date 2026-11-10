@@ -71,3 +71,6 @@ services:
         value: "8"
       - key: GOOGLE_PLACES_API_KEY
         sync: false
+      # 選填：菜單分析先問 ChatGPT，失敗才換 Gemini
+      - key: OPENAI_API_KEY
+        sync: false

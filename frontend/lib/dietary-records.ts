@@ -66,6 +66,12 @@ export function getLocalTodayDateKey(now = new Date()): string {
   return formatLocalDateKey(now);
 }
 
+/** 日期鍵（YYYY-MM-DD）往前或往後幾天，跨月、跨年、閏年都照日曆算。 */
+export function shiftDateKey(dateKey: string, days: number): string {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return formatLocalDateKey(new Date(year, month - 1, day + days));
+}
+
 export function validateRecordDate(value: string, now = new Date()): RecordDateValidation {
   const dateKey = parseDateInput(value);
   if (!dateKey) return { dateKey: null, error: '請選擇有效的紀錄日期' };
@@ -276,6 +282,25 @@ export function formatRecordDateTime(timestamp: string): string {
 
 export function getRecordFoodNames(record: DietaryRecord): string {
   return getEditableRecordFoods(record).map((food) => String(food.name || '').trim()).filter(Boolean).join('、') || '未命名餐點';
+}
+
+export function formatFoodSourceLabel(source?: string): string {
+  const raw = String(source || '').trim();
+  const key = raw.toLowerCase();
+  if (!key) return '';
+  if (key === 'manual') return '手動紀錄';
+  if (key === 'camera' || key === 'gemini_vision_db' || key === 'gemini-vision-db-lookup') return '拍照辨識';
+  if (key === 'tfda' || key === 'tfda-search') return 'TFDA 資料庫';
+  if (key === 'custom' || key === 'custom-food') return '自訂食品';
+  if (key === 'nutrition-label' || key === 'nutrition-label-ocr' || key === 'gemini ocr') return '營養標示';
+  return raw;
+}
+
+export function formatMealEmojiSource(emoji?: string): string {
+  if (emoji === '🏷️') return '營養標示';
+  if (emoji === '🔎') return '手動搜尋';
+  if (emoji === '📸') return '拍照辨識';
+  return '飲食紀錄';
 }
 
 function normalizeRecordDateForRange(timestamp: string, timezoneOffsetMinutes?: number): string | null {

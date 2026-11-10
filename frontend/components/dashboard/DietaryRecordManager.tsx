@@ -28,17 +28,15 @@ import {
   createRecordFoodDrafts,
   filterAndSortRecords,
   formatDateInput,
-  formatRecordDateTime,
-  getDefaultRecordDateRange,
+  formatFoodSourceLabel, formatRecordDateTime,
   getEditableRecordFoods,
   getLocalTodayDateKey,
   getRecordFoodNames,
+  parseDateInput,
   RECORD_NUTRIENT_FIELDS,
+  shiftDateKey,
   validateRecordDate,
-  validateRecordDateRange,
   validateRecordFoodDrafts,
-  type RecordDateRange,
-  type RecordDateRangeErrors,
   type RecordDraftErrors,
   type RecordFoodDraft,
   type RecordNutrientKey,
@@ -61,13 +59,11 @@ type ManagerView = 'list' | 'create' | 'edit';
 export default function DietaryRecordManager({ visible, onClose }: Props) {
   const { width } = useResponsive();
   const isNarrow = width < 600;
-  const isDateRangeStacked = width < 840;
   const { user, apiBaseUrl, accessToken, invalidateDietaryRecords } = useStore();
-  const defaultRange = useMemo(() => getDefaultRecordDateRange(), []);
-  const [range, setRange] = useState<RecordDateRange>(defaultRange);
-  const [rangeErrors, setRangeErrors] = useState<RecordDateRangeErrors>({});
-  const [activeDateKeys, setActiveDateKeys] = useState<{ startDate: string; endDate: string } | null>(null);
-  const [records, setRecords] = useState<DietaryRecord[]>([]);
+  // 一次看一天：選好的日期（YYYY/MM/DD）與全部紀錄分開放，換日期只在本機篩選，不用重新下載
+  const [selectedDate, setSelectedDate] = useState(() => formatDateInput(getLocalTodayDateKey()));
+  const [selectedDateError, setSelectedDateError] = useState<string | undefined>();
+  const [allRecords, setAllRecords] = useState<DietaryRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<ManagerFeedback | null>(null);
@@ -99,42 +95,59 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
     createClientRecordIdRef.current = null;
   }, []);
 
-  const runQuery = useCallback(async (queryRange: RecordDateRange) => {
-    const validation = validateRecordDateRange(queryRange);
-    setRangeErrors(validation.errors);
-    setFeedback(null);
-    if (!validation.dateKeys) return;
+  const todayKey = getLocalTodayDateKey();
+  const selectedDateKey = parseDateInput(selectedDate) || todayKey;
+  const records = useMemo(
+    () => filterAndSortRecords(allRecords, user.userId, selectedDateKey, selectedDateKey),
+    [allRecords, selectedDateKey, user.userId]
+  );
+  // 這一天的總熱量：有紀錄總計就用總計，沒有就把每樣食物加起來
+  const dayCalories = records.reduce((sum, record) => {
+    const total = Number(record.total_calories);
+    if (record.total_calories !== undefined && Number.isFinite(total)) return sum + total;
+    return sum + getEditableRecordFoods(record).reduce((foodSum, food) => foodSum + (Number(food.calories) || 0), 0);
+  }, 0);
 
-    const normalizedRange = {
-      startDate: formatDateInput(validation.dateKeys.startDate),
-      endDate: formatDateInput(validation.dateKeys.endDate),
-    };
-    setRange(normalizedRange);
-    setActiveDateKeys(validation.dateKeys);
+  const loadRecords = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     const requestId = ++requestIdRef.current;
     try {
-      const allRecords = await fetchAllRecords(apiBaseUrl, user.userId, { accessToken });
+      const fetched = await fetchAllRecords(apiBaseUrl, user.userId, { accessToken });
       if (requestId !== requestIdRef.current) return;
-      setRecords(filterAndSortRecords(
-        allRecords,
-        user.userId,
-        validation.dateKeys.startDate,
-        validation.dateKeys.endDate
-      ));
+      setAllRecords(fetched);
     } catch (error) {
       if (requestId !== requestIdRef.current) return;
-      setRecords([]);
+      setAllRecords([]);
       setLoadError(error instanceof Error ? error.message : '無法載入飲食紀錄');
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [accessToken, apiBaseUrl, user.userId]);
 
+  const selectDate = (value: string) => {
+    const validation = validateRecordDate(value);
+    if (!validation.dateKey) {
+      setSelectedDateError(validation.error);
+      return;
+    }
+    setSelectedDate(formatDateInput(validation.dateKey));
+    setSelectedDateError(undefined);
+    setFeedback(null);
+  };
+
+  const shiftSelectedDay = (days: number) => {
+    const next = shiftDateKey(selectedDateKey, days);
+    if (next > todayKey) return;
+    selectDate(formatDateInput(next));
+  };
+
   useEffect(() => {
     if (visible && !wasVisibleRef.current) {
-      void runQuery(range);
+      // 每次打開都從今天開始看
+      setSelectedDate(formatDateInput(getLocalTodayDateKey()));
+      setSelectedDateError(undefined);
+      void loadRecords();
     }
     if (!visible) {
       requestIdRef.current += 1;
@@ -147,12 +160,7 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
       resetCreateForm();
     }
     wasVisibleRef.current = visible;
-  }, [range, resetCreateForm, runQuery, visible]);
-
-  const updateRange = (key: keyof RecordDateRange, value: string) => {
-    setRange((current) => ({ ...current, [key]: value }));
-    setRangeErrors((current) => ({ ...current, [key]: undefined }));
-  };
+  }, [loadRecords, resetCreateForm, visible]);
 
   const openEditor = (record: DietaryRecord) => {
     if (!record.client_record_id) {
@@ -168,6 +176,8 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
 
   const openCreator = () => {
     resetCreateForm();
+    // 新增時預設記在正在看的那一天
+    setCreateDate(formatDateInput(selectedDateKey));
     createClientRecordIdRef.current = createManualRecordClientId();
     setEditingRecord(null);
     setFeedback(null);
@@ -237,13 +247,11 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
         source: 'manual',
       }, { accessToken });
       invalidateDietaryRecords();
-      const selectedRange = {
-        startDate: formatDateInput(dateValidation.dateKey),
-        endDate: formatDateInput(dateValidation.dateKey),
-      };
       setViewMode('list');
       resetCreateForm();
-      await runQuery(selectedRange);
+      setSelectedDate(formatDateInput(dateValidation.dateKey));
+      setSelectedDateError(undefined);
+      await loadRecords();
       setFeedback({
         tone: 'success',
         title: '飲食紀錄已新增',
@@ -278,13 +286,9 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
         validation.foods,
         { accessToken }
       );
-      setRecords((current) => {
-        const updated = current.map((record) => (
-          record.client_record_id === response.record.client_record_id ? response.record : record
-        ));
-        if (!activeDateKeys) return updated;
-        return filterAndSortRecords(updated, user.userId, activeDateKeys.startDate, activeDateKeys.endDate);
-      });
+      setAllRecords((current) => current.map((record) => (
+        record.client_record_id === response.record.client_record_id ? response.record : record
+      )));
       invalidateDietaryRecords();
       setEditingRecord(null);
       setViewMode('list');
@@ -317,7 +321,7 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
     setDeleteError(null);
     try {
       await deleteDietaryRecord(apiBaseUrl, user.userId, deleteTarget.client_record_id, { accessToken });
-      setRecords((current) => current.filter((record) => record.client_record_id !== deleteTarget.client_record_id));
+      setAllRecords((current) => current.filter((record) => record.client_record_id !== deleteTarget.client_record_id));
       invalidateDietaryRecords();
       setDeleteTarget(null);
       setFeedback({ tone: 'success', title: '飲食紀錄已刪除', message: '列表與首頁營養趨勢已同步重新計算。' });
@@ -392,35 +396,40 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
                 />
               ) : (
                 <>
-                  <View style={[styles.dateRow, isDateRangeStacked && styles.stackRow]}>
+                  <View style={styles.dayRow}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="前一天"
+                      onPress={() => shiftSelectedDay(-1)}
+                      style={styles.dayStepButton}
+                    >
+                      <Ionicons name="chevron-back" size={22} color={Palette.accent.green} />
+                    </Pressable>
                     <View style={styles.dateField}>
                       <DatePicker
-                        label="開始日期"
-                        value={range.startDate}
-                        onChange={(value) => updateRange('startDate', value)}
-                        error={rangeErrors.startDate}
+                        label="日期"
+                        value={selectedDate}
+                        onChange={selectDate}
+                        error={selectedDateError}
+                        maximumDate={formatDateInput(todayKey)}
                       />
                     </View>
-                    <Text style={[styles.rangeSeparator, isDateRangeStacked && styles.rangeSeparatorNarrow]}>～</Text>
-                    <View style={styles.dateField}>
-                      <DatePicker
-                        label="結束日期"
-                        value={range.endDate}
-                        onChange={(value) => updateRange('endDate', value)}
-                        error={rangeErrors.endDate}
-                      />
-                    </View>
-                    <View style={[styles.queryButton, isDateRangeStacked && styles.queryButtonStacked]}>
-                      <PrimaryButton
-                        label={loading ? '查詢中' : '查詢'}
-                        onPress={() => void runQuery(range)}
-                        disabled={loading}
-                        icon={loading
-                          ? <ActivityIndicator size="small" color={Palette.text.inverse} />
-                          : <Ionicons name="search" size={18} color={Palette.text.inverse} />}
-                      />
-                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="後一天"
+                      accessibilityState={{ disabled: selectedDateKey >= todayKey }}
+                      disabled={selectedDateKey >= todayKey}
+                      onPress={() => shiftSelectedDay(1)}
+                      style={[styles.dayStepButton, selectedDateKey >= todayKey && styles.dayStepButtonDisabled]}
+                    >
+                      <Ionicons name="chevron-forward" size={22} color={selectedDateKey >= todayKey ? Palette.text.muted : Palette.accent.green} />
+                    </Pressable>
                   </View>
+                  {selectedDateKey !== todayKey ? (
+                    <View style={styles.todayLinkRow}>
+                      <SecondaryButton label="回到今天" onPress={() => selectDate(formatDateInput(todayKey))} icon={<Ionicons name="today-outline" size={16} color={Palette.accent.green} />} />
+                    </View>
+                  ) : null}
 
                   <View style={[styles.listToolbar, isNarrow && styles.listToolbarNarrow]}>
                     <View style={[styles.createButtonWrap, isNarrow && styles.createButtonWrapNarrow]}>
@@ -433,17 +442,16 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
                     </View>
                   </View>
 
-                  {activeDateKeys ? (
-                    <View style={styles.resultHeader}>
-                      <View style={styles.resultHeaderCopy}>
-                        <Text style={styles.resultTitle}>查詢結果</Text>
-                        <Text style={styles.resultRange}>
-                          {formatDateInput(activeDateKeys.startDate)} ～ {formatDateInput(activeDateKeys.endDate)}
-                        </Text>
-                      </View>
-                      <DataPill tone="info">{records.length} 筆</DataPill>
+                  <View style={styles.resultHeader}>
+                    <View style={styles.resultHeaderCopy}>
+                      <Text style={styles.resultTitle}>{describeDay(selectedDateKey, todayKey)}</Text>
+                      <Text style={styles.resultRange}>
+                        {formatDateInput(selectedDateKey)}
+                        {records.length > 0 ? ` · 共 ${Math.round(dayCalories)} kcal` : ''}
+                      </Text>
                     </View>
-                  ) : null}
+                    <DataPill tone="info">{records.length} 筆</DataPill>
+                  </View>
 
                   {loading ? (
                     <RecordState loading icon="time-outline" title="正在讀取飲食紀錄" />
@@ -452,10 +460,10 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
                       icon="cloud-offline-outline"
                       title="無法載入飲食紀錄"
                       message={loadError}
-                      action={<PrimaryButton label="重新讀取" onPress={() => void runQuery(range)} icon={<Ionicons name="refresh" size={18} color={Palette.text.inverse} />} />}
+                      action={<PrimaryButton label="重新讀取" onPress={() => void loadRecords()} icon={<Ionicons name="refresh" size={18} color={Palette.text.inverse} />} />}
                     />
                   ) : records.length === 0 ? (
-                    <RecordState icon="receipt-outline" title="所選日期內沒有飲食紀錄" message="調整日期範圍後重新查詢。" />
+                    <RecordState icon="receipt-outline" title="這一天沒有飲食紀錄" message="用上方的箭頭換一天，或按「新增飲食紀錄」補上。" />
                   ) : (
                     <View style={styles.recordList}>
                       {records.map((record, index) => (
@@ -489,12 +497,23 @@ export default function DietaryRecordManager({ visible, onClose }: Props) {
   );
 }
 
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
+/** 「今天」「昨天」，其他日期顯示「11月3日（週一）」 */
+function describeDay(dateKey: string, todayKey: string): string {
+  if (dateKey === todayKey) return '今天';
+  if (dateKey === shiftDateKey(todayKey, -1)) return '昨天';
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const weekday = WEEKDAYS[new Date(year, month - 1, day).getDay()];
+  return `${month}月${day}日（週${weekday}）`;
+}
+
 function ManagerHeader({ onClose }: { onClose: () => void }) {
   return (
     <View style={styles.modalHeader}>
       <View style={styles.modalTitleWrap}>
         <Text style={styles.modalTitle}>飲食紀錄</Text>
-        <Text style={styles.modalSubtitle}>依日期查看吃過的餐點，也可以修改營養內容或刪除紀錄。</Text>
+        <Text style={styles.modalSubtitle}>一天一天查看吃過的餐點，也可以修改營養內容或刪除紀錄。</Text>
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel="關閉" onPress={onClose} style={styles.iconButton}>
         <Ionicons name="close" size={22} color={Palette.text.secondary} />
@@ -665,7 +684,7 @@ function RecordFoodFields({ title, draft, errors, foodIndex, disabled, isNarrow,
     <View style={styles.foodEditor}>
       <View style={styles.foodEditorHeader}>
         <Text style={styles.foodEditorTitle}>{title}</Text>
-        {draft.source ? <DataPill tone="info">{draft.source}</DataPill> : null}
+        {draft.source ? <DataPill tone="info">{formatFoodSourceLabel(draft.source)}</DataPill> : null}
       </View>
       <FormInput
         label="食物名稱"
@@ -826,13 +845,20 @@ const styles = StyleSheet.create({
   modalSubtitle: { ...Typography.caption, color: Palette.text.secondary },
   iconButton: { width: 44, height: 44, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
   scrollContent: { padding: Spacing.xl, paddingBottom: Spacing['3xl'] },
-  dateRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm, marginBottom: Spacing.xl },
-  stackRow: { flexDirection: 'column', alignItems: 'stretch' },
+  dayRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm, marginBottom: Spacing.md },
   dateField: { flex: 1, minWidth: 0 },
-  rangeSeparator: { ...Typography.bodyBold, color: Palette.text.tertiary, height: 48, textAlignVertical: 'center', paddingTop: 12 },
-  rangeSeparatorNarrow: { height: 18, paddingTop: 0, alignSelf: 'center' },
-  queryButton: { minWidth: 124 },
-  queryButtonStacked: { width: '100%' },
+  dayStepButton: {
+    width: 48,
+    height: 48,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    backgroundColor: Palette.bg.elevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayStepButtonDisabled: { opacity: 0.45 },
+  todayLinkRow: { alignItems: 'flex-start', marginBottom: Spacing.md },
   listToolbar: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: Spacing.lg },
   listToolbarNarrow: { alignItems: 'stretch' },
   createButtonWrap: { minWidth: 210 },

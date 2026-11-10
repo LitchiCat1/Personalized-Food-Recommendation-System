@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TextInput, Pressable, Linking, Modal, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Pressable, Linking, Modal, ScrollView } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
@@ -52,7 +52,6 @@ export default function RecommendScreen() {
   const addMealFromScan = useStore((state) => state.addMealFromScan);
   const invalidateDietaryRecords = useStore((state) => state.invalidateDietaryRecords);
 
-  const [budget, setBudget] = useState('150');
   const [radiusKm, setRadiusKm] = useState(3);
   const [category, setCategory] = useState('all');
   const [healthyLoading, setHealthyLoading] = useState(false);
@@ -117,7 +116,6 @@ export default function RecommendScreen() {
           restaurant_id: restaurant.restaurant_id,
           name: restaurant.name,
           address: restaurant.address,
-          budget: Number(budget) || 150,
           user_id: user.userId,
           lat: restaurant.lat,
           lng: restaurant.lng,
@@ -238,7 +236,7 @@ export default function RecommendScreen() {
       const result = await fetchHealthyFoodRecommendations(
         apiBaseUrl,
         user.userId,
-        { budget: Number(budget) || 150, lat, lng, radiusKm, category },
+        { lat, lng, radiusKm, category },
         { accessToken }
       );
       setHealthyData(result);
@@ -277,7 +275,7 @@ export default function RecommendScreen() {
       const result = await fetchRestaurantAiSummary(
         apiBaseUrl,
         user.userId,
-        { restaurant, budget: Number(budget) || 150, category },
+        { restaurant, category },
         { accessToken }
       );
       setSummaryByRestaurant((current: Record<string, RestaurantAiSummary>) => ({
@@ -303,7 +301,6 @@ export default function RecommendScreen() {
             restaurant_id: restaurant.restaurant_id,
             name: restaurant.name,
             address: restaurant.address,
-            budget: Number(budget) || 150,
             user_id: user.userId,
             lat: restaurant.lat,
             lng: restaurant.lng,
@@ -341,7 +338,7 @@ export default function RecommendScreen() {
           indexNearbyVenues(
             apiBaseUrl,
             user.userId,
-            { budget: Number(budget) || 150, lat: location.lat, lng: location.lng, radiusKm, category },
+            { lat: location.lat, lng: location.lng, radiusKm, category },
             // 一次建檔可能跑好幾分鐘，每一輪都拿最新的登入憑證，中途換發過也不會被擋
             { accessToken: useStore.getState().accessToken }
           ),
@@ -395,17 +392,7 @@ export default function RecommendScreen() {
       ) : null}
 
       <SectionBlock title="附近店家推薦" subtitle="Google Places 只提供真實店家位置；實際餐點營養仍建議用掃描確認。">
-            <Text style={styles.optionLabel}>本餐預算</Text>
-            <View style={styles.budgetRow}>
-              <TextInput
-                value={budget}
-                onChangeText={setBudget}
-                keyboardType="numeric"
-                placeholder="例如：150"
-                placeholderTextColor={Palette.text.muted}
-                accessibilityLabel="本餐預算（元）"
-                style={styles.budgetInput}
-              />
+            <View style={styles.searchRow}>
               <PrimaryButton
                 label={healthyLoading ? '搜尋中' : '更新地圖'}
                 onPress={handleHealthyFoodSearch}
@@ -771,7 +758,7 @@ function RestaurantCard({
         <View style={styles.aiSummaryBox}>
           <Text style={styles.itemName}>AI 推測：{summary.restaurant_type}</Text>
           <Text style={styles.restaurantMeta}>可能販售：{summary.likely_foods.join('、') || '不確定'}</Text>
-          <Text style={styles.restaurantMeta}>價格：約 {summary.price_range_twd.min}-{summary.price_range_twd.max} 元 · 預算：{summary.budget_fit}</Text>
+          <Text style={styles.restaurantMeta}>價格：約 {summary.price_range_twd.min}-{summary.price_range_twd.max} 元</Text>
           {(summary.recommended_foods || []).length ? (
             <View style={styles.personalizedRecommendations}>
               <View style={styles.personalizedTitleRow}>
@@ -864,7 +851,7 @@ const styles = StyleSheet.create({
   openingNoticeText: { ...Typography.small, color: Palette.text.secondary, flex: 1 },
   fakeDataWarning: {
     flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm,
-    backgroundColor: `${Palette.status.error}14`,
+    backgroundColor: Palette.status.errorDim,
     borderLeftWidth: 3, borderLeftColor: Palette.status.error,
     borderRadius: Radius.lg, padding: Spacing.md,
   },
@@ -876,18 +863,7 @@ const styles = StyleSheet.create({
   nutritionMini: { flex: 1, backgroundColor: Palette.bg.card, borderRadius: Radius.lg, padding: Spacing.sm },
   nutritionMiniLabel: { ...Typography.small, color: Palette.text.tertiary },
   nutritionMiniValue: { ...Typography.caption, ...Typography.number },
-  budgetRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center', marginBottom: Spacing.md },
-  budgetInput: {
-    flex: 1,
-    minHeight: 48,
-    backgroundColor: Palette.bg.elevated,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Palette.border.subtle,
-    color: Palette.text.primary,
-    paddingHorizontal: Spacing.md,
-    ...Typography.caption,
-  },
+  searchRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center', marginBottom: Spacing.md },
   optionLabel: { ...Typography.small, color: Palette.text.tertiary, marginTop: Spacing.md, marginBottom: Spacing.sm },
   categoryWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   categoryChip: {

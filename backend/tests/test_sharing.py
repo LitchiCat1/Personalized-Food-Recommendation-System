@@ -51,6 +51,33 @@ class FrontendServingTests(ApiTestBase):
         # nosniff 之下，腳本的類型一定要是 JavaScript，不然瀏覽器會拒絕執行
         self.assertIn("javascript", self.get("/_expo/static/js/entry-abc.js").headers["Content-Type"])
 
+    def test_big_scripts_are_gzipped_for_slow_outside_connections(self):
+        import gzip
+        body = b"console.log('nutrilens');\n" * 2000
+        with open(os.path.join(self.folder.name, "_expo", "static", "js", "entry-big.js"), "wb") as f:
+            f.write(body)
+        response = self.client.get("/_expo/static/js/entry-big.js", headers={"Accept-Encoding": "gzip, br"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Content-Encoding"], "gzip")
+        self.assertIn("Accept-Encoding", response.headers["Vary"])
+        self.assertIn("javascript", response.headers["Content-Type"])
+        self.assertIn("immutable", response.headers["Cache-Control"])
+        self.assertLess(int(response.headers["Content-Length"]), len(body) // 4)
+        self.assertTrue(gzip.decompress(response.data) == body)
+        # 帶回 ETag 還是能拿到 304
+        again = self.client.get("/_expo/static/js/entry-big.js", headers={
+            "Accept-Encoding": "gzip", "If-None-Match": response.headers["ETag"]})
+        self.assertEqual(again.status_code, 304)
+        again.close()
+        # 不支援 gzip 的客戶端拿原始檔；太小的檔案不壓
+        plain = self.get("/_expo/static/js/entry-big.js")
+        self.assertNotIn("Content-Encoding", plain.headers)
+        self.assertTrue(plain.data == body)
+        small = self.client.get("/_expo/static/js/entry-abc.js", headers={"Accept-Encoding": "gzip"})
+        small.get_data()
+        small.close()
+        self.assertNotIn("Content-Encoding", small.headers)
+
     def test_missing_files_and_escapes_are_not_served(self):
         self.assertEqual(self.get("/_expo/static/js/missing.js").status_code, 404)
         self.assertEqual(self.get("/logo.png").status_code, 404)

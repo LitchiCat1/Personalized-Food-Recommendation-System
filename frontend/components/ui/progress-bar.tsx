@@ -28,6 +28,18 @@ function formatAmount(value: number): string {
   return String(Math.round(safe));
 }
 
+function resolveTrackColor(color: string): string {
+  if (color === Palette.accent.green || color === Palette.status.success) return Palette.accent.greenDim;
+  if (color === Palette.accent.blue || color === Palette.status.info) return Palette.accent.blueDim;
+  if (color === Palette.accent.orange || color === Palette.status.warning) return Palette.accent.orangeDim;
+  if (color === Palette.accent.purple) return Palette.accent.purpleDim;
+  if (color === Palette.accent.pink) return Palette.accent.pinkDim;
+  if (color === Palette.accent.cyan) return Palette.accent.cyanDim;
+  if (color === Palette.status.error) return Palette.status.errorDim;
+  if (color.startsWith('#') && color.length === 7) return `${color}22`;
+  return Palette.bg.elevated;
+}
+
 export default function ProgressBar({ label, current, target, unit, color, attentionLabel, goalType }: Props) {
   const progress = target <= 0 ? (current > 0 ? 1 : 0) : Math.min(current / target, 1);
   // 目標為 0 的營養素（反式脂肪）只要吃到就是超標。
@@ -69,7 +81,7 @@ export default function ProgressBar({ label, current, target, unit, color, atten
           <Text style={styles.attentionText}>{attentionLabel}</Text>
         </View>
       ) : null}
-      <View style={[styles.track, { backgroundColor: `${color}22` }]}>
+      <View style={[styles.track, { backgroundColor: resolveTrackColor(color) }]}>
         <Animated.View style={[styles.fill, { backgroundColor: fillColor }, fillStyle]} />
       </View>
     </View>

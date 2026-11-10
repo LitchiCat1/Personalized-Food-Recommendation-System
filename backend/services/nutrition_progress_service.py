@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from services.app_time_service import app_today
-from services.profile_service import compute_bmr, resolve_energy_factor
+from services.profile_service import compute_bmr, compute_tdee, resolve_energy_factor, resolve_weight_goal_energy
 
 
 DEFAULT_DAILY_NUTRITION_TARGETS = {
@@ -174,6 +174,19 @@ def calculate_daily_targets_with_basis(user: dict) -> dict:
     kcal_per_kg = None
     weight_reduced = False
     floored_at_bmr = False
+    weight_goal = None
+    if not factor_candidates:
+        tdee = _number(user.get("tdee"), 0.0)
+        if tdee <= 0 and bmr > 0:
+            tdee = compute_tdee(bmr, activity_multiplier)
+        weight_goal = resolve_weight_goal_energy(
+            user.get("target_weight") or user.get("targetWeight"),
+            weight_kg,
+            height_cm,
+            tdee,
+            bmr,
+        )
+
     if factor_candidates:
         kcal_per_kg = min(factor_candidates)
         weight_reduced = kcal_per_kg < energy_factor
@@ -184,6 +197,12 @@ def calculate_daily_targets_with_basis(user: dict) -> dict:
             E = bmr
             floored_at_bmr = True
         target_source = "disease"
+    elif weight_goal:
+        # 有設目標體重就照它算；「每日熱量基準」只在沒設目標體重時採用。
+        # 疾病目標仍然優先：臨床指引的數字不因體重目標改變。
+        E = weight_goal["calories"]
+        floored_at_bmr = weight_goal["floored_at_bmr"]
+        target_source = "weight_goal"
     else:
         E = daily_calorie_target
         target_source = "user"
@@ -293,6 +312,12 @@ def calculate_daily_targets_with_basis(user: dict) -> dict:
         "is_overweight": is_overweight,
         # 過重不等於有減量：只有糖尿病／高血脂的係數勝出時才真的下調一級。
         "weight_reduced": weight_reduced,
+        # source 為 weight_goal 時才有：方向、TDEE、實際加減了多少。
+        "weight_goal": (
+            {key: value for key, value in weight_goal.items() if key != "calories"}
+            if target_source == "weight_goal"
+            else None
+        ),
     }
 
     return {"targets": targets, "basis": basis}

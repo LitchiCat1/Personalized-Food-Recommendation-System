@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import DataPill from '@/components/ui/data-pill';
 import type { MealEntry } from '@/constants/mock-data';
+import { formatMealEmojiSource } from '@/lib/dietary-records';
 import { perMealBudget } from '@/lib/meal';
 
 type Props = {
@@ -18,7 +19,7 @@ export default function MealCard({ meal, sodiumDailyTarget }: Props) {
   const sodiumMealBudget = perMealBudget(sodiumDailyTarget, 2000);
 
   return (
-    <Pressable style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
+    <View style={styles.card}>
       <View style={styles.timeRail}>
         <View style={[styles.dot, hasWarnings && styles.warningDot]} />
         <Text style={styles.time}>{meal.time}</Text>
@@ -29,7 +30,7 @@ export default function MealCard({ meal, sodiumDailyTarget }: Props) {
             <Text style={styles.name} numberOfLines={1}>{meal.name}</Text>
             <View style={styles.metaRow}>
               <DataPill tone={hasWarnings ? 'warning' : 'success'}>{meal.mealType}</DataPill>
-              <Text style={styles.source}>{meal.emoji} 來源紀錄</Text>
+              <Text style={styles.source}>{meal.emoji} {formatMealEmojiSource(meal.emoji)}</Text>
             </View>
           </View>
           <View style={styles.calorieBox}>
@@ -39,10 +40,10 @@ export default function MealCard({ meal, sodiumDailyTarget }: Props) {
         </View>
 
         <View style={styles.macroRow}>
-          <Text style={styles.macro}>P {meal.protein}g</Text>
-          <Text style={styles.macro}>C {meal.carbs}g</Text>
-          <Text style={styles.macro}>F {meal.fat}g</Text>
-          <Text style={[styles.macro, meal.sodium > sodiumMealBudget && styles.sodiumWarning]}>Na {meal.sodium}mg</Text>
+          <Text style={styles.macro}>蛋白質 {meal.protein}g</Text>
+          <Text style={styles.macro}>碳水 {meal.carbs}g</Text>
+          <Text style={styles.macro}>脂肪 {meal.fat}g</Text>
+          <Text style={[styles.macro, meal.sodium > sodiumMealBudget && styles.sodiumWarning]}>鈉 {meal.sodium}mg</Text>
         </View>
 
         {hasWarnings ? (
@@ -52,7 +53,7 @@ export default function MealCard({ meal, sodiumDailyTarget }: Props) {
           </View>
         ) : null}
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -67,13 +68,10 @@ const styles = StyleSheet.create({
     borderColor: Palette.border.subtle,
     ...Shadows.soft,
   },
-  cardPressed: {
-    backgroundColor: Palette.bg.cardHover,
-  },
   timeRail: { width: 58, alignItems: 'flex-start', gap: Spacing.sm },
   dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Palette.accent.green, marginTop: 4 },
   warningDot: { backgroundColor: Palette.status.warning },
-  time: { ...Typography.small, color: Palette.text.tertiary },
+  time: { ...Typography.small, ...Typography.number, color: Palette.text.tertiary },
   content: { flex: 1, gap: Spacing.md },
   header: { flexDirection: 'row', gap: Spacing.md, alignItems: 'flex-start' },
   nameWrap: { flex: 1, gap: Spacing.sm },
@@ -84,7 +82,7 @@ const styles = StyleSheet.create({
   calorieValue: { ...Typography.h3, ...Typography.number, color: Palette.text.primary },
   calorieUnit: { ...Typography.small, color: Palette.text.tertiary },
   macroRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  macro: { ...Typography.small, color: Palette.text.secondary, backgroundColor: Palette.bg.elevated, borderRadius: Radius.full, paddingHorizontal: Spacing.sm, paddingVertical: 3 },
+  macro: { ...Typography.small, ...Typography.number, color: Palette.text.secondary, backgroundColor: Palette.bg.elevated, borderRadius: Radius.full, paddingHorizontal: Spacing.sm, paddingVertical: 3 },
   sodiumWarning: { color: Palette.status.warning },
   warning: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, backgroundColor: Palette.accent.orangeDim, borderRadius: Radius.md, padding: Spacing.sm },
   warningText: { ...Typography.small, color: Palette.status.warning, flex: 1 },

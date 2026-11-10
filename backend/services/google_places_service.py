@@ -127,9 +127,9 @@ def clear_search_cache() -> None:
     _SEARCH_CACHE.clear()
 
 
-def _search_cache_key(lat: float, lng: float, radius_km: float, category: str, budget: int, limit: int) -> tuple:
+def _search_cache_key(lat: float, lng: float, radius_km: float, category: str, limit: int) -> tuple:
     # 座標取到小數第 3 位（約 100 公尺），走幾步不會重新計費
-    return (round(lat, 3), round(lng, 3), round(radius_km, 2), category or "all", budget, limit)
+    return (round(lat, 3), round(lng, 3), round(radius_km, 2), category or "all", limit)
 
 
 def _search_cache_get(key: tuple):
@@ -301,15 +301,13 @@ def venue_open_now(periods: list, now=None):
     return venue_open_at(periods, now.isoweekday() % 7, now.hour * 60 + now.minute)
 
 
-def _score_place(distance_km: float, rating, user_ratings_total, is_open, budget: int, price_level) -> int:
+def _score_place(distance_km: float, rating, user_ratings_total, is_open) -> int:
     distance_score = max(0, 42 - int(distance_km * 8))
     rating_score = int(float(rating or 0) * 8)
     popularity_score = min(12, int((int(user_ratings_total or 0) ** 0.5) / 2))
     # 只有「確定營業中」才加分；不知道營業時間的店不該贏過確定有開的店
     open_bonus = 12 if is_open is True else 0
-    estimated_price = _price_estimate(price_level)
-    budget_score = 10 if estimated_price is None or estimated_price <= budget else -8
-    return max(1, min(99, distance_score + rating_score + popularity_score + open_bonus + budget_score))
+    return max(1, min(99, distance_score + rating_score + popularity_score + open_bonus))
 
 
 def _fetch_new_places_api(lat: float, lng: float, radius_m: float, key: str, max_results: int = 20) -> list[dict]:
@@ -393,8 +391,8 @@ def _fetch_new_places_api(lat: float, lng: float, radius_m: float, key: str, max
     return []
 
 
-def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, category: str, budget: int, limit: int = 12) -> list[dict]:
-    cache_key = _search_cache_key(lat, lng, radius_km, category, budget, limit)
+def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, category: str, limit: int = 12) -> list[dict]:
+    cache_key = _search_cache_key(lat, lng, radius_km, category, limit)
     cached = _search_cache_get(cache_key)
     if cached is not None:
         print(f"[places] 命中快取，未送出計費請求 ({cache_key})")
@@ -475,7 +473,7 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
         rating = place.get("rating")
         user_ratings_total = place.get("user_ratings_total")
         price_level = place.get("price_level")
-        score = _score_place(distance_km, rating, user_ratings_total, is_open, budget, price_level)
+        score = _score_place(distance_km, rating, user_ratings_total, is_open)
         place_id = place.get("place_id") or place.get("name") or str(len(candidates))
         name = place.get("name") or "附近餐廳"
 
@@ -488,8 +486,8 @@ def fetch_google_places_restaurants(lat: float, lng: float, radius_km: float, ca
             "distance_km": round(distance_km, 2),
             "tags": ["Google Places", "真實店家", "營養待確認"],
             "item_id": f"google_{place_id}_visit",
-            "item_name": "到店後選擇符合預算的餐點",
-            "price": _price_estimate(price_level) or budget,
+            "item_name": "到店後選擇適合的餐點",
+            "price": _price_estimate(price_level) or 0,
             "calories": 0,
             "protein": 0,
             "carbs": 0,

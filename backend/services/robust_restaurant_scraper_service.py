@@ -19,6 +19,16 @@ from services.nutrition_label_service import (
     is_forbidden_gemini_model,
     remember_forbidden_gemini_model,
 )
+from services.openai_service import (
+    OPENAI_CHAT_URL,
+    OPENAI_NO_CREDIT_CODES,
+    get_openai_api_key,
+    get_openai_models,
+    openai_chat_payload,
+    openai_error,
+    openai_headers,
+    openai_response_text,
+)
 
 # Modern User-Agents to prevent anti-bot blocking
 USER_AGENTS = [
@@ -250,10 +260,61 @@ def validate_and_balance_nutrition(item: dict) -> dict:
 
 
 MENU_GENERATION_TIMEOUT_SECONDS = 30
+# 照片要辨識的品項多、輸出長，給 ChatGPT 比文字菜單多一點時間
+MENU_PHOTO_OPENAI_TIMEOUT_SECONDS = 45
+
+
+def _ask_openai_for_menu(prompt: str, api_key: str, restaurant_name: str, deadline: float | None) -> dict:
+    """Gemini 沒問到菜單時改問 ChatGPT。
+
+    回 {"items": [...]}，或 {"outcome": ...}：
+    - empty：模型說看不出這家店賣什麼
+    - rate_limited：429，限流或帳戶餘額用完（OPENAI_NO_CREDIT_CODES）
+    - unavailable：金鑰無效，或沒有任何模型能用（全部 404）
+    - inconclusive：逾時或出錯，沒問完
+    - out_of_budget：呼叫端給的時間用完了
+    """
+    outcome = "unavailable"
+    for model_name in get_openai_models():
+        if deadline is not None and time.monotonic() >= deadline:
+            return {"outcome": "out_of_budget"}
+        try:
+            res = requests.post(
+                OPENAI_CHAT_URL,
+                headers=openai_headers(api_key),
+                json=openai_chat_payload(model_name, prompt, 1500),
+                timeout=MENU_GENERATION_TIMEOUT_SECONDS,
+            )
+            if res.status_code == 200:
+                text, _finish_reason = openai_response_text(res.json())
+                items = extract_json_items(text) if text else []
+                if items:
+                    print(f"[Scraper] Successfully generated menu using ChatGPT model: {model_name}")
+                    return {"items": items}
+                print(f"[!] {restaurant_name}: ChatGPT {model_name} 回了空菜單")
+                return {"outcome": "empty"}
+            code, message = openai_error(res)
+            if res.status_code == 429:
+                print(f"[!] ChatGPT 429（{code or 'rate_limited'}）：{message[:160]}")
+                return {"outcome": "rate_limited"}
+            if res.status_code in (401, 403):
+                print(f"[!] ChatGPT 金鑰無效或沒有權限（HTTP {res.status_code}）：{message[:160]}")
+                return {"outcome": "unavailable"}
+            # 404 = 帳號沒有這個模型，換下一個
+            print(f"[!] ChatGPT {model_name} status {res.status_code}: {message[:160]}")
+            if res.status_code != 404:
+                outcome = "inconclusive"
+        except requests.Timeout:
+            print(f"[!] ChatGPT {model_name} 逾時 {MENU_GENERATION_TIMEOUT_SECONDS}s，換下一個模型")
+            outcome = "inconclusive"
+        except Exception as e:
+            print(_describe_failure(e, f"ChatGPT {model_name}"))
+            outcome = "inconclusive"
+    return {"outcome": outcome}
 
 
 def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_text: str = "", deadline: float | None = None) -> dict:
-    """請 Gemini 估這家店的幾道菜。
+    """請 ChatGPT／Gemini 估這家店的幾道菜。
 
     回傳 {"items": [...]}；拿不到菜單時多帶 "failure"，讓建檔端決定要不要把
     這家店記下來、多久內別再問：
@@ -262,9 +323,12 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
     - rate_limited：金鑰額度用完（429），還有模型沒問到
     - out_of_budget：呼叫端給的時間用完了
     - unavailable：沒有任何模型能用（沒設金鑰，或全部 404）
+
+    有設 OPENAI_API_KEY 時先問 ChatGPT，它沒給出菜單才換 Gemini 的金鑰與模型。
     """
     keys = get_gemini_api_keys()
-    if not keys:
+    openai_key = get_openai_api_key()
+    if not keys and not openai_key:
         print("[!] No Gemini API key found for scraper - using realistic templates")
         fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
         return {"items": fallback_items} if fallback_items else {"items": [], "failure": "unavailable"}
@@ -301,6 +365,16 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
     answered_empty_models = set()
     out_of_budget = False
     rate_limited = False
+
+    # 有設 ChatGPT 就先問它；它沒給出菜單（出錯、額度用完或說看不出來）才輪到 Gemini
+    openai_outcome = None
+    if openai_key:
+        asked = _ask_openai_for_menu(prompt, openai_key, restaurant_name, deadline)
+        if asked.get("items"):
+            return {"items": [validate_and_balance_nutrition(item) for item in asked["items"]]}
+        openai_outcome = asked["outcome"]
+        out_of_budget = openai_outcome == "out_of_budget"
+
     for gemini_key in keys:
         if out_of_budget:
             break
@@ -360,8 +434,9 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
         model for model in candidate_models
         if all(is_forbidden_gemini_model(key, model) for key in keys)
     }
-    if never_allowed:
+    if keys and never_allowed:
         print(f"[!] 沒有任何一把金鑰有權限的模型（404）：{sorted(never_allowed)}。可用 GEMINI_MODELS 指定其他模型。")
+
     fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
     if fallback_items:
         return {"items": fallback_items}
@@ -369,6 +444,13 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
     # 只有「每個能用的模型都說看不出來」才算這家店問不出菜單；
     # 有模型因為時間、額度或錯誤沒回答到，就不能怪到店家頭上。
     judgeable_models = set(candidate_models) - never_allowed
+    # ChatGPT 也算一個能回答的模型；金鑰無效或沒有模型能用時，跟 404 一樣不算
+    if openai_outcome in {"empty", "rate_limited", "inconclusive"}:
+        judgeable_models.add("chatgpt")
+        if openai_outcome == "empty":
+            answered_empty_models.add("chatgpt")
+        elif openai_outcome == "rate_limited":
+            rate_limited = True
     if out_of_budget:
         failure = "out_of_budget"
     elif answered_empty_models and judgeable_models <= answered_empty_models:
@@ -434,12 +516,17 @@ def _extract_menu_items_from_response(body: dict) -> tuple[list[dict], str | Non
     response_text = "\n".join(
         part.get("text", "") for part in parts if isinstance(part, dict) and isinstance(part.get("text"), str)
     ).strip()
+    return _menu_items_from_text(response_text), finish_reason
+
+
+def _menu_items_from_text(response_text: str) -> list[dict]:
+    """把模型回的菜單文字轉成品項；Gemini 與 ChatGPT 共用。"""
     if not response_text:
-        return [], finish_reason
+        return []
 
     try:
         items = extract_json_items(response_text)
-        return _normalize_menu_items(items), finish_reason
+        return _normalize_menu_items(items)
     except (AttributeError, TypeError, ValueError, KeyError):
         # A dense menu can hit the output limit after several complete rows.
         # Recover those rows instead of throwing away the usable prefix.
@@ -454,7 +541,7 @@ def _extract_menu_items_from_response(body: dict) -> tuple[list[dict], str | Non
             ):
                 recovered.append(parsed_object)
         if recovered:
-            return _normalize_menu_items(recovered), finish_reason
+            return _normalize_menu_items(recovered)
 
         pattern = re.compile(
             r"[\"'](?:name|item_name|dish_name)[\"']\s*:\s*[\"']([^\"']+)[\"']"
@@ -462,11 +549,53 @@ def _extract_menu_items_from_response(body: dict) -> tuple[list[dict], str | Non
         )
         for index, match in enumerate(pattern.finditer(response_text)):
             recovered.append({"item_id": f"menu_{index + 1:03d}", "name": match.group(1), "price": int(match.group(2))})
-        return _normalize_menu_items(recovered), finish_reason
+        return _normalize_menu_items(recovered)
+
+
+def _read_menu_photo_with_openai(prompt: str, image_base64: str, image_mime_type: str, api_key: str) -> dict:
+    """用 ChatGPT 辨識菜單照片。回 {"items", "model"}，失敗時回 {"error": 給使用者看的原因}。"""
+    error = "ChatGPT 未回傳可用的菜單品項"
+    for model_name in get_openai_models():
+        try:
+            res = requests.post(
+                OPENAI_CHAT_URL,
+                headers=openai_headers(api_key),
+                json=openai_chat_payload(model_name, prompt, 8192, image_base64, image_mime_type),
+                timeout=MENU_PHOTO_OPENAI_TIMEOUT_SECONDS,
+            )
+            if res.status_code == 200:
+                text, finish_reason = openai_response_text(res.json())
+                items = _menu_items_from_text(text)
+                if items:
+                    print(f"[Scraper] Successfully parsed menu photo using ChatGPT model: {model_name}, {len(items)} items")
+                    return {"items": items, "model": model_name}
+                error = f"ChatGPT 回傳 0 個品項（finish_reason={finish_reason or 'unknown'}）"
+                print(f"[!] ChatGPT Vision {model_name} returned zero items (finish_reason={finish_reason}), trying next model...")
+                continue
+            code, message = openai_error(res)
+            print(f"[!] ChatGPT Vision {model_name} status {res.status_code}: {message[:180]}")
+            # 額度與金鑰是帳號層級的，換模型也一樣
+            if res.status_code == 429:
+                if code in OPENAI_NO_CREDIT_CODES:
+                    return {"error": "ChatGPT 帳戶餘額不足，請到 OpenAI 儲值。"}
+                return {"error": "ChatGPT 使用額度已達上限，請稍後再試。"}
+            if res.status_code in (401, 403):
+                return {"error": "ChatGPT API key 無效或沒有權限，請檢查 OPENAI_API_KEY。"}
+            if res.status_code == 404:
+                error = f"ChatGPT 模型 {model_name} 無法使用，可用 OPENAI_MODELS 指定其他模型。"
+            else:
+                error = f"ChatGPT 暫時無法辨識菜單（HTTP {res.status_code}）。"
+        except Exception as e:
+            error = "ChatGPT 連線失敗，請稍後再試。"
+            print(_describe_failure(e, f"ChatGPT Vision model {model_name}"))
+    return {"error": error}
 
 
 def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐廳") -> dict:
-    """Use Gemini Vision to OCR a menu photo, returning status details for the UI."""
+    """辨識菜單照片，回傳品項與給畫面用的狀態。
+
+    有設 OPENAI_API_KEY 時先問 ChatGPT，它沒辨識出品項才換 Gemini Vision。
+    """
     if not image_base64:
         return {"items": [], "recognition_status": "error", "recognition_error": "缺少菜單圖片"}
 
@@ -477,7 +606,8 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
         return {"items": [], "recognition_status": "error", "recognition_error": str(e)}
 
     keys = get_gemini_api_keys()
-    if not keys:
+    openai_key = get_openai_api_key()
+    if not keys and not openai_key:
         print("[!] No Gemini API key found for menu image parsing")
         return {
             "items": [],
@@ -520,6 +650,18 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
       ]
     }}
     """
+    # 有設 ChatGPT 就先問它；沒辨識出品項才輪到 Gemini
+    openai_failure = None
+    if openai_key:
+        asked = _read_menu_photo_with_openai(prompt, image_base64, image_mime_type, openai_key)
+        if asked.get("items"):
+            return {
+                "items": [validate_and_balance_nutrition(item) for item in asked["items"]],
+                "recognition_status": "recognized",
+                "recognition_model": asked["model"],
+            }
+        openai_failure = asked["error"]
+
     candidate_models = get_gemini_models()
     # 最近回過 404 的（金鑰, 模型）直接跳過，記憶由各功能共用
     usable_pairs = set(gemini_key_model_pairs(keys, candidate_models))
@@ -579,5 +721,10 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
                 last_error = "Gemini Vision 連線失敗，請稍後再試。"
                 print(_describe_failure(e, f"Gemini Vision model {model_name}"))
 
+    if not keys:
+        last_error = openai_failure
+    elif openai_failure:
+        # 兩邊都問過了，兩邊失敗的原因都讓使用者看到
+        last_error = f"{openai_failure}；{last_error}"
     return {"items": [], "recognition_status": "error", "recognition_error": last_error}
 

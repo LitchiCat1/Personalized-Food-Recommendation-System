@@ -8,8 +8,11 @@ import {
   createRecordFoodDrafts,
   filterAndSortRecords,
   formatDateInput,
+  formatFoodSourceLabel,
+  formatMealEmojiSource,
   getDefaultRecordDateRange,
   parseDateInput,
+  shiftDateKey,
   validateRecordDate,
   validateRecordDateRange,
   validateRecordFoodDrafts,
@@ -52,6 +55,15 @@ test('builds a seven-day default range across a year boundary', () => {
     startDate: '2025/12/28',
     endDate: '2026/01/03',
   });
+});
+
+test('steps one calendar day at a time across month, year and leap-day boundaries', () => {
+  assert.equal(shiftDateKey('2026-11-05', -1), '2026-11-04');
+  assert.equal(shiftDateKey('2026-11-05', 1), '2026-11-06');
+  assert.equal(shiftDateKey('2026-03-01', -1), '2026-02-28');
+  assert.equal(shiftDateKey('2028-03-01', -1), '2028-02-29');
+  assert.equal(shiftDateKey('2026-01-01', -1), '2025-12-31');
+  assert.equal(shiftDateKey('2025-12-31', 1), '2026-01-01');
 });
 
 test('formats date picker values and validates today, past, future and leap dates', () => {
@@ -155,4 +167,15 @@ test('keeps draft content while reporting blank names, missing values and negati
   assert.equal(validation.errors['foods.0.calories'], '熱量為必填');
   assert.equal(validation.errors['foods.0.sodium'], '鈉 (Sodium)需為 0 或正數');
   assert.equal(drafts[0].name, '   ');
+});
+
+test('formats internal food source codes and meal emojis into Chinese labels', () => {
+  assert.equal(formatFoodSourceLabel('manual'), '手動紀錄');
+  assert.equal(formatFoodSourceLabel('camera'), '拍照辨識');
+  assert.equal(formatFoodSourceLabel('TFDA-search'), 'TFDA 資料庫');
+  assert.equal(formatFoodSourceLabel('nutrition-label-ocr'), '營養標示');
+  assert.equal(formatFoodSourceLabel('custom-food'), '自訂食品');
+  assert.equal(formatMealEmojiSource('📸'), '拍照辨識');
+  assert.equal(formatMealEmojiSource('🔎'), '手動搜尋');
+  assert.equal(formatMealEmojiSource('🏷️'), '營養標示');
 });

@@ -224,12 +224,11 @@ class ApiRouteTests(ApiTestBase):
         self.assertIn("429", data["menu_recognition"]["recognition_error"])
 
     def test_menu_route_blocks_a_dish_the_disease_rules_reject(self):
-        """/restaurant/menu 必須真的擋掉疾病禁忌，不是只擋超出預算的。
+        """/restaurant/menu 必須真的擋掉疾病禁忌。
 
         先前這裡判斷的是 medical_risk.get("action") == "BLOCK"，
         但 evaluate_medical_risk 沒有 action 這個鍵，所以恆為 False：
-        一份 1500mg 鈉的炸雞排會被放進推薦區，旁邊還寫「判定依據：
-        符合單餐預算」，而算好的 block_reasons 整個被丟掉。
+        一份 1500mg 鈉的炸雞排會被放進推薦區，而算好的 block_reasons 整個被丟掉。
         user-a 在 setUp 裡就有高血壓。
         """
         parsed = {
@@ -237,7 +236,7 @@ class ApiRouteTests(ApiTestBase):
                 {
                     "item_id": "salty",
                     "name": "炸雞排便當",
-                    "price": 100,          # 預算內，所以只有疾病規則能擋它
+                    "price": 100,
                     "calories": 700,
                     "protein": 30,
                     "carbs": 60,
@@ -279,7 +278,6 @@ class ApiRouteTests(ApiTestBase):
                     "restaurant_id": "sodium-test",
                     "name": "重鹹便當店",
                     "user_id": "user-a",
-                    "budget": 150,
                 },
                 headers=self.auth_headers(),
             )
@@ -299,6 +297,87 @@ class ApiRouteTests(ApiTestBase):
             any("鈉" in reason for reason in blocked["reasons"]),
             f"理由裡沒有提到鈉：{blocked['reasons']}",
         )
+
+    MENU_PHOTO_ITEMS = [
+        {"item_id": "salty", "name": "炸雞排便當", "price": 100, "calories": 700, "protein": 30, "carbs": 60,
+         "fat": 30, "sugar": 3, "saturated_fat": 8, "trans_fat": 2.0, "fiber": 3, "sodium": 1500, "is_fried": True},
+        {"item_id": "mild", "name": "清蒸雞肉飯", "price": 100, "calories": 500, "protein": 25, "carbs": 55,
+         "fat": 10, "sugar": 2, "saturated_fat": 3, "trans_fat": 0, "fiber": 5, "sodium": 400, "is_fried": False},
+        # 很貴但健康：預算拿掉之後不能因為價格被排除
+        {"item_id": "pricey", "name": "清蒸鱸魚套餐", "price": 2000, "calories": 480, "protein": 32, "carbs": 45,
+         "fat": 12, "sugar": 2, "saturated_fat": 2, "trans_fat": 0, "fiber": 4, "sodium": 380, "is_fried": False},
+    ]
+
+    def post_menu_photo(self, parsed, payload=None):
+        image_base64 = base64.b64encode(b"\x89PNG\r\n\x1a\nmenu-image").decode("ascii")
+        with self.mock_auth("user-a"):
+            with patch.object(self.app_module, "parse_menu_image_with_gemini", return_value=parsed) as parse:
+                response = self.client.post(
+                    "/menu/photo-check",
+                    json=payload if payload is not None else {"user_id": "user-a", "menu_image": image_base64},
+                    headers=self.auth_headers(),
+                )
+        return response, parse
+
+    def test_menu_photo_check_sorts_every_dish_by_whether_it_can_be_eaten(self):
+        response, _ = self.post_menu_photo({"items": self.MENU_PHOTO_ITEMS, "recognition_status": "recognized"})
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        edible = [item["item_name"] for item in data["safe_items"] + data["caution_items"]]
+        blocked = {item["item_name"]: item["reasons"] for item in data["not_recommended_items"]}
+        # user-a 有高血壓：1500mg 鈉的炸雞排要擋，而且要說出原因
+        self.assertIn("炸雞排便當", blocked)
+        self.assertTrue(any("鈉" in reason for reason in blocked["炸雞排便當"]))
+        self.assertIn("清蒸雞肉飯", edible)
+        # 價格不再是排除條件
+        self.assertIn("清蒸鱸魚套餐", edible)
+        self.assertFalse(any("預算" in reason for reasons in blocked.values() for reason in reasons))
+        self.assertEqual(data["total_items"], 3)
+        self.assertIn("僅供參考", data["disclaimer"])
+        for item in data["caution_items"]:
+            self.assertTrue(item["medical_risk"]["has_caution"])
+        for item in data["safe_items"]:
+            self.assertFalse(item["medical_risk"]["has_caution"])
+
+    def test_menu_photo_check_lists_all_dishes_not_only_the_top_five(self):
+        items = [
+            {**self.MENU_PHOTO_ITEMS[1], "item_id": f"mild-{index}", "name": f"清蒸雞肉飯{index}"}
+            for index in range(8)
+        ]
+        response, _ = self.post_menu_photo({"items": items, "recognition_status": "recognized"})
+        data = response.get_json()
+        self.assertEqual(len(data["safe_items"]) + len(data["caution_items"]), 8)
+
+    def test_menu_photo_check_reports_a_recognition_failure(self):
+        response, _ = self.post_menu_photo({
+            "items": [], "recognition_status": "error", "recognition_error": "Gemini HTTP 429: quota exceeded",
+        })
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("429", response.get_json()["error"])
+
+    def test_menu_photo_check_needs_a_photo(self):
+        response, parse = self.post_menu_photo({"items": []}, payload={"user_id": "user-a"})
+        self.assertEqual(response.status_code, 400)
+        parse.assert_not_called()
+
+    def test_menu_photo_check_needs_a_login(self):
+        response = self.client.post("/menu/photo-check", json={"menu_image": "abc"})
+        self.assertEqual(response.status_code, 401)
+
+    def test_restaurant_menu_no_longer_filters_by_price(self):
+        self.app_module.storage.save_restaurant_menu(
+            "高價清淡店", self.MENU_PHOTO_ITEMS[1:], venue={"address": "台北市", "lat": 25.03, "lng": 121.56}
+        )
+        with self.mock_auth("user-a"):
+            response = self.client.post(
+                "/restaurant/menu",
+                json={"restaurant_id": "pricey-test", "name": "高價清淡店", "user_id": "user-a"},
+                headers=self.auth_headers(),
+            )
+        data = response.get_json()
+        self.assertIn("清蒸鱸魚套餐", [item["item_name"] for item in data["recommended_items"]])
+        self.assertEqual(data["filtered_items"], [])
 
     def test_record_route_deduplicates_client_record_id(self):
         payload = {
@@ -715,7 +794,7 @@ class ApiRouteTests(ApiTestBase):
     def test_map_food_recommend_requires_google_places_key(self):
         with patch.dict(os.environ, {"GOOGLE_PLACES_API_KEY": "", "GOOGLE_MAPS_API_KEY": ""}, clear=False):
             with self.mock_auth("user-a"):
-                response = self.client.get("/map-food-recommend/user-a?budget=150&lat=24.9890&lng=121.3443&radius_km=3&category=all", headers=self.auth_headers())
+                response = self.client.get("/map-food-recommend/user-a?lat=24.9890&lng=121.3443&radius_km=3&category=all", headers=self.auth_headers())
         self.assertEqual(response.status_code, 503)
 
     def test_health_metadata_in_map_food_route(self):
@@ -759,7 +838,7 @@ class ApiRouteTests(ApiTestBase):
 
         with self.mock_auth("user-a"):
             with patch("services.healthy_food_service.fetch_google_places_restaurants", return_value=fake_restaurants):
-                response = self.client.get("/map-food-recommend/user-a?budget=150&lat=24.9890&lng=121.3443&radius_km=3&category=all", headers=self.auth_headers())
+                response = self.client.get("/map-food-recommend/user-a?lat=24.9890&lng=121.3443&radius_km=3&category=all", headers=self.auth_headers())
 
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
@@ -793,7 +872,6 @@ class ApiRouteTests(ApiTestBase):
             "likely_foods": ["便當"],
             "recommended_foods": [{"name": "少醬蔬菜餐", "reason": "鈉已超標"}],
             "price_range_twd": {"min": 100, "max": 150},
-            "budget_fit": "適合",
             "health_tips": ["醬汁另外放"],
             "confidence": "medium",
             "source_note": "test",
@@ -803,16 +881,17 @@ class ApiRouteTests(ApiTestBase):
             with patch.object(self.app_module, "build_restaurant_ai_summary", return_value=fake_summary) as build_summary:
                 response = self.client.post(
                     "/map-food-recommend/user-a/restaurant-summary",
-                    json={"restaurant": {"name": "Healthy Bento"}, "budget": 150, "category": "bento"},
+                    json={"restaurant": {"name": "Healthy Bento"}, "category": "bento"},
                     headers=self.auth_headers(),
                 )
 
         self.assertEqual(response.status_code, 200)
         args = build_summary.call_args.args
-        self.assertEqual(args[3], ["hypertension"])
-        self.assertEqual(args[4]["status"]["sodium"], "over")
-        self.assertEqual(args[4]["over_by"]["sodium"], 300)
-        self.assertIn("hypertension", args[5])
+        self.assertEqual(args[1], "bento")
+        self.assertEqual(args[2], ["hypertension"])
+        self.assertEqual(args[3]["status"]["sodium"], "over")
+        self.assertEqual(args[3]["over_by"]["sodium"], 300)
+        self.assertIn("hypertension", args[4])
 
 
 if __name__ == "__main__":
@@ -898,7 +977,7 @@ class PaidRouteRateLimitTests(ApiTestBase):
     def test_the_nearby_store_search_is_rate_limited(self):
         with patch("services.healthy_food_service.fetch_google_places_restaurants", return_value=[]):
             self._three_calls(lambda: self.client.get(
-                "/map-food-recommend/user-a?budget=150&lat=24.9890&lng=121.3443&radius_km=3&category=all",
+                "/map-food-recommend/user-a?lat=24.9890&lng=121.3443&radius_km=3&category=all",
                 headers=self.auth_headers(),
             ))
 
@@ -906,7 +985,7 @@ class PaidRouteRateLimitTests(ApiTestBase):
         with patch.object(self.app_module, "build_restaurant_ai_summary", return_value={"restaurant_type": "便當店"}):
             self._three_calls(lambda: self.client.post(
                 "/map-food-recommend/user-a/restaurant-summary",
-                json={"restaurant": {"name": "Healthy Bento"}, "budget": 150},
+                json={"restaurant": {"name": "Healthy Bento"}},
                 headers=self.auth_headers(),
             ))
 
@@ -969,16 +1048,6 @@ class JsonErrorTests(ApiTestBase):
                     response = self.client.get(path, headers=self.auth_headers())
                     self.assertEqual(response.status_code, 400)
                     self.assertIn("有效數字", response.get_json()["error"])
-
-    def test_a_non_numeric_budget_is_a_400(self):
-        with self.mock_auth("user-a"):
-            response = self.client.post(
-                "/restaurant/menu",
-                json={"name": "測試店", "user_id": "user-a", "budget": "abc"},
-                headers=self.auth_headers(),
-            )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("budget", response.get_json()["error"])
 
     def test_a_non_text_store_name_or_address_is_a_400(self):
         with self.mock_auth("user-a"):
@@ -1140,7 +1209,7 @@ class ExternalApiFailureTests(ApiTestBase):
              patch("requests.post", side_effect=requests.Timeout("read timed out")):
             response = self.client.post(
                 "/map-food-recommend/user-a/restaurant-summary",
-                json={"restaurant": {"name": "Healthy Bento"}, "budget": 150},
+                json={"restaurant": {"name": "Healthy Bento"}},
                 headers=self.auth_headers(),
             )
         self.assertEqual(response.status_code, 502)
@@ -1152,7 +1221,7 @@ class ExternalApiFailureTests(ApiTestBase):
              patch("services.google_places_service.requests.post", side_effect=post), \
              patch("services.google_places_service.requests.get", side_effect=get):
             return self.client.get(
-                "/map-food-recommend/user-a?budget=150&lat=24.9890&lng=121.3443&radius_km=3&category=all",
+                "/map-food-recommend/user-a?lat=24.9890&lng=121.3443&radius_km=3&category=all",
                 headers=self.auth_headers(),
             )
 

@@ -88,13 +88,13 @@ class GooglePlacesServiceTests(unittest.TestCase):
         mock_new.return_value = [new_places_api_place()]
 
         for _ in range(5):
-            fetch_google_places_restaurants(25.0338, 121.5645, 3, "all", 150, limit=6)
+            fetch_google_places_restaurants(25.0338, 121.5645, 3, "all", limit=6)
         self.assertEqual(mock_new.call_count, 1)
 
-        fetch_google_places_restaurants(25.0338, 121.5645, 5, "all", 150, limit=6)  # 換半徑
+        fetch_google_places_restaurants(25.0338, 121.5645, 5, "all", limit=6)  # 換半徑
         self.assertEqual(mock_new.call_count, 2)
 
-        fetch_google_places_restaurants(25.0500, 121.5645, 3, "all", 150, limit=6)  # 移動位置
+        fetch_google_places_restaurants(25.0500, 121.5645, 3, "all", limit=6)  # 移動位置
         self.assertEqual(mock_new.call_count, 3)
 
     @patch.dict(os.environ, {"GOOGLE_PLACES_API_KEY": "test-key", "GOOGLE_MAPS_API_KEY": ""}, clear=False)
@@ -106,7 +106,7 @@ class GooglePlacesServiceTests(unittest.TestCase):
             FakeResponse(200, {"status": "OK", "result": {"website": "https://bento.example/menu", "url": "https://maps.google.com/?cid=123"}}),
         ]
 
-        restaurants = fetch_google_places_restaurants(25.0338, 121.5645, 3, "all", 150)
+        restaurants = fetch_google_places_restaurants(25.0338, 121.5645, 3, "all")
 
         self.assertEqual(restaurants[0]["official_website_url"], "https://bento.example/menu")
         self.assertEqual(restaurants[0]["google_maps_url"], "https://maps.google.com/?cid=123")
@@ -121,7 +121,7 @@ class GooglePlacesServiceTests(unittest.TestCase):
             FakeResponse(200, {"status": "REQUEST_DENIED", "result": {}}),
         ]
 
-        restaurants = fetch_google_places_restaurants(25.0338, 121.5645, 3, "all", 150)
+        restaurants = fetch_google_places_restaurants(25.0338, 121.5645, 3, "all")
 
         self.assertEqual(len(restaurants), 1)
         self.assertNotIn("menu_link", restaurants[0])
@@ -142,7 +142,7 @@ class BusinessStatusTests(unittest.TestCase):
     def _search(self, places):
         with patch("services.google_places_service.requests.post",
                    return_value=FakeResponse(200, {"places": places})):
-            return fetch_google_places_restaurants(25.0338, 121.5645, 3, "all", 150, limit=10)
+            return fetch_google_places_restaurants(25.0338, 121.5645, 3, "all", limit=10)
 
     @staticmethod
     def _v1_place(place_id, name, *, status="OPERATIONAL", open_now=None):
@@ -232,7 +232,7 @@ class SearchRadiusTests(unittest.TestCase):
         }
 
     def _search(self, radius_km=3):
-        return fetch_google_places_restaurants(*self.TAROKO, radius_km, "all", 150, limit=10)
+        return fetch_google_places_restaurants(*self.TAROKO, radius_km, "all", limit=10)
 
     @patch("services.google_places_service.requests.get")
     @patch("services.google_places_service.requests.post")

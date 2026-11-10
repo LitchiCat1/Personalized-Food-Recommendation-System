@@ -3,6 +3,7 @@ NutriLens Backend — Flask API
 PRD-aligned: Gemini Vision food recognition + nutrition analysis + user management
 """
 
+import gzip
 import hmac
 import ipaddress
 import json
@@ -592,6 +593,8 @@ def health():
         "disease_rule_review_status": build_disease_rules_response(DISEASE_RULES)["review_status_counts"],
         "restaurants": len(RESTAURANT_CATALOG),
         "places_enabled": bool(os.environ.get("GOOGLE_PLACES_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY")),
+        # 菜單分析先問 ChatGPT、失敗才換 Gemini；沒設就只用 Gemini
+        "openai_enabled": bool((os.environ.get("OPENAI_API_KEY") or "").strip()),
         "auth_required": is_auth_required(),
         "auth_provider": f"local-{sql_db.dialect}" if auth_repo.use_sql else "local-memory",
         "custom_foods": storage.count_custom_foods(),
@@ -1032,10 +1035,9 @@ def delete_record(user_id, client_record_id):
     return jsonify({"message": "飲食紀錄已刪除", "record": deleted})
 
 
-# ─── 3.5 一週測試資料（我的 → 開發者工具） ──────────────────
+# ─── 3.5 附近店家菜單建檔（我的 → 附近店家菜單） ──────────────
 def _venue_search_params(data: dict) -> dict:
     return {
-        "budget": data.get("budget", 150),
         "lat": data.get("lat", 25.0338),
         "lng": data.get("lng", 121.5645),
         "radius_km": data.get("radius_km", 3),
@@ -1131,7 +1133,6 @@ def get_history(user_id):
 def healthy_food_recommend(user_id):
     require_user_access(user_id)
     params = {
-        "budget": request.args.get("budget", 150),
         "lat": request.args.get("lat", 25.0338),
         "lng": request.args.get("lng", 121.5645),
         "radius_km": request.args.get("radius_km", 5),
@@ -1149,7 +1150,6 @@ def map_food_recommend(user_id):
     # 每次都會打 Google Places
     enforce_rate_limit(_paid_api_limiter, "places")
     params = {
-        "budget": request.args.get("budget", 150),
         "lat": request.args.get("lat", 25.0338),
         "lng": request.args.get("lng", 121.5645),
         "radius_km": request.args.get("radius_km", 3),
@@ -1176,6 +1176,99 @@ def _coordinate(value, default: float, low: float, high: float) -> float:
     if not math.isfinite(number) or not low <= number <= high:
         raise ValueError(value)
     return number
+
+
+def check_menu_items(items: list, user: dict, context: dict) -> tuple[list, list]:
+    """逐道菜判斷能不能吃：回傳（可以吃的，依契合度排序；不建議的，附原因）。
+
+    可以吃的裡面 medical_risk.has_caution 為真的是「可以吃但要注意」。
+    context 是每一筆都要帶的店家欄位（restaurant_id、restaurant_name…）。
+    """
+    conditions = user.get("health_conditions", []) or []
+    allergens = user.get("allergens", []) or []
+    # 先前這裡直接讀 profile 存的 daily_calorie_target，沒有就退回寫死的 2100。
+    # 但「我的」頁面顯示的每日目標是依疾病與活動量重算過的，兩個數字對不起來：
+    # 畫面說每天 1900 kcal，這條路徑卻拿 2100÷3=700 kcal 當單餐目標。
+    # 改成跟單餐上限同源，整個後端只有一個每日熱量。
+    daily_energy, _ideal_weight = resolve_user_energy_and_weight(conditions, user)
+    target_calories = daily_energy / MEALS_PER_DAY
+
+    recommended_items = []
+    filtered_items = []
+    for item in items:
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        candidate = {
+            "label": item.get("item_id", name),
+            "name_zh": name,
+            "gi": item.get("gi"),
+            "allergens": item.get("allergens", []),
+            # 少了 calories 這個鍵，scale_nutrients 就把熱量讀成 0，
+            # 於是每個疾病宣告的單餐熱量上限（每日 E ÷ 3）永遠不會觸發。
+            "calories": item.get("calories"),
+            "sodium": item.get("sodium"),
+            "carbs": item.get("carbs"),
+            "protein": item.get("protein"),
+            "fat": item.get("fat"),
+            "sugar": item.get("sugar"),
+            "saturated_fat": item.get("saturated_fat"),
+            "trans_fat": item.get("trans_fat"),
+            "fiber": item.get("fiber"),
+            "is_fried": item.get("is_fried"),
+        }
+        medical_risk = evaluate_medical_risk(candidate, conditions, allergens, DISEASE_RULES, ALLERGEN_TAXONOMY, user_profile=user)
+        # evaluate_medical_risk 沒有 action 這個鍵，要看 block_reasons
+        block_reasons = list(medical_risk.get("block_reasons", []))
+
+        if block_reasons:
+            filtered_items.append({
+                "restaurant_id": context.get("restaurant_id"),
+                "restaurant_name": context.get("restaurant_name"),
+                "item_name": name,
+                "reasons": block_reasons,
+                "price": item.get("price", 0),
+                "medical_risk": medical_risk,
+            })
+            continue
+
+        base_score = 92 if medical_risk["is_safe"] and not medical_risk["has_caution"] else 78
+        item_cal = float(item.get("calories", 0) or 0)
+        cal_score = max(0, 10 - int(abs(target_calories - item_cal) / 40))
+        prot = float(item.get("protein", 0) or 0)
+        prot_bonus = 5 if prot >= 18 else 0
+        sod = float(item.get("sodium", 0) or 0)
+        sod_bonus = 3 if sod <= 600 else -5 if sod >= 1000 else 0
+        match_score = min(99, max(1, base_score + cal_score + prot_bonus + sod_bonus))
+
+        reasons = []
+        if medical_risk.get("caution_reasons"):
+            reasons.extend(medical_risk["caution_reasons"])
+        else:
+            reasons.append(f"熱量契合個人單餐目標 ({int(target_calories)} kcal)")
+        if prot >= 18:
+            reasons.append("高蛋白質補給")
+        if sod <= 600:
+            reasons.append("低鈉好選擇")
+
+        recommended_items.append({
+            **context,
+            "item_id": item.get("item_id", name),
+            "item_name": name,
+            "price": item.get("price", 0),
+            "calories": item.get("calories", 0),
+            "protein": item.get("protein", 0),
+            "carbs": item.get("carbs", 0),
+            "fat": item.get("fat", 0),
+            "sodium": item.get("sodium", 0),
+            "gi": item.get("gi"),
+            "match_score": match_score,
+            "reasons": reasons,
+            "medical_risk": medical_risk,
+        })
+
+    recommended_items.sort(key=lambda x: x["match_score"], reverse=True)
+    return recommended_items, filtered_items
 
 
 @app.route("/restaurant/menu", methods=["POST"])
@@ -1223,11 +1316,6 @@ def get_restaurant_menu():
         venue_lng = _coordinate(data.get("lng"), 121.5645, -180, 180)
     except ValueError:
         return jsonify({"error": "lat / lng 必須是有效的座標"}), 400
-    # 在呼叫 Gemini 之前就檢查：先前放在後面，菜單都分析完了才 500
-    try:
-        budget = int(data.get("budget", 150))
-    except (TypeError, ValueError):
-        return jsonify({"error": "budget 必須是有效數字"}), 400
 
     # 沒有 profile 就不能篩。先前這裡退回共用的 "demo_user"（storage 還會在
     # 正式資料庫自動建一個 0 疾病 0 過敏的帳號），等於把安全過濾靜默關掉，
@@ -1261,7 +1349,7 @@ def get_restaurant_menu():
 
     menu_recognition = None
     if menu_image:
-        print(f"[Scraper] 使用 Gemini Vision AI 辨識 {name} 的實體菜單圖片")
+        print(f"[Scraper] 使用 AI（ChatGPT／Gemini）辨識 {name} 的實體菜單圖片")
         enriched = parse_menu_image_with_gemini(menu_image, name)
         menu_recognition = {
             key: enriched[key]
@@ -1315,120 +1403,79 @@ def get_restaurant_menu():
         # 就能讓模型回一份假的低鈉菜單、用真實店名存進快取，其他人的推薦照它篩選，
         # 建檔也會把它當成新的而跳過這家店。共用快取只由建檔寫入，店名和地址來自 Google。
 
-    # 3. 對所有菜單項目進行醫學過濾與個人化偏好契合度評分（user 在上面已經確認存在）
-    conditions = user.get("health_conditions", []) or []
-    allergens = user.get("allergens", []) or []
-    # 先前這裡直接讀 profile 存的 daily_calorie_target，沒有就退回寫死的 2100。
-    # 但「我的」頁面顯示的每日目標是依疾病與活動量重算過的，兩個數字對不起來：
-    # 畫面說每天 1900 kcal，這條路徑卻拿 2100÷3=700 kcal 當單餐目標。
-    # 改成跟單餐上限同源，整個後端只有一個每日熱量。
-    daily_energy, _ideal_weight = resolve_user_energy_and_weight(conditions, user)
-    target_calories = daily_energy / MEALS_PER_DAY
-    
-    recommended_items = []
-    filtered_items = []
-    
-    for item in matched.get("items", []):
-        candidate = {
-            "label": item.get("item_id", item["name"]),
-            "name_zh": item["name"],
-            "gi": item.get("gi"),
-            "allergens": item.get("allergens", []),
-            # 少了 calories 這個鍵，scale_nutrients 就把熱量讀成 0，
-            # 於是每個疾病宣告的單餐熱量上限（每日 E ÷ 3）永遠不會觸發。
-            "calories": item.get("calories"),
-            "sodium": item.get("sodium"),
-            "carbs": item.get("carbs"),
-            "protein": item.get("protein"),
-            "fat": item.get("fat"),
-            "sugar": item.get("sugar"),
-            "saturated_fat": item.get("saturated_fat"),
-            "trans_fat": item.get("trans_fat"),
-            "fiber": item.get("fiber"),
-            "is_fried": item.get("is_fried"),
-        }
-        medical_risk = evaluate_medical_risk(candidate, conditions, allergens, DISEASE_RULES, ALLERGEN_TAXONOMY, user_profile=user)
-        is_over_budget = item.get("price", 0) > budget
-
-        block_reasons = []
-        if is_over_budget:
-            block_reasons.append(f"超出預算 {budget} 元")
-        block_reasons.extend(medical_risk.get("block_reasons", []))
-
-        # 先前這裡是 medical_risk.get("action") == "BLOCK"，但 evaluate_medical_risk
-        # 從來沒有回傳過 action 這個鍵，所以整條疾病過濾在這個路徑上是死的：
-        # 只有超出預算會被擋，算好的 block_reasons 接著被丟掉。
-        # healthy_food_service 一直都是用 block_reasons 判斷的。
-        is_blocked = bool(block_reasons)
-        
-        if is_blocked:
-            filtered_items.append({
-                "restaurant_id": matched["restaurant_id"],
-                "restaurant_name": matched["name"],
-                "item_name": item["name"],
-                "reasons": block_reasons,
-                "price": item.get("price", 0),
-                "medical_risk": medical_risk,
-            })
-        else:
-            # 計算個人化契合度分數
-            # 同一個不存在的鍵，這裡讓分數永遠是 78。
-            base_score = 92 if medical_risk["is_safe"] and not medical_risk["has_caution"] else 78
-            item_cal = float(item.get("calories", 0) or 0)
-            cal_diff = abs(target_calories - item_cal)
-            cal_score = max(0, 10 - int(cal_diff / 40))
-            
-            prot = float(item.get("protein", 0) or 0)
-            prot_bonus = 5 if prot >= 18 else 0
-            
-            sod = float(item.get("sodium", 0) or 0)
-            sod_bonus = 3 if sod <= 600 else -5 if sod >= 1000 else 0
-            
-            match_score = min(99, max(1, base_score + cal_score + prot_bonus + sod_bonus))
-            
-            reasons = []
-            if medical_risk.get("caution_reasons"):
-                reasons.extend(medical_risk["caution_reasons"])
-            else:
-                reasons.append(f"符合單餐預算 {budget} 元")
-                reasons.append(f"熱量契合個人單餐目標 ({int(target_calories)} kcal)")
-            if prot >= 18:
-                reasons.append("高蛋白質補給")
-            if sod <= 600:
-                reasons.append("低鈉好選擇")
-                
-            recommended_items.append({
-                "restaurant_id": matched["restaurant_id"],
-                "restaurant_name": matched["name"],
-                "restaurant_lat": matched["lat"],
-                "restaurant_lng": matched["lng"],
-                "address": matched.get("address", ""),
-                **({"distance_km": client_distance_km} if client_distance_km is not None else {}),
-                "tags": matched["tags"],
-                "item_id": item.get("item_id", item["name"]),
-                "item_name": item["name"],
-                "price": item.get("price", 0),
-                "calories": item.get("calories", 0),
-                "protein": item.get("protein", 0),
-                "carbs": item.get("carbs", 0),
-                "fat": item.get("fat", 0),
-                "sodium": item.get("sodium", 0),
-                "gi": item.get("gi"),
-                "match_score": match_score,
-                "reasons": reasons,
-                "medical_risk": medical_risk,
-            })
-
-    # 按契合度高低排序，精準截取前 3~5 項推薦品項
-    recommended_items.sort(key=lambda x: x["match_score"], reverse=True)
-    top_recommended = recommended_items[:5]
+    # 3. 逐道菜比對疾病禁忌與過敏原，並依個人單餐目標評分（user 在上面已經確認存在）
+    recommended_items, filtered_items = check_menu_items(
+        matched.get("items", []),
+        user,
+        {
+            "restaurant_id": matched["restaurant_id"],
+            "restaurant_name": matched["name"],
+            "restaurant_lat": matched["lat"],
+            "restaurant_lng": matched["lng"],
+            "address": matched.get("address", ""),
+            **({"distance_km": client_distance_km} if client_distance_km is not None else {}),
+            "tags": matched["tags"],
+        },
+    )
 
     return jsonify({
         "restaurant_id": matched["restaurant_id"],
         "name": matched["name"],
-        "recommended_items": top_recommended,
+        # 店家頁只放分數最高的 5 道
+        "recommended_items": recommended_items[:5],
         "filtered_items": filtered_items,
         "menu_recognition": menu_recognition,
+    })
+
+
+@app.route("/menu/photo-check", methods=["POST"])
+def menu_photo_check():
+    """拍任何一張菜單，不用先選店家：列出上面每道菜能不能吃。
+
+    跟 /restaurant/menu 用同一套逐道菜判斷，但回傳全部品項（不只前 5 名），
+    結果只給這次的回應用，不寫進共用的菜單快取。
+    """
+    data = json_body()
+    require_authenticated_user()
+    enforce_rate_limit(_paid_api_limiter, "menu")
+    if data.get("user_id"):
+        require_user_access(data["user_id"])
+    raw_image = data.get("menu_image")
+    if not isinstance(raw_image, str) or not raw_image.strip():
+        return jsonify({"error": "缺少菜單照片（menu_image，Base64）"}), 400
+
+    user_id = data.get("user_id") or get_request_user_id() or ""
+    user = storage.get_user(user_id)
+    if not user:
+        return jsonify({"error": "使用者不存在，請先建立 profile"}), 404
+
+    print("[MenuCheck] 使用 AI（ChatGPT／Gemini）辨識拍攝的菜單")
+    enriched = parse_menu_image_with_gemini(raw_image.strip(), "菜單照片")
+    recognition = {
+        key: enriched[key]
+        for key in ("recognition_status", "recognition_error", "recognition_model")
+        if key in enriched
+    }
+    if enriched.get("recognition_status") == "error":
+        return jsonify({
+            "error": enriched.get("recognition_error") or "菜單辨識失敗，請稍後再試",
+            "menu_recognition": recognition,
+        }), 502
+
+    edible, not_recommended = check_menu_items(
+        enriched.get("items", []) or [],
+        user,
+        {"restaurant_id": "menu_photo", "restaurant_name": "拍攝的菜單", "tags": ["實體菜單辨識", "AI標記"]},
+    )
+    safe = [item for item in edible if not item["medical_risk"].get("has_caution")]
+    caution = [item for item in edible if item["medical_risk"].get("has_caution")]
+    return jsonify({
+        "safe_items": safe,
+        "caution_items": caution,
+        "not_recommended_items": not_recommended,
+        "total_items": len(edible) + len(not_recommended),
+        "menu_recognition": recognition,
+        "disclaimer": "營養數字是 AI 依菜名估算的，僅供參考，不能取代醫師或營養師的建議。",
     })
 
 
@@ -1445,13 +1492,11 @@ def map_food_restaurant_summary(user_id):
     restaurant = data.get("restaurant") or {}
     if not restaurant.get("name"):
         return jsonify({"error": "缺少 restaurant.name"}), 400
-    budget = data.get("budget") or 150
     category = data.get("category") or "all"
     try:
         nutrition_progress = build_daily_nutrition_progress(storage, user_id, user)
         summary = build_restaurant_ai_summary(
             restaurant,
-            budget,
             category,
             user.get("health_conditions", []),
             nutrition_progress,
@@ -1489,6 +1534,48 @@ def frontend_available() -> bool:
     return os.path.isfile(os.path.join(FRONTEND_DIST, "index.html"))
 
 
+# 透過 Tailscale Funnel 從外面連只有約 200 KB/s，2 MB 的 JS 不壓縮要十幾秒，手機常常逾時。
+# 文字檔 gzip 後大約剩四分之一；壓好的結果依檔案修改時間快取在記憶體，不用每次重壓。
+GZIP_EXTENSIONS = {".js", ".css", ".html", ".json", ".svg", ".map", ".txt", ".ttf", ".otf"}
+GZIP_MIN_BYTES = 1024
+_gzip_cache: dict[str, tuple[int, bytes]] = {}
+
+
+def gzipped_file(full_path: str) -> bytes:
+    stamp = os.stat(full_path).st_mtime_ns
+    cached = _gzip_cache.get(full_path)
+    if cached and cached[0] == stamp:
+        return cached[1]
+    with open(full_path, "rb") as f:
+        data = gzip.compress(f.read(), compresslevel=6)
+    _gzip_cache[full_path] = (stamp, data)
+    return data
+
+
+def compress_frontend_response(response, name: str):
+    full = safe_join(FRONTEND_DIST, name)
+    if (
+        response.status_code != 200
+        or "gzip" not in request.headers.get("Accept-Encoding", "").lower()
+        or os.path.splitext(name)[1].lower() not in GZIP_EXTENSIONS
+        or not full
+        or os.path.getsize(full) < GZIP_MIN_BYTES
+    ):
+        return response
+    data = gzipped_file(full)
+    etag, _ = response.get_etag()
+    response.close()  # 放掉 send_from_directory 開著的原始檔
+    response.direct_passthrough = False
+    response.set_data(data)
+    response.headers["Content-Encoding"] = "gzip"
+    response.headers.pop("Accept-Ranges", None)
+    response.vary.add("Accept-Encoding")
+    if etag:
+        # 壓縮後位元組不同，標成 weak；瀏覽器帶回來比對仍會得到 304
+        response.set_etag(etag, weak=True)
+    return response
+
+
 def serve_frontend(path: str):
     candidates = [path, f"{path}.html"] if path else ["index.html"]
     found = next(
@@ -1500,7 +1587,7 @@ def serve_frontend(path: str):
         if path.startswith(("_expo/", "assets/")) or os.path.splitext(path)[1]:
             return jsonify({"error": "找不到這個檔案"}), 404
         found = "index.html"
-    response = send_from_directory(FRONTEND_DIST, found)
+    response = compress_frontend_response(send_from_directory(FRONTEND_DIST, found), found)
     # 打包出來的 JS 檔名帶內容雜湊，可以放心長期快取；頁面本身每次都要重新確認
     if found.startswith(("_expo/static/", "assets/")):
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"

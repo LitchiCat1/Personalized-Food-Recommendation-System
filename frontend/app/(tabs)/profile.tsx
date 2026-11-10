@@ -464,7 +464,7 @@ export default function ProfileScreen() {
       setProfileFeedback(await action());
       invalidateDietaryRecords();
     } catch (err: any) {
-      setProfileFeedback({ tone: 'error', title: '測試資料操作失敗', message: err?.message || '請確認後端連線與登入狀態。' });
+      setProfileFeedback({ tone: 'error', title: '店家菜單操作失敗', message: err?.message || '請確認後端連線與登入狀態。' });
     } finally {
       setSeedBusy(null);
     }
@@ -503,15 +503,15 @@ export default function ProfileScreen() {
     {
       label: '每日目標熱量',
       value: nutritionTargetsReady ? `${formatCalories(dailyNutrition.calories.target)} kcal` : '讀取中…',
-      color: '#FB923C',
+      color: Palette.accent.orange, bg: Palette.accent.orangeDim,
     },
     {
       label: '目標體重',
       value: user.targetWeight ? `${user.targetWeight} kg` : '未設定',
-      color: '#4ADE80',
+      color: Palette.accent.green, bg: Palette.accent.greenDim,
     },
-    { label: '飲食計畫', value: user.dietType || '未設定', color: '#60A5FA' },
-    { label: '目前體重', value: `${user.weight} kg`, color: '#A78BFA' },
+    { label: '飲食計畫', value: user.dietType || '未設定', color: Palette.accent.blue, bg: Palette.accent.blueDim },
+    { label: '目前體重', value: `${user.weight} kg`, color: Palette.accent.purple, bg: Palette.accent.purpleDim },
   ];
 
   const handleIndexVenues = () =>
@@ -526,7 +526,7 @@ export default function ProfileScreen() {
             indexNearbyVenues(
               apiBaseUrl,
               user.userId,
-              { budget: 150, lat: location.lat, lng: location.lng },
+              { lat: location.lat, lng: location.lng },
               // 一次建檔可能跑好幾分鐘，每一輪都拿最新的登入憑證
               { accessToken: useStore.getState().accessToken }
             ),
@@ -543,7 +543,7 @@ export default function ProfileScreen() {
     runSeedAction('list', async () => {
       const result = await listNearbyVenueIndex(apiBaseUrl, user.userId, { accessToken });
       if (!result.count) {
-        return { tone: 'error', title: '還沒有建檔任何店家', message: '按①開始建檔。' };
+        return { tone: 'error', title: '還沒有建檔任何店家', message: '請按「建立附近店家菜單檔案」開始建檔。' };
       }
       const names = result.venues.map((venue) =>
         `${venue.name}（${venue.items} 道${venue.stale ? '・需更新' : ''}${venue.has_opening_hours ? '' : '・無營業時段'}）`
@@ -561,7 +561,7 @@ export default function ProfileScreen() {
       return {
         tone: 'success',
         title: result.removed > 0 ? `已清除 ${result.removed} 家店的菜單檔案` : '菜單檔案本來就是空的',
-        message: '按①重新建檔，這次會照現在的規則來：已歇業的店不收，並記下每家店的營業時段。',
+        message: '請按「建立附近店家菜單檔案」重新建檔，這次會照現在的規則來：已歇業的店不收，並記下每家店的營業時段。',
       };
     });
 
@@ -750,7 +750,7 @@ export default function ProfileScreen() {
         <View style={styles.conditionsGrid}>
           {conditionCatalog.map((cond) => {
             const isActive = isSelected(user.healthConditions, cond.id, [cond.label_zh]);
-            const fallback = AVAILABLE_CONDITIONS.find((item) => item.id === cond.id);
+            const fallback = AVAILABLE_CONDITIONS.find((item) => item.id === cond.id || item.label === cond.label_zh);
             const accent = fallback?.color || Palette.accent.green;
             return (
               <Pressable
@@ -763,7 +763,7 @@ export default function ProfileScreen() {
                 }}
                 style={[styles.conditionChip, isActive && styles.conditionChipActive]}
               >
-                <View style={[styles.conditionIcon, isActive && { backgroundColor: `${accent}22` }]}>
+                <View style={[styles.conditionIcon, isActive && { backgroundColor: accent.startsWith('#') ? `${accent}22` : Palette.accent.greenDim }]}>
                   <Ionicons name="medical-outline" size={18} color={isActive ? accent : Palette.text.tertiary} />
                 </View>
                 <View style={styles.conditionInfo}>
@@ -815,7 +815,7 @@ export default function ProfileScreen() {
         <View style={styles.goalList}>
           {dietGoals.map((goal) => (
             <View key={goal.label} style={styles.goalItem}>
-              <View style={[styles.goalIcon, { backgroundColor: `${goal.color}18` }]}>
+              <View style={[styles.goalIcon, { backgroundColor: goal.bg }]}>
                 <Ionicons name="flag-outline" size={18} color={goal.color} />
               </View>
               <View style={styles.goalInfo}>
@@ -849,7 +849,7 @@ export default function ProfileScreen() {
             <Ionicons name="information-circle-outline" size={16} color={Palette.text.tertiary} />
             <View style={styles.targetExplainCopy}>
               <Text style={styles.targetExplainMuted}>
-                還沒設定目標體重。填了之後這裡會對照每日熱量目標，告訴你兩者方向是不是一致。
+                還沒設定目標體重。填了之後，沒有疾病條件時每日熱量目標會依它自動計算。
               </Text>
             </View>
           </View>
@@ -888,7 +888,7 @@ export default function ProfileScreen() {
           />
         </View>
         <Text style={styles.seedHint}>
-Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini 讀出菜單並估算營養，一家約 20~30 秒，會同時分析幾家並自動分批做完。已建檔且未過期的店家不會重複分析。沒有建檔的店家，推薦只能用店名比對，無法逐道菜篩選。
+建檔會依目前定位分批分析附近店家菜單；已建檔且未過期的店家不會重複建立。
         </Text>
       </SectionBlock>
 
@@ -927,13 +927,14 @@ Google Places 只給店名與位置，沒有菜色營養。建檔會請 Gemini �
                     keyboardType: 'numeric' as const,
                     // 這個欄位先前叫「每日熱量」，改了會顯示儲存成功，但畫面上沒有一處會變──
                     // 有疾病條件時一律以臨床指引的目標為準。講清楚它什麼時候才生效。
-                    hint: '沒有勾選疾病時採用這個數字；有疾病條件時以臨床指引的每日目標為準。',
+                    hint: '沒有勾選疾病、也沒設目標體重時才採用這個數字。',
                   },
                   {
                     key: 'targetWeight' as const,
                     label: '目標體重 kg',
                     keyboardType: 'numeric' as const,
-                    hint: '「飲食目標」會拿它跟每日熱量目標對照，方向不一致時會提醒你。',
+                    // 先前只拿來跟每日目標對照；現在沒有疾病條件時，每日目標就照它算。
+                    hint: '填了會自動算每日熱量：減重 TDEE − 500、增重 + 300（不低於 BMR）。有疾病條件時以臨床指引為準。',
                   },
                 ].map((field) => {
                   const invalid = !isDraftFieldValid(field.key);

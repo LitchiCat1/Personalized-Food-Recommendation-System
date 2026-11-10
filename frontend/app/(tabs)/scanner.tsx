@@ -1,9 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, Keyboard, TextInput } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import type { DetectedFood } from '@/constants/mock-data';
@@ -18,7 +16,6 @@ import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
 import FeedbackBanner from '@/components/ui/feedback-banner';
-import ScannerCameraView from '@/components/scanner/ScannerCameraView';
 import ScannerManualTools from '@/components/scanner/ScannerManualTools';
 import ScannerResults from '@/components/scanner/ScannerResults';
 import MenuCheckResults from '@/components/scanner/MenuCheckResults';
@@ -210,8 +207,7 @@ function ManualResultsList({
 }
 
 export default function ScannerScreen() {
-  const insets = useSafeAreaInsets();
-  const { rs, wp, isWeb, isDesktop } = useResponsive();
+  const { rs, wp, isDesktop } = useResponsive();
   const {
     scanResult,
     setScanResult,
@@ -221,14 +217,10 @@ export default function ScannerScreen() {
     addMealFromScan,
     apiBaseUrl,
     accessToken,
-    isCameraActive,
-    setCameraActive,
     user,
     dailyNutrition,
     invalidateDietaryRecords,
   } = useStore();
-  const [permission, requestPermission] = useCameraPermissions();
-  const cameraRef = useRef<CameraView>(null);
   const [manualQuery, setManualQuery] = useState('');
   const [manualResults, setManualResults] = useState<DetectedFood[]>([]);
   const [manualSearching, setManualSearching] = useState(false);
@@ -245,9 +237,6 @@ export default function ScannerScreen() {
   const [activeRecordSubmission, setActiveRecordSubmission] = useState<ActiveRecordSubmission | null>(null);
   const [recordFeedback, setRecordFeedback] = useState<RecordFeedback | null>(null);
   const [pendingRecordQueue, setPendingRecordQueue] = useState<PendingRecordSync[]>([]);
-  const [isCameraReady, setCameraReady] = useState(false);
-  const [isCapturing, setCapturing] = useState(false);
-  const captureInFlightRef = useRef(false);
   const recordSubmitInFlightRef = useRef(false);
   const recordSyncInFlightRef = useRef(false);
   const recordClientIdsRef = useRef(new Map<string, string>());
@@ -268,36 +257,26 @@ export default function ScannerScreen() {
   const handleCamera = async () => {
     setRecordFeedback(null);
     try {
-      const isAvailable = await CameraView.isAvailableAsync();
-      if (!isAvailable) {
+      const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!cameraPermission.granted) {
         setRecordFeedback({
           tone: 'error',
-          title: '無法使用相機',
-          message: isWeb
-            ? '請使用支援相機的瀏覽器，並透過 HTTPS 或 localhost 開啟 NutriLens。你仍可改用相簿上傳。'
-            : '此裝置沒有可用的相機，你仍可改用相簿上傳。',
+          title: '需要相機權限',
+          message: '請允許 NutriLens 使用相機，或改從相簿選擇餐點照片。',
         });
         return;
       }
 
-      if (!permission?.granted) {
-        const res = await requestPermission();
-        if (!res.granted) {
-          setRecordFeedback({
-            tone: 'error',
-            title: '需要相機權限',
-            message: res.canAskAgain
-              ? '請允許 NutriLens 存取相機後再試一次。'
-              : '相機權限已被封鎖，請到瀏覽器或系統設定中允許 NutriLens 使用相機。',
-          });
-          return;
-        }
+      const picked = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.7 });
+      if (picked.canceled) return;
+      const imageBase64 = await resolveImageBase64(picked.assets?.[0]);
+      if (!imageBase64) {
+        setRecordFeedback({ tone: 'error', title: '圖片無法讀取', message: '請重新拍攝，或改從相簿選擇餐點照片。' });
+        return;
       }
-
-      setCameraReady(false);
-      setCameraActive(true);
+      await analyzeImage(imageBase64);
     } catch (error: any) {
-      setRecordFeedback({ tone: 'error', title: '相機啟動失敗', message: error?.message || '請重新整理後再試，或改用相簿上傳。' });
+      setRecordFeedback({ tone: 'error', title: '拍照失敗', message: error?.message || '請再試一次，或改從相簿選擇餐點照片。' });
     }
   };
 
@@ -337,31 +316,6 @@ export default function ScannerScreen() {
       return false;
     } finally {
       setScanning(false);
-    }
-  };
-
-  const takePicture = async () => {
-    if (!cameraRef.current || !isCameraReady || captureInFlightRef.current) return;
-    captureInFlightRef.current = true;
-    setCapturing(true);
-    try {
-      const photo = await cameraRef.current.takePictureAsync({
-        base64: true,
-        quality: 0.7,
-        ...(isWeb ? { imageType: 'jpg' as const, scale: 0.8 } : {}),
-      });
-      setCameraActive(false);
-      const imageBase64 = photo?.base64 || (isWeb ? photo?.uri : undefined);
-      if (!imageBase64) {
-        throw new Error('相機沒有回傳可辨識的圖片，請重新拍照。');
-      }
-      await analyzeImage(imageBase64);
-    } catch (error: any) {
-      setScanning(false);
-      setRecordFeedback({ tone: 'error', title: '拍照失敗', message: error?.message || '請再試一次，或改用相簿上傳。' });
-    } finally {
-      captureInFlightRef.current = false;
-      setCapturing(false);
     }
   };
 
@@ -647,9 +601,8 @@ export default function ScannerScreen() {
       });
       return () => {
         active = false;
-        setCameraActive(false);
       };
-    }, [setCameraActive, syncPendingRecords])
+    }, [syncPendingRecords])
   );
 
   const handleAddRecord = async () => {
@@ -734,29 +687,6 @@ export default function ScannerScreen() {
     setOcrNameError(null);
     return normalizedDraft;
   };
-
-  if (isCameraActive) {
-    return (
-      <ScannerCameraView
-        cameraRef={cameraRef}
-        rs={rs}
-        topInset={insets.top}
-        isReady={isCameraReady}
-        isCapturing={isCapturing}
-        onClose={() => {
-          setCameraReady(false);
-          setCameraActive(false);
-        }}
-        onCapture={takePicture}
-        onReady={() => setCameraReady(true)}
-        onError={(message) => {
-          setCameraReady(false);
-          setCameraActive(false);
-          setRecordFeedback({ tone: 'error', title: '相機啟動失敗', message: message || '請確認權限後再試，或改用相簿上傳。' });
-        }}
-      />
-    );
-  }
 
   const modeConfig = {
     camera: { icon: 'camera-outline' as const, title: '拍攝完整餐盤', hint: '保持光線充足並避免遮擋，拍攝後會立即送出 AI 分析。', action: '啟動相機', onPress: handleCamera },

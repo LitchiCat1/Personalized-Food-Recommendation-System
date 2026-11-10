@@ -47,7 +47,7 @@ export default function TabLayout() {
           healthConditions: data.health_conditions,
           allergens: data.allergens,
           dailyCalorieTarget: data.daily_calorie_target,
-          targetWeight: data.target_weight ?? undefined,
+          targetWeight: data.target_weight ?? latestUser.targetWeight,
           dietType: data.diet_type,
           profileComplete: data.profile_complete !== false,
         });
@@ -67,7 +67,7 @@ export default function TabLayout() {
     ios: 52 + bottomInset,
     android: 58 + bottomInset,
     default: 64,
-  });
+  }) ?? 64;
 
   return (
     <Tabs

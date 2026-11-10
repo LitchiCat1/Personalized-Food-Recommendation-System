@@ -556,7 +556,7 @@ print(f"[OK] Restaurant catalog loaded: {len(RESTAURANT_CATALOG)} restaurants")
 # ═══════════════════════════════════════════════════════════════
 
 
-APP_VERSION = "v0.0.9"
+APP_VERSION = "v1.0.0"
 STARTED_AT = app_now().isoformat()
 
 

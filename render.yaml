@@ -4,7 +4,7 @@ services:
     runtime: static
     repo: https://github.com/LitchiCat1/Personalized-Food-Recommendation-System
     rootDir: frontend
-    branch: v0.0.9
+    branch: v1.0.0
     buildCommand: npm ci && npm run build:web
     staticPublishPath: dist
     # 打包出來的檔名帶 content hash（entry-<hash>.js），內容變了檔名就會變，
@@ -45,7 +45,7 @@ services:
     repo: https://github.com/LitchiCat1/Personalized-Food-Recommendation-System
     plan: free
     rootDir: backend
-    branch: v0.0.9
+    branch: v1.0.0
     buildCommand: pip install -r requirements.txt
     startCommand: python -u app.py
     # 資料存在 Supabase 的 Postgres：DATABASE_URL 填 Supabase → Connect → Session pooler

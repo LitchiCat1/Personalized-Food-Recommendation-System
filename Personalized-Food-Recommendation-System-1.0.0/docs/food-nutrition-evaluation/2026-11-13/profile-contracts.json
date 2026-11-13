@@ -1,0 +1,406 @@
+{
+  "created_at": "2026-11-13T14:17:36.925976+00:00",
+  "mode": "offline_profile_contracts",
+  "network_calls": 0,
+  "production_partial_profiles_enabled": false,
+  "limits": [
+    "No real source adapters, image calls, persistence or medical-risk integration.",
+    "Synthetic examples and consistency inventory are not accuracy measurements.",
+    "Existing production lookup policy is unchanged by this pure-service stage."
+  ],
+  "official_snapshot_consistency_inventory": {
+    "TFDA": {
+      "dataset_health": {
+        "source": "TFDA",
+        "status": "available",
+        "reason": null,
+        "record_count": 2213,
+        "incomplete_core_profiles": 98,
+        "sha256": "498647298f230297ec24ca24b4d38ef0f0103ec3a1104e8fab7e52bcdbad3643",
+        "hash_verification": "not_configured",
+        "validation_schema_version": 1
+      },
+      "profile_results": {
+        "partial": 1870,
+        "complete": 330,
+        "source_conflict": 13
+      },
+      "warning_counts": {
+        "energy_macro_discrepancy": 14
+      },
+      "snapshot_missing_fields": {
+        "sugar": 1001,
+        "trans_fat": 1775,
+        "fiber": 785,
+        "saturated_fat": 457,
+        "sodium": 51,
+        "protein": 30,
+        "fat": 50
+      },
+      "source_consistency_review": [
+        {
+          "key": "中脂調味乳(果汁)",
+          "name": "中脂調味乳(果汁)",
+          "food_code": "L0124301",
+          "code": "source_conflict",
+          "reason": "sugar exceeds carbs",
+          "snapshot_nutrients": {
+            "calories": 54.0,
+            "protein": 1.6,
+            "carbs": 8.4,
+            "sugar": 9.9,
+            "fat": 1.6,
+            "saturated_fat": 1.2,
+            "trans_fat": 0.042,
+            "fiber": null,
+            "sodium": 39.0
+          }
+        },
+        {
+          "key": "鮮奶布丁",
+          "name": "鮮奶布丁",
+          "food_code": "Q2102101",
+          "code": "source_conflict",
+          "reason": "sugar exceeds carbs",
+          "snapshot_nutrients": {
+            "calories": 110.0,
+            "protein": 3.0,
+            "carbs": 13.1,
+            "sugar": 17.9,
+            "fat": 5.1,
+            "saturated_fat": 3.3,
+            "trans_fat": null,
+            "fiber": null,
+            "sodium": 54.0
+          }
+        },
+        {
+          "key": "高脂保久乳",
+          "name": "高脂保久乳",
+          "food_code": "L0130101",
+          "code": "source_conflict",
+          "reason": "sugar exceeds carbs",
+          "snapshot_nutrients": {
+            "calories": 71.0,
+            "protein": 3.1,
+            "carbs": 3.4,
+            "sugar": 4.6,
+            "fat": 5.1,
+            "saturated_fat": 3.5,
+            "trans_fat": null,
+            "fiber": null,
+            "sodium": 32.0
+          }
+        },
+        {
+          "key": "中脂保久乳",
+          "name": "中脂保久乳",
+          "food_code": "L0134101",
+          "code": "source_conflict",
+          "reason": "sugar exceeds carbs",
+          "snapshot_nutrients": {
+            "calories": 48.0,
+            "protein": 3.2,
+            "carbs": 4.8,
+            "sugar": 6.1,
+            "fat": 1.8,
+            "saturated_fat": 1.4,
+            "trans_fat": 0.049,
+            "fiber": null,
+            "sodium": 52.0
+          }
+        },
+        {
+          "key": "奶油(液態)",
+          "name": "奶油(液態)",
+          "food_code": "M0900301",
+          "code": "source_conflict",
+          "reason": "sugar exceeds carbs",
+          "snapshot_nutrients": {
+            "calories": 340.0,
+            "protein": 2.0,
+            "carbs": 0.0,
+            "sugar": 3.2,
+            "fat": 39.1,
+            "saturated_fat": 27.1,
+            "trans_fat": null,
+            "fiber": null,
+            "sodium": 24.0
+          }
+        },
+        {
+          "key": "冷凍貢丸",
+          "name": "冷凍貢丸",
+          "food_code": "R5400201",
+          "code": "source_conflict",
+          "reason": "sugar exceeds carbs",
+          "snapshot_nutrients": {
+            "calories": 244.0,
+            "protein": 16.6,
+            "carbs": 0.0,
+            "sugar": 1.5,
+            "fat": 20.3,
+            "saturated_fat": 7.4,
+            "trans_fat": 0.094,
+            "fiber": null,
+            "sodium": 580.0
+          }
+        },
+        {
+          "key": "椰漿",
+          "name": "椰漿",
+          "food_code": "P0201101",
+          "code": "source_conflict",
+          "reason": "sugar exceeds carbs",
+          "snapshot_nutrients": {
+            "calories": 208.0,
+            "protein": 1.1,
+            "carbs": 0.0,
+            "sugar": 1.8,
+            "fat": 23.1,
+            "saturated_fat": 21.4,
+            "trans_fat": null,
+            "fiber": 0.3,
+            "sodium": 23.0
+          }
+        },
+        {
+          "key": "豆花(花生)",
+          "name": "豆花(花生)",
+          "food_code": "Q2104101",
+          "code": "source_conflict",
+          "reason": "sugar exceeds carbs",
+          "snapshot_nutrients": {
+            "calories": 60.0,
+            "protein": 2.0,
+            "carbs": 10.9,
+            "sugar": 12.8,
+            "fat": 0.9,
+            "saturated_fat": 0.2,
+            "trans_fat": 0.0,
+            "fiber": 0.8,
+            "sodium": 8.0
+          }
+        },
+        {
+          "key": "西瓜汁(非原汁)",
+          "name": "西瓜汁(非原汁)",
+          "food_code": "O0100101",
+          "code": "source_conflict",
+          "reason": "sugar exceeds carbs",
+          "snapshot_nutrients": {
+            "calories": 30.0,
+            "protein": 1.1,
+            "carbs": 6.1,
+            "sugar": 9.9,
+            "fat": 0.1,
+            "saturated_fat": null,
+            "trans_fat": null,
+            "fiber": 0.1,
+            "sodium": 1.0
+          }
+        },
+        {
+          "key": "檸檬汁(非原汁)",
+          "name": "檸檬汁(非原汁)",
+          "food_code": "O0101101",
+          "code": "source_conflict",
+          "reason": "sugar exceeds carbs",
+          "snapshot_nutrients": {
+            "calories": 33.0,
+            "protein": 0.8,
+            "carbs": 7.1,
+            "sugar": 10.6,
+            "fat": 0.1,
+            "saturated_fat": null,
+            "trans_fat": null,
+            "fiber": 0.1,
+            "sodium": 1.0
+          }
+        },
+        {
+          "key": "日本鰻鱺魚片(蒲燒)",
+          "name": "日本鰻鱺魚片(蒲燒)",
+          "food_code": "R7500201",
+          "code": "source_conflict",
+          "reason": "sugar exceeds carbs",
+          "snapshot_nutrients": {
+            "calories": 272.0,
+            "protein": 25.0,
+            "carbs": 0.9,
+            "sugar": 2.3,
+            "fat": 18.7,
+            "saturated_fat": 5.8,
+            "trans_fat": null,
+            "fiber": null,
+            "sodium": 421.0
+          }
+        },
+        {
+          "key": "金鉤蝦乾",
+          "name": "金鉤蝦乾",
+          "food_code": "J2300301",
+          "code": "source_conflict",
+          "reason": "sugar exceeds carbs",
+          "snapshot_nutrients": {
+            "calories": 257.0,
+            "protein": 54.6,
+            "carbs": 0.0,
+            "sugar": 1.3,
+            "fat": 2.6,
+            "saturated_fat": 1.1,
+            "trans_fat": null,
+            "fiber": null,
+            "sodium": 2553.0
+          }
+        },
+        {
+          "key": "培根",
+          "name": "培根",
+          "food_code": "R5100801",
+          "code": "source_conflict",
+          "reason": "sugar exceeds carbs",
+          "snapshot_nutrients": {
+            "calories": 372.0,
+            "protein": 13.5,
+            "carbs": 0.0,
+            "sugar": 1.4,
+            "fat": 35.6,
+            "saturated_fat": 13.3,
+            "trans_fat": 0.104,
+            "fiber": null,
+            "sodium": 610.0
+          }
+        }
+      ]
+    },
+    "USDA FNDDS": {
+      "dataset_health": {
+        "source": "USDA FNDDS",
+        "status": "available",
+        "reason": null,
+        "record_count": 5431,
+        "incomplete_core_profiles": 0,
+        "sha256": "7de8563a2bc64b71bd5289095ae646e286cc4c333535ca58541e4d8c6daf2673",
+        "hash_verification": "not_configured",
+        "validation_schema_version": 1
+      },
+      "profile_results": {
+        "partial": 5431
+      },
+      "warning_counts": {
+        "energy_macro_discrepancy": 104
+      },
+      "snapshot_missing_fields": {
+        "trans_fat": 5431
+      },
+      "source_consistency_review": []
+    }
+  },
+  "serving_to_100g_to_intake": {
+    "per_100g": {
+      "calories": 200.0,
+      "protein": 10.0,
+      "carbs": 20.0,
+      "sugar": null,
+      "fat": 5.0,
+      "saturated_fat": null,
+      "trans_fat": null,
+      "fiber": null,
+      "sodium": 300.0
+    },
+    "portion": {
+      "weight_g": 150.0,
+      "portion_source": "user_weighed",
+      "values": {
+        "calories": 300.0,
+        "protein": 15.0,
+        "carbs": 30.0,
+        "sugar": null,
+        "fat": 7.5,
+        "saturated_fat": null,
+        "trans_fat": null,
+        "fiber": null,
+        "sodium": 450.0
+      },
+      "upper_bounds": {
+        "calories": null,
+        "protein": null,
+        "carbs": null,
+        "sugar": null,
+        "fat": null,
+        "saturated_fat": null,
+        "trans_fat": null,
+        "fiber": null,
+        "sodium": null
+      },
+      "bound_comparison": "less_than",
+      "missing_nutrition_fields": [
+        "sugar",
+        "saturated_fat",
+        "trans_fat",
+        "fiber"
+      ]
+    }
+  },
+  "known_plus_bound": {
+    "known_sum": 300.0,
+    "known_items": 1,
+    "eligible_items": 2,
+    "unresolved_items": 1,
+    "bounded_items": 1,
+    "known_bounds_sum": 100.0,
+    "total_upper_bound": 400.0,
+    "upper_bound_comparison": "less_than",
+    "status": "partial"
+  },
+  "unknown_item_removes_total_upper_bound": {
+    "known_sum": 300.0,
+    "known_items": 1,
+    "eligible_items": 3,
+    "unresolved_items": 2,
+    "bounded_items": 1,
+    "known_bounds_sum": 100.0,
+    "total_upper_bound": null,
+    "upper_bound_comparison": null,
+    "status": "partial"
+  },
+  "unknown_weight": {
+    "weight_g": null,
+    "portion_source": "unknown",
+    "values": {
+      "calories": null,
+      "protein": null,
+      "carbs": null,
+      "sugar": null,
+      "fat": null,
+      "saturated_fat": null,
+      "trans_fat": null,
+      "fiber": null,
+      "sodium": null
+    },
+    "upper_bounds": {
+      "calories": null,
+      "protein": null,
+      "carbs": null,
+      "sugar": null,
+      "fat": null,
+      "saturated_fat": null,
+      "trans_fat": null,
+      "fiber": null,
+      "sodium": null
+    },
+    "bound_comparison": "less_than",
+    "missing_nutrition_fields": [
+      "calories",
+      "protein",
+      "carbs",
+      "sugar",
+      "fat",
+      "saturated_fat",
+      "trans_fat",
+      "fiber",
+      "sodium"
+    ]
+  }
+}

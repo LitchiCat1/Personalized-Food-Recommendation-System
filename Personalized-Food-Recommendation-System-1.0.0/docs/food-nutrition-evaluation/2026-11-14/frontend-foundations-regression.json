@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-11-13T16:04:59.455Z",
+  "branch": "v1.0.2",
+  "scope": "Phase2b1 frontend nullable foundations and versioned queue; not full scanner integration",
+  "paid_calls": 0,
+  "real_user_database_access": false,
+  "backend_snapshot_test": "Pure Python services with socket disabled; mocked fetch; no live HTTP integration",
+  "checks": [
+    {
+      "name": "frontend_tests",
+      "command": "node --test --test-reporter=tap scripts/test-*.mjs",
+      "exit_code": 0,
+      "duration_ms": 985,
+      "passed": true,
+      "tests": 114,
+      "pass": 114,
+      "fail": 0,
+      "skipped": 0,
+      "files": [
+        "test-browser-location.mjs",
+        "test-build-env.mjs",
+        "test-dietary-records.mjs",
+        "test-dietary-trends.mjs",
+        "test-nutrition-calculation.mjs",
+        "test-nutrition-record-api.mjs",
+        "test-record-sync-contract.mjs",
+        "test-safety-selection.mjs",
+        "test-scanner-records.mjs",
+        "test-trend-insights.mjs",
+        "test-venue-indexing.mjs"
+      ]
+    },
+    {
+      "name": "typecheck",
+      "command": "npm run typecheck",
+      "exit_code": 0,
+      "duration_ms": 5214,
+      "passed": true
+    },
+    {
+      "name": "lint",
+      "command": "npm run lint",
+      "exit_code": 0,
+      "duration_ms": 7277,
+      "passed": true
+    },
+    {
+      "name": "build:web",
+      "command": "npm run build:web",
+      "exit_code": 0,
+      "duration_ms": 16234,
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "limitations": [
+    "Does not test real Postgres/Mongo, live AI/Tavily, photo accuracy, or native device input",
+    "V2 scanner/OCR/dashboard/history/trend/recommendation UI and v2 retry dispatcher remain unconnected",
+    "Queue serializes only one JS runtime; cross-tab atomicity and mixed-version reconciliation remain pending",
+    "Rendered checks are recorded separately and are not rerun by this command"
+  ]
+}

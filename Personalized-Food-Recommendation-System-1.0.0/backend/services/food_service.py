@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import uuid
 
 from services.nutrient_service import get_nutrient_value, is_fried_food_name
+from services.nutrition_label_service import custom_nutrition_conflicts, has_nutrition_values, positive_quantity
 
 
 def search_foods(storage, tfda_db: dict, query: str, limit: int, user_id: str | None, build_custom_food_search_result):
@@ -93,9 +94,13 @@ def build_custom_food_doc(data: dict, normalize_nutrition_payload, scale_nutriti
     if not isinstance(is_fried, bool):
         raise ValueError("is_fried 必須是布林值")
 
-    nutrition_per_serving = normalize_nutrition_payload(data.get("nutrition_per_serving") or {})
-    nutrition_per_100g = normalize_nutrition_payload(data.get("nutrition_per_100g") or {})
-    serving_size_g = extract_number(data.get("serving_size_g"))
+    original_unit = data.get("unit")
+    if original_unit not in (None, "", "per 100g", "per serving"):
+        raise ValueError("unit 僅支援 per 100g 或 per serving；毫升基準不可直接換算為公克")
+    nutrition_per_serving = normalize_nutrition_payload(data.get("nutrition_per_serving") if data.get("nutrition_per_serving") is not None else {})
+    nutrition_per_100g = normalize_nutrition_payload(data.get("nutrition_per_100g") if data.get("nutrition_per_100g") is not None else {})
+    serving_size_g = positive_quantity(data.get("serving_size_g"), "serving_size_g")
+    servings_per_container = positive_quantity(data.get("servings_per_container"), "servings_per_container")
 
     if not any(value is not None for value in nutrition_per_serving.values()) and not any(
         value is not None for value in nutrition_per_100g.values()
@@ -104,6 +109,9 @@ def build_custom_food_doc(data: dict, normalize_nutrition_payload, scale_nutriti
 
     if not any(value is not None for value in nutrition_per_100g.values()):
         nutrition_per_100g = scale_nutrition_per_100g(nutrition_per_serving, serving_size_g)
+    if custom_nutrition_conflicts(nutrition_per_serving, nutrition_per_100g, serving_size_g):
+        raise ValueError("每份與每 100g 營養數據不一致，或缺少可核對的每份公克數")
+    basis = "per_100g" if has_nutrition_values(nutrition_per_100g) else "per_serving"
 
     now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     return {
@@ -114,8 +122,10 @@ def build_custom_food_doc(data: dict, normalize_nutrition_payload, scale_nutriti
         "brand": (data.get("brand") or "").strip(),
         "category": data.get("category", "自訂食品"),
         "serving_size_g": serving_size_g,
-        "servings_per_container": extract_number(data.get("servings_per_container")),
-        "unit": data.get("unit") or ("per 100g" if nutrition_per_100g else "per serving"),
+        "servings_per_container": servings_per_container,
+        "unit": "per 100g" if basis == "per_100g" else "per serving",
+        "nutrition_basis": basis,
+        "original_unit": original_unit,
         "nutrition_per_serving": nutrition_per_serving,
         "nutrition_per_100g": nutrition_per_100g,
         "is_fried": is_fried or is_fried_food_name(name_zh, data.get("name_en")),

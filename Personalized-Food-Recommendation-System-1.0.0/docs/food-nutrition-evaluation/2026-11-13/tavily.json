@@ -1,0 +1,280 @@
+{
+  "created_at": "2026-11-13T12:41:08.038750+00:00",
+  "max_requests": 7,
+  "searches": [
+    {
+      "http_status": 200,
+      "request_id": "ebdf1891-7af1-41c3-a84a-0dd97f06556c",
+      "response_time": 0.96,
+      "usage": {
+        "credits": 1
+      },
+      "answer_returned": false,
+      "elapsed_seconds": 2.146,
+      "query_id": "hollow_balls",
+      "query": "炸地瓜球 空心 熟食 營養標示 每100公克 熱量 蛋白質 鈉",
+      "include_domains": [],
+      "results": [
+        {
+          "title": "炸地瓜球by 腎臟病防治基金會-豐腎食堂",
+          "url": "https://icook.tw/recipes/349672",
+          "score": 0.50558066
+        },
+        {
+          "title": "地瓜球的熱量是多少？ - Bao",
+          "url": "https://trybao.app/zh/blog/calories-in-sweet-potato-balls",
+          "score": 0.437463
+        },
+        {
+          "title": "QQ王子地瓜球",
+          "url": "https://www.tahsda.org.tw/communitymedicine/files/20161126_RAOHEStreetMarketNight/QQ%E7%8E%8B%E5%AD%90%E5%9C%B0%E7%93%9C%E7%90%83.pdf",
+          "score": 0.42321965
+        },
+        {
+          "title": "地瓜球做法｜省80%、320大卡、食譜與成本分析 - 突然好想吃",
+          "url": "https://cravequake.com/food/sweet-potato-balls",
+          "score": 0.2617081
+        },
+        {
+          "title": "5.低蛋白食譜_低蛋白點心區.pdf",
+          "url": "https://www.mch.org.tw/UserFiles/20220505001/5.%E4%BD%8E%E8%9B%8B%E7%99%BD%E9%A3%9F%E8%AD%9C_%E4%BD%8E%E8%9B%8B%E7%99%BD%E9%BB%9E%E5%BF%83%E5%8D%80.pdf",
+          "score": 0.059646938
+        }
+      ]
+    },
+    {
+      "http_status": 200,
+      "request_id": "03c11e1a-f962-449b-8687-19131121fd05",
+      "response_time": 1.56,
+      "usage": {
+        "credits": 1
+      },
+      "answer_returned": false,
+      "elapsed_seconds": 2.977,
+      "query_id": "rice_sausage",
+      "query": "糯米腸 烤 營養標示 每100公克 熱量 蛋白質 鈉",
+      "include_domains": [],
+      "results": [
+        {
+          "title": "食品營養標示懶人包大全，輕鬆簡單一秒看懂！ - 婕樂纖 JERÔSSE 官方網站",
+          "url": "https://jerosse.com.tw/blog/%E9%A3%9F%E5%93%81%E7%87%9F%E9%A4%8A%E6%A8%99%E7%A4%BA%E6%87%B6%E4%BA%BA%E5%8C%85%E5%A4%A7%E5%85%A8%EF%BC%8C%E8%BC%95%E9%AC%86%E7%B0%A1%E5%96%AE%E4%B8%80%E7%A7%92%E7%9C%8B%E6%87%82%EF%BC%81",
+          "score": 0.263789
+        },
+        {
+          "title": "八大食品營養標示換算工具，標示範例介紹 ｜SGS安心資訊平台",
+          "url": "https://msn.sgs.com/food/food-nutfacts.aspx",
+          "score": 0.24454336
+        },
+        {
+          "title": "營養標籤",
+          "url": "https://www.cfs.gov.hk/tc_chi/programme/programme_nifl/files/HOWTOREAD_C.pdf",
+          "score": 0.18184364
+        },
+        {
+          "title": "看懂營養標示，過年不採雷！",
+          "url": "https://www.mohw.gov.tw/cp-3791-39782-1.html",
+          "score": 0.13184245
+        },
+        {
+          "title": "學會看營養標籤：拆解熱量來源，找出產品成分的比重大小 - 低卡新知 | 米林香&黃正宜低卡餐 減法飲食專業製造商",
+          "url": "https://www.dgifood.com.tw/article_d.php?lang=tw&tb=8&id=300",
+          "score": 0.11299101
+        }
+      ]
+    },
+    {
+      "http_status": 200,
+      "request_id": "2cd126cf-f4ef-441c-9e15-3a4842c648ee",
+      "response_time": 2.15,
+      "usage": {
+        "credits": 1
+      },
+      "answer_returned": false,
+      "elapsed_seconds": 3.37,
+      "query_id": "fried_tofu",
+      "query": "炸臭豆腐 熟重 每100公克 營養 鈉",
+      "include_domains": [],
+      "results": [
+        {
+          "title": "炸臭豆腐营养成分表",
+          "url": "https://health.baidu.com/m/detail/ar_7082778244192363772",
+          "score": 0.7017131
+        },
+        {
+          "title": "深坑五大美味",
+          "url": "https://shenkeng.health.ntpc.gov.tw/archive/health_ntpc/22/file/education.pdf",
+          "score": 0.5346733
+        },
+        {
+          "title": "臭豆腐熱量多少？炸、清蒸、麻辣一次比較 悠活原力YohoPower",
+          "url": "https://www.yohopower.tw/blogs/health-note/119246",
+          "score": 0.41709343
+        },
+        {
+          "title": "臭豆腐易致癌？避免劣質油，注意4點健康吃 | 華人健康網",
+          "url": "https://www.top1health.com/Article/68969",
+          "score": 0.36897394
+        },
+        {
+          "title": "【臭豆腐】了解卡路里、食用禁忌（附營養及食譜） | Bowtie 專欄網誌",
+          "url": "https://www.bowtie.com.hk/blog/zh/%E7%87%9F%E9%A4%8A%E8%B2%BC%E5%A3%AB/%E8%87%AD%E8%B1%86%E8%85%90",
+          "score": 0.27096224
+        }
+      ]
+    },
+    {
+      "http_status": 200,
+      "request_id": "24aaa15c-194e-470a-93cd-7a4ea77abca4",
+      "response_time": 1.86,
+      "usage": {
+        "credits": 1
+      },
+      "answer_returned": false,
+      "elapsed_seconds": 3.111,
+      "query_id": "exact_brand_soup",
+      "query": "香菇赤肉羹 營養標示 每100公克",
+      "include_domains": [
+        "green-n-safe.com"
+      ],
+      "results": [
+        {
+          "title": "香菇赤肉羹",
+          "url": "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS",
+          "score": 0.7833262
+        },
+        {
+          "title": "元盅雞湯｜永豐餘生技",
+          "url": "https://www.green-n-safe.com/Products/Content?id=MEC0018ZBCS",
+          "score": 0.359589
+        },
+        {
+          "title": "老菜脯黑蒜雞湯｜永豐餘生技",
+          "url": "https://www.green-n-safe.com/Products/Content?id=MEC0023ABCS",
+          "score": 0.28537196
+        },
+        {
+          "title": "GREEN & SAFE 料理教室-古早味香菇赤肉羹米粉",
+          "url": "https://www.green-n-safe.com/Recipe/Content?id=71",
+          "score": 0.20577459
+        },
+        {
+          "title": "韓式牛肉雪濃湯",
+          "url": "https://www.green-n-safe.com/Products/Content?id=MEF0019ABAS",
+          "score": 0.027690258
+        }
+      ]
+    },
+    {
+      "http_status": 200,
+      "request_id": "78eec9dd-453f-4d34-a368-0bfd983b8d00",
+      "response_time": 1.16,
+      "usage": {
+        "credits": 1
+      },
+      "answer_returned": false,
+      "elapsed_seconds": 2.449,
+      "query_id": "government_soup",
+      "query": "肉羹 總重量 330 營養",
+      "include_domains": [
+        "obesity.chshb.gov.tw"
+      ],
+      "results": [
+        {
+          "title": "肉羹",
+          "url": "https://obesity.chshb.gov.tw/snack_content01.aspx?mno=37&sno=96",
+          "score": 0.81815636
+        }
+      ]
+    },
+    {
+      "http_status": 200,
+      "request_id": "e2b4cc7f-bfd2-4575-ac9d-24db3c030031",
+      "response_time": 1.57,
+      "usage": {
+        "credits": 1
+      },
+      "answer_returned": false,
+      "elapsed_seconds": 2.82,
+      "query_id": "nonexistent_food",
+      "query": "\"不存在品牌_測試XQ_20261113藍光地瓜球\" 營養標示",
+      "include_domains": [],
+      "results": [
+        {
+          "title": "❌四個不同意❌ 🌕地瓜球進國際🌕 ‼️全球第一包‼️ 符合🇺 ...",
+          "url": "https://www.facebook.com/TWsweetpotato/videos/%E5%9B%9B%E5%80%8B%E4%B8%8D%E5%90%8C%E6%84%8F%E5%9C%B0%E7%93%9C%E7%90%83%E9%80%B2%E5%9C%8B%E9%9A%9B%EF%B8%8F%E5%85%A8%E7%90%83%E7%AC%AC%E4%B8%80%E5%8C%85%EF%B8%8F%E7%AC%A6%E5%90%88%E7%BE%8E%E5%9C%8Bfda%E9%A3%9F%E5%93%81%E7%87%9F%E9%A4%8A%E6%A8%99%E7%A4%BA%E7%9A%84%E5%9C%B0%E7%93%9C%E7%90%83%E7%B6%93sgs%E5%8F%B0%E7%81%A3%E6%AA%A2%E6%B8%AC%E5%A4%A7%E8%85%B8%E6%A1%BF%E8%8F%8C%E4%BA%BA%E5%B7%A5%E8%89%B2%E7%B4%A0%E9%98%B2%E8%85%90%E5%8A%91%E5%9D%87%E7%82%BA%E9%AB%98%E6%A8%99%E6%BA%96%E9%99%B0%E6%80%A7%E9%9B%B6%E6%AA%A2%E5%87%BA%E6%B2%B9%E5%93%81%E6%9B%B4%E7%AC%A6%E5%90%883m%E5%9C%8B%E9%9A%9B%E9%85%B8%E5%83%B9%E8%A9%A6%E7%B4%99%E6%B8%AC%E8%A9%A6%E6%A8%99/633506654507309",
+          "score": 0.32071492
+        },
+        {
+          "title": "台灣番薯丸-地瓜球第一品牌（品牌總部）",
+          "url": "https://www.facebook.com/TWsweetpotato/posts/%E5%9B%9B%E5%80%8B%E4%B8%8D%E5%90%8C%E6%84%8F%E5%9C%B0%E7%93%9C%E7%90%83%E9%80%B2%E5%9C%8B%E9%9A%9B%EF%B8%8F%E5%85%A8%E7%90%83%E7%AC%AC%E4%B8%80%E5%8C%85%EF%B8%8F%E7%AC%A6%E5%90%88%E7%BE%8E%E5%9C%8Bfda%E9%A3%9F%E5%93%81%E7%87%9F%E9%A4%8A%E6%A8%99%E7%A4%BA%E7%9A%84%E5%9C%B0%E7%93%9C%E7%90%83%E7%B6%93sgs%E5%8F%B0%E7%81%A3%E6%AA%A2%E6%B8%AC%E5%A4%A7%E8%85%B8%E6%A1%BF%E8%8F%8C%E4%BA%BA%E5%B7%A5%E8%89%B2%E7%B4%A0%E9%98%B2%E8%85%90%E5%8A%91%E5%9D%87%E7%82%BA%E9%AB%98%E6%A8%99%E6%BA%96%E9%99%B0%E6%80%A7%E9%9B%B6%E6%AA%A2%E5%87%BA%E6%B2%B9%E5%93%81%E6%9B%B4%E7%AC%A6%E5%90%883m%E5%9C%8B%E9%9A%9B%E9%85%B8%E5%83%B9%E8%A9%A6%E7%B4%99%E6%B8%AC%E8%A9%A6%E6%A8%99/876050243072183?locale=hi_IN",
+          "score": 0.2739627
+        },
+        {
+          "title": "QQ王子地瓜球",
+          "url": "https://www.tahsda.org.tw/communitymedicine/files/20161126_RAOHEStreetMarketNight/QQ%E7%8E%8B%E5%AD%90%E5%9C%B0%E7%93%9C%E7%90%83.pdf",
+          "score": 0.23899394
+        },
+        {
+          "title": "減肥必看的低脂食物飲品食物飲品的熱量表1.地瓜（110g）",
+          "url": "https://www.threads.com/@life97916/post/DYM2qV1jzpq/%E6%B8%9B%E8%82%A5%E5%BF%85%E7%9C%8B%E7%9A%84%E4%BD%8E%E8%84%82%E9%A3%9F%E7%89%A9%E9%A3%B2%E5%93%81%E9%A3%9F%E7%89%A9%E9%A3%B2%E5%93%81%E7%9A%84%E7%86%B1%E9%87%8F%E8%A1%A81%E5%9C%B0%E7%93%9C110g140%E5%A4%A7%E5%8D%A12%E5%9C%B0%E7%93%9C%E7%90%8310%E9%A1%86400%E5%A4%A7%E5%8D%A13%E7%87%95%E9%BA%A540g140%E5%A4%A7%E5%8D%A14%E9%BA%A5%E7%89%87%E7%A9%80%E7%89%A950g220%E5%A4%A7%E5%8D%A15%E8%98%8B%E6%9E%9C1-%E9%A1%8660%E5%A4%A7%E5%8D%A16%E8%98%8B%E6%9E%9C",
+          "score": 0.19667186
+        },
+        {
+          "title": "香港營養標籤測試 1+7 或 7+1",
+          "url": "https://www.wsa-ltd.com/%E7%87%9F%E9%A4%8A%E6%A8%99%E7%B1%A4%E6%B8%AC%E8%A9%A6",
+          "score": 0.11357959
+        }
+      ]
+    }
+  ],
+  "extract": {
+    "http_status": 200,
+    "request_id": "c7699682-fa3d-44d4-ae38-382a7ac08fd2",
+    "response_time": 4.85,
+    "usage": {
+      "credits": 1
+    },
+    "answer_returned": false,
+    "elapsed_seconds": 18.559,
+    "results": [
+      {
+        "source_id": "tavily_0",
+        "url": "https://handian.co.uk/zh-tw/products/catering-products/sticky-rice-roll/",
+        "characters": 1145,
+        "text_sha256": "eefa28bbe244cef3f8494c0fb4d52fea86c4e440d9babea4b4e96dbe490c8575",
+        "contains_nutrition_heading": true
+      },
+      {
+        "source_id": "tavily_1",
+        "url": "https://obesity.chshb.gov.tw/snack_content01.aspx?mno=26&sno=39",
+        "characters": 1058,
+        "text_sha256": "042e06578fa05a9f2e9c7ad9c927f4839d1d74b81042fa9221255ae740815608",
+        "contains_nutrition_heading": true
+      },
+      {
+        "source_id": "tavily_2",
+        "url": "https://obesity.chshb.gov.tw/snack_content01.aspx?mno=37&sno=96",
+        "characters": 1066,
+        "text_sha256": "ca1edb55148b4e5135ef4a70fe8d3011082a585359e9f231a0925cbf61873fdc",
+        "contains_nutrition_heading": true
+      },
+      {
+        "source_id": "tavily_3",
+        "url": "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS",
+        "characters": 1755,
+        "text_sha256": "518382e02a88216d59a8147e0f03e85d58d63581d7835cbd0e67a984165f24ce",
+        "contains_nutrition_heading": false
+      },
+      {
+        "source_id": "tavily_4",
+        "url": "https://www.gqfood.com.tw/product_d.php?id=256&lang=tw&tb=1",
+        "characters": 1057,
+        "text_sha256": "3797e55145751476bc1747f00258470b03c300e3eab8307239d16f92daf80149",
+        "contains_nutrition_heading": true
+      }
+    ],
+    "failed_results": []
+  },
+  "key_logged": false,
+  "reported_credits": 7
+}

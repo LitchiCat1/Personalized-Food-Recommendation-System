@@ -1,0 +1,361 @@
+{
+  "mode": "offline_current_production_observations",
+  "feature_code_modified": false,
+  "confidence": [
+    {
+      "case": "missing",
+      "normalized": 0.5,
+      "accepted_items": 1
+    },
+    {
+      "case": "boolean_true",
+      "normalized": 1.0,
+      "accepted_items": 1
+    },
+    {
+      "case": "invalid_text",
+      "normalized": 0.5,
+      "accepted_items": 1
+    },
+    {
+      "case": "out_of_range",
+      "normalized": 1.0,
+      "accepted_items": 1
+    },
+    {
+      "case": "ambiguous_fraction",
+      "normalized": 0.012,
+      "accepted_items": 0
+    }
+  ],
+  "boolean_weight": 1.0,
+  "invalid_images": [
+    {
+      "case": "truncated_jpeg",
+      "accepted_by_input_decoder": true
+    },
+    {
+      "case": "truncated_png",
+      "accepted_by_input_decoder": true
+    }
+  ],
+  "aliases": [
+    {
+      "name": "滷牛肉",
+      "matches": []
+    },
+    {
+      "name": "紅燒牛肉",
+      "matches": [
+        {
+          "key": "usda_fndds:2705849",
+          "source": "USDA FNDDS",
+          "reference_name": "燉牛肉（USDA參考）"
+        }
+      ]
+    },
+    {
+      "name": "燉牛肉",
+      "matches": [
+        {
+          "key": "usda_fndds:2705849",
+          "source": "USDA FNDDS",
+          "reference_name": "燉牛肉（USDA參考）"
+        }
+      ]
+    },
+    {
+      "name": "熟麵條",
+      "matches": [
+        {
+          "key": "usda_fndds:2708352",
+          "source": "USDA FNDDS",
+          "reference_name": "熟麵條（USDA參考）"
+        }
+      ]
+    },
+    {
+      "name": "熟白麵條",
+      "matches": [
+        {
+          "key": "usda_fndds:2708352",
+          "source": "USDA FNDDS",
+          "reference_name": "熟麵條（USDA參考）"
+        }
+      ]
+    },
+    {
+      "name": "糯米腸",
+      "matches": []
+    },
+    {
+      "name": "豬大腸",
+      "matches": []
+    },
+    {
+      "name": "炸臭豆腐",
+      "matches": []
+    },
+    {
+      "name": "泡麵",
+      "matches": [
+        {
+          "key": "usda_fndds:2709152",
+          "source": "USDA FNDDS",
+          "reference_name": "沖泡泡麵含湯（USDA參考）"
+        }
+      ]
+    }
+  ],
+  "memory_api_persistence": {
+    "status": 201,
+    "record": {
+      "client_record_id": "probe-partial",
+      "contains_fried_food": false,
+      "foods": [
+        {
+          "calories": 290.0,
+          "carbs": 22.0,
+          "fat": 17.0,
+          "fiber": 0.0,
+          "is_fried": false,
+          "missing_nutrition_fields": [
+            "sodium",
+            "fiber",
+            "sugar"
+          ],
+          "name": "只知道熱量",
+          "nutrition_source_url": "https://example.invalid/probe",
+          "protein": 12.2,
+          "saturated_fat": 0.0,
+          "sodium": 0.0,
+          "sugar": 0.0,
+          "trans_fat": 0.0
+        }
+      ],
+      "meal_type": "午餐",
+      "source": "camera",
+      "timestamp": "2026-11-13T20:44:10.283548+08:00",
+      "total_calories": 290.0,
+      "total_carbs": 22.0,
+      "total_fat": 17.0,
+      "total_fiber": 0.0,
+      "total_protein": 12.2,
+      "total_saturated_fat": 0.0,
+      "total_sodium": 0.0,
+      "total_sugar": 0.0,
+      "total_trans_fat": 0.0,
+      "user_id": "probe-only"
+    },
+    "unresolved_context_preserved": false
+  },
+  "memory_api_read": {
+    "status": 200,
+    "response": {
+      "count": 1,
+      "meal_nutrient_limits": {
+        "calories": {
+          "conditions": [
+            "高血壓 / 鈉控制"
+          ],
+          "label_zh": "熱量",
+          "limit": 741.8,
+          "unit": "kcal"
+        },
+        "sodium": {
+          "conditions": [
+            "高血壓 / 鈉控制"
+          ],
+          "label_zh": "鈉",
+          "limit": 600.0,
+          "unit": "mg"
+        }
+      },
+      "nutrition_goal_types": {
+        "calories": "upper_limit",
+        "carbs": "upper_limit",
+        "fat": "upper_limit",
+        "fiber": "minimum_target",
+        "protein": "minimum_target",
+        "saturated_fat": "upper_limit",
+        "sodium": "upper_limit",
+        "sugar": "upper_limit",
+        "trans_fat": "upper_limit"
+      },
+      "nutrition_target_basis": {
+        "activity_multiplier": 1.55,
+        "bmr": 1568,
+        "conditions": [
+          "hypertension"
+        ],
+        "floored_at_bmr": false,
+        "ideal_body_weight": 63.6,
+        "is_overweight": false,
+        "kcal_per_kg": 35,
+        "source": "disease",
+        "user_target": 1950,
+        "weight_goal": null,
+        "weight_reduced": false
+      },
+      "nutrition_targets": {
+        "calories": 2225.3,
+        "carbs": 278.2,
+        "fat": 61.8,
+        "fiber": 30,
+        "protein": 63.6,
+        "saturated_fat": 17.3,
+        "sodium": 2000,
+        "sugar": 27.8,
+        "trans_fat": 0
+      },
+      "records": [
+        {
+          "client_record_id": "probe-partial",
+          "contains_fried_food": false,
+          "foods": [
+            {
+              "calories": 290.0,
+              "carbs": 22.0,
+              "fat": 17.0,
+              "fiber": 0.0,
+              "is_fried": false,
+              "missing_nutrition_fields": [
+                "sodium",
+                "fiber",
+                "sugar"
+              ],
+              "name": "只知道熱量",
+              "nutrition_source_url": "https://example.invalid/probe",
+              "protein": 12.2,
+              "saturated_fat": 0.0,
+              "sodium": 0.0,
+              "sugar": 0.0,
+              "trans_fat": 0.0
+            }
+          ],
+          "meal_type": "午餐",
+          "source": "camera",
+          "timestamp": "2026-11-13T20:44:10.283548+08:00",
+          "total_calories": 290.0,
+          "total_carbs": 22.0,
+          "total_fat": 17.0,
+          "total_fiber": 0.0,
+          "total_protein": 12.2,
+          "total_saturated_fat": 0.0,
+          "total_sodium": 0.0,
+          "total_sugar": 0.0,
+          "total_trans_fat": 0.0,
+          "user_id": "probe-only"
+        }
+      ]
+    }
+  },
+  "sqlite_api_persistence": {
+    "status": 201,
+    "record": {
+      "client_record_id": "probe-partial",
+      "contains_fried_food": false,
+      "foods": [
+        {
+          "calories": 290.0,
+          "carbs": 22.0,
+          "fat": 17.0,
+          "fiber": 0.0,
+          "is_fried": false,
+          "missing_nutrition_fields": [
+            "sodium",
+            "fiber",
+            "sugar"
+          ],
+          "name": "只知道熱量",
+          "nutrition_source_url": "https://example.invalid/probe",
+          "protein": 12.2,
+          "saturated_fat": 0.0,
+          "sodium": 0.0,
+          "sugar": 0.0,
+          "trans_fat": 0.0
+        }
+      ],
+      "meal_type": "午餐",
+      "source": "camera",
+      "timestamp": "2026-11-13T20:44:10.352610+08:00",
+      "total_calories": 290.0,
+      "total_carbs": 22.0,
+      "total_fat": 17.0,
+      "total_fiber": 0.0,
+      "total_protein": 12.2,
+      "total_saturated_fat": 0.0,
+      "total_sodium": 0.0,
+      "total_sugar": 0.0,
+      "total_trans_fat": 0.0,
+      "user_id": "probe-only"
+    }
+  },
+  "sqlite_after_reopen": [
+    {
+      "user_id": "probe-only",
+      "client_record_id": "probe-partial",
+      "timestamp": "2026-11-13T20:44:10.352610+08:00",
+      "meal_type": "午餐",
+      "foods": [
+        {
+          "calories": 290.0,
+          "carbs": 22.0,
+          "fat": 17.0,
+          "fiber": 0.0,
+          "is_fried": false,
+          "missing_nutrition_fields": [
+            "sodium",
+            "fiber",
+            "sugar"
+          ],
+          "name": "只知道熱量",
+          "nutrition_source_url": "https://example.invalid/probe",
+          "protein": 12.2,
+          "sodium": 0.0,
+          "sugar": 0.0,
+          "saturated_fat": 0.0,
+          "trans_fat": 0.0
+        }
+      ],
+      "total_calories": 290.0,
+      "total_protein": 12.2,
+      "total_carbs": 22.0,
+      "total_fat": 17.0,
+      "total_sodium": 0.0,
+      "total_fiber": 0.0,
+      "total_sugar": 0.0,
+      "total_saturated_fat": 0.0,
+      "total_trans_fat": 0.0,
+      "source": "camera",
+      "contains_fried_food": false
+    }
+  ],
+  "reference_arithmetic": {
+    "synthetic_control": true,
+    "source_g": 180,
+    "source_kcal": 450,
+    "per100g_kcal": 250.0,
+    "consumed_g": 160,
+    "consumed_kcal": 400.0
+  },
+  "official_source_sanity_counterexamples": [
+    {
+      "source": "handian_rice",
+      "kJ": 1506.2,
+      "reported_kcal": 301.2,
+      "kcal_from_kJ": 359.99,
+      "carbs_g": 90,
+      "fat_g": 0,
+      "saturated_fat_g": 0.1,
+      "kcal_from_4_4_9": 360,
+      "requires_source_review": true
+    },
+    {
+      "source": "changhua_noodles",
+      "reported_weight_g": 130,
+      "protein_carbs_fat_sum_g": 144.2,
+      "requires_source_review": true
+    }
+  ]
+}

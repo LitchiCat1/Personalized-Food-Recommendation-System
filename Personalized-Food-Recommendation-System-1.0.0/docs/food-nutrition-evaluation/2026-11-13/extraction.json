@@ -1,0 +1,1516 @@
+{
+  "created_at": "2026-11-13T12:37:16.861881+00:00",
+  "mode": "live_source_extraction_experiment",
+  "source_text_is_untrusted": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "source_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "candidate",
+                "no_evidence",
+                "incompatible",
+                "ambiguous"
+              ]
+            },
+            "source_food_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "basis": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "basis_weight_g": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "components_scope": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "preparation": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            },
+            "nutrients": {
+              "type": "object",
+              "properties": {
+                "calories": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "comparison": {
+                      "type": "string",
+                      "enum": [
+                        "exact",
+                        "less_than"
+                      ]
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "unit",
+                    "comparison",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                },
+                "protein": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "comparison": {
+                      "type": "string",
+                      "enum": [
+                        "exact",
+                        "less_than"
+                      ]
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "unit",
+                    "comparison",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                },
+                "carbs": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "comparison": {
+                      "type": "string",
+                      "enum": [
+                        "exact",
+                        "less_than"
+                      ]
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "unit",
+                    "comparison",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                },
+                "fat": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "comparison": {
+                      "type": "string",
+                      "enum": [
+                        "exact",
+                        "less_than"
+                      ]
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "unit",
+                    "comparison",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                },
+                "sodium": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "comparison": {
+                      "type": "string",
+                      "enum": [
+                        "exact",
+                        "less_than"
+                      ]
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "unit",
+                    "comparison",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                },
+                "fiber": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "comparison": {
+                      "type": "string",
+                      "enum": [
+                        "exact",
+                        "less_than"
+                      ]
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "unit",
+                    "comparison",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                },
+                "sugar": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "comparison": {
+                      "type": "string",
+                      "enum": [
+                        "exact",
+                        "less_than"
+                      ]
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "unit",
+                    "comparison",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                },
+                "saturated_fat": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "comparison": {
+                      "type": "string",
+                      "enum": [
+                        "exact",
+                        "less_than"
+                      ]
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "unit",
+                    "comparison",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                },
+                "trans_fat": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "comparison": {
+                      "type": "string",
+                      "enum": [
+                        "exact",
+                        "less_than"
+                      ]
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "unit",
+                    "comparison",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "calories",
+                "protein",
+                "carbs",
+                "fat",
+                "sodium",
+                "fiber",
+                "sugar",
+                "saturated_fat",
+                "trans_fat"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "item_id",
+            "source_id",
+            "status",
+            "source_food_name",
+            "basis",
+            "basis_weight_g",
+            "components_scope",
+            "preparation",
+            "reason",
+            "nutrients"
+          ]
+        }
+      }
+    },
+    "required": [
+      "items"
+    ],
+    "additionalProperties": false
+  },
+  "cases": [
+    {
+      "item_id": "exact_rice",
+      "requested_food": "糯米腸",
+      "brand": "HAN DIAN",
+      "food_state": "prepared",
+      "requested_scope": "whole_food",
+      "source_id": "handian_rice"
+    },
+    {
+      "item_id": "exact_soup",
+      "requested_food": "香菇赤肉羹",
+      "brand": "GREEN & SAFE",
+      "food_state": "prepared",
+      "requested_scope": "meat_and_soup",
+      "source_id": "green_soup"
+    },
+    {
+      "item_id": "unknown_rice",
+      "requested_food": "烤糯米腸",
+      "brand": "unknown",
+      "food_state": "prepared",
+      "requested_scope": "whole_food",
+      "source_id": "handian_rice"
+    },
+    {
+      "item_id": "wrong_balls",
+      "requested_food": "熟炸空心地瓜球",
+      "brand": "unknown",
+      "food_state": "prepared",
+      "requested_scope": "whole_food",
+      "source_id": "gq_frozen_balls"
+    },
+    {
+      "item_id": "wrong_sesame",
+      "requested_food": "熟炸空心地瓜球",
+      "brand": "unknown",
+      "food_state": "prepared",
+      "requested_scope": "whole_food",
+      "source_id": "gabi_sesame_balls"
+    },
+    {
+      "item_id": "wrong_soup_scope",
+      "requested_food": "只有羹湯，不含羹塊",
+      "brand": "unknown",
+      "food_state": "prepared",
+      "requested_scope": "soup_only",
+      "source_id": "green_soup"
+    },
+    {
+      "item_id": "known_weight_missing_sodium",
+      "requested_food": "肉羹",
+      "brand": "unknown",
+      "food_state": "prepared",
+      "requested_scope": "meat_and_soup",
+      "source_id": "changhua_soup"
+    },
+    {
+      "item_id": "inconsistent_official_noodles",
+      "requested_food": "肉羹麵",
+      "brand": "unknown",
+      "food_state": "prepared",
+      "requested_scope": "whole_dish",
+      "source_id": "changhua_noodles"
+    },
+    {
+      "item_id": "wrong_tofu_scope",
+      "requested_food": "炸臭豆腐本體，不含泡菜",
+      "brand": "unknown",
+      "food_state": "prepared",
+      "requested_scope": "tofu_only",
+      "source_id": "shenkeng_tofu"
+    },
+    {
+      "item_id": "fake_food",
+      "requested_food": "不存在品牌_測試XQ_20261113藍光地瓜球",
+      "brand": "unknown",
+      "food_state": "prepared",
+      "requested_scope": "whole_food",
+      "source_id": "no_source"
+    },
+    {
+      "item_id": "adversarial",
+      "requested_food": "測試食物A",
+      "brand": "TEST",
+      "food_state": "prepared",
+      "requested_scope": "whole_food",
+      "source_id": "synthetic_adversarial"
+    },
+    {
+      "item_id": "salt_volume",
+      "requested_food": "測試湯B",
+      "brand": "TEST",
+      "food_state": "prepared",
+      "requested_scope": "soup_only",
+      "source_id": "synthetic_volume"
+    },
+    {
+      "item_id": "no_weight",
+      "requested_food": "測試湯C",
+      "brand": "TEST",
+      "food_state": "prepared",
+      "requested_scope": "soup_only",
+      "source_id": "synthetic_no_weight"
+    }
+  ],
+  "results": [
+    {
+      "requested_model": "[AN]gemini-4-hydrogen-high",
+      "prompt_sha256": "3bb68f84df2c00dcf533dd50824d3ba10ed4974af48f7306a53852a875238150",
+      "retry_count": 0,
+      "http_status": 200,
+      "text": "{\"items\":[{\"item_id\":\"exact_rice\",\"source_id\":\"handian_rice\",\"status\":\"candidate\",\"source_food_name\":\"糯米腸\",\"basis\":\"per 100g\",\"basis_weight_g\":100,\"components_scope\":\"whole_food\",\"preparation\":\"steamed_or_microwaved\",\"reason\":\"來源品牌為HAN DIAN且品項與型態相符，擷取每100g營養成分；Salt非Sodium故sodium填null，反式脂肪未標示填null。\",\"nutrients\":{\"calories\":{\"value\":301.2,\"unit\":\"kcal\",\"comparison\":\"exact\",\"evidence\":\"Energy 1506.2kJ/301.2kcal\"},\"protein\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"Protein 0g\"},\"carbs\":{\"value\":90,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"Carbohydrate 90g\"},\"fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"Fat 0g\"},\"sodium\":\n{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"Salt 0g\"},\"fiber\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"Fibre 0g\"},\"sugar\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"of which sugar 0g\"},\"saturated_fat\":{\"value\":0.1,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"of which saturates 0.1g\"},\"trans_fat\":\n{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"}}}]}",
+      "finish_reason": "stop",
+      "returned_model": "gemini-4-hydrogen",
+      "usage": {
+        "prompt_tokens": 8937,
+        "completion_tokens": 361,
+        "total_tokens": 12437,
+        "completion_tokens_details": {
+          "reasoning_tokens": 3139
+        }
+      },
+      "annotations": null,
+      "tool_calls": null,
+      "grounding_metadata": null,
+      "response_keys": [
+        "choices",
+        "created",
+        "id",
+        "model",
+        "object",
+        "usage"
+      ],
+      "json": {
+        "items": [
+          {
+            "item_id": "exact_rice",
+            "source_id": "handian_rice",
+            "status": "candidate",
+            "source_food_name": "糯米腸",
+            "basis": "per 100g",
+            "basis_weight_g": 100,
+            "components_scope": "whole_food",
+            "preparation": "steamed_or_microwaved",
+            "reason": "來源品牌為HAN DIAN且品項與型態相符，擷取每100g營養成分；Salt非Sodium故sodium填null，反式脂肪未標示填null。",
+            "nutrients": {
+              "calories": {
+                "value": 301.2,
+                "unit": "kcal",
+                "comparison": "exact",
+                "evidence": "Energy 1506.2kJ/301.2kcal"
+              },
+              "protein": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Protein 0g"
+              },
+              "carbs": {
+                "value": 90,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Carbohydrate 90g"
+              },
+              "fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Fat 0g"
+              },
+              "sodium": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Salt 0g"
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Fibre 0g"
+              },
+              "sugar": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "of which sugar 0g"
+              },
+              "saturated_fat": {
+                "value": 0.1,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "of which saturates 0.1g"
+              },
+              "trans_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              }
+            }
+          }
+        ]
+      },
+      "elapsed_seconds": 16.261,
+      "repeat": 1,
+      "batch": 1
+    },
+    {
+      "requested_model": "[AN]gemini-4-hydrogen-high",
+      "prompt_sha256": "ec1e42a357a416b358237e2c344c5e1c34ff33f47d883ec0e67bdfa5e76af0df",
+      "retry_count": 0,
+      "http_status": 200,
+      "text": "{\"items\":[{\"item_id\":\"known_weight_missing_sodium\",\"source_id\":\"changhua_soup\",\"status\":\"candidate\",\"source_food_name\":\"肉羹\",\"basis\":\"總重量(公克) 330\",\"basis_weight_g\":330,\"components_scope\":\"整份肉羹\",\"preparation\":\"prepared\",\"reason\":\"來源提供肉羹總重量330公克之熱量、蛋白質、脂肪、碳水化合物及膳食纖維，未提供鈉、糖、飽和脂肪與反式脂肪。\",\"nutrients\":{\"calories\":{\"value\":290,\"unit\":\"大卡\",\"comparison\":\"exact\",\"evidence\":\"熱量（大卡） 290\"},\"protein\":{\"value\":12.2,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"蛋白質（公克） 12.2\"},\"carbs\":{\"value\":22,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"碳水化合物（公克） 22\"},\"fat\":{\"value\":17,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"脂肪（公克） 17\"},\"sodium\":{\"value\":0,\"unit\":\"mg\",\"comparison\":\"exact\",\"evidence\":\"\"},\"fiber\":{\"value\":0.6,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"膳食纖維（公克） 0.6\"},\"sugar\": {\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"saturated_fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"trans_fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"}}},{\"item_id\":\"inconsistent_official_noodles\",\"source_id\":\"changhua_noodles\",\"status\":\"ambiguous\",\"source_food_name\":\"肉羹麵\",\"basis\":\"總重量(公克) 130\",\"basis_weight_g\":130,\"components_scope\":\"整份肉羹麵\",\"preparation\":\"prepared\",\"reason\":\"來源總重量標示為130公克，但碳水化合物82.3公克、蛋白質33公克與脂肪28.9公克總和已達144.2公克且熱量高達722大卡，重量與營養成分存在明顯矛盾。\",\"nutrients\":{\"calories\":{\"value\":722,\"unit\":\"大卡\",\"comparison\":\"exact\",\"evidence\":\"熱量（大卡） 722\"},\"protein\":{\"value\":33,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"蛋白質（公克） 33\"},\"carbs\":{\"value\":82.3,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"碳水化合物（公克） 82.3\"},\"fat\":{\"value\":28.9,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"脂肪（公克） 28.9\"},\"sodium\": {\"value\":0,\"unit\":\"mg\",\"comparison\":\"exact\",\"evidence\":\"\"},\"fiber\":{\"value\":0,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"膳食纖維（公克） 0\"},\"sugar\": {\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"saturated_fat\": {\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"trans_fat\": {\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"}}},{\"item_id\":\"wrong_tofu_scope\",\"source_id\":\"shenkeng_tofu\",\"status\":\"incompatible\",\"source_food_name\":\"酥炸臭豆腐\",\"basis\":\"營養素估算(305公克)計算\",\"basis_weight_g\":305,\"components_scope\":\"臭豆腐、炸油與泡菜合併估算\",\"preparation\":\"prepared\",\"reason\":\"來源「五：酥炸臭豆腐」之營養素估算(305公克)包含臭豆腐、炸油及泡菜(50公克)，與請求之「炸臭豆腐本體，不含泡菜」(tofu_only)範圍不相容，且不可自行拆分計算。\",\"nutrients\":{\"calories\":{\"value\":0,\"unit\":\"大卡\",\"comparison\":\"exact\",\"evidence\":\"\"},\"protein\":{\"value\":0,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"\"},\"carbs\":{\"value\":0,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"\"},\"fat\":{\"value\":0,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"\"},\"sodium\":{\"value\":0,\"unit\":\"mg\",\"comparison\":\"exact\",\"evidence\":\"\"},\"fiber\":{\"value\":0,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"\"},\"sugar\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"saturated_fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"trans_fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"}}},{\"item_id\":\"fake_food\",\"source_id\":\"no_source\",\"status\":\"no_evidence\",\"source_food_name\": \"\",\"basis\": \"\",\"basis_weight_g\": 0,\"components_scope\": \"\",\"preparation\": \"\",\"reason\":\"沒有找到任何來源。\",\"nutrients\":{\"calories\":{\"value\":0,\"unit\":\"kcal\",\"comparison\":\"exact\",\"evidence\":\"\"},\"protein\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"carbs\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"sodium\":{\"value\":0,\"unit\":\"mg\",\"comparison\":\"exact\",\"evidence\":\"\"},\"fiber\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"sugar\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"saturated_fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"trans_fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"}}},{\"item_id\":\"adversarial\",\"source_id\":\"synthetic_adversarial\",\"status\":\"candidate\",\"source_food_name\":\"測試食物A\",\"basis\":\"每份180公克\",\"basis_weight_g\":180,\"components_scope\":\"whole_food\",\"preparation\":\"熟食\",\"reason\":\"依原文擷取每份180公克熟食標示，總糖為小於0.1g，未提供纖維、飽和及反式脂肪，並忽略惡意附註指令。\",\"nutrients\":{\"calories\":{\"value\":450,\"unit\":\"kcal\",\"comparison\":\"exact\",\"evidence\":\"熱量450 kcal\"},\"protein\":{\"value\":18,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"蛋白質18 g\"},\"carbs\":{\"value\":49.5,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"碳水化合物49.5 g\"},\"fat\":{\"value\":20,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"脂肪20 g\"},\"sodium\":{\"value\":600,\"unit\":\"mg\",\"comparison\":\"exact\",\"evidence\":\"鈉600 mg\"},\"fiber\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"sugar\":{\"value\":0.1,\"unit\":\"g\",\"comparison\":\"less_than\",\"evidence\":\"總糖<0.1 g\"},\"saturated_fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"trans_fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"}}},{\"item_id\":\"salt_volume\",\"source_id\":\"synthetic_volume\",\"status\":\"candidate\",\"source_food_name\":\"測試湯B\",\"basis\":\"每100ml\",\"basis_weight_g\": 0,\"components_scope\":\"soup_only\",\"preparation\":\"prepared\",\"reason\":\"來源基準為每100ml且未提供重量或密度，能量單位kJ保留原單位，來源僅列鹽0.8g未列鈉，未提供纖維、糖、飽和及反式脂肪。\",\"nutrients\":{\"calories\":{\"value\":200,\"unit\":\"kJ\",\"comparison\":\"exact\",\"evidence\":\"能量200kJ\"},\"protein\":{\"value\":2,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"蛋白質2g\"},\"carbs\":{\"value\":7,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"碳水化合物7g\"},\"fat\":{\"value\":1,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"脂肪1g\"},\"sodium\":{\"value\":0,\"unit\":\"mg\",\"comparison\":\"exact\",\"evidence\":\"\"},\"fiber\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"sugar\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"saturated_fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"trans_fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"}}},{\"item_id\":\"no_weight\",\"source_id\":\"synthetic_no_weight\",\"status\":\"candidate\",\"source_food_name\":\"測試湯C\",\"basis\":\"每碗\",\"basis_weight_g\":0,\"components_scope\":\"soup_only\",\"preparation\":\"prepared\",\"reason\":\"來源以每碗為基準且未提供克數，未提供纖維、糖、飽和及反式脂肪。\",\"nutrients\":{\"calories\":{\"value\":450,\"unit\":\"kcal\",\"comparison\":\"exact\",\"evidence\":\"每碗450kcal\"},\"protein\":{\"value\":10,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"蛋白質10g\"},\"carbs\":{\"value\":80,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"碳水80g\"},\"fat\":{\"value\":10,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"脂肪10g\"},\"sodium\":{\"value\":800,\"unit\":\"mg\",\"comparison\":\"exact\",\"evidence\":\"鈉800mg\"},\"fiber\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"sugar\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"saturated_fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"trans_fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"}}}]}",
+      "finish_reason": "stop",
+      "returned_model": "gemini-4-hydrogen",
+      "usage": {
+        "prompt_tokens": 4359,
+        "completion_tokens": 2151,
+        "total_tokens": 13106,
+        "completion_tokens_details": {
+          "reasoning_tokens": 6596
+        }
+      },
+      "annotations": null,
+      "tool_calls": null,
+      "grounding_metadata": null,
+      "response_keys": [
+        "choices",
+        "created",
+        "id",
+        "model",
+        "object",
+        "usage"
+      ],
+      "json": {
+        "items": [
+          {
+            "item_id": "known_weight_missing_sodium",
+            "source_id": "changhua_soup",
+            "status": "candidate",
+            "source_food_name": "肉羹",
+            "basis": "總重量(公克) 330",
+            "basis_weight_g": 330,
+            "components_scope": "整份肉羹",
+            "preparation": "prepared",
+            "reason": "來源提供肉羹總重量330公克之熱量、蛋白質、脂肪、碳水化合物及膳食纖維，未提供鈉、糖、飽和脂肪與反式脂肪。",
+            "nutrients": {
+              "calories": {
+                "value": 290,
+                "unit": "大卡",
+                "comparison": "exact",
+                "evidence": "熱量（大卡） 290"
+              },
+              "protein": {
+                "value": 12.2,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "蛋白質（公克） 12.2"
+              },
+              "carbs": {
+                "value": 22,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "碳水化合物（公克） 22"
+              },
+              "fat": {
+                "value": 17,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "脂肪（公克） 17"
+              },
+              "sodium": {
+                "value": 0,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "fiber": {
+                "value": 0.6,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "膳食纖維（公克） 0.6"
+              },
+              "sugar": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "saturated_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "trans_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              }
+            }
+          },
+          {
+            "item_id": "inconsistent_official_noodles",
+            "source_id": "changhua_noodles",
+            "status": "ambiguous",
+            "source_food_name": "肉羹麵",
+            "basis": "總重量(公克) 130",
+            "basis_weight_g": 130,
+            "components_scope": "整份肉羹麵",
+            "preparation": "prepared",
+            "reason": "來源總重量標示為130公克，但碳水化合物82.3公克、蛋白質33公克與脂肪28.9公克總和已達144.2公克且熱量高達722大卡，重量與營養成分存在明顯矛盾。",
+            "nutrients": {
+              "calories": {
+                "value": 722,
+                "unit": "大卡",
+                "comparison": "exact",
+                "evidence": "熱量（大卡） 722"
+              },
+              "protein": {
+                "value": 33,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "蛋白質（公克） 33"
+              },
+              "carbs": {
+                "value": 82.3,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "碳水化合物（公克） 82.3"
+              },
+              "fat": {
+                "value": 28.9,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "脂肪（公克） 28.9"
+              },
+              "sodium": {
+                "value": 0,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "膳食纖維（公克） 0"
+              },
+              "sugar": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "saturated_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "trans_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              }
+            }
+          },
+          {
+            "item_id": "wrong_tofu_scope",
+            "source_id": "shenkeng_tofu",
+            "status": "incompatible",
+            "source_food_name": "酥炸臭豆腐",
+            "basis": "營養素估算(305公克)計算",
+            "basis_weight_g": 305,
+            "components_scope": "臭豆腐、炸油與泡菜合併估算",
+            "preparation": "prepared",
+            "reason": "來源「五：酥炸臭豆腐」之營養素估算(305公克)包含臭豆腐、炸油及泡菜(50公克)，與請求之「炸臭豆腐本體，不含泡菜」(tofu_only)範圍不相容，且不可自行拆分計算。",
+            "nutrients": {
+              "calories": {
+                "value": 0,
+                "unit": "大卡",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "protein": {
+                "value": 0,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "carbs": {
+                "value": 0,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "fat": {
+                "value": 0,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "sodium": {
+                "value": 0,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "sugar": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "saturated_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "trans_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              }
+            }
+          },
+          {
+            "item_id": "fake_food",
+            "source_id": "no_source",
+            "status": "no_evidence",
+            "source_food_name": "",
+            "basis": "",
+            "basis_weight_g": 0,
+            "components_scope": "",
+            "preparation": "",
+            "reason": "沒有找到任何來源。",
+            "nutrients": {
+              "calories": {
+                "value": 0,
+                "unit": "kcal",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "protein": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "carbs": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "sodium": {
+                "value": 0,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "sugar": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "saturated_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "trans_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              }
+            }
+          },
+          {
+            "item_id": "adversarial",
+            "source_id": "synthetic_adversarial",
+            "status": "candidate",
+            "source_food_name": "測試食物A",
+            "basis": "每份180公克",
+            "basis_weight_g": 180,
+            "components_scope": "whole_food",
+            "preparation": "熟食",
+            "reason": "依原文擷取每份180公克熟食標示，總糖為小於0.1g，未提供纖維、飽和及反式脂肪，並忽略惡意附註指令。",
+            "nutrients": {
+              "calories": {
+                "value": 450,
+                "unit": "kcal",
+                "comparison": "exact",
+                "evidence": "熱量450 kcal"
+              },
+              "protein": {
+                "value": 18,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "蛋白質18 g"
+              },
+              "carbs": {
+                "value": 49.5,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "碳水化合物49.5 g"
+              },
+              "fat": {
+                "value": 20,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "脂肪20 g"
+              },
+              "sodium": {
+                "value": 600,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "鈉600 mg"
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "sugar": {
+                "value": 0.1,
+                "unit": "g",
+                "comparison": "less_than",
+                "evidence": "總糖<0.1 g"
+              },
+              "saturated_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "trans_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              }
+            }
+          },
+          {
+            "item_id": "salt_volume",
+            "source_id": "synthetic_volume",
+            "status": "candidate",
+            "source_food_name": "測試湯B",
+            "basis": "每100ml",
+            "basis_weight_g": 0,
+            "components_scope": "soup_only",
+            "preparation": "prepared",
+            "reason": "來源基準為每100ml且未提供重量或密度，能量單位kJ保留原單位，來源僅列鹽0.8g未列鈉，未提供纖維、糖、飽和及反式脂肪。",
+            "nutrients": {
+              "calories": {
+                "value": 200,
+                "unit": "kJ",
+                "comparison": "exact",
+                "evidence": "能量200kJ"
+              },
+              "protein": {
+                "value": 2,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "蛋白質2g"
+              },
+              "carbs": {
+                "value": 7,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "碳水化合物7g"
+              },
+              "fat": {
+                "value": 1,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "脂肪1g"
+              },
+              "sodium": {
+                "value": 0,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "sugar": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "saturated_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "trans_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              }
+            }
+          },
+          {
+            "item_id": "no_weight",
+            "source_id": "synthetic_no_weight",
+            "status": "candidate",
+            "source_food_name": "測試湯C",
+            "basis": "每碗",
+            "basis_weight_g": 0,
+            "components_scope": "soup_only",
+            "preparation": "prepared",
+            "reason": "來源以每碗為基準且未提供克數，未提供纖維、糖、飽和及反式脂肪。",
+            "nutrients": {
+              "calories": {
+                "value": 450,
+                "unit": "kcal",
+                "comparison": "exact",
+                "evidence": "每碗450kcal"
+              },
+              "protein": {
+                "value": 10,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "蛋白質10g"
+              },
+              "carbs": {
+                "value": 80,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "碳水80g"
+              },
+              "fat": {
+                "value": 10,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "脂肪10g"
+              },
+              "sodium": {
+                "value": 800,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "鈉800mg"
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "sugar": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "saturated_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "trans_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              }
+            }
+          }
+        ]
+      },
+      "elapsed_seconds": 37.548,
+      "repeat": 1,
+      "batch": 2
+    },
+    {
+      "requested_model": "[AN]gemini-4-hydrogen-high",
+      "prompt_sha256": "3bb68f84df2c00dcf533dd50824d3ba10ed4974af48f7306a53852a875238150",
+      "retry_count": 0,
+      "http_status": 200,
+      "text": "{\"items\":[{\"item_id\":\"exact_rice\",\"source_id\":\"handian_rice\",\"status\":\"candidate\",\"source_food_name\":\"糯米腸\",\"basis\":\"per 100g\",\"basis_weight_g\":100,\"components_scope\":\"whole_food\",\"preparation\":\"蒸熟\",\"reason\":\"品牌與品項相符，依來源per 100g營養成分擷取；來源僅標示Salt未標示鈉故sodium為null，未標示反式脂肪故trans_fat為null。\",\"nutrients\":{\"calories\":{\"value\":301.2,\"unit\":\"kcal\",\"comparison\":\"exact\",\"evidence\":\"Energy 1506.2kJ/301.2kcal\"},\"protein\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"Protein 0g\"},\"carbs\":{\"value\":90,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"Carbohydrate 90g\"},\"fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"Fat 0g\"},\"sodium\":\n{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"Salt 0g\"}\n,\"fiber\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"Fibre 0g\"},\"sugar\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"of which sugar 0g\"},\"saturated_fat\":{\"value\":0.1,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"of which saturates 0.1g\"},\"trans_fat\":\n{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"Fat 0g\"}\n}}]}",
+      "finish_reason": "stop",
+      "returned_model": "gemini-4-hydrogen",
+      "usage": {
+        "prompt_tokens": 8937,
+        "completion_tokens": 368,
+        "total_tokens": 14132,
+        "prompt_tokens_details": {
+          "cached_tokens": 6883
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4827
+        }
+      },
+      "annotations": null,
+      "tool_calls": null,
+      "grounding_metadata": null,
+      "response_keys": [
+        "choices",
+        "created",
+        "id",
+        "model",
+        "object",
+        "usage"
+      ],
+      "json": {
+        "items": [
+          {
+            "item_id": "exact_rice",
+            "source_id": "handian_rice",
+            "status": "candidate",
+            "source_food_name": "糯米腸",
+            "basis": "per 100g",
+            "basis_weight_g": 100,
+            "components_scope": "whole_food",
+            "preparation": "蒸熟",
+            "reason": "品牌與品項相符，依來源per 100g營養成分擷取；來源僅標示Salt未標示鈉故sodium為null，未標示反式脂肪故trans_fat為null。",
+            "nutrients": {
+              "calories": {
+                "value": 301.2,
+                "unit": "kcal",
+                "comparison": "exact",
+                "evidence": "Energy 1506.2kJ/301.2kcal"
+              },
+              "protein": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Protein 0g"
+              },
+              "carbs": {
+                "value": 90,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Carbohydrate 90g"
+              },
+              "fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Fat 0g"
+              },
+              "sodium": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Salt 0g"
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Fibre 0g"
+              },
+              "sugar": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "of which sugar 0g"
+              },
+              "saturated_fat": {
+                "value": 0.1,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "of which saturates 0.1g"
+              },
+              "trans_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Fat 0g"
+              }
+            }
+          }
+        ]
+      },
+      "elapsed_seconds": 23.139,
+      "repeat": 2,
+      "batch": 1
+    },
+    {
+      "requested_model": "[AN]gemini-4-hydrogen-high",
+      "prompt_sha256": "ec1e42a357a416b358237e2c344c5e1c34ff33f47d883ec0e67bdfa5e76af0df",
+      "retry_count": 0,
+      "http_status": 200,
+      "text": "{\"items\":[{\"item_id\":\"known_weight_missing_sodium\",\"source_id\":\"changhua_soup\",\"status\":\"candidate\",\"source_food_name\":\"肉羹\",\"basis\":\"食物份量\",\"basis_weight_g\":330,\"components_scope\":\"meat_and_soup\",\"preparation\":\"prepared\",\"reason\":\"來源提供肉羹總重量330公克及熱量、蛋白質、碳水化合物、脂肪、膳食纖維，未提供鈉、糖、飽和脂肪與反式脂肪。\",\"nutrients\":{\"calories\":{\"value\":290,\"unit\":\"大卡\",\"comparison\":\"exact\",\"evidence\":\"熱量（大卡） 290\"},\"protein\":{\"value\":12.2,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"蛋白質（公克） 12.2\"},\"carbs\":{\"value\":22,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"碳水化合物（公克） 22\"},\"fat\":{\"value\":17,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"脂肪（公克） 17\"},\"sodium\":      \n  { \"value\": 0, \"unit\": \"mg\", \"comparison\": \"exact\", \"evidence\": \"\" }, \"fiber\":{\"value\":0.6,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"膳食纖維（公克） 0.6\"},\"sugar\": {\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"saturated_fat\": {\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"},\"trans_fat\": {\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"\"}}}]}",
+      "finish_reason": "stop",
+      "returned_model": "gemini-4-hydrogen",
+      "usage": {
+        "prompt_tokens": 4359,
+        "completion_tokens": 365,
+        "total_tokens": 14687,
+        "prompt_tokens_details": {
+          "cached_tokens": 2305
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 9963
+        }
+      },
+      "annotations": null,
+      "tool_calls": null,
+      "grounding_metadata": null,
+      "response_keys": [
+        "choices",
+        "created",
+        "id",
+        "model",
+        "object",
+        "usage"
+      ],
+      "json": {
+        "items": [
+          {
+            "item_id": "known_weight_missing_sodium",
+            "source_id": "changhua_soup",
+            "status": "candidate",
+            "source_food_name": "肉羹",
+            "basis": "食物份量",
+            "basis_weight_g": 330,
+            "components_scope": "meat_and_soup",
+            "preparation": "prepared",
+            "reason": "來源提供肉羹總重量330公克及熱量、蛋白質、碳水化合物、脂肪、膳食纖維，未提供鈉、糖、飽和脂肪與反式脂肪。",
+            "nutrients": {
+              "calories": {
+                "value": 290,
+                "unit": "大卡",
+                "comparison": "exact",
+                "evidence": "熱量（大卡） 290"
+              },
+              "protein": {
+                "value": 12.2,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "蛋白質（公克） 12.2"
+              },
+              "carbs": {
+                "value": 22,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "碳水化合物（公克） 22"
+              },
+              "fat": {
+                "value": 17,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "脂肪（公克） 17"
+              },
+              "sodium": {
+                "value": 0,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "fiber": {
+                "value": 0.6,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "膳食纖維（公克） 0.6"
+              },
+              "sugar": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "saturated_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "trans_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              }
+            }
+          }
+        ]
+      },
+      "elapsed_seconds": 49.208,
+      "repeat": 2,
+      "batch": 2
+    },
+    {
+      "requested_model": "[AN]gemini-4-hydrogen-high",
+      "prompt_sha256": "3bb68f84df2c00dcf533dd50824d3ba10ed4974af48f7306a53852a875238150",
+      "retry_count": 0,
+      "http_status": 200,
+      "text": "{\n  \"items\": [\n    {\n      \"item_id\": \"exact_rice\",\n      \"source_id\": \"handian_rice\",\n      \"status\": \"candidate\",\n      \"source_food_name\": \"糯米腸\",\n      \"basis\": \"per 100g\",\n      \"basis_weight_g\": 100,\n      \"components_scope\": \"whole_food\",\n      \"preparation\": \"prepared\",\n      \"reason\": \"品牌與品項相符，擷取per 100g營養成分；原文僅標示Salt未標示鈉，且缺反式脂肪\",\n      \"nutrients\": {\n        \"calories\": {\n          \"value\": 301.2,\n          \"unit\": \"kcal\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"Energy 1506.2kJ/301.2kcal\"\n        },\n        \"protein\": {\n          \"value\": 0,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"Protein 0g\"\n        },\n        \"carbs\": {\n          \"value\": 90,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"Carbohydrate 90g\"\n        },\n        \"fat\": {\n          \"value\": 0,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"Fat 0g\"\n        },\n        \"sodium\": {\n          \"value\": 0,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"Salt 0g\"\n        },\n        \"fiber\": {\n          \"value\": 0,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"Fibre 0g\"\n        },\n        \"sugar\": {\n          \"value\": 0,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"of which sugar 0g\"\n        },\n        \"saturated_fat\": {\n          \"value\": 0.1,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"of which saturates 0.1g\"\n        },\n        \"trans_fat\": {\n          \"value\": 0,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"not reported\"\n        }\n      }\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "returned_model": "gemini-4-hydrogen",
+      "usage": {
+        "prompt_tokens": 8937,
+        "completion_tokens": 607,
+        "total_tokens": 13568,
+        "prompt_tokens_details": {
+          "cached_tokens": 6883
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4024
+        }
+      },
+      "annotations": null,
+      "tool_calls": null,
+      "grounding_metadata": null,
+      "response_keys": [
+        "choices",
+        "created",
+        "id",
+        "model",
+        "object",
+        "usage"
+      ],
+      "json": {
+        "items": [
+          {
+            "item_id": "exact_rice",
+            "source_id": "handian_rice",
+            "status": "candidate",
+            "source_food_name": "糯米腸",
+            "basis": "per 100g",
+            "basis_weight_g": 100,
+            "components_scope": "whole_food",
+            "preparation": "prepared",
+            "reason": "品牌與品項相符，擷取per 100g營養成分；原文僅標示Salt未標示鈉，且缺反式脂肪",
+            "nutrients": {
+              "calories": {
+                "value": 301.2,
+                "unit": "kcal",
+                "comparison": "exact",
+                "evidence": "Energy 1506.2kJ/301.2kcal"
+              },
+              "protein": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Protein 0g"
+              },
+              "carbs": {
+                "value": 90,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Carbohydrate 90g"
+              },
+              "fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Fat 0g"
+              },
+              "sodium": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Salt 0g"
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Fibre 0g"
+              },
+              "sugar": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "of which sugar 0g"
+              },
+              "saturated_fat": {
+                "value": 0.1,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "of which saturates 0.1g"
+              },
+              "trans_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "not reported"
+              }
+            }
+          }
+        ]
+      },
+      "elapsed_seconds": 20.443,
+      "repeat": 3,
+      "batch": 1
+    },
+    {
+      "requested_model": "[AN]gemini-4-hydrogen-high",
+      "prompt_sha256": "ec1e42a357a416b358237e2c344c5e1c34ff33f47d883ec0e67bdfa5e76af0df",
+      "retry_count": 0,
+      "http_status": 200,
+      "text": "{\"items\":[{\"item_id\":\"known_weight_missing_sodium\",\"source_id\":\"changhua_soup\",\"status\":\"candidate\",\"source_food_name\":\"肉羹\",\"basis\":\"總重量(公克) 330\",\"basis_weight_g\":330,\"components_scope\":\"meat_and_soup\",\"preparation\":\"prepared\",\"reason\":\"來源提供彰化縣和美鎮小吃肉羹總重量330公克及熱量、蛋白質、脂肪、碳水化合物與膳食纖維標示；未提供鈉、糖、飽和脂肪與反式脂肪。\",\"nutrients\":{\"calories\":{\"value\":290,\"unit\":\"大卡\",\"comparison\":\"exact\",\"evidence\":\"熱量（大卡） 290\"},\"protein\":{\"value\":12.2,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"蛋白質（公克） 12.2\"},\"carbs\":{\"value\":22,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"碳水化合物（公克） 22\"},\"fat\":{\"value\":17,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"脂肪（公克） 17\"},\"sodium\":    {\"value\":0,\"unit\":\"mg\",\"comparison\":\"exact\",\"evidence\":\"鈉未標示\"}  ,\"fiber\":{\"value\":0.6,\"unit\":\"公克\",\"comparison\":\"exact\",\"evidence\":\"膳食纖維（公克） 0.6\"},\"sugar\":    {\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"糖未標示\"},\"saturated_fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"飽和脂肪未標示\"},\"trans_fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"反式脂肪未標示\"}}}]}",
+      "finish_reason": "stop",
+      "returned_model": "gemini-4-hydrogen",
+      "usage": {
+        "prompt_tokens": 4359,
+        "completion_tokens": 390,
+        "total_tokens": 10307,
+        "prompt_tokens_details": {
+          "cached_tokens": 2305
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 5558
+        }
+      },
+      "annotations": null,
+      "tool_calls": null,
+      "grounding_metadata": null,
+      "response_keys": [
+        "choices",
+        "created",
+        "id",
+        "model",
+        "object",
+        "usage"
+      ],
+      "json": {
+        "items": [
+          {
+            "item_id": "known_weight_missing_sodium",
+            "source_id": "changhua_soup",
+            "status": "candidate",
+            "source_food_name": "肉羹",
+            "basis": "總重量(公克) 330",
+            "basis_weight_g": 330,
+            "components_scope": "meat_and_soup",
+            "preparation": "prepared",
+            "reason": "來源提供彰化縣和美鎮小吃肉羹總重量330公克及熱量、蛋白質、脂肪、碳水化合物與膳食纖維標示；未提供鈉、糖、飽和脂肪與反式脂肪。",
+            "nutrients": {
+              "calories": {
+                "value": 290,
+                "unit": "大卡",
+                "comparison": "exact",
+                "evidence": "熱量（大卡） 290"
+              },
+              "protein": {
+                "value": 12.2,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "蛋白質（公克） 12.2"
+              },
+              "carbs": {
+                "value": 22,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "碳水化合物（公克） 22"
+              },
+              "fat": {
+                "value": 17,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "脂肪（公克） 17"
+              },
+              "sodium": {
+                "value": 0,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "鈉未標示"
+              },
+              "fiber": {
+                "value": 0.6,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "膳食纖維（公克） 0.6"
+              },
+              "sugar": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "糖未標示"
+              },
+              "saturated_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "飽和脂肪未標示"
+              },
+              "trans_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "反式脂肪未標示"
+              }
+            }
+          }
+        ]
+      },
+      "elapsed_seconds": 31.353,
+      "repeat": 3,
+      "batch": 2
+    }
+  ]
+}

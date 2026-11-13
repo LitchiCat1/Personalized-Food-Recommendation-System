@@ -1,0 +1,1379 @@
+{
+  "vision_original": {
+    "calls": 39,
+    "successful_grounding_responses": 39,
+    "recognized_items": 128,
+    "matched_items": 80,
+    "excluded_items": 48,
+    "excluded_by_nutrition_status": {
+      "unmatched": 46,
+      "not_evaluated": 2
+    },
+    "excluded_by_reason": {
+      "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充": 46,
+      "Gemini Vision 食物辨識信心過低 (30%)": 1,
+      "Gemini Vision 食物辨識信心過低 (40%)": 1
+    },
+    "matching_coverage": 0.625,
+    "name_confidence_below_045": 2,
+    "weight_confidence_below_075": 128,
+    "needs_confirmation_count": 80,
+    "p50_seconds": 15.036,
+    "p95_nearest_rank_seconds": 26.468,
+    "max_seconds": 27.826,
+    "photos": [
+      {
+        "filename": "地瓜球.jpg",
+        "item_counts": [
+          1,
+          1,
+          1
+        ],
+        "exact_name_multiset_stable": true,
+        "current_identity_multiset_stable": true,
+        "weight_totals_g": [
+          350,
+          350,
+          330
+        ],
+        "matched_calories": [
+          0,
+          0,
+          0
+        ],
+        "matched_items": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "filename": "多種菜色的便當.jpg",
+        "item_counts": [
+          8,
+          7,
+          8
+        ],
+        "exact_name_multiset_stable": false,
+        "current_identity_multiset_stable": false,
+        "weight_totals_g": [
+          570,
+          535,
+          565
+        ],
+        "matched_calories": [
+          761,
+          735,
+          723
+        ],
+        "matched_items": [
+          5,
+          5,
+          5
+        ]
+      },
+      {
+        "filename": "大腸包小腸.jpg",
+        "item_counts": [
+          2,
+          2,
+          2
+        ],
+        "exact_name_multiset_stable": true,
+        "current_identity_multiset_stable": true,
+        "weight_totals_g": [
+          200,
+          190,
+          190
+        ],
+        "matched_calories": [
+          283,
+          283,
+          283
+        ],
+        "matched_items": [
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "filename": "多種菜色的便當2.jpg",
+        "item_counts": [
+          6,
+          6,
+          6
+        ],
+        "exact_name_multiset_stable": false,
+        "current_identity_multiset_stable": false,
+        "weight_totals_g": [
+          540,
+          555,
+          570
+        ],
+        "matched_calories": [
+          704,
+          713,
+          776
+        ],
+        "matched_items": [
+          4,
+          4,
+          4
+        ]
+      },
+      {
+        "filename": "泡麵.jpg",
+        "item_counts": [
+          1,
+          1,
+          1
+        ],
+        "exact_name_multiset_stable": true,
+        "current_identity_multiset_stable": true,
+        "weight_totals_g": [
+          350,
+          350,
+          360
+        ],
+        "matched_calories": [
+          231,
+          231,
+          238
+        ],
+        "matched_items": [
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "filename": "滷肉飯.jpg",
+        "item_counts": [
+          4,
+          4,
+          4
+        ],
+        "exact_name_multiset_stable": true,
+        "current_identity_multiset_stable": true,
+        "weight_totals_g": [
+          306,
+          280,
+          303
+        ],
+        "matched_calories": [
+          708,
+          666,
+          707
+        ],
+        "matched_items": [
+          4,
+          4,
+          4
+        ]
+      },
+      {
+        "filename": "水餃17顆左右.jpg",
+        "item_counts": [
+          2,
+          2,
+          2
+        ],
+        "exact_name_multiset_stable": true,
+        "current_identity_multiset_stable": true,
+        "weight_totals_g": [
+          445,
+          390,
+          465
+        ],
+        "matched_calories": [
+          856,
+          746,
+          896
+        ],
+        "matched_items": [
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "filename": "牛肉麵.jpg",
+        "item_counts": [
+          6,
+          5,
+          5
+        ],
+        "exact_name_multiset_stable": false,
+        "current_identity_multiset_stable": false,
+        "weight_totals_g": [
+          753,
+          728,
+          708
+        ],
+        "matched_calories": [
+          276,
+          276,
+          249
+        ],
+        "matched_items": [
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "filename": "臭豆腐.jpg",
+        "item_counts": [
+          2,
+          2,
+          2
+        ],
+        "exact_name_multiset_stable": true,
+        "current_identity_multiset_stable": true,
+        "weight_totals_g": [
+          340,
+          260,
+          330
+        ],
+        "matched_calories": [
+          47,
+          35,
+          41
+        ],
+        "matched_items": [
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "filename": "肉羹麵.jpg",
+        "item_counts": [
+          6,
+          4,
+          4
+        ],
+        "exact_name_multiset_stable": false,
+        "current_identity_multiset_stable": false,
+        "weight_totals_g": [
+          520,
+          523,
+          493
+        ],
+        "matched_calories": [
+          278,
+          294,
+          294
+        ],
+        "matched_items": [
+          3,
+          2,
+          2
+        ]
+      },
+      {
+        "filename": "蛋糕.jpg",
+        "item_counts": [
+          1,
+          1,
+          1
+        ],
+        "exact_name_multiset_stable": true,
+        "current_identity_multiset_stable": true,
+        "weight_totals_g": [
+          600,
+          600,
+          600
+        ],
+        "matched_calories": [
+          1716,
+          1716,
+          1716
+        ],
+        "matched_items": [
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "filename": "蔥油餅.jpg",
+        "item_counts": [
+          2,
+          2,
+          2
+        ],
+        "exact_name_multiset_stable": true,
+        "current_identity_multiset_stable": true,
+        "weight_totals_g": [
+          175,
+          170,
+          185
+        ],
+        "matched_calories": [
+          468,
+          453,
+          499
+        ],
+        "matched_items": [
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "filename": "陽春麵.jpg",
+        "item_counts": [
+          4,
+          4,
+          4
+        ],
+        "exact_name_multiset_stable": false,
+        "current_identity_multiset_stable": false,
+        "weight_totals_g": [
+          443,
+          483,
+          438
+        ],
+        "matched_calories": [
+          248,
+          259,
+          234
+        ],
+        "matched_items": [
+          2,
+          3,
+          2
+        ]
+      }
+    ]
+  },
+  "vision_q70": {
+    "calls": 6,
+    "successful_grounding_responses": 6,
+    "recognized_items": 37,
+    "matched_items": 22,
+    "excluded_items": 15,
+    "excluded_by_nutrition_status": {
+      "unmatched": 14,
+      "not_evaluated": 1
+    },
+    "excluded_by_reason": {
+      "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充": 14,
+      "Gemini Vision 食物辨識信心過低 (35%)": 1
+    },
+    "matching_coverage": 0.5945945945945946,
+    "name_confidence_below_045": 1,
+    "weight_confidence_below_075": 37,
+    "needs_confirmation_count": 22,
+    "p50_seconds": 17.0265,
+    "p95_nearest_rank_seconds": 24.682,
+    "max_seconds": 24.682,
+    "photos": [
+      {
+        "filename": "牛肉麵.jpg",
+        "item_counts": [
+          5,
+          5,
+          5
+        ],
+        "exact_name_multiset_stable": false,
+        "current_identity_multiset_stable": false,
+        "weight_totals_g": [
+          718,
+          643,
+          718
+        ],
+        "matched_calories": [
+          276,
+          525,
+          249
+        ],
+        "matched_items": [
+          2,
+          3,
+          2
+        ]
+      },
+      {
+        "filename": "多種菜色的便當.jpg",
+        "item_counts": [
+          7,
+          8,
+          7
+        ],
+        "exact_name_multiset_stable": false,
+        "current_identity_multiset_stable": false,
+        "weight_totals_g": [
+          510,
+          563,
+          510
+        ],
+        "matched_calories": [
+          682,
+          716,
+          685
+        ],
+        "matched_items": [
+          5,
+          5,
+          5
+        ]
+      }
+    ]
+  },
+  "relay_extractions": [
+    {
+      "file": "extraction.json",
+      "calls": 6,
+      "expected_items": 39,
+      "returned_items": 12,
+      "latencies_seconds": [
+        16.261,
+        37.548,
+        23.139,
+        49.208,
+        20.443,
+        31.353
+      ],
+      "http_200": 6,
+      "statuses": [
+        {
+          "repeat": 1,
+          "batch": 1,
+          "items": [
+            {
+              "id": "exact_rice",
+              "status": "candidate",
+              "sodium": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Salt 0g"
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Fibre 0g"
+              },
+              "source_id": "handian_rice"
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "batch": 2,
+          "items": [
+            {
+              "id": "known_weight_missing_sodium",
+              "status": "candidate",
+              "sodium": {
+                "value": 0,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "fiber": {
+                "value": 0.6,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "膳食纖維（公克） 0.6"
+              },
+              "source_id": "changhua_soup"
+            },
+            {
+              "id": "inconsistent_official_noodles",
+              "status": "ambiguous",
+              "sodium": {
+                "value": 0,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "膳食纖維（公克） 0"
+              },
+              "source_id": "changhua_noodles"
+            },
+            {
+              "id": "wrong_tofu_scope",
+              "status": "incompatible",
+              "sodium": {
+                "value": 0,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "source_id": "shenkeng_tofu"
+            },
+            {
+              "id": "fake_food",
+              "status": "no_evidence",
+              "sodium": {
+                "value": 0,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "source_id": "no_source"
+            },
+            {
+              "id": "adversarial",
+              "status": "candidate",
+              "sodium": {
+                "value": 600,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "鈉600 mg"
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "source_id": "synthetic_adversarial"
+            },
+            {
+              "id": "salt_volume",
+              "status": "candidate",
+              "sodium": {
+                "value": 0,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "source_id": "synthetic_volume"
+            },
+            {
+              "id": "no_weight",
+              "status": "candidate",
+              "sodium": {
+                "value": 800,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "鈉800mg"
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "source_id": "synthetic_no_weight"
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "batch": 1,
+          "items": [
+            {
+              "id": "exact_rice",
+              "status": "candidate",
+              "sodium": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Salt 0g"
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Fibre 0g"
+              },
+              "source_id": "handian_rice"
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "batch": 2,
+          "items": [
+            {
+              "id": "known_weight_missing_sodium",
+              "status": "candidate",
+              "sodium": {
+                "value": 0,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": ""
+              },
+              "fiber": {
+                "value": 0.6,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "膳食纖維（公克） 0.6"
+              },
+              "source_id": "changhua_soup"
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "batch": 1,
+          "items": [
+            {
+              "id": "exact_rice",
+              "status": "candidate",
+              "sodium": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Salt 0g"
+              },
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Fibre 0g"
+              },
+              "source_id": "handian_rice"
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "batch": 2,
+          "items": [
+            {
+              "id": "known_weight_missing_sodium",
+              "status": "candidate",
+              "sodium": {
+                "value": 0,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "鈉未標示"
+              },
+              "fiber": {
+                "value": 0.6,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "膳食纖維（公克） 0.6"
+              },
+              "source_id": "changhua_soup"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "extraction-json_object-direct.json",
+      "calls": 2,
+      "expected_items": 13,
+      "returned_items": 13,
+      "latencies_seconds": [
+        17.162,
+        40.052
+      ],
+      "http_200": 2,
+      "statuses": [
+        {
+          "repeat": 1,
+          "batch": 1,
+          "items": [
+            {
+              "id": "exact_rice",
+              "status": "candidate",
+              "sodium": null,
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Fibre\n0g"
+              },
+              "source_id": "handian_rice"
+            },
+            {
+              "id": "exact_soup",
+              "status": "candidate",
+              "sodium": {
+                "value": 1506,
+                "unit": "毫克",
+                "comparison": "exact",
+                "evidence": "鈉\n1506 毫克"
+              },
+              "fiber": null,
+              "source_id": "green_soup"
+            },
+            {
+              "id": "unknown_rice",
+              "status": "incompatible",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "handian_rice"
+            },
+            {
+              "id": "wrong_balls",
+              "status": "incompatible",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "gq_frozen_balls"
+            },
+            {
+              "id": "wrong_sesame",
+              "status": "no_evidence",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "gabi_sesame_balls"
+            },
+            {
+              "id": "wrong_soup_scope",
+              "status": "incompatible",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "green_soup"
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "batch": 2,
+          "items": [
+            {
+              "id": "known_weight_missing_sodium",
+              "status": "candidate",
+              "sodium": null,
+              "fiber": {
+                "value": 0.6,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "膳食纖維（公克）\n0.6"
+              },
+              "source_id": "changhua_soup"
+            },
+            {
+              "id": "inconsistent_official_noodles",
+              "status": "candidate",
+              "sodium": null,
+              "fiber": {
+                "value": 0,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "膳食纖維（公克）\n0"
+              },
+              "source_id": "changhua_noodles"
+            },
+            {
+              "id": "wrong_tofu_scope",
+              "status": "incompatible",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "shenkeng_tofu"
+            },
+            {
+              "id": "fake_food",
+              "status": "no_evidence",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "no_source"
+            },
+            {
+              "id": "adversarial",
+              "status": "candidate",
+              "sodium": {
+                "value": 600,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "鈉600 mg"
+              },
+              "fiber": null,
+              "source_id": "synthetic_adversarial"
+            },
+            {
+              "id": "salt_volume",
+              "status": "candidate",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "synthetic_volume"
+            },
+            {
+              "id": "no_weight",
+              "status": "candidate",
+              "sodium": {
+                "value": 800,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "鈉800mg"
+              },
+              "fiber": null,
+              "source_id": "synthetic_no_weight"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "extraction-json_object-tavily.json",
+      "calls": 4,
+      "expected_items": 26,
+      "returned_items": 26,
+      "latencies_seconds": [
+        17.649,
+        26.42,
+        20.637,
+        28.456
+      ],
+      "http_200": 4,
+      "statuses": [
+        {
+          "repeat": 1,
+          "batch": 1,
+          "items": [
+            {
+              "id": "exact_rice",
+              "status": "candidate",
+              "sodium": null,
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Fibre\n0g"
+              },
+              "source_id": "handian_rice"
+            },
+            {
+              "id": "exact_soup",
+              "status": "no_evidence",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "green_soup"
+            },
+            {
+              "id": "unknown_rice",
+              "status": "incompatible",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "handian_rice"
+            },
+            {
+              "id": "wrong_balls",
+              "status": "incompatible",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "gq_frozen_balls"
+            },
+            {
+              "id": "wrong_sesame",
+              "status": "no_evidence",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "gabi_sesame_balls"
+            },
+            {
+              "id": "wrong_soup_scope",
+              "status": "incompatible",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "green_soup"
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "batch": 2,
+          "items": [
+            {
+              "id": "known_weight_missing_sodium",
+              "status": "candidate",
+              "sodium": null,
+              "fiber": {
+                "value": 0.6,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "| 膳食纖維（公克） | 0.6 |"
+              },
+              "source_id": "changhua_soup"
+            },
+            {
+              "id": "inconsistent_official_noodles",
+              "status": "candidate",
+              "sodium": null,
+              "fiber": {
+                "value": 0,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "| 膳食纖維（公克） | 0 |"
+              },
+              "source_id": "changhua_noodles"
+            },
+            {
+              "id": "wrong_tofu_scope",
+              "status": "no_evidence",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "shenkeng_tofu"
+            },
+            {
+              "id": "fake_food",
+              "status": "no_evidence",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "no_source"
+            },
+            {
+              "id": "adversarial",
+              "status": "candidate",
+              "sodium": {
+                "value": 600,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "鈉600 mg"
+              },
+              "fiber": null,
+              "source_id": "synthetic_adversarial"
+            },
+            {
+              "id": "salt_volume",
+              "status": "candidate",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "synthetic_volume"
+            },
+            {
+              "id": "no_weight",
+              "status": "candidate",
+              "sodium": {
+                "value": 800,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "鈉800mg"
+              },
+              "fiber": null,
+              "source_id": "synthetic_no_weight"
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "batch": 1,
+          "items": [
+            {
+              "id": "exact_rice",
+              "status": "candidate",
+              "sodium": null,
+              "fiber": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "Fibre\n0g"
+              },
+              "source_id": "handian_rice"
+            },
+            {
+              "id": "exact_soup",
+              "status": "no_evidence",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "green_soup"
+            },
+            {
+              "id": "unknown_rice",
+              "status": "incompatible",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "handian_rice"
+            },
+            {
+              "id": "wrong_balls",
+              "status": "incompatible",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "gq_frozen_balls"
+            },
+            {
+              "id": "wrong_sesame",
+              "status": "no_evidence",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "gabi_sesame_balls"
+            },
+            {
+              "id": "wrong_soup_scope",
+              "status": "incompatible",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "green_soup"
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "batch": 2,
+          "items": [
+            {
+              "id": "known_weight_missing_sodium",
+              "status": "candidate",
+              "sodium": null,
+              "fiber": {
+                "value": 0.6,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "| 膳食纖維（公克） | 0.6 |"
+              },
+              "source_id": "changhua_soup"
+            },
+            {
+              "id": "inconsistent_official_noodles",
+              "status": "candidate",
+              "sodium": null,
+              "fiber": {
+                "value": 0,
+                "unit": "公克",
+                "comparison": "exact",
+                "evidence": "| 膳食纖維（公克） | 0 |"
+              },
+              "source_id": "changhua_noodles"
+            },
+            {
+              "id": "wrong_tofu_scope",
+              "status": "no_evidence",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "shenkeng_tofu"
+            },
+            {
+              "id": "fake_food",
+              "status": "no_evidence",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "no_source"
+            },
+            {
+              "id": "adversarial",
+              "status": "candidate",
+              "sodium": {
+                "value": 600,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "鈉600 mg"
+              },
+              "fiber": null,
+              "source_id": "synthetic_adversarial"
+            },
+            {
+              "id": "salt_volume",
+              "status": "candidate",
+              "sodium": null,
+              "fiber": null,
+              "source_id": "synthetic_volume"
+            },
+            {
+              "id": "no_weight",
+              "status": "candidate",
+              "sodium": {
+                "value": 800,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "鈉800mg"
+              },
+              "fiber": null,
+              "source_id": "synthetic_no_weight"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "tavily": {
+    "search_requests": 8,
+    "extract_requests": 2,
+    "reported_credits": 9,
+    "search_latencies_seconds": [
+      2.146,
+      2.977,
+      3.37,
+      3.111,
+      2.449,
+      2.82,
+      1.991,
+      3.238
+    ],
+    "extract_latencies_seconds": [
+      18.559,
+      5.604
+    ]
+  },
+  "tavily_settings": {
+    "search_requests": 3,
+    "extract_requests": 4,
+    "http_200": 7,
+    "reported_credits": 4,
+    "cases": [
+      {
+        "case": "rice_taiwan",
+        "seconds": 1.96,
+        "results": [
+          {
+            "url": "https://chinesecalorie.com/china/zh-hant/foods/snacks/jilin-sticky-rice-sausage-cn",
+            "title": "吉林糯米腸熱量與營養 | ChineseCalorie",
+            "score": 0.7923036
+          },
+          {
+            "url": "https://www.pizzafood.com.tw/products/%E6%B6%88%E8%B2%BB%E8%80%85%E9%87%91%E7%89%8C%E7%8D%8E%E3%80%90%E7%8B%80%E5%85%83%E7%B3%AF%E7%B1%B3%E8%85%B8%E3%80%91580%E5%85%8B6%E6%A2%9D",
+            "title": "消費者金牌獎【狀元糯米腸】580克/6條",
+            "score": 0.77167153
+          },
+          {
+            "url": "https://www.epochtimes.com/b5/26/4/7/n14736548.htm",
+            "title": "營養師傳授技巧 安心享用爆卡美食糯米腸 | 大紀元",
+            "score": 0.7272981
+          },
+          {
+            "url": "https://www.green-n-safe.com/Products/Content?id=MAQ0064ABCS",
+            "title": "古早味花生糯米腸 (220g/2條)｜永豐餘生技",
+            "score": 0.6798167
+          },
+          {
+            "url": "https://www.threads.com/@steven_go_fitness/post/DYJ9zBTks_5/%E5%90%83%E7%B3%AF%E7%B1%B3%E8%85%B8%E8%A6%81%E6%B3%A8%E6%84%8F%E7%9A%84%E4%BA%8B%E7%B3%AF%E7%B1%B3%E8%85%B8%E6%9C%80%E5%A4%A7%E7%9A%84%E5%95%8F%E9%A1%8C%E4%B8%8D%E6%98%AF%E4%B8%8D%E8%83%BD%E5%90%83%E8%80%8C%E6%98%AF%E5%BE%88%E5%AE%B9%E6%98%93%E5%9C%A8%E4%BD%A0%E6%B2%92%E6%84%9F%E8%A6%BA%E7%9A%84%E6%83%85%E6%B3%81%E4%B8%8B%E6%BE%B1%E7%B2%89%E6%B2%B9%E8%84%82%E9%88%89%E4%B8%80%E6%AC%A1%E5%90%83%E6%BB%BF%E5%B0%A4%E5%85%B6%E5%A4%9C%E5%B8%82%E9%A6%99%E8%85%B8%E6%94%A4%E9%82%A3%E7%A8%AE%E7%B3%AF%E7%B1%B3%E8%85%B8%E5%BE%88%E5%A4%9A%E6%9C%83%E5%85%88%E8%92%B8%E5%86%8D%E6%B2%B9%E7%82%B8%E5%86%8D%E5%88%B7%E9%86%AC%E7%86%B1%E9%87%8F%E4%B8%8D%E6%96%B7%E7%96%8A%E5%8A%A0%E4%BB%A5%E7%82%BA%E5%9C%A8%E5%90%83%E4%B8%80%E6%A2%9D",
+            "title": "吃糯米腸要注意的事 糯米腸最大的問題不是不能吃 而是很容易在你沒感覺的情況下 「澱粉＋油脂＋鈉」一次吃滿 尤其夜市、香腸攤那種糯米腸很多會先蒸 再油炸，再刷醬 熱量不斷疊加，以為在吃一條小點心， 但實際上比較像壓縮版便當",
+            "score": 0.4815148
+          }
+        ]
+      },
+      {
+        "case": "exact_soup",
+        "seconds": 3.626,
+        "results": [
+          {
+            "url": "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS",
+            "title": "香菇赤肉羹｜永豐餘生技",
+            "score": 0.76454014
+          },
+          {
+            "url": "https://www.green-n-safe.com/Products/Content?id=UAA3240C",
+            "title": "台式小吃組｜永豐餘生技",
+            "score": 0.44013837
+          },
+          {
+            "url": "https://www.green-n-safe.com/Products/Content?id=MFA0004ABCS",
+            "title": "香菇鮮筍雞茸粥｜永豐餘生技",
+            "score": 0.34587815
+          },
+          {
+            "url": "https://www.green-n-safe.com/Products/Content?id=MEC0023ABCS",
+            "title": "老菜脯黑蒜雞湯｜永豐餘生技",
+            "score": 0.33993718
+          },
+          {
+            "url": "https://www.green-n-safe.com/Products/Content?id=MAC0075ABCS",
+            "title": "麻油放養雞｜永豐餘生技",
+            "score": 0.33111975
+          }
+        ]
+      },
+      {
+        "case": "exact_fake",
+        "seconds": 1.86,
+        "results": [
+          {
+            "url": "https://www.facebook.com/TWsweetpotato/videos/%E5%9B%9B%E5%80%8B%E4%B8%8D%E5%90%8C%E6%84%8F%E5%9C%B0%E7%93%9C%E7%90%83%E9%80%B2%E5%9C%8B%E9%9A%9B%EF%B8%8F%E5%85%A8%E7%90%83%E7%AC%AC%E4%B8%80%E5%8C%85%EF%B8%8F%E7%AC%A6%E5%90%88%E7%BE%8E%E5%9C%8Bfda%E9%A3%9F%E5%93%81%E7%87%9F%E9%A4%8A%E6%A8%99%E7%A4%BA%E7%9A%84%E5%9C%B0%E7%93%9C%E7%90%83%E7%B6%93sgs%E5%8F%B0%E7%81%A3%E6%AA%A2%E6%B8%AC%E5%A4%A7%E8%85%B8%E6%A1%BF%E8%8F%8C%E4%BA%BA%E5%B7%A5%E8%89%B2%E7%B4%A0%E9%98%B2%E8%85%90%E5%8A%91%E5%9D%87%E7%82%BA%E9%AB%98%E6%A8%99%E6%BA%96%E9%99%B0%E6%80%A7%E9%9B%B6%E6%AA%A2%E5%87%BA%E6%B2%B9%E5%93%81%E6%9B%B4%E7%AC%A6%E5%90%883m%E5%9C%8B%E9%9A%9B%E9%85%B8%E5%83%B9%E8%A9%A6%E7%B4%99%E6%B8%AC%E8%A9%A6%E6%A8%99/633506654507309",
+            "title": "❌四個不同意❌ 🌕地瓜球進國際🌕 ‼️全球第一包‼️ 符合🇺 ...",
+            "score": 0.3116363
+          },
+          {
+            "url": "https://www.facebook.com/TWsweetpotato/posts/%E5%9B%9B%E5%80%8B%E4%B8%8D%E5%90%8C%E6%84%8F%E5%9C%B0%E7%93%9C%E7%90%83%E9%80%B2%E5%9C%8B%E9%9A%9B%EF%B8%8F%E5%85%A8%E7%90%83%E7%AC%AC%E4%B8%80%E5%8C%85%EF%B8%8F%E7%AC%A6%E5%90%88%E7%BE%8E%E5%9C%8Bfda%E9%A3%9F%E5%93%81%E7%87%9F%E9%A4%8A%E6%A8%99%E7%A4%BA%E7%9A%84%E5%9C%B0%E7%93%9C%E7%90%83%E7%B6%93sgs%E5%8F%B0%E7%81%A3%E6%AA%A2%E6%B8%AC%E5%A4%A7%E8%85%B8%E6%A1%BF%E8%8F%8C%E4%BA%BA%E5%B7%A5%E8%89%B2%E7%B4%A0%E9%98%B2%E8%85%90%E5%8A%91%E5%9D%87%E7%82%BA%E9%AB%98%E6%A8%99%E6%BA%96%E9%99%B0%E6%80%A7%E9%9B%B6%E6%AA%A2%E5%87%BA%E6%B2%B9%E5%93%81%E6%9B%B4%E7%AC%A6%E5%90%883m%E5%9C%8B%E9%9A%9B%E9%85%B8%E5%83%B9%E8%A9%A6%E7%B4%99%E6%B8%AC%E8%A9%A6%E6%A8%99/876050243072183?locale=hi_IN",
+            "title": "台灣番薯丸-地瓜球第一品牌（品牌總部）",
+            "score": 0.27308947
+          },
+          {
+            "url": "https://www.tahsda.org.tw/communitymedicine/files/20161126_RAOHEStreetMarketNight/QQ%E7%8E%8B%E5%AD%90%E5%9C%B0%E7%93%9C%E7%90%83.pdf",
+            "title": "QQ王子地瓜球",
+            "score": 0.22337708
+          },
+          {
+            "url": "https://www.threads.com/@tw_sweetpotato/post/DMKZ3_mSpLW/%E6%98%AF%E4%B8%8D%E6%98%AF%E4%BB%A5%E7%82%BA%E5%9C%B0%E7%93%9C%E7%90%83%E4%B8%8A%E4%BA%86%E5%85%B6%E4%BB%96%E9%A1%8F%E8%89%B2%E5%B0%B1%E6%B2%92%E4%BA%8B%E4%BA%86",
+            "title": "是不是以為地瓜球上了其他顏色就沒事了🙂",
+            "score": 0.08137364
+          },
+          {
+            "url": "https://www.youtube.com/watch?v=zBHtJlAxRaw",
+            "title": "地瓜球遭批「乾硬如石頭」　業者：沒加發粉熱漲冷縮｜華視新聞 20240421",
+            "score": 0.073963374
+          }
+        ]
+      },
+      {
+        "case": "basic_markdown",
+        "seconds": 0.861,
+        "results": [
+          {
+            "url": "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS",
+            "characters": 7800,
+            "sha256": "f3e910650351fed56cecc3dae5b15293b16619f54506ab54c7b4ccf09dce4693",
+            "numeric_markers": {
+              "94.6": true,
+              "283.8": true,
+              "1506": true,
+              "502": true,
+              "300": true
+            },
+            "label_markers": {
+              "香菇赤肉羹": true,
+              "營養標示": true,
+              "每100": false,
+              "蛋白質": true,
+              "鈉": true
+            }
+          }
+        ]
+      },
+      {
+        "case": "advanced_markdown",
+        "seconds": 0.837,
+        "results": [
+          {
+            "url": "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS",
+            "characters": 7800,
+            "sha256": "f3e910650351fed56cecc3dae5b15293b16619f54506ab54c7b4ccf09dce4693",
+            "numeric_markers": {
+              "94.6": true,
+              "283.8": true,
+              "1506": true,
+              "502": true,
+              "300": true
+            },
+            "label_markers": {
+              "香菇赤肉羹": true,
+              "營養標示": true,
+              "每100": false,
+              "蛋白質": true,
+              "鈉": true
+            }
+          }
+        ]
+      },
+      {
+        "case": "advanced_targeted",
+        "seconds": 0.84,
+        "results": [
+          {
+            "url": "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS",
+            "characters": 7800,
+            "sha256": "f3e910650351fed56cecc3dae5b15293b16619f54506ab54c7b4ccf09dce4693",
+            "numeric_markers": {
+              "94.6": true,
+              "283.8": true,
+              "1506": true,
+              "502": true,
+              "300": true
+            },
+            "label_markers": {
+              "香菇赤肉羹": true,
+              "營養標示": true,
+              "每100": false,
+              "蛋白質": true,
+              "鈉": true
+            }
+          }
+        ]
+      },
+      {
+        "case": "basic_text_control",
+        "seconds": 0.856,
+        "results": [
+          {
+            "url": "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS",
+            "characters": 2384,
+            "sha256": "f4471d1b01fa664a144565a280ea0e98ff2a93ce0ab6d35b3d3a85ebc81c8459",
+            "numeric_markers": {
+              "94.6": true,
+              "283.8": true,
+              "1506": true,
+              "502": true,
+              "300": true
+            },
+            "label_markers": {
+              "香菇赤肉羹": true,
+              "營養標示": true,
+              "每100": false,
+              "蛋白質": true,
+              "鈉": true
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "tavily_all_calls": {
+    "search_requests": 11,
+    "extract_requests": 6,
+    "reported_credits": 13
+  },
+  "positive_pipeline": {
+    "calls": 3,
+    "historical_raw_harness_checks_passed": 43,
+    "historical_raw_harness_checks": 60,
+    "historical_harness_limitation": "Absent items incorrectly passed three expected-null checks. Preserve raw evidence; use corrected offline replay below.",
+    "latencies_seconds": [
+      16.606,
+      18.305,
+      14.971
+    ],
+    "offline_production_parser_replay": [
+      {
+        "repeat": 1,
+        "raw_json_parseable": true,
+        "production_parser_parseable": true,
+        "checks_passed": 20,
+        "checks": 20
+      },
+      {
+        "repeat": 2,
+        "raw_json_parseable": true,
+        "production_parser_parseable": true,
+        "checks_passed": 20,
+        "checks": 20
+      },
+      {
+        "repeat": 3,
+        "raw_json_parseable": false,
+        "production_parser_parseable": true,
+        "checks_passed": 20,
+        "checks": 20
+      }
+    ],
+    "corrected_raw_parser_checks_passed": 40,
+    "corrected_production_parser_checks_passed": 60,
+    "corrected_checks": 60
+  },
+  "all_relay_calls": {
+    "attempted": 67,
+    "http_200": 66,
+    "errors": [
+      "ReadTimeout"
+    ],
+    "reported_usage_totals": {
+      "prompt_tokens": 167047,
+      "completion_tokens": 45113,
+      "total_tokens": 361440
+    },
+    "returned_models": [
+      "gemini-4-hydrogen"
+    ]
+  }
+}

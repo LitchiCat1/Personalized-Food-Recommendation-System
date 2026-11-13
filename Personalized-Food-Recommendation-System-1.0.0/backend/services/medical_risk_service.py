@@ -1,5 +1,8 @@
+import math
+
 from services.disease_rule_service import normalize_allergen_ids, normalize_condition_ids
 from services.nutrient_service import get_nutrient_value, is_fried_food_name
+from services.nutrition_profile_service import NutritionProfileError, calculate_portion
 from services.profile_service import compute_bmr, compute_tdee, resolve_energy_factor, resolve_weight_goal_energy
 
 
@@ -51,6 +54,79 @@ def scale_nutrients(nutrients: dict, portion_g: float | None = None) -> dict:
     return {
         key: normalize_number(get_nutrient_value(nutrients, source_key)) * scale
         for key, (source_key, _unit) in NUTRIENT_FIELDS.items()
+    }
+
+
+def _coverage_values(coverage: dict) -> tuple[dict, list]:
+    if not isinstance(coverage, dict) or coverage.get("schema_version") != "NutritionCoverageV1":
+        raise NutritionProfileError("invalid_coverage", "Expected canonical nutrition coverage")
+    rows = coverage.get("nutrients")
+    if not isinstance(rows, dict):
+        raise NutritionProfileError("invalid_coverage", "Missing nutrient coverage")
+    values, missing = {}, []
+    for field in NUTRIENT_FIELDS:
+        row = rows.get(field)
+        if not isinstance(row, dict):
+            raise NutritionProfileError("invalid_coverage", "Missing nutrient coverage row")
+        value = row.get("known_sum")
+        counts = [row.get(key) for key in ("known_items", "eligible_items", "unresolved_items")]
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
+                or (isinstance(value, int) and value.bit_length() > 1024) or not math.isfinite(value)
+                or value < 0 or any(type(count) is not int or count < 0 for count in counts)
+                or counts[0] + counts[2] != counts[1]
+                or row.get("status") not in {"complete", "partial", "unknown", "legacy_unknown"}):
+            raise NutritionProfileError("invalid_coverage", "Invalid nutrient coverage values")
+        complete = row["status"] == "complete" and counts[1] > 0 and counts[2] == 0
+        if row["status"] == "complete" and not complete:
+            raise NutritionProfileError("invalid_coverage", "Inconsistent complete coverage")
+        values[field] = value
+        if not complete:
+            missing.append(field)
+    return values, missing
+
+
+def _critical_nutrients(conditions: list, disease_rules: dict) -> set:
+    fields = {"trans_fat"} if conditions else set()
+    for condition in conditions:
+        rule = disease_rules.get(condition) or {}
+        for nutrient in rule.get("risk_nutrients", {}):
+            decided = threshold_resolution(rule, nutrient)
+            if not decided or decided["use"] != "derived":
+                fields.add(nutrient)
+        for nutrient in rule.get("personalized_limits", {}):
+            decided = threshold_resolution(rule, nutrient)
+            if not decided or decided["use"] != "configured":
+                fields.add(nutrient)
+    return fields
+
+
+def _v2_assessment(result: dict, conditions: list, disease_rules: dict, missing: list,
+                   *, candidate: dict | None = None, allergens: list | None = None) -> dict:
+    critical = _critical_nutrients(conditions, disease_rules)
+    critical_missing = sorted(critical.intersection(missing) | critical.difference(NUTRIENT_FIELDS))
+    unresolved = list(critical_missing)
+    if len(missing) == len(NUTRIENT_FIELDS):
+        unresolved.append("nutrition")
+    if candidate is not None:
+        if allergens and not any(risk["type"] == "allergen" for risk in result["risks"]):
+            unresolved.append("allergens")
+        needs_gi = any((disease_rules.get(condition) or {}).get("blocked_gi") for condition in conditions)
+        if needs_gi and not any(risk["type"] == "glycemic_index" for risk in result["risks"]):
+            if candidate.get("gi_source") != "verified_reference" or candidate.get("gi") not in {"low", "medium", "high"}:
+                unresolved.append("gi")
+    known_excess = any(risk["type"] in {"nutrient_limit", "meal_nutrient_limit"} for risk in result["risks"])
+    known_risk = bool(result["risks"])
+    status = ("known_excess" if known_excess else "known_risk" if known_risk else
+              "unknown" if unresolved else "within_reference_limits")
+    return {
+        **result,
+        "nutrition_contract_version": 2,
+        "assessment_status": status,
+        "assessment_scope": "reference_nutrition_only",
+        "missing_nutrition_fields": list(missing),
+        "missing_critical_nutrition_fields": critical_missing,
+        "unresolved_risk_fields": unresolved,
+        "is_safe": False if result["block_reasons"] else None if unresolved else result["is_safe"],
     }
 
 
@@ -240,10 +316,24 @@ def evaluate_medical_risk(
     allergen_taxonomy: dict,
     portion_g: float | None = None,
     user_profile: dict | None = None,
+    *,
+    nutrition_contract_version: int = 1,
+    nutrition_coverage: dict | None = None,
 ) -> dict:
     conditions = normalize_condition_ids(user_conditions, disease_rules)
     allergens = normalize_allergen_ids(user_allergens, allergen_taxonomy)
-    nutrients = scale_nutrients(candidate, portion_g)
+    is_v2 = ((type(nutrition_contract_version) is int and nutrition_contract_version == 2) or
+             (type(candidate.get("nutrition_contract_version")) is int and candidate["nutrition_contract_version"] == 2))
+    missing = []
+    if is_v2 and nutrition_coverage is not None:
+        nutrients, missing = _coverage_values(nutrition_coverage)
+    elif is_v2:
+        portion = calculate_portion(candidate.get("nutrition_profile"),
+                                    portion_g if portion_g is not None else candidate.get("weight_g"),
+                                    portion_source=candidate.get("portion_source", "unknown"))
+        nutrients, missing = portion["values"], portion["missing_nutrition_fields"]
+    else:
+        nutrients = scale_nutrients(candidate, portion_g)
 
     # 理想體重 W 與每日熱量 E。先前這裡自己抄了一份公式，跟下面的
     # resolve_user_energy_and_weight 是兩套會各自漂移的數字——這個檔案已經
@@ -335,7 +425,7 @@ def evaluate_medical_risk(
 
     block_reasons = [risk["message"] for risk in risks if risk["severity"] == "block"]
     caution_reasons = [risk["message"] for risk in risks if risk["severity"] == "caution"]
-    return {
+    result = {
         "is_safe": not block_reasons,
         "has_caution": bool(caution_reasons),
         "risks": risks,
@@ -344,6 +434,8 @@ def evaluate_medical_risk(
         "normalized_conditions": conditions,
         "normalized_allergens": allergens,
     }
+    return (_v2_assessment(result, conditions, disease_rules, missing, candidate=candidate, allergens=allergens)
+            if is_v2 else result)
 
 
 def resolve_user_energy_and_weight(conditions: list, user_profile: dict | None) -> tuple[float, float]:
@@ -441,6 +533,9 @@ def evaluate_meal_medical_risk(
     disease_rules: dict,
     allergen_taxonomy: dict,
     user_profile: dict | None = None,
+    *,
+    nutrition_contract_version: int = 1,
+    nutrition_coverage: dict | None = None,
 ) -> dict:
     """檢查「一餐合計」有沒有超過單餐上限。
 
@@ -452,23 +547,55 @@ def evaluate_meal_medical_risk(
     items 每個元素是 {"nutrients": {...}, "portion_g": 份量或 None}。
     """
     conditions = normalize_condition_ids(user_conditions, disease_rules)
-    if not conditions or not items:
+    is_v2 = type(nutrition_contract_version) is int and nutrition_contract_version == 2
+    if (not conditions or not items) and not is_v2:
         return {"is_safe": True, "has_caution": False, "risks": [], "block_reasons": [], "caution_reasons": []}
 
-    totals = {key: 0.0 for key in NUTRIENT_FIELDS}
-    for item in items:
-        scaled = scale_nutrients(item.get("nutrients") or {}, item.get("portion_g"))
-        for key, value in scaled.items():
-            totals[key] += normalize_number(value)
+    missing = []
+    if is_v2:
+        totals, missing = _coverage_values(nutrition_coverage)
+    else:
+        totals = {key: 0.0 for key in NUTRIENT_FIELDS}
+        for item in items:
+            scaled = scale_nutrients(item.get("nutrients") or {}, item.get("portion_g"))
+            for key, value in scaled.items():
+                totals[key] += normalize_number(value)
 
     E, W = resolve_user_energy_and_weight(conditions, user_profile)
 
     risks = []
+    allergens = normalize_allergen_ids(user_allergens, allergen_taxonomy)
+    if is_v2:
+        for item in items:
+            metadata = item.get("nutrients") or item
+            risks.extend(detect_allergen_hits(metadata, allergens, allergen_taxonomy))
+            for condition_id in conditions:
+                rule = disease_rules.get(condition_id) or {}
+                risks.extend(_condition_gi_hits(metadata, condition_id, rule))
+                risks.extend(_condition_label_hits(metadata, condition_id, rule))
+                risks.extend(_condition_keyword_hits(metadata, condition_id, rule))
+                if _is_fried_food(metadata) and condition_id in {"gout", "hyperlipidemia", "diabetes", "hypertension", "kidney_disease"}:
+                    risks.append({
+                        "type": "fried_food", "severity": "block" if condition_id in {"gout", "hyperlipidemia"} else "caution",
+                        "scope": "item", "condition_id": condition_id,
+                        "condition_label_zh": rule.get("label_zh", condition_id),
+                        "message": f"{rule.get('label_zh', condition_id)}需留意油炸食物",
+                    })
     for condition_id in conditions:
         rule = disease_rules.get(condition_id)
         if not rule:
             continue
         condition_label = rule.get("label_zh", condition_id)
+        if is_v2:
+            for risk in _condition_nutrient_hits(totals, condition_id, rule):
+                risks.append({**risk, "scope": "meal", "type": "meal_nutrient_limit"})
+            if totals.get("trans_fat", 0) > 0.1:
+                risks.append({
+                    "type": "meal_nutrient_limit", "severity": "block", "scope": "meal",
+                    "condition_id": condition_id, "condition_label_zh": condition_label,
+                    "nutrient": "trans_fat", "value": totals["trans_fat"], "limit": 0.0, "unit": "g",
+                    "message": f"{condition_label}風險：這一餐已知反式脂肪 {totals['trans_fat']:.1f}g 超過控管門檻",
+                })
         for nutrient, spec in (rule.get("personalized_limits") or {}).items():
             decided = threshold_resolution(rule, nutrient)
             if decided and decided["use"] == "configured":
@@ -491,7 +618,7 @@ def evaluate_meal_medical_risk(
                 "condition_label_zh": condition_label,
                 "message": (
                     f"{condition_label}提醒：這一餐合計{label} {value:.1f}{unit}，"
-                    f"超過單餐上限 {limit:.1f}{unit}（每道菜單獨看都在範圍內）。"
+                    f"超過單餐上限 {limit:.1f}{unit}" + ("。" if is_v2 else "（每道菜單獨看都在範圍內）。")
                 ),
                 "nutrient": nutrient,
                 "value": round(value, 1),
@@ -500,14 +627,29 @@ def evaluate_meal_medical_risk(
                 "item_count": len(items),
             })
 
-    caution_reasons = [risk["message"] for risk in risks]
-    return {
-        "is_safe": True,
+    caution_reasons = [risk["message"] for risk in risks if risk["severity"] == "caution"]
+    block_reasons = [risk["message"] for risk in risks if risk["severity"] == "block"]
+    result = {
+        "is_safe": not block_reasons,
         "has_caution": bool(caution_reasons),
         "risks": risks,
-        "block_reasons": [],
+        "block_reasons": block_reasons,
         "caution_reasons": caution_reasons,
     }
+    if is_v2:
+        result = _v2_assessment(result, conditions, disease_rules, missing)
+        if allergens and not any(risk["type"] == "allergen" for risk in risks):
+            result["unresolved_risk_fields"].append("allergens")
+        if any((disease_rules.get(condition) or {}).get("blocked_gi") for condition in conditions):
+            metadata = [item.get("nutrients") or item for item in items]
+            if not metadata or any(item.get("gi_source") != "verified_reference" or item.get("gi") not in {"low", "medium", "high"}
+                                   for item in metadata):
+                result["unresolved_risk_fields"].append("gi")
+        if result["unresolved_risk_fields"] and not block_reasons:
+            result["is_safe"] = None
+            if not risks:
+                result["assessment_status"] = "unknown"
+    return result
 
 
 def risk_messages(risk_result: dict) -> list[str]:

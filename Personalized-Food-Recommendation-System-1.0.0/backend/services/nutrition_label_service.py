@@ -1,6 +1,7 @@
 import base64
 import binascii
 import json
+import math
 import os
 import re
 import threading
@@ -55,13 +56,26 @@ def extract_number(value, as_int: bool = False):
     return int(round(number)) if as_int else number
 
 
+def _finite_number(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
 def round_nutrient(value, digits: int = 1):
     if value is None:
         return None
+    if not _finite_number(value) or value < 0:
+        raise ValueError("營養數值必須是非負有限數字或 null")
     return round(float(value), digits)
 
 
 def normalize_nutrition_payload(nutrition: dict) -> dict:
+    if not isinstance(nutrition, dict):
+        raise ValueError("營養資料必須是物件")
     return {
         "calories": round_nutrient(nutrition.get("calories"), 0),
         "protein": round_nutrient(nutrition.get("protein"), 1),
@@ -76,33 +90,88 @@ def normalize_nutrition_payload(nutrition: dict) -> dict:
 
 
 def scale_nutrition_per_100g(nutrition_per_serving: dict, serving_size_g: float | None):
-    if not serving_size_g or serving_size_g <= 0:
+    if serving_size_g is None:
         return None
+    positive_quantity(serving_size_g, "serving_size_g")
+    nutrition_per_serving = normalize_nutrition_payload(nutrition_per_serving)
     scale = 100.0 / serving_size_g
     return normalize_nutrition_payload(
         {key: (value * scale if value is not None else None) for key, value in nutrition_per_serving.items()}
     )
 
 
+def positive_quantity(value, field: str):
+    if value is None:
+        return None
+    if not _finite_number(value) or value <= 0:
+        raise ValueError(f"{field} 必須是正有限數字或 null")
+    return float(value)
+
+
+def has_nutrition_values(nutrition):
+    return isinstance(nutrition, dict) and any(value is not None for value in nutrition.values())
+
+
+def custom_nutrition_conflicts(per_serving: dict, per_100g: dict, serving_size_g):
+    if not has_nutrition_values(per_serving) or not has_nutrition_values(per_100g):
+        return False
+    if serving_size_g is None:
+        return True
+    scale = 100 / positive_quantity(serving_size_g, "serving_size_g")
+    if not math.isfinite(scale):
+        raise ValueError("每份重量無法進行有限數值換算")
+    for field, serving_value in per_serving.items():
+        hundred_value = per_100g.get(field)
+        if serving_value is None or hundred_value is None:
+            continue
+        # Each displayed table may already be rounded independently.
+        resolution = 1 if field in ("calories", "sodium") else 0.1
+        tolerance = resolution * (1 + scale) / 2 + 1e-9
+        if abs(serving_value * scale - hundred_value) > tolerance:
+            return True
+    return False
+
+
 def build_custom_food_search_result(food_doc: dict) -> dict:
-    base_nutrition = food_doc.get("nutrition_per_100g") or food_doc.get("nutrition_per_serving") or {}
+    unit = "unknown"
+    basis_status = "invalid"
+    base_nutrition = {}
+    try:
+        original_unit = food_doc.get("unit")
+        if original_unit not in (None, "", "per 100g", "per serving"):
+            raise ValueError("不支援的營養基準")
+        per_100g = normalize_nutrition_payload(food_doc.get("nutrition_per_100g") or {})
+        per_serving = normalize_nutrition_payload(food_doc.get("nutrition_per_serving") or {})
+        serving_size_g = positive_quantity(food_doc.get("serving_size_g"), "serving_size_g")
+        if custom_nutrition_conflicts(per_serving, per_100g, serving_size_g):
+            basis_status = "conflicting"
+        elif has_nutrition_values(per_100g):
+            base_nutrition, unit, basis_status = per_100g, "per 100g", "valid"
+        elif has_nutrition_values(per_serving):
+            base_nutrition, unit, basis_status = per_serving, "per serving", "valid"
+    except (ValueError, OverflowError):
+        # Legacy documents remain stored, but invalid bases cannot auto-match.
+        pass
     return {
         "key": food_doc["food_id"],
         "food_id": food_doc["food_id"],
         "name_zh": food_doc.get("name_zh", food_doc["food_id"]),
         "name_en": food_doc.get("name_en", ""),
         "category": food_doc.get("category", "自訂食品"),
-        "calories": base_nutrition.get("calories", 0),
-        "protein": base_nutrition.get("protein", 0),
-        "fat": base_nutrition.get("fat", 0),
-        "carbs": base_nutrition.get("carbs", 0),
-        "sodium": base_nutrition.get("sodium", 0),
-        "fiber": base_nutrition.get("fiber", 0),
-        "sugar": base_nutrition.get("sugar", base_nutrition.get("refined_sugar", 0)),
-        "saturated_fat": base_nutrition.get("saturated_fat", 0),
-        "trans_fat": base_nutrition.get("trans_fat", 0),
+        "calories": base_nutrition.get("calories"),
+        "protein": base_nutrition.get("protein"),
+        "fat": base_nutrition.get("fat"),
+        "carbs": base_nutrition.get("carbs"),
+        "sodium": base_nutrition.get("sodium"),
+        "fiber": base_nutrition.get("fiber"),
+        "sugar": base_nutrition.get("sugar"),
+        "saturated_fat": base_nutrition.get("saturated_fat"),
+        "trans_fat": base_nutrition.get("trans_fat"),
         "is_fried": food_doc.get("is_fried", False),
-        "unit": food_doc.get("unit", "per serving"),
+        "unit": unit,
+        "nutrition_basis": "per_100g" if unit == "per 100g" else "per_serving" if unit == "per serving" else "unknown",
+        "nutrition_basis_status": basis_status,
+        "original_unit": food_doc.get("original_unit", food_doc.get("unit")),
         "source": food_doc.get("source", "custom-food"),
         "serving_size_g": food_doc.get("serving_size_g"),
         "allergens": food_doc.get("allergens", []) or [],
@@ -444,19 +513,27 @@ def call_gemini_nutrition_ocr(image_b64: str, mime_type: str, api_key: str, gemi
 
 
 def normalize_ocr_result(parsed: dict) -> dict:
-    serving_size_g = extract_number(parsed.get("serving_size_g"))
-    servings_per_container = extract_number(parsed.get("servings_per_container"), as_int=False)
+    if not isinstance(parsed, dict) or not isinstance(parsed.get("nutrition_per_serving", {}), dict):
+        raise ValueError("營養標示與每份營養資料必須是物件")
+
+    def label_number(value):
+        if isinstance(value, bool):
+            raise ValueError("營養標示數字不可為布林值")
+        return extract_number(value)
+
+    serving_size_g = positive_quantity(label_number(parsed.get("serving_size_g")), "serving_size_g")
+    servings_per_container = positive_quantity(label_number(parsed.get("servings_per_container")), "servings_per_container")
     nutrition_per_serving = normalize_nutrition_payload(
         {
-            "calories": extract_number((parsed.get("nutrition_per_serving") or {}).get("calories")),
-            "protein": extract_number((parsed.get("nutrition_per_serving") or {}).get("protein")),
-            "fat": extract_number((parsed.get("nutrition_per_serving") or {}).get("fat")),
-            "carbs": extract_number((parsed.get("nutrition_per_serving") or {}).get("carbs")),
-            "sodium": extract_number((parsed.get("nutrition_per_serving") or {}).get("sodium")),
-            "fiber": extract_number((parsed.get("nutrition_per_serving") or {}).get("fiber")),
-            "sugar": extract_number((parsed.get("nutrition_per_serving") or {}).get("sugar")),
-            "saturated_fat": extract_number((parsed.get("nutrition_per_serving") or {}).get("saturated_fat")),
-            "trans_fat": extract_number((parsed.get("nutrition_per_serving") or {}).get("trans_fat")),
+            "calories": label_number((parsed.get("nutrition_per_serving") or {}).get("calories")),
+            "protein": label_number((parsed.get("nutrition_per_serving") or {}).get("protein")),
+            "fat": label_number((parsed.get("nutrition_per_serving") or {}).get("fat")),
+            "carbs": label_number((parsed.get("nutrition_per_serving") or {}).get("carbs")),
+            "sodium": label_number((parsed.get("nutrition_per_serving") or {}).get("sodium")),
+            "fiber": label_number((parsed.get("nutrition_per_serving") or {}).get("fiber")),
+            "sugar": label_number((parsed.get("nutrition_per_serving") or {}).get("sugar")),
+            "saturated_fat": label_number((parsed.get("nutrition_per_serving") or {}).get("saturated_fat")),
+            "trans_fat": label_number((parsed.get("nutrition_per_serving") or {}).get("trans_fat")),
         }
     )
     nutrition_per_100g = scale_nutrition_per_100g(nutrition_per_serving, serving_size_g)

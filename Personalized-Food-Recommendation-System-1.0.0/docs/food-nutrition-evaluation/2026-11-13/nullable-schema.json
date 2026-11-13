@@ -1,0 +1,107 @@
+[
+  {
+    "requested_model": "[AN]gemini-4-hydrogen-high",
+    "prompt_sha256": "5699061ed4575c45aa42b77c15224085ee2606e60d61a4100cbcc90795fefbd0",
+    "retry_count": 0,
+    "error": "ReadTimeout",
+    "elapsed_seconds": 35.703,
+    "case": "union_type",
+    "preserves_expected_json": false
+  },
+  {
+    "requested_model": "[AN]gemini-4-hydrogen-high",
+    "prompt_sha256": "5699061ed4575c45aa42b77c15224085ee2606e60d61a4100cbcc90795fefbd0",
+    "retry_count": 0,
+    "http_status": 200,
+    "text": "{\"missing\":0,\"items\":[{\"id\":\"A\",\"value\":0},{\"id\":\"B\",\"value\":2},{\"id\":\"C\",\"value\":0}]}",
+    "finish_reason": "stop",
+    "returned_model": "gemini-4-hydrogen",
+    "usage": {
+      "prompt_tokens": 316,
+      "completion_tokens": 49,
+      "total_tokens": 1964,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1599
+      }
+    },
+    "annotations": null,
+    "tool_calls": null,
+    "grounding_metadata": null,
+    "response_keys": [
+      "choices",
+      "created",
+      "id",
+      "model",
+      "object",
+      "usage"
+    ],
+    "json": {
+      "missing": 0,
+      "items": [
+        {
+          "id": "A",
+          "value": 0
+        },
+        {
+          "id": "B",
+          "value": 2
+        },
+        {
+          "id": "C",
+          "value": 0
+        }
+      ]
+    },
+    "elapsed_seconds": 11.07,
+    "case": "anyof_type",
+    "preserves_expected_json": false
+  },
+  {
+    "requested_model": "[AN]gemini-4-hydrogen-high",
+    "prompt_sha256": "5699061ed4575c45aa42b77c15224085ee2606e60d61a4100cbcc90795fefbd0",
+    "retry_count": 0,
+    "http_status": 200,
+    "text": "{\"missing\":null,\"items\":[{\"id\":\"A\",\"value\":null},{\"id\":\"B\",\"value\":2},{\"id\":\"C\",\"value\":null}]}",
+    "finish_reason": "stop",
+    "returned_model": "gemini-4-hydrogen",
+    "usage": {
+      "prompt_tokens": 75,
+      "completion_tokens": 35,
+      "total_tokens": 337,
+      "completion_tokens_details": {
+        "reasoning_tokens": 227
+      }
+    },
+    "annotations": null,
+    "tool_calls": null,
+    "grounding_metadata": null,
+    "response_keys": [
+      "choices",
+      "created",
+      "id",
+      "model",
+      "object",
+      "usage"
+    ],
+    "json": {
+      "missing": null,
+      "items": [
+        {
+          "id": "A",
+          "value": null
+        },
+        {
+          "id": "B",
+          "value": 2
+        },
+        {
+          "id": "C",
+          "value": null
+        }
+      ]
+    },
+    "elapsed_seconds": 3.421,
+    "case": "json_object_control",
+    "preserves_expected_json": true
+  }
+]

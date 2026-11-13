@@ -13,6 +13,7 @@
     "test:insights": "node --test scripts/test-trend-insights.mjs",
     "test:records": "node --test scripts/test-dietary-records.mjs",
     "test:scanner": "node --test scripts/test-scanner-records.mjs",
+    "test:nutrition": "node --test scripts/test-nutrition-calculation.mjs scripts/test-nutrition-record-api.mjs scripts/test-record-sync-contract.mjs scripts/test-record-sync-locks.mjs scripts/test-record-submission.mjs",
     "test:config": "node --test scripts/test-build-env.mjs",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",

@@ -57,6 +57,8 @@ from services.nutrition_label_service import (
 )
 from services.nutrition_progress_service import build_daily_nutrition_progress, build_nutrition_goal_types, calculate_daily_targets_with_basis, round_targets_for_display
 from services.nutrient_service import NUTRITION_FIELDS, get_nutrient_value
+from services.nutrition_profile_service import NutritionProfileError, profile_from_local_food
+from services.record_nutrition_service import normalize_v2_record
 from services.profile_service import (
     ACTIVITY_LEVELS,
     DIET_TYPES,
@@ -70,12 +72,13 @@ from services.vision_food_service import (
     build_vision_food_response,
     call_gemini_food_recognition_with_rotation,
 )
-from services.nutrition_database_service import load_usda_foods
+from services.nutrition_database_service import load_official_nutrition_dataset, build_nutrition_dataset_context
 from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini, parse_menu_image_with_gemini
 from services.medical_risk_service import (
     MEALS_PER_DAY,
     effective_meal_limits,
     evaluate_medical_risk,
+    evaluate_meal_medical_risk,
     normalize_number,
     resolve_user_energy_and_weight,
     rule_threshold_conflicts,
@@ -533,17 +536,16 @@ DB_PATH = os.path.join(BASE_DIR, "nutrition_db.json")
 with open(DB_PATH, "r", encoding="utf-8") as f:
     NUTRITION_DB = json.load(f)
 
-# 2. TFDA 衛福部食品營養成分資料庫 (2,181 筆台灣食品)
-TFDA_PATH = os.path.join(BASE_DIR, "nutrition_db_tw.json")
-try:
-    with open(TFDA_PATH, "r", encoding="utf-8") as f:
-        TFDA_DB = json.load(f)
-    print(f"[OK] TFDA nutrition DB loaded: {len(TFDA_DB)} foods")
-except FileNotFoundError:
-    TFDA_DB = {}
-    print("[WARN] TFDA nutrition_db_tw.json not found - using fallback only")
-
-USDA_DB = load_usda_foods(BASE_DIR)
+# Each official layer keeps its own health. An unavailable layer is not a
+# successful empty lookup and must never trigger automatic paid enrichment.
+_tfda_dataset = load_official_nutrition_dataset(BASE_DIR, "TFDA")
+_usda_dataset = load_official_nutrition_dataset(BASE_DIR, "USDA FNDDS")
+NUTRITION_DATASET_HEALTH = {"TFDA": _tfda_dataset["health"], "USDA FNDDS": _usda_dataset["health"]}
+TFDA_DB = dict(_tfda_dataset["foods"])
+USDA_DB = _usda_dataset["foods"]
+for _source, _health in NUTRITION_DATASET_HEALTH.items():
+    print(f"[{'OK' if _health['status'] == 'available' else 'WARN'}] {_source} nutrition DB: "
+          f"{_health['status']} ({_health['record_count']} foods; {_health['reason'] or 'validated'})")
 TFDA_DB.update(USDA_DB)
 
 # ─── Disease filter rules (PRD: 硬性排除規則) ────────────────
@@ -586,6 +588,9 @@ def index():
 def health():
     return jsonify({
         "status": "ok",
+        "nutrition_contract_versions": [1, 2],
+        "nutrition_v2_flows": ["record_preview", "record_save", "record_edit", "records", "history"],
+        "nutrition_v2_scanner_enabled": False,
         "database": sql_db.dialect if sql_db is not None else ("mongo" if USE_MONGO else "memory"),
         # 路徑裡有 Windows 使用者名稱，只給這台電腦自己看；Postgres 不回傳主機
         "database_path": database_path if database_path and is_local_request() else None,
@@ -595,6 +600,7 @@ def health():
         "foods_in_db": len(NUTRITION_DB),
         "foods_in_tfda": len(TFDA_DB) - len(USDA_DB),
         "foods_in_usda": len(USDA_DB),
+        **build_nutrition_dataset_context(NUTRITION_DATASET_HEALTH),
         "disease_rules": len(DISEASE_RULES),
         "disease_rule_review_status": build_disease_rules_response(DISEASE_RULES)["review_status_counts"],
         "restaurants": len(RESTAURANT_CATALOG),
@@ -728,8 +734,9 @@ def list_custom_foods():
 @app.route("/ocr/nutrition-label", methods=["POST"])
 def ocr_nutrition_label():
     require_authenticated_user()
-    enforce_rate_limit(_paid_api_limiter, "ocr")
     data = json_body()
+    require_legacy_nutrition_flow(data)
+    enforce_rate_limit(_paid_api_limiter, "ocr")
     if "image" not in data:
         return jsonify({"error": "缺少 image 欄位（Base64）"}), 400
 
@@ -772,6 +779,7 @@ def ocr_nutrition_label():
 @app.route("/predict/vision-food", methods=["POST"])
 def predict_vision_food():
     data = json_body()
+    require_legacy_nutrition_flow(data)
     if "image" not in data:
         return jsonify({"error": "缺少 image 欄位（Base64）"}), 400
 
@@ -795,19 +803,19 @@ def predict_vision_food():
 
     try:
         parsed = call_gemini_food_recognition_with_rotation(image_base64, mime_type, api_keys)
-        return jsonify(
-            build_vision_food_response(
-                parsed,
-                storage,
-                TFDA_DB,
-                DISEASE_RULES,
-                ALLERGEN_TAXONOMY,
-                user_conditions,
-                user_allergens,
-                user_id,
-                build_custom_food_search_result,
-            )
+        response = build_vision_food_response(
+            parsed,
+            storage,
+            TFDA_DB,
+            DISEASE_RULES,
+            ALLERGEN_TAXONOMY,
+            user_conditions,
+            user_allergens,
+            user_id,
+            build_custom_food_search_result,
         )
+        response.update(build_nutrition_dataset_context(NUTRITION_DATASET_HEALTH))
+        return jsonify(response)
     except requests.HTTPError as e:
         return gemini_http_error_response("食物辨識", e)
     except requests.RequestException as e:
@@ -872,6 +880,99 @@ def create_or_update_user():
 EDITABLE_RECORD_NUTRIENTS = NUTRITION_FIELDS
 
 
+@app.errorhandler(NutritionProfileError)
+def nutrition_contract_error(error):
+    conflict = error.code in ("upgrade_required", "nutrition_flow_unavailable", "stale_revision", "legacy_conversion_required")
+    messages = {
+        "upgrade_required": "此紀錄使用新版營養資料格式，請更新應用程式後再讀取或修改",
+        "nutrition_flow_unavailable": "此流程尚未支援新版營養缺值合約，請稍後再試",
+        "stale_revision": "紀錄已更新，請重新讀取後再修改",
+    }
+    return jsonify({"error": messages.get(error.code, str(error)), "error_code": error.code,
+                    "required_nutrition_contract_version": 2}), 409 if conflict else 400
+
+
+def nutrition_contract_version(data=None):
+    values = []
+    if isinstance(data, dict) and "nutrition_contract_version" in data:
+        value = data["nutrition_contract_version"]
+        if type(value) is not int:
+            raise NutritionProfileError("invalid_contract", "nutrition_contract_version must be an integer")
+        values.append(value)
+    for value in (request.args.get("nutrition_contract_version"), request.headers.get("X-Nutrition-Contract-Version")):
+        if value is not None:
+            if value not in ("1", "2"):
+                raise NutritionProfileError("invalid_contract", "Unsupported nutrition contract version")
+            values.append(int(value))
+    if any(value not in (1, 2) for value in values) or len(set(values)) > 1:
+        raise NutritionProfileError("invalid_contract", "Conflicting or unsupported nutrition contract versions")
+    return values[0] if values else 1
+
+
+def require_legacy_nutrition_flow(data=None):
+    if nutrition_contract_version(data) == 2:
+        raise NutritionProfileError("nutrition_flow_unavailable", "This flow has not completed v2 acceptance")
+
+
+def require_record_reader(records, version):
+    if version != 2 and any(record.get("nutrition_contract_version") == 2 for record in records):
+        raise NutritionProfileError("upgrade_required", "A newer nutrition client is required")
+
+
+def require_recommendation_nutrition(user_id, data=None):
+    version = nutrition_contract_version(data)
+    today = storage.get_today_records(user_id)
+    require_record_reader(today, version)
+    if any(record.get("nutrition_contract_version") == 2 for record in today):
+        raise NutritionProfileError("nutrition_flow_unavailable", "Recommendations do not yet support v2 coverage")
+
+
+def prepare_v2_record(data, existing=None):
+    user_id = data["user_id"]
+
+    def resolve_food(key):
+        custom = storage.get_custom_food(key, user_id)
+        source = build_custom_food_search_result(custom) if custom else TFDA_DB.get(key)
+        if source is None:
+            return None
+        name = source.get("name_zh") or source.get("name") or key
+        return {"name": name, "nutrition_profile": profile_from_local_food(source, source_details={
+                    "source_type": "user_custom" if custom else source.get("source", "official_local"),
+                    "food_key": key, "food_name": name,
+                    "source_url": source.get("source_url"), "snapshot_scope": "local_database"}),
+                "source": "user_custom" if custom else source.get("source", "official_local"),
+                "is_fried": source.get("is_fried") is True,
+                "allergens": source.get("allergens") or [], "gi": source.get("gi")}
+
+    prepared = normalize_v2_record({**data, "nutrition_contract_version": 2}, existing=existing, resolve_food=resolve_food)
+    user = storage.get_user(user_id) or {}
+    items = [{"nutrients": {**food, "label": food["name"], "nutrition_contract_version": 2},
+              "portion_g": food["weight_g"]} for food in prepared["foods"] if food.get("included", True)]
+    risk = evaluate_meal_medical_risk(
+        items, user.get("health_conditions") or [], user.get("allergens") or [], DISEASE_RULES,
+        ALLERGEN_TAXONOMY, user_profile=user, nutrition_contract_version=2,
+        nutrition_coverage=prepared["nutrition_context"]["coverage"])
+    prepared["nutrition_context"]["medical_risk"] = risk
+    return prepared
+
+
+@app.route("/record/preview", methods=["POST"])
+def preview_record():
+    data = json_body(MAX_FORM_BYTES)
+    if not isinstance(data, dict) or not data.get("user_id"):
+        return jsonify({"error": "缺少 user_id"}), 400
+    require_user_access(data["user_id"])
+    enforce_rate_limit(_general_limiter, "write")
+    if nutrition_contract_version(data) != 2:
+        raise NutritionProfileError("upgrade_required", "Preview requires v2")
+    existing = None
+    if data.get("client_record_id"):
+        existing = storage.get_record_by_client_record_id(data["user_id"], data["client_record_id"])
+        if existing and existing.get("nutrition_contract_version") != 2:
+            raise NutritionProfileError("legacy_conversion_required", "Legacy records require explicit conversion")
+    return jsonify({"record": prepare_v2_record(data, existing=existing)})
+
+
 def normalize_record_foods(foods):
     if not isinstance(foods, list) or not foods:
         raise ValueError("飲食紀錄至少需要一項食物")
@@ -880,6 +981,8 @@ def normalize_record_foods(foods):
     for food in foods:
         if not isinstance(food, dict):
             raise ValueError("食物資料格式錯誤")
+        if "nutrition_profile" in food or "user_entered_nutrients" in food:
+            raise NutritionProfileError("upgrade_required", "Canonical nutrition requires v2")
         name = str(food.get("name") or "").strip()
         if not name:
             raise ValueError("食物名稱不可空白")
@@ -939,14 +1042,25 @@ def add_record():
     if not data.get("client_record_id"):
         data["client_record_id"] = f"server_record_{uuid.uuid4().hex}"
 
+    version = nutrition_contract_version(data)
+    existing = storage.get_record_by_client_record_id(data["user_id"], data["client_record_id"])
+    if existing:
+        require_record_reader([existing], version)
+        return jsonify({"message": "飲食紀錄已存在", "record": existing, "deduplicated": True}), 200
+
     try:
-        foods = normalize_record_foods(data.get("foods"))
+        canonical = prepare_v2_record(data) if version == 2 else None
+        if version == 1 and "nutrition_context" in data:
+            raise NutritionProfileError("upgrade_required", "nutrition_context requires v2")
+        foods = canonical["foods"] if canonical else normalize_record_foods(data.get("foods"))
         timestamp = normalize_record_timestamp(data.get("timestamp"))
+    except NutritionProfileError:
+        raise
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
 
     totals = {
-        nutrient: round(sum(food[nutrient] for food in foods), 2)
+        nutrient: canonical[f"total_{nutrient}"] if canonical else round(sum(food[nutrient] for food in foods), 2)
         for nutrient in EDITABLE_RECORD_NUTRIENTS
     }
     record = {
@@ -958,8 +1072,11 @@ def add_record():
         **{f"total_{nutrient}": total for nutrient, total in totals.items()},
         "source": data.get("source", "camera"),  # camera | manual | nutrition-label
     }
+    if canonical:
+        record.update(canonical)
 
     saved_record = storage.insert_record(record)
+    require_record_reader([saved_record], version)
 
     if saved_record.get("_deduplicated"):
         saved_record = {key: value for key, value in saved_record.items() if key != "_deduplicated"}
@@ -971,6 +1088,7 @@ def add_record():
 @app.route("/records/<user_id>", methods=["GET"])
 def get_records(user_id):
     require_user_access(user_id)
+    version = nutrition_contract_version()
     date_str = request.args.get("date")  # YYYY-MM-DD
     try:
         limit = min(max(int(request.args.get("limit", 50)), 1), 500)
@@ -978,6 +1096,7 @@ def get_records(user_id):
     except (TypeError, ValueError):
         return jsonify({"error": "limit 與 offset 必須是有效數字"}), 400
     records = storage.get_records(user_id, date_str, limit=limit, offset=offset)
+    require_record_reader(storage.get_all_records(user_id, date_str) if version == 1 else records, version)
     user = storage.get_user(user_id) or {}
     daily = calculate_daily_targets_with_basis(user)
     return jsonify({
@@ -1013,8 +1132,20 @@ def update_record(user_id, client_record_id):
     data = json_body(MAX_FORM_BYTES)
     if not isinstance(data, dict):
         return jsonify({"error": "缺少資料"}), 400
+    version = nutrition_contract_version(data)
+    require_record_reader([existing], version)
+    if version == 2:
+        if existing.get("nutrition_contract_version") != 2:
+            raise NutritionProfileError("legacy_conversion_required", "Legacy records require explicit conversion")
+        canonical = prepare_v2_record({**data, "user_id": user_id}, existing=existing)
+        saved = storage.update_record({**existing, **canonical}, expected_revision=data["base_revision"])
+        if not saved:
+            raise NutritionProfileError("stale_revision", "Record changed; reload before editing")
+        return jsonify({"message": "飲食紀錄已更新", "record": saved})
     try:
         foods = normalize_record_foods(data.get("foods"))
+    except NutritionProfileError:
+        raise
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
 
@@ -1026,7 +1157,7 @@ def update_record(user_id, client_record_id):
             for nutrient in EDITABLE_RECORD_NUTRIENTS
         },
     }
-    saved = storage.update_record(updated)
+    saved = storage.update_record(updated, nutrition_contract_version=1)
     if not saved:
         return jsonify({"error": "找不到飲食紀錄"}), 404
     return jsonify({"message": "飲食紀錄已更新", "record": saved})
@@ -1036,7 +1167,9 @@ def update_record(user_id, client_record_id):
 def delete_record(user_id, client_record_id):
     require_user_access(user_id)
     enforce_rate_limit(_general_limiter, "write")
-    deleted = storage.delete_record(user_id, client_record_id)
+    existing = storage.get_record_by_client_record_id(user_id, client_record_id)
+    require_record_reader([existing] if existing else [], nutrition_contract_version())
+    deleted = storage.delete_record(user_id, client_record_id, nutrition_contract_version=nutrition_contract_version())
     if not deleted:
         return jsonify({"error": "找不到飲食紀錄"}), 404
     return jsonify({"message": "飲食紀錄已刪除", "record": deleted})
@@ -1133,12 +1266,14 @@ def get_history(user_id):
         days = min(max(int(request.args.get("days", 7)), 1), 365)
     except (TypeError, ValueError):
         return jsonify({"error": "days 必須是有效數字"}), 400
-    return jsonify(build_history_response(storage, user_id, days))
+    version = nutrition_contract_version()
+    return jsonify(build_history_response(storage, user_id, days, nutrition_contract_version=version))
 
 
 @app.route("/healthy-food-recommend/<user_id>", methods=["GET"])
 def healthy_food_recommend(user_id):
     require_user_access(user_id)
+    require_recommendation_nutrition(user_id)
     params = {
         "lat": request.args.get("lat", 25.0338),
         "lng": request.args.get("lng", 121.5645),
@@ -1154,6 +1289,7 @@ def healthy_food_recommend(user_id):
 @app.route("/map-food-recommend/<user_id>", methods=["GET"])
 def map_food_recommend(user_id):
     require_user_access(user_id)
+    require_recommendation_nutrition(user_id)
     # 每次都會打 Google Places
     enforce_rate_limit(_paid_api_limiter, "places")
     params = {
@@ -1293,6 +1429,7 @@ def get_restaurant_menu():
     # 反推出對方有哪些疾病。沒帶就用登入者自己，不再退回共用的 demo_user。
     if data.get("user_id"):
         require_user_access(data["user_id"])
+    require_recommendation_nutrition(data.get("user_id") or get_request_user_id() or "", data)
     restaurant_id = data.get("restaurant_id", "")
     name = data.get("name") or ""
     address = data.get("address") or ""
@@ -1447,6 +1584,7 @@ def menu_photo_check():
     enforce_rate_limit(_paid_api_limiter, "menu")
     if data.get("user_id"):
         require_user_access(data["user_id"])
+    require_recommendation_nutrition(data.get("user_id") or get_request_user_id() or "", data)
     raw_image = data.get("menu_image")
     if not isinstance(raw_image, str) or not raw_image.strip():
         return jsonify({"error": "缺少菜單照片（menu_image，Base64）"}), 400
@@ -1489,6 +1627,7 @@ def menu_photo_check():
 @app.route("/map-food-recommend/<user_id>/restaurant-summary", methods=["POST"])
 def map_food_restaurant_summary(user_id):
     require_user_access(user_id)
+    require_recommendation_nutrition(user_id, request.get_json(silent=True))
     # 每點一家店就打一次 Gemini
     enforce_rate_limit(_paid_api_limiter, "summary")
     user = storage.get_user(user_id)

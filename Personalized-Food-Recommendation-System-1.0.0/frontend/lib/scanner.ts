@@ -5,8 +5,9 @@ import type { MealType } from '@/lib/meal';
 
 // 後端回 401 時通知 AuthGate 帶回登入畫面（事件名稱見 lib/auth.ts 的 UNAUTHORIZED_EVENT）。
 // 這個檔案會被 Node 的測試直接載入，不能 import 只有 App 裡才解析得到的模組。
-function reportIfUnauthorized(resp: Response) {
-  if (resp.status === 401 && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+function reportIfUnauthorized(resp: Response, isCurrentSession?: () => boolean) {
+  if (resp.status === 401 && (!isCurrentSession || isCurrentSession())
+    && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
     window.dispatchEvent(new Event('nutrilens:unauthorized'));
   }
 }
@@ -169,6 +170,7 @@ type SaveRecordParams = {
    * 隔天早上，算進隔天的熱量與鈉。
    */
   timestamp?: string;
+  isCurrentSession?: () => boolean;
 };
 
 const inFlightRecordRequests = new Map<string, Promise<void>>();
@@ -246,7 +248,7 @@ async function performSaveRecord(params: SaveRecordParams): Promise<void> {
       source: params.source,
     }),
   });
-  reportIfUnauthorized(resp);
+  reportIfUnauthorized(resp, params.isCurrentSession);
   if (!resp.ok) {
     const data = await resp.json().catch(() => ({}));
     throw new Error(data.error || '飲食紀錄同步失敗');

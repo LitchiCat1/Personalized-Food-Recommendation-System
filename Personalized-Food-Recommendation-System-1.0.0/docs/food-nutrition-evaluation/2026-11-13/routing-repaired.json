@@ -1,0 +1,264 @@
+{
+  "created_at": "2026-11-13T13:46:30.841106+00:00",
+  "mode": "offline_repaired_local_routing",
+  "network_calls": 0,
+  "production_code_modified": true,
+  "limits": [
+    "Synthetic inputs demonstrate missing guards, not production incidence.",
+    "No third-layer implementation or end-to-end intake accuracy tested."
+  ],
+  "database_sha256_lf": {
+    "nutrition_db_tw.json": "a95d1be39df132fef101a31548ee4ddc4e4aeb756002e06047ec62f800d67302",
+    "nutrition_db_usda.json": "7ea045a1a87860caf6d9322fcec5227ec0e12140a74882052ae0c6571be3fcb7"
+  },
+  "inventory": {
+    "tfda_count": 2213,
+    "usda_count": 5431,
+    "usda_chinese_name_count": 12,
+    "usda_chinese_alias_count": 12
+  },
+  "state_and_scope": [
+    {
+      "name": "泡麵",
+      "input": {
+        "food_state": "dry"
+      },
+      "identity": "泡麵",
+      "matches": []
+    },
+    {
+      "name": "泡麵",
+      "input": {
+        "food_state": "prepared",
+        "components_scope": "noodles_only"
+      },
+      "identity": "泡麵",
+      "matches": []
+    },
+    {
+      "name": "泡麵",
+      "input": {
+        "food_state": "prepared",
+        "components_scope": "whole_dish_with_broth"
+      },
+      "identity": "泡麵",
+      "matches": [
+        {
+          "key": "usda_fndds:2709152",
+          "name_zh": "沖泡泡麵含湯（USDA參考）",
+          "source": "USDA FNDDS",
+          "unit": "per 100g",
+          "calories": 66.0,
+          "sodium": 282,
+          "match_notes": [
+            "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "白飯",
+      "input": {
+        "food_state": "raw"
+      },
+      "identity": "白飯",
+      "matches": []
+    },
+    {
+      "name": "炒高麗菜",
+      "input": {
+        "food_state": "prepared"
+      },
+      "identity": "高麗菜",
+      "matches": [
+        {
+          "key": "usda_fndds:2709891",
+          "name_zh": "炒高麗菜（USDA參考）",
+          "source": "USDA FNDDS",
+          "unit": "per 100g",
+          "calories": 58.0,
+          "sodium": 133,
+          "match_notes": [
+            "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "水餃(韭菜)",
+      "input": {
+        "food_state": "prepared"
+      },
+      "identity": "水餃(韭菜)",
+      "matches": []
+    }
+  ],
+  "custom_order": [
+    {
+      "key": "routing-custom",
+      "name_zh": "白飯",
+      "source": "custom-food",
+      "unit": "per 100g",
+      "calories": 123.0,
+      "sodium": 10.0,
+      "match_notes": []
+    },
+    {
+      "key": "白飯",
+      "name_zh": "白飯",
+      "source": "TFDA",
+      "unit": "per 100g",
+      "calories": 183.0,
+      "sodium": 2.0,
+      "match_notes": []
+    }
+  ],
+  "custom_basis": {
+    "input_per_serving_calories": 400,
+    "serving_size_g": 200,
+    "builder_unit": "per 100g",
+    "builder_per100g_calories": 200.0,
+    "expected_per100g_calories": 200,
+    "matches": [
+      {
+        "key": "custom_61199680d5",
+        "name_zh": "routing-custom-basis",
+        "source": "custom-food",
+        "unit": "per 100g",
+        "calories": 200.0,
+        "sodium": 300.0,
+        "match_notes": []
+      }
+    ]
+  },
+  "dry_usda_only": [],
+  "cabbage_official_subset": [
+    {
+      "key": "usda_fndds:2709891",
+      "name_zh": "炒高麗菜（USDA參考）",
+      "source": "USDA FNDDS",
+      "unit": "per 100g",
+      "calories": 58.0,
+      "sodium": 133,
+      "match_notes": [
+        "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認"
+      ]
+    }
+  ],
+  "bilingual_lookup_control": {
+    "source_key": "usda_fndds:2705385",
+    "source_name": "Milk, whole",
+    "chinese_plus_exact_english": [
+      {
+        "key": "usda_fndds:2705385",
+        "name_zh": "Milk, whole",
+        "source": "USDA FNDDS",
+        "unit": "per 100g",
+        "calories": 61.0,
+        "sodium": 38.0,
+        "match_notes": [
+          "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認"
+        ]
+      }
+    ],
+    "english_name_control": [
+      {
+        "key": "usda_fndds:2705385",
+        "name_zh": "Milk, whole",
+        "source": "USDA FNDDS",
+        "unit": "per 100g",
+        "calories": 61.0,
+        "sodium": 38.0,
+        "match_notes": [
+          "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認"
+        ]
+      }
+    ],
+    "limits": "Isolated matching-path control, not permission for automatic translation/equivalence."
+  },
+  "numeric_guards": [
+    {
+      "case": "boolean_core",
+      "accepted": false,
+      "calories_repr": "None",
+      "finite_calories": null
+    },
+    {
+      "case": "negative_core",
+      "accepted": false,
+      "calories_repr": "None",
+      "finite_calories": null
+    },
+    {
+      "case": "nonfinite_core",
+      "accepted": false,
+      "calories_repr": "None",
+      "finite_calories": null
+    },
+    {
+      "case": "negative_serving",
+      "accepted": false,
+      "calories_repr": "None",
+      "finite_calories": null
+    },
+    {
+      "case": "boolean_serving",
+      "accepted": false,
+      "calories_repr": "None",
+      "finite_calories": null
+    },
+    {
+      "case": "nonnumeric_serving",
+      "accepted": false,
+      "calories_repr": "None",
+      "finite_calories": null
+    }
+  ],
+  "missing_usda_file": {
+    "raises": true,
+    "explicit_unavailable_status": true,
+    "health": {
+      "source": "USDA FNDDS",
+      "status": "unavailable",
+      "reason": "missing_file",
+      "record_count": 0,
+      "incomplete_core_profiles": 0,
+      "sha256": null,
+      "hash_verification": "not_configured",
+      "validation_schema_version": 1
+    }
+  },
+  "actual_data_invalid_core_count": 0,
+  "historical_unmatched_payload_observation": [
+    {
+      "filename": "地瓜球.jpg",
+      "repeat": 1,
+      "label": "地瓜球",
+      "original_item_count": 1,
+      "original_has_weight": true,
+      "response_has_weight": false,
+      "response_has_food_state": false,
+      "response_has_item_id": false
+    },
+    {
+      "filename": "多種菜色的便當.jpg",
+      "repeat": 1,
+      "label": "葉菜",
+      "original_item_count": 2,
+      "original_has_weight": true,
+      "response_has_weight": false,
+      "response_has_food_state": false,
+      "response_has_item_id": false
+    },
+    {
+      "filename": "大腸包小腸.jpg",
+      "repeat": 1,
+      "label": "糯米腸",
+      "original_item_count": 1,
+      "original_has_weight": true,
+      "response_has_weight": false,
+      "response_has_food_state": false,
+      "response_has_item_id": false
+    }
+  ]
+}

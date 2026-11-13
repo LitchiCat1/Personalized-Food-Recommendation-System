@@ -17,11 +17,19 @@ from typing import Callable
 
 from repositories.sqlite_db import SqliteDatabase
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # 版本 n → 把 n-1 版的資料庫改成 n 版。例：
 #   2: lambda sql: sql.execute("ALTER TABLE records ADD COLUMN note TEXT"),
-MIGRATIONS: dict[int, Callable[[SqliteDatabase], None]] = {}
+def add_record_nutrition_contract(sql: SqliteDatabase) -> None:
+    columns = set(sql.column_names("records"))
+    if "nutrition_contract_version" not in columns:
+        sql.execute("ALTER TABLE records ADD COLUMN nutrition_contract_version INTEGER")
+    if "nutrition_context" not in columns:
+        sql.execute("ALTER TABLE records ADD COLUMN nutrition_context TEXT")
+
+
+MIGRATIONS: dict[int, Callable[[SqliteDatabase], None]] = {2: add_record_nutrition_contract}
 
 
 class SchemaVersionError(RuntimeError):

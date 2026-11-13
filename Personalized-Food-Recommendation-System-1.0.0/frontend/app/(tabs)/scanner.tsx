@@ -33,14 +33,18 @@ import {
   type OCRDraft,
   type RejectedDetection,
 } from '@/lib/scanner';
-import { formatLocalTimestamp } from '@/lib/dietary-records';
 import { getAutoMealType } from '@/lib/meal';
+import { formatLocalTimestamp } from '@/lib/dietary-records';
+import { createRecordSubmissionSession, RecordSubmissionError } from '@/lib/record-submission';
 import {
   canRetryPendingRecordSync,
+  assertPendingRecordSyncTarget,
   enqueuePendingRecordSync,
+  getPendingRecordReplayMetadata,
   loadPendingRecordSyncQueue,
   markPendingRecordSyncFailed,
   MAX_RECORD_SYNC_ATTEMPTS,
+  RecordSyncQueueError,
   removePendingRecordSync,
   removePendingRecordSyncByClientRecordId,
   type PendingRecordSync,
@@ -59,6 +63,8 @@ type ActiveRecordSubmission = {
   key: string;
   source: RecordSource;
 };
+
+const recordSubmissions = createRecordSubmissionSession({ mealType: getAutoMealType, timestamp: formatLocalTimestamp });
 
 const SCAN_MODE_OPTIONS = [
   { value: 'camera', label: '拍照' },
@@ -214,7 +220,6 @@ export default function ScannerScreen() {
     updateScanFoodWeight,
     clearScan,
     setScanning,
-    addMealFromScan,
     apiBaseUrl,
     accessToken,
     user,
@@ -239,7 +244,6 @@ export default function ScannerScreen() {
   const [pendingRecordQueue, setPendingRecordQueue] = useState<PendingRecordSync[]>([]);
   const recordSubmitInFlightRef = useRef(false);
   const recordSyncInFlightRef = useRef(false);
-  const recordClientIdsRef = useRef(new Map<string, string>());
   const ocrSubmissionKeyRef = useRef(buildSubmissionKey('nutrition-label'));
 
   const results = scanResult.detections;
@@ -456,56 +460,80 @@ export default function ScannerScreen() {
     setRecordFeedback(null);
     Keyboard.dismiss();
 
-    const clientRecordId = getOrCreateClientRecordId(recordClientIdsRef.current, submissionKey);
+    const isCurrentSession = () => {
+      const state = useStore.getState();
+      return state.user.userId === user.userId && state.accessToken === accessToken && state.apiBaseUrl === apiBaseUrl;
+    };
+    let pendingId: string | undefined;
+    let persisted = false;
     let recordSaved = false;
 
     try {
-      await saveRecord({ apiBaseUrl, userId: user.userId, clientRecordId, foods, source, auth: { accessToken }, mealType: getAutoMealType() });
+      const request = recordSubmissions.prepare({ apiBaseUrl, userId: user.userId, foods, source, submissionKey });
+      const result = await recordSubmissions.deliver(request, {
+        isCurrent: isCurrentSession,
+        persist: async (snapshot) => {
+          const nextQueue = await enqueuePendingRecordSync({
+            userId: snapshot.userId, clientRecordId: snapshot.clientRecordId,
+            apiBaseUrl: snapshot.apiBaseUrl,
+            foods: snapshot.foods, source: snapshot.source, error: '',
+            recordTimestamp: snapshot.timestamp, mealType: snapshot.mealType,
+          });
+          persisted = true;
+          pendingId = nextQueue.find((item) => item.userId === snapshot.userId && item.clientRecordId === snapshot.clientRecordId)?.id;
+          if (isCurrentSession()) setPendingRecordQueue(nextQueue);
+        },
+        send: async (snapshot) => {
+          await saveRecord({ ...snapshot, auth: { accessToken }, isCurrentSession });
+          recordSaved = true;
+        },
+        remove: async (snapshot) => {
+          const nextQueue = await removePendingRecordSyncByClientRecordId(snapshot.userId, snapshot.clientRecordId);
+          if (isCurrentSession()) setPendingRecordQueue(nextQueue);
+        },
+      });
       recordSaved = true;
+      if (!isCurrentSession()) return false;
+      // Refresh from the saved record; response time must not move an old meal into today.
       invalidateDietaryRecords();
-
-      try {
-        const nextQueue = await removePendingRecordSyncByClientRecordId(user.userId, clientRecordId);
-        setPendingRecordQueue(nextQueue);
-      } catch {
-        // The backend write already succeeded. A stale local queue item is harmless
-        // because client_record_id keeps later synchronization idempotent.
-      }
-
-      addMealFromScan(foods);
       onSuccess();
-      recordClientIdsRef.current.delete(submissionKey);
-      setRecordFeedback({ tone: 'success', title: successTitle, message: successMessage });
+      setRecordFeedback({
+        tone: 'success', title: result.alreadySaved ? '這筆飲食紀錄已儲存' : successTitle,
+        message: result.cleanupPending ? '後端已儲存；本機同步狀態稍後更新，請勿重複新增。' : successMessage,
+      });
       return true;
     } catch (error: any) {
+      if (!isCurrentSession()) return false;
       if (recordSaved) {
+        setRecordFeedback({ tone: 'error', title: '紀錄已儲存，畫面更新失敗', message: '請重新整理確認最新紀錄，請勿再次新增。' });
+        return false;
+      }
+      if (error instanceof RecordSubmissionError) {
+        setRecordFeedback({ tone: 'error', title: '請先確認原紀錄', message: error.message });
+        return false;
+      }
+      const errorMessage = getRecordSubmitErrorMessage(error);
+      if (persisted && pendingId) {
+        try {
+          const nextQueue = await markPendingRecordSyncFailed(pendingId, errorMessage);
+          if (isCurrentSession()) setPendingRecordQueue(nextQueue);
+        } catch {
+          // The original write-ahead snapshot remains the retry authority.
+        }
+      }
+      if (!isCurrentSession()) return false;
+      if (!persisted) {
         setRecordFeedback({
           tone: 'error',
-          title: '紀錄已儲存，畫面更新失敗',
-          message: '請重新整理畫面確認最新紀錄，請勿再次送出。',
+          title: '本機紀錄尚未備妥',
+          message: '這筆資料尚未送出。請保留目前畫面，稍後重試；原有待同步資料未清除。',
         });
         return false;
       }
-
-      const errorMessage = getRecordSubmitErrorMessage(error);
-      try {
-        const nextQueue = await enqueuePendingRecordSync({
-          userId: user.userId,
-          clientRecordId,
-          foods,
-          source,
-          error: errorMessage,
-        });
-        setPendingRecordQueue(nextQueue);
-      } catch {
-        // The visible result remains available for an explicit retry even if
-        // local persistence is unavailable.
-      }
-
       setRecordFeedback({
         tone: 'error',
-        title: '飲食紀錄新增失敗',
-        message: `${errorMessage}。內容已保留，請再按一次加入重試。`,
+        title: '飲食紀錄等待同步',
+        message: `${errorMessage}。原內容與用餐時間已保留，可重試同步。`,
       });
       return false;
     } finally {
@@ -519,17 +547,22 @@ export default function ScannerScreen() {
     const userQueue = queue.filter((item) => item.userId === user.userId);
     const retryableQueue = options?.manual ? userQueue : userQueue.filter(canRetryPendingRecordSync);
     if (retryableQueue.length === 0) return 0;
+    for (const item of retryableQueue) assertPendingRecordSyncTarget(item, apiBaseUrl);
 
     recordSyncInFlightRef.current = true;
     setSyncingRecord(true);
     let syncedCount = 0;
+    const isCurrentSession = () => {
+      const state = useStore.getState();
+      return state.user.userId === user.userId && state.accessToken === accessToken && state.apiBaseUrl === apiBaseUrl;
+    };
     try {
       for (const item of retryableQueue) {
+        if (!isCurrentSession()) break;
         try {
           // 餐別和時間都要用當初入列的時間，不是補送的時間：早上排隊的早餐
           // 如果晚上才連上線，用「現在」判會變成晚餐；半夜排隊的隔天才送，
           // 不帶時間的話後端會把它存成隔天。
-          const queuedAt = new Date(item.createdAt);
           await saveRecord({
             apiBaseUrl,
             userId: item.userId,
@@ -537,16 +570,23 @@ export default function ScannerScreen() {
             foods: item.foods,
             source: item.source,
             auth: { accessToken },
-            mealType: getAutoMealType(queuedAt),
-            timestamp: formatLocalTimestamp(queuedAt),
+            isCurrentSession,
+            ...getPendingRecordReplayMetadata(item),
           });
+          recordSubmissions.markSaved(apiBaseUrl, item.userId, item.clientRecordId);
+          if (!isCurrentSession()) break;
           invalidateDietaryRecords();
-          const nextQueue = await removePendingRecordSync(item.id);
-          setPendingRecordQueue(nextQueue);
           syncedCount += 1;
         } catch (error: any) {
           const nextQueue = await markPendingRecordSyncFailed(item.id, error?.message || '後端暫時無法儲存這筆紀錄');
-          setPendingRecordQueue(nextQueue);
+          if (isCurrentSession()) setPendingRecordQueue(nextQueue);
+          break;
+        }
+        try {
+          const nextQueue = await removePendingRecordSync(item.id);
+          if (isCurrentSession()) setPendingRecordQueue(nextQueue);
+        } catch {
+          // Remote success is already counted. Cleanup failure keeps the same idempotency ID.
           break;
         }
       }
@@ -560,9 +600,14 @@ export default function ScannerScreen() {
 
   const retryPendingRecordSync = async () => {
     if (recordSubmitInFlightRef.current || recordSyncInFlightRef.current) return;
+    const isCurrentSession = () => {
+      const state = useStore.getState();
+      return state.user.userId === user.userId && state.accessToken === accessToken && state.apiBaseUrl === apiBaseUrl;
+    };
     setRecordFeedback(null);
     try {
       const syncedCount = await syncPendingRecords(pendingRecordQueue, { manual: true });
+      if (!isCurrentSession()) return;
 
       if (syncedCount > 0) {
         setRecordFeedback({
@@ -574,6 +619,7 @@ export default function ScannerScreen() {
       }
 
       const latestQueue = await loadPendingRecordSyncQueue();
+      if (!isCurrentSession()) return;
       const latestPendingRecord = latestQueue.find((item) => item.userId === user.userId);
       if (latestPendingRecord) {
         setRecordFeedback({
@@ -583,6 +629,7 @@ export default function ScannerScreen() {
         });
       }
     } catch (error) {
+      if (!isCurrentSession()) return;
       setRecordFeedback({
         tone: 'error',
         title: '同步仍未完成',
@@ -597,7 +644,16 @@ export default function ScannerScreen() {
       loadPendingRecordSyncQueue().then((queue) => {
         if (!active) return;
         setPendingRecordQueue(queue);
-        void syncPendingRecords(queue).catch(() => undefined);
+        void syncPendingRecords(queue).catch((error) => {
+          if (active) setRecordFeedback({ tone: 'error', title: '待同步紀錄需要確認', message: getRecordSubmitErrorMessage(error) });
+        });
+      }).catch(() => {
+        if (!active) return;
+        setRecordFeedback({
+          tone: 'error',
+          title: '待同步紀錄暫時無法讀取',
+          message: '本機紀錄尚未同步。偵測到版本衝突或資料讀取問題，資料未清除。',
+        });
       });
       return () => {
         active = false;
@@ -613,8 +669,12 @@ export default function ScannerScreen() {
       source: 'camera',
       submissionKey,
       successTitle: '飲食紀錄已新增',
-      successMessage: `${results.length} 項食物已加入今日紀錄。`,
-      onSuccess: clearScan,
+      successMessage: `${results.length} 項食物已依原用餐時間加入飲食紀錄。`,
+      onSuccess: () => {
+        const current = useStore.getState().scanResult;
+        const currentKey = `camera:${current.timestamp || current.detections.map((food) => food.id).join(',')}`;
+        if (currentKey === submissionKey) clearScan();
+      },
     });
   };
 
@@ -624,7 +684,7 @@ export default function ScannerScreen() {
       source: 'manual',
       submissionKey: `manual:${food.id}`,
       successTitle: '飲食紀錄已新增',
-      successMessage: `${food.foodName} 已以每 100g 份量加入今日紀錄。`,
+      successMessage: `${food.foodName} 已以每 100g 份量加入飲食紀錄。`,
       onSuccess: () => setManualResults((current) => current.filter((item) => item.id !== food.id)),
     });
   };
@@ -643,14 +703,16 @@ export default function ScannerScreen() {
   const handleQuickAddOCRFood = async () => {
     const draft = getValidatedOCRDraft();
     if (!draft) return;
-    const food = buildOCRDetectedFood(draft);
+    const submissionKey = ocrSubmissionKeyRef.current;
+    const food = { ...buildOCRDetectedFood(draft), id: submissionKey };
     await submitRecord({
       foods: [food],
       source: 'nutrition-label',
-      submissionKey: ocrSubmissionKeyRef.current,
+      submissionKey,
       successTitle: '飲食紀錄已新增',
       successMessage: `${food.foodName} 已依包裝營養標示加入紀錄。`,
       onSuccess: () => {
+        if (ocrSubmissionKeyRef.current !== submissionKey) return;
         setOcrDraft(null);
         setOcrNameError(null);
       },
@@ -823,7 +885,7 @@ export default function ScannerScreen() {
             </Text>
             {firstPendingRecord ? (
               <Text style={styles.syncStatusMessage}>
-                {firstPendingRecord.error}，已重試 {firstPendingRecord.attempts}/{MAX_RECORD_SYNC_ATTEMPTS} 次
+                {firstPendingRecord.error || '等待後端確認'}，已重試 {firstPendingRecord.attempts}/{MAX_RECORD_SYNC_ATTEMPTS} 次
               </Text>
             ) : null}
           </View>
@@ -852,24 +914,16 @@ export default function ScannerScreen() {
   );
 }
 
-function buildClientRecordId(): string {
-  return `record_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-}
-
 function buildSubmissionKey(source: RecordSource): string {
   return `${source}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function getOrCreateClientRecordId(recordIds: Map<string, string>, submissionKey: string): string {
-  const existingId = recordIds.get(submissionKey);
-  if (existingId) return existingId;
-
-  const clientRecordId = buildClientRecordId();
-  recordIds.set(submissionKey, clientRecordId);
-  return clientRecordId;
-}
-
 function getRecordSubmitErrorMessage(error: unknown): string {
+  if (error instanceof RecordSyncQueueError) {
+    if (error.code === 'target_unverified') return '舊紀錄的原儲存位置尚未確認，資料已保留，暫不補送';
+    if (error.code === 'target_mismatch') return '這筆紀錄屬於其他伺服器，請切回原設定後再同步；資料已保留';
+    if (error.code === 'storage_coordination_unavailable') return '目前瀏覽器無法安全讀取待同步紀錄，資料未清除；請保持畫面並稍後重試';
+  }
   const message = error instanceof Error ? error.message.trim() : '';
   if (/failed to fetch|network request failed|fetch failed|networkerror/i.test(message)) {
     return '目前無法連線到伺服器';

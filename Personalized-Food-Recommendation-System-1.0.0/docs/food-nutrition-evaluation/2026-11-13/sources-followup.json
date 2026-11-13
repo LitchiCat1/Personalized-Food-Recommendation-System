@@ -1,0 +1,21 @@
+{
+  "created_at": "2026-11-13T12:42:25.409253+00:00",
+  "mode": "live_public_fetch",
+  "sources": [
+    {
+      "source_id": "hospital_qq_balls",
+      "url": "https://www.tahsda.org.tw/communitymedicine/files/20161126_RAOHEStreetMarketNight/QQ%E7%8E%8B%E5%AD%90%E5%9C%B0%E7%93%9C%E7%90%83.pdf",
+      "http_status": 200,
+      "final_url": "https://www.tahsda.org.tw/communitymedicine/files/20161126_RAOHEStreetMarketNight/QQ%E7%8E%8B%E5%AD%90%E5%9C%B0%E7%93%9C%E7%90%83.pdf",
+      "content_type": "application/pdf",
+      "bytes": 113977,
+      "sha256": "29857642b9ff8a381b12fd331730f0c69db062fb83c9a6ad18734408cf0ab46d",
+      "pages": 1,
+      "text_sha256": "478402295175aaffb2fc3eec31c136bcb7b2c47ff6fcf4c0d5f126e0d9b50a82",
+      "text_characters": 1275,
+      "has_nutrition_heading": true,
+      "has_text_sodium_or_salt": true,
+      "elapsed_seconds": 0.934
+    }
+  ]
+}

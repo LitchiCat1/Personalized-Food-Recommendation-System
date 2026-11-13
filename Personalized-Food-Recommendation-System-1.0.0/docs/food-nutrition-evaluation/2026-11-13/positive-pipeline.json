@@ -1,0 +1,638 @@
+{
+  "mode": "tavily_pdf_to_current_model_plus_direct_html_fallback",
+  "results": [
+    {
+      "requested_model": "[AN]gemini-4-hydrogen-high",
+      "prompt_sha256": "09bae85032d8d957cff9e2db368fb19dc04ff27f41fe6a32368143ed302fa44b",
+      "retry_count": 0,
+      "http_status": 200,
+      "text": "{\n  \"items\": [\n    {\n      \"item_id\": \"hospital_reference\",\n      \"source_id\": \"hospital_qq\",\n      \"status\": \"candidate\",\n      \"source_food_name\": \"地瓜球\",\n      \"basis\": \"per_100g\",\n      \"basis_weight_g\": 100,\n      \"components_scope\": \"whole_food\",\n      \"preparation\": \"油炸\",\n      \"reason\": \"依explicit_reference_only政策採用同類油炸熟食地瓜球（臺安醫院輔導QQ王子地瓜球資料）作為參考；此數值非目標unknown品牌或實際攝取值，且來源缺少飽和脂肪與反式脂肪資料。\",\n      \"nutrients\": {\n        \"calories\": {\n          \"value\": 477.3,\n          \"unit\": \"kcal\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"熱量(大卡) CALORIES ... 每100 公克 (或毫升) PER 100 G (OR ML) 477.3\"\n        },\n        \"protein\": {\n          \"value\": 0.6,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"蛋白質 (公克) PROTIEN(G) ... 每100 公克 (或毫升) ... 477.3 0.6\"\n        },\n        \"carbs\": {\n          \"value\": 58.2,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"碳水化合物 (公克) CARBOHYDRATE(G) ... 每100 公克 (或毫升) ... 477.3 0.6 26.9 58.2\"\n        },\n        \"fat\": {\n          \"value\": 26.9,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"脂肪 (公克) FAT(G) ... 每100 公克 (或毫升) ... 477.3 0.6 26.9\"\n        },\n        \"sodium\": {\n          \"value\": 26,\n          \"unit\": \"mg\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"鈉 (毫克) SODIUM(MG) ... 每100 公克 (或毫升) ... 58.2 1.4 26\"\n        },\n        \"fiber\": {\n          \"value\": 1.4,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"纖維 (公克) FIBRE(G) ... 每100 公克 (或毫升) ... 58.2 1.4\"\n        },\n        \"sugar\": {\n          \"value\": 11.5,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"糖 (公克) SUGARS(G) 每100 公克 (或毫升) ... 26 11.5\"\n        },\n        \"saturated_fat\": null,\n        \"trans_fat\": null\n      }\n    },\n    {\n      \"item_id\": \"exact_soup\",\n      \"source_id\": \"direct_green\",\n      \"status\": \"candidate\",\n      \"source_food_name\": \"香菇赤肉羹\",\n      \"basis\": \"per_100g\",\n      \"basis_weight_g\": 100,\n      \"components_scope\": \"whole_package\",\n      \"preparation\": \"冷凍調理包\",\n      \"reason\": \"產品名稱（香菇赤肉羹）與品牌（GREEN & SAFE／永豐餘生技）完全符合exact_product；同時有每份與每100公克標示，依規則取每100公克數值，未標示膳食纖維故為null。\",\n      \"nutrients\": {\n        \"calories\": {\n          \"value\": 94.6,\n          \"unit\": \"kcal\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 熱量 283.8 大卡 94.6 大卡\"\n        },\n        \"protein\": {\n          \"value\": 9.5,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 ... 蛋白質 28.5 公克 9.5 公克\"\n        },\n        \"carbs\": {\n          \"value\": 9.2,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 ... 碳水化合物 27.6 公克 9.2 公克\"\n        },\n        \"fat\": {\n          \"value\": 2.2,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 ... 脂肪 6.6 公克 2.2 公克\"\n        },\n        \"sodium\": {\n          \"value\": 502,\n          \"unit\": \"mg\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 ... 鈉 1506 毫克 502 毫克\"\n        },\n        \"fiber\": null,\n        \"sugar\": {\n          \"value\": 1.2,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 ... 糖 3.6 公克 1.2 公克\"\n        },\n        \"saturated_fat\": {\n          \"value\": 0.7,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 ... 飽和脂肪 2.1 公克 0.7 公克\"\n        },\n        \"trans_fat\": {\n          \"value\": 0,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 ... 反式脂肪 0 公克 0 公克\"\n        }\n      }\n    },\n    {\n      \"item_id\": \"fake_identity\",\n      \"source_id\": \"hospital_qq\",\n      \"status\": \"incompatible\",\n      \"source_food_name\": \"地瓜球\",\n      \"basis\": null,\n      \"basis_weight_g\": null,\n      \"components_scope\": null,\n      \"preparation\": null,\n      \"reason\": \"match_policy為exact_product，目標品牌與品名為「不存在品牌_XQ」及「不存在品牌_XQ_20261113藍光地瓜球」，與來源「QQ 王子地瓜球 / 地瓜球」不符，故判定為incompatible且營養素全為null。\",\n      \"nutrients\": {\n        \"calories\": null,\n        \"protein\": null,\n        \"carbs\": null,\n        \"fat\": null,\n        \"sodium\": null,\n        \"fiber\": null,\n        \"sugar\": null,\n        \"saturated_fat\": null,\n        \"trans_fat\": null\n      }\n    }\n  ]\n}",
+      "finish_reason": "stop",
+      "returned_model": "gemini-4-hydrogen",
+      "usage": {
+        "prompt_tokens": 4991,
+        "completion_tokens": 1696,
+        "total_tokens": 9127,
+        "completion_tokens_details": {
+          "reasoning_tokens": 2440
+        }
+      },
+      "annotations": null,
+      "tool_calls": null,
+      "grounding_metadata": null,
+      "response_keys": [
+        "choices",
+        "created",
+        "id",
+        "model",
+        "object",
+        "usage"
+      ],
+      "json": {
+        "items": [
+          {
+            "item_id": "hospital_reference",
+            "source_id": "hospital_qq",
+            "status": "candidate",
+            "source_food_name": "地瓜球",
+            "basis": "per_100g",
+            "basis_weight_g": 100,
+            "components_scope": "whole_food",
+            "preparation": "油炸",
+            "reason": "依explicit_reference_only政策採用同類油炸熟食地瓜球（臺安醫院輔導QQ王子地瓜球資料）作為參考；此數值非目標unknown品牌或實際攝取值，且來源缺少飽和脂肪與反式脂肪資料。",
+            "nutrients": {
+              "calories": {
+                "value": 477.3,
+                "unit": "kcal",
+                "comparison": "exact",
+                "evidence": "熱量(大卡) CALORIES ... 每100 公克 (或毫升) PER 100 G (OR ML) 477.3"
+              },
+              "protein": {
+                "value": 0.6,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "蛋白質 (公克) PROTIEN(G) ... 每100 公克 (或毫升) ... 477.3 0.6"
+              },
+              "carbs": {
+                "value": 58.2,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "碳水化合物 (公克) CARBOHYDRATE(G) ... 每100 公克 (或毫升) ... 477.3 0.6 26.9 58.2"
+              },
+              "fat": {
+                "value": 26.9,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "脂肪 (公克) FAT(G) ... 每100 公克 (或毫升) ... 477.3 0.6 26.9"
+              },
+              "sodium": {
+                "value": 26,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "鈉 (毫克) SODIUM(MG) ... 每100 公克 (或毫升) ... 58.2 1.4 26"
+              },
+              "fiber": {
+                "value": 1.4,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "纖維 (公克) FIBRE(G) ... 每100 公克 (或毫升) ... 58.2 1.4"
+              },
+              "sugar": {
+                "value": 11.5,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "糖 (公克) SUGARS(G) 每100 公克 (或毫升) ... 26 11.5"
+              },
+              "saturated_fat": null,
+              "trans_fat": null
+            }
+          },
+          {
+            "item_id": "exact_soup",
+            "source_id": "direct_green",
+            "status": "candidate",
+            "source_food_name": "香菇赤肉羹",
+            "basis": "per_100g",
+            "basis_weight_g": 100,
+            "components_scope": "whole_package",
+            "preparation": "冷凍調理包",
+            "reason": "產品名稱（香菇赤肉羹）與品牌（GREEN & SAFE／永豐餘生技）完全符合exact_product；同時有每份與每100公克標示，依規則取每100公克數值，未標示膳食纖維故為null。",
+            "nutrients": {
+              "calories": {
+                "value": 94.6,
+                "unit": "kcal",
+                "comparison": "exact",
+                "evidence": "每 100 公克 熱量 283.8 大卡 94.6 大卡"
+              },
+              "protein": {
+                "value": 9.5,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "每 100 公克 ... 蛋白質 28.5 公克 9.5 公克"
+              },
+              "carbs": {
+                "value": 9.2,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "每 100 公克 ... 碳水化合物 27.6 公克 9.2 公克"
+              },
+              "fat": {
+                "value": 2.2,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "每 100 公克 ... 脂肪 6.6 公克 2.2 公克"
+              },
+              "sodium": {
+                "value": 502,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "每 100 公克 ... 鈉 1506 毫克 502 毫克"
+              },
+              "fiber": null,
+              "sugar": {
+                "value": 1.2,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "每 100 公克 ... 糖 3.6 公克 1.2 公克"
+              },
+              "saturated_fat": {
+                "value": 0.7,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "每 100 公克 ... 飽和脂肪 2.1 公克 0.7 公克"
+              },
+              "trans_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "每 100 公克 ... 反式脂肪 0 公克 0 公克"
+              }
+            }
+          },
+          {
+            "item_id": "fake_identity",
+            "source_id": "hospital_qq",
+            "status": "incompatible",
+            "source_food_name": "地瓜球",
+            "basis": null,
+            "basis_weight_g": null,
+            "components_scope": null,
+            "preparation": null,
+            "reason": "match_policy為exact_product，目標品牌與品名為「不存在品牌_XQ」及「不存在品牌_XQ_20261113藍光地瓜球」，與來源「QQ 王子地瓜球 / 地瓜球」不符，故判定為incompatible且營養素全為null。",
+            "nutrients": {
+              "calories": null,
+              "protein": null,
+              "carbs": null,
+              "fat": null,
+              "sodium": null,
+              "fiber": null,
+              "sugar": null,
+              "saturated_fat": null,
+              "trans_fat": null
+            }
+          }
+        ]
+      },
+      "elapsed_seconds": 16.606,
+      "repeat": 1,
+      "checks": [
+        {
+          "check": "all_three_unique_ids",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.calories",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.protein",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.fat",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.carbs",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.fiber",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.sodium",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.sugar",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.saturated_fat",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.trans_fat",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.calories",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.protein",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.fat",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.carbs",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.fiber",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.sodium",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.sugar",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.saturated_fat",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.trans_fat",
+          "passed": true
+        },
+        {
+          "check": "fake_brand_refused",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "requested_model": "[AN]gemini-4-hydrogen-high",
+      "prompt_sha256": "09bae85032d8d957cff9e2db368fb19dc04ff27f41fe6a32368143ed302fa44b",
+      "retry_count": 0,
+      "http_status": 200,
+      "text": "{\"items\":[{\"item_id\":\"hospital_reference\",\"source_id\":\"hospital_qq\",\"status\":\"candidate\",\"source_food_name\":\"地瓜球\",\"basis\":\"per_100g\",\"basis_weight_g\":100,\"components_scope\":\"地瓜球單品（固體）\",\"preparation\":\"油炸\",\"reason\":\"採納一般同類熟食參考（饒河觀光夜市 QQ 王子地瓜球），此數據並非目標項目（品牌 unknown）之同品牌實測值或實際攝取量；來源表格為固體炸地瓜球，已採用每100公克欄數值。\",\"nutrients\":{\"calories\":{\"value\":477.3,\"unit\":\"kcal\",\"comparison\":\"exact\",\"evidence\":\"熱量(大卡) CALORIES ... 每100 公克 (或毫升) PER 100 G (OR ML) 477.3\"},\"protein\":{\"value\":0.6,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"蛋白質 (公克) PROTIEN(G) ... 每100 公克 (或毫升) ... 0.6\"},\"carbs\":{\"value\":58.2,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"碳水化合物 (公克) CARBOHYDRATE(G) ... 每100 公克 (或毫升) ... 58.2\"},\"fat\":{\"value\":26.9,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"脂肪 (公克) FAT(G) ... 每100 公克 (或毫升) ... 26.9\"},\"sodium\":{\"value\":26,\"unit\":\"mg\",\"comparison\":\"exact\",\"evidence\":\"鈉 (毫克) SODIUM(MG) ... 每100 公克 (或毫升) ... 26\"},\"fiber\":{\"value\":1.4,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"纖維 (公克) FIBRE(G) ... 每100 公克 (或毫升) ... 1.4\"},\"sugar\":{\"value\":11.5,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"糖 (公克) SUGARS(G) ... 每100 公克 (或毫升) ... 11.5\"},\"saturated_fat\":null,\"trans_fat\":null}},{\"item_id\":\"exact_soup\",\"source_id\":\"direct_green\",\"status\":\"candidate\",\"source_food_name\":\"香菇赤肉羹\",\"basis\":\"per_100g\",\"basis_weight_g\":100,\"components_scope\":\"整包調理包（羹湯及肉羹）\",\"preparation\":\"冷凍即食調理包\",\"reason\":\"來源品牌（GREEN&SAFE／永豐餘生技）與產品名稱（香菇赤肉羹）皆與目標相符；每份與每100公克並存，僅擷取每100公克標示值，缺少之膳食纖維欄位維持null。\",\"nutrients\":{\"calories\":{\"value\":94.6,\"unit\":\"kcal\",\"comparison\":\"exact\",\"evidence\":\"每 100 公克 熱量 94.6 大卡\"},\"protein\":{\"value\":9.5,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"每 100 公克 蛋白質 9.5 公克\"},\"carbs\":{\"value\":9.2,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"每 100 公克 碳水化合物 9.2 公克\"},\"fat\":{\"value\":2.2,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"每 100 公克 脂肪 2.2 公克\"},\"sodium\":{\"value\":502,\"unit\":\"mg\",\"comparison\":\"exact\",\"evidence\":\"每 100 公克 鈉 502 毫克\"},\"fiber\":null,\"sugar\":{\"value\":1.2,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"每 100 公克 糖 1.2 公克\"},\"saturated_fat\":{\"value\":0.7,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"每 100 公克 飽和脂肪 0.7 公克\"},\"trans_fat\":{\"value\":0,\"unit\":\"g\",\"comparison\":\"exact\",\"evidence\":\"每 100 公克 反式脂肪 0 公克\"}}},{\"item_id\":\"fake_identity\",\"source_id\":\"hospital_qq\",\"status\":\"incompatible\",\"source_food_name\":\"地瓜球\",\"basis\":null,\"basis_weight_g\":null,\"components_scope\":null,\"preparation\":null,\"reason\":\"match_policy為exact_product，但目標品牌「不存在品牌_XQ」及品名「不存在品牌_XQ_20261113藍光地瓜球」與來源攤位「QQ 王子地瓜球」及品名「地瓜球」不符，判定incompatible且營養欄位全為null。\",\"nutrients\":{\"calories\":null,\"protein\":null,\"carbs\":null,\"fat\":null,\"sodium\":null,\"fiber\":null,\"sugar\":null,\"saturated_fat\":null,\"trans_fat\":null}}]}",
+      "finish_reason": "stop",
+      "returned_model": "gemini-4-hydrogen",
+      "usage": {
+        "prompt_tokens": 4991,
+        "completion_tokens": 1092,
+        "total_tokens": 8740,
+        "prompt_tokens_details": {
+          "cached_tokens": 2937
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2657
+        }
+      },
+      "annotations": null,
+      "tool_calls": null,
+      "grounding_metadata": null,
+      "response_keys": [
+        "choices",
+        "created",
+        "id",
+        "model",
+        "object",
+        "usage"
+      ],
+      "json": {
+        "items": [
+          {
+            "item_id": "hospital_reference",
+            "source_id": "hospital_qq",
+            "status": "candidate",
+            "source_food_name": "地瓜球",
+            "basis": "per_100g",
+            "basis_weight_g": 100,
+            "components_scope": "地瓜球單品（固體）",
+            "preparation": "油炸",
+            "reason": "採納一般同類熟食參考（饒河觀光夜市 QQ 王子地瓜球），此數據並非目標項目（品牌 unknown）之同品牌實測值或實際攝取量；來源表格為固體炸地瓜球，已採用每100公克欄數值。",
+            "nutrients": {
+              "calories": {
+                "value": 477.3,
+                "unit": "kcal",
+                "comparison": "exact",
+                "evidence": "熱量(大卡) CALORIES ... 每100 公克 (或毫升) PER 100 G (OR ML) 477.3"
+              },
+              "protein": {
+                "value": 0.6,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "蛋白質 (公克) PROTIEN(G) ... 每100 公克 (或毫升) ... 0.6"
+              },
+              "carbs": {
+                "value": 58.2,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "碳水化合物 (公克) CARBOHYDRATE(G) ... 每100 公克 (或毫升) ... 58.2"
+              },
+              "fat": {
+                "value": 26.9,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "脂肪 (公克) FAT(G) ... 每100 公克 (或毫升) ... 26.9"
+              },
+              "sodium": {
+                "value": 26,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "鈉 (毫克) SODIUM(MG) ... 每100 公克 (或毫升) ... 26"
+              },
+              "fiber": {
+                "value": 1.4,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "纖維 (公克) FIBRE(G) ... 每100 公克 (或毫升) ... 1.4"
+              },
+              "sugar": {
+                "value": 11.5,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "糖 (公克) SUGARS(G) ... 每100 公克 (或毫升) ... 11.5"
+              },
+              "saturated_fat": null,
+              "trans_fat": null
+            }
+          },
+          {
+            "item_id": "exact_soup",
+            "source_id": "direct_green",
+            "status": "candidate",
+            "source_food_name": "香菇赤肉羹",
+            "basis": "per_100g",
+            "basis_weight_g": 100,
+            "components_scope": "整包調理包（羹湯及肉羹）",
+            "preparation": "冷凍即食調理包",
+            "reason": "來源品牌（GREEN&SAFE／永豐餘生技）與產品名稱（香菇赤肉羹）皆與目標相符；每份與每100公克並存，僅擷取每100公克標示值，缺少之膳食纖維欄位維持null。",
+            "nutrients": {
+              "calories": {
+                "value": 94.6,
+                "unit": "kcal",
+                "comparison": "exact",
+                "evidence": "每 100 公克 熱量 94.6 大卡"
+              },
+              "protein": {
+                "value": 9.5,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "每 100 公克 蛋白質 9.5 公克"
+              },
+              "carbs": {
+                "value": 9.2,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "每 100 公克 碳水化合物 9.2 公克"
+              },
+              "fat": {
+                "value": 2.2,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "每 100 公克 脂肪 2.2 公克"
+              },
+              "sodium": {
+                "value": 502,
+                "unit": "mg",
+                "comparison": "exact",
+                "evidence": "每 100 公克 鈉 502 毫克"
+              },
+              "fiber": null,
+              "sugar": {
+                "value": 1.2,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "每 100 公克 糖 1.2 公克"
+              },
+              "saturated_fat": {
+                "value": 0.7,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "每 100 公克 飽和脂肪 0.7 公克"
+              },
+              "trans_fat": {
+                "value": 0,
+                "unit": "g",
+                "comparison": "exact",
+                "evidence": "每 100 公克 反式脂肪 0 公克"
+              }
+            }
+          },
+          {
+            "item_id": "fake_identity",
+            "source_id": "hospital_qq",
+            "status": "incompatible",
+            "source_food_name": "地瓜球",
+            "basis": null,
+            "basis_weight_g": null,
+            "components_scope": null,
+            "preparation": null,
+            "reason": "match_policy為exact_product，但目標品牌「不存在品牌_XQ」及品名「不存在品牌_XQ_20261113藍光地瓜球」與來源攤位「QQ 王子地瓜球」及品名「地瓜球」不符，判定incompatible且營養欄位全為null。",
+            "nutrients": {
+              "calories": null,
+              "protein": null,
+              "carbs": null,
+              "fat": null,
+              "sodium": null,
+              "fiber": null,
+              "sugar": null,
+              "saturated_fat": null,
+              "trans_fat": null
+            }
+          }
+        ]
+      },
+      "elapsed_seconds": 18.305,
+      "repeat": 2,
+      "checks": [
+        {
+          "check": "all_three_unique_ids",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.calories",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.protein",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.fat",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.carbs",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.fiber",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.sodium",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.sugar",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.saturated_fat",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.trans_fat",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.calories",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.protein",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.fat",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.carbs",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.fiber",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.sodium",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.sugar",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.saturated_fat",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.trans_fat",
+          "passed": true
+        },
+        {
+          "check": "fake_brand_refused",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "requested_model": "[AN]gemini-4-hydrogen-high",
+      "prompt_sha256": "09bae85032d8d957cff9e2db368fb19dc04ff27f41fe6a32368143ed302fa44b",
+      "retry_count": 0,
+      "http_status": 200,
+      "text": "```json\n{\n  \"items\": [\n    {\n      \"item_id\": \"hospital_reference\",\n      \"source_id\": \"hospital_qq\",\n      \"status\": \"candidate\",\n      \"source_food_name\": \"地瓜球\",\n      \"basis\": \"per_100g\",\n      \"basis_weight_g\": 100,\n      \"components_scope\": \"地瓜球\",\n      \"preparation\": \"油炸\",\n      \"reason\": \"match_policy 為 explicit_reference_only，採用臺安醫院輔導「QQ 王子地瓜球」之同類油炸熟食營養分析作為一般參考，並非目標之同品牌產品或實際攝取值；來源僅有每100公克數據（無飽和脂肪與反式脂肪）。\",\n      \"nutrients\": {\n        \"calories\": {\n          \"value\": 477.3,\n          \"unit\": \"kcal\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"熱量(大卡) CALORIES ... 每100 公克 (或毫升) PER 100 G (OR ML) 477.3\"\n        },\n        \"protein\": {\n          \"value\": 0.6,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"蛋白質 (公克) PROTIEN(G) ... 每100 公克 (或毫升) PER 100 G (OR ML) 477.3 0.6\"\n        },\n        \"carbs\": {\n          \"value\": 58.2,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"碳水化合物 (公克) CARBOHYDRATE(G) ... 477.3 0.6 26.9 58.2\"\n        },\n        \"fat\": {\n          \"value\": 26.9,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"脂肪 (公克) FAT(G) ... 477.3 0.6 26.9\"\n        },\n        \"sodium\": {\n          \"value\": 26,\n          \"unit\": \"mg\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"鈉 (毫克) SODIUM(MG) ... 58.2 1.4 26\"\n        },\n        \"fiber\": {\n          \"value\": 1.4,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"纖維 (公克) FIBRE(G) ... 58.2 1.4\"\n        },\n        \"sugar\": {\n          \"value\": 11.5,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"糖 (公克) SUGARS(G) ... 1.4 26 11.5\"\n        },\n        \"saturated_fat\": null,\n        \"trans_fat\": null\n      }\n    },\n    {\n      \"item_id\": \"exact_soup\",\n      \"source_id\": \"direct_green\",\n      \"status\": \"candidate\",\n      \"source_food_name\": \"香菇赤肉羹\",\n      \"basis\": \"per_100g\",\n      \"basis_weight_g\": 100,\n      \"components_scope\": \"香菇赤肉羹\",\n      \"preparation\": \"冷凍調理包\",\n      \"reason\": \"品牌 GREEN & SAFE（永豐餘生技）與品名「香菇赤肉羹」均符合 exact_product，同時存在每份與每 100 公克標示，依規定僅擷取每 100 公克數值；來源未標示膳食纖維。\",\n      \"nutrients\": {\n        \"calories\": {\n          \"value\": 94.6,\n          \"unit\": \"kcal\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 熱量 283.8 大卡 94.6 大卡\"\n        },\n        \"protein\": {\n          \"value\": 9.5,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 ... 蛋白質 28.5 公克 9.5 公克\"\n        },\n        \"carbs\": {\n          \"value\": 9.2,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 ... 碳水化合物 27.6 公克 9.2 公克\"\n        },\n        \"fat\": {\n          \"value\": 2.2,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 ... 脂肪 6.6 公克 2.2 公克\"\n        },\n        \"sodium\": {\n          \"value\": 502,\n          \"unit\": \"mg\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 ... 鈉 1506 毫克 502 毫克\"\n        },\n        \"fiber\": null,\n        \"sugar\": {\n          \"value\": 1.2,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 ... 糖 3.6 公克 1.2 公克\"\n        },\n        \"saturated_fat\": {\n          \"value\": 0.7,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 ... 飽和脂肪 2.1 公克 0.7 公克\"\n        },\n        \"trans_fat\": {\n          \"value\": 0,\n          \"unit\": \"g\",\n          \"comparison\": \"exact\",\n          \"evidence\": \"每 100 公克 ... 反式脂肪 0 公克 0 公克\"\n        }\n      }\n    },\n    {\n      \"item_id\": \"fake_identity\",\n      \"source_id\": \"hospital_qq\",\n      \"status\": \"incompatible\",\n      \"source_food_name\": \"地瓜球\",\n      \"basis\": null,\n      \"basis_weight_g\": null,\n      \"components_scope\": null,\n      \"preparation\": null,\n      \"reason\": \"match_policy 為 exact_product，目標品牌「不存在品牌_XQ」與品名「不存在品牌_XQ_20261113藍光地瓜球」和來源攤位「QQ 王子地瓜球」之「地瓜球」不相符，判定為 incompatible，所有營養素皆設為 null。\",\n      \"nutrients\": {\n        \"calories\": null,\n        \"protein\": null,\n        \"carbs\": null,\n        \"fat\": null,\n        \"sodium\": null,\n        \"fiber\": null,\n        \"sugar\": null,\n        \"saturated_fat\": null,\n        \"trans_fat\": null\n      }\n    }\n  ]\n}\n```",
+      "finish_reason": "stop",
+      "returned_model": "gemini-4-hydrogen",
+      "usage": {
+        "prompt_tokens": 4991,
+        "completion_tokens": 1679,
+        "total_tokens": 8402,
+        "prompt_tokens_details": {
+          "cached_tokens": 2937
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1732
+        }
+      },
+      "annotations": null,
+      "tool_calls": null,
+      "grounding_metadata": null,
+      "response_keys": [
+        "choices",
+        "created",
+        "id",
+        "model",
+        "object",
+        "usage"
+      ],
+      "json_error": true,
+      "elapsed_seconds": 14.971,
+      "repeat": 3,
+      "checks": [
+        {
+          "check": "all_three_unique_ids",
+          "passed": false
+        },
+        {
+          "check": "hospital_reference.calories",
+          "passed": false
+        },
+        {
+          "check": "hospital_reference.protein",
+          "passed": false
+        },
+        {
+          "check": "hospital_reference.fat",
+          "passed": false
+        },
+        {
+          "check": "hospital_reference.carbs",
+          "passed": false
+        },
+        {
+          "check": "hospital_reference.fiber",
+          "passed": false
+        },
+        {
+          "check": "hospital_reference.sodium",
+          "passed": false
+        },
+        {
+          "check": "hospital_reference.sugar",
+          "passed": false
+        },
+        {
+          "check": "hospital_reference.saturated_fat",
+          "passed": true
+        },
+        {
+          "check": "hospital_reference.trans_fat",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.calories",
+          "passed": false
+        },
+        {
+          "check": "exact_soup.protein",
+          "passed": false
+        },
+        {
+          "check": "exact_soup.fat",
+          "passed": false
+        },
+        {
+          "check": "exact_soup.carbs",
+          "passed": false
+        },
+        {
+          "check": "exact_soup.fiber",
+          "passed": true
+        },
+        {
+          "check": "exact_soup.sodium",
+          "passed": false
+        },
+        {
+          "check": "exact_soup.sugar",
+          "passed": false
+        },
+        {
+          "check": "exact_soup.saturated_fat",
+          "passed": false
+        },
+        {
+          "check": "exact_soup.trans_fat",
+          "passed": false
+        },
+        {
+          "check": "fake_brand_refused",
+          "passed": false
+        }
+      ]
+    }
+  ]
+}

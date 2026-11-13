@@ -1,6 +1,8 @@
 from datetime import datetime
+import math
 
 from services.app_time_service import app_today
+from services.nutrition_profile_service import NutritionProfileError
 from services.profile_service import compute_bmr, compute_tdee, resolve_energy_factor, resolve_weight_goal_energy
 
 
@@ -86,8 +88,17 @@ def _number(value, fallback: float = 0) -> float:
 
 
 def _display_number(value: float) -> int | float:
+    if not math.isfinite(value):
+        raise NutritionProfileError("numeric_range", "Nutrition progress exceeds supported range")
     rounded = round(value, 1)
     return int(rounded) if rounded.is_integer() else rounded
+
+
+def _progress_percent(consumed: float, target: float) -> float:
+    value = consumed / max(0.1, target) * 100
+    if not math.isfinite(value):
+        raise NutritionProfileError("numeric_range", "Nutrition progress exceeds supported range")
+    return round(value, 1)
 
 
 def _progress_status(nutrient: str, consumed: float, target: float, goal_types: dict | None = None) -> str:
@@ -334,7 +345,7 @@ SHORTFALL_NUTRIENTS = {
 SHORTFALL_RATIO = 0.8
 
 
-def build_shortfalls(consumed: dict, targets: dict, records: list) -> list[dict]:
+def build_shortfalls(consumed: dict, targets: dict, records: list, coverage: dict | None = None) -> list[dict]:
     """列出明顯沒吃夠的項目。
 
     只在當天已經有紀錄時才提醒：一天還沒開始當然什麼都沒吃到，
@@ -345,6 +356,8 @@ def build_shortfalls(consumed: dict, targets: dict, records: list) -> list[dict]
 
     shortfalls = []
     for nutrient, (label_zh, unit) in SHORTFALL_NUTRIENTS.items():
+        if coverage is not None and (coverage.get("nutrients", {}).get(nutrient) or {}).get("status") != "complete":
+            continue
         target = _number(targets.get(nutrient))
         if target <= 0:
             continue
@@ -364,13 +377,61 @@ def build_shortfalls(consumed: dict, targets: dict, records: list) -> list[dict]
     return shortfalls
 
 
-def build_daily_nutrition_progress(storage, user_id: str, user: dict, now: datetime | None = None) -> dict:
+def build_daily_nutrition_progress(storage, user_id: str, user: dict, now: datetime | None = None,
+                                   *, nutrition_contract_version: int = 1) -> dict:
     today = app_today(now)
-    records = storage.get_records(user_id, today, limit=500)
+    all_records = getattr(storage, "get_all_records", None)
+    scope_complete = callable(all_records)
+    records = all_records(user_id, today) if scope_complete else storage.get_records(user_id, today, limit=500)
 
     # 根據 PDF 指引動態計算目標值
     targets = calculate_pdf_daily_targets(user)
     goal_types = build_nutrition_goal_types(user)
+
+    has_v2 = any(
+        record.get("nutrition_contract_version") == 2 or
+        (isinstance(record.get("nutrition_context"), dict) and
+         (record["nutrition_context"].get("contract_version") == 2 or
+          record["nutrition_context"].get("nutrition_contract_version") == 2))
+        for record in records
+    )
+    if has_v2 or (type(nutrition_contract_version) is int and nutrition_contract_version == 2):
+        from services.record_nutrition_service import aggregate_record_coverage
+
+        coverage = aggregate_record_coverage(records)
+        # A bounded legacy storage interface cannot prove that a full day was read.
+        if not scope_complete and len(records) >= 500:
+            for row in coverage["nutrients"].values():
+                row["eligible_items"] += 1
+                row["unresolved_items"] += 1
+                if row["status"] != "legacy_unknown":
+                    row["status"] = "partial" if row["known_items"] else "unknown"
+                row["total_upper_bound"] = None
+                row["upper_bound_comparison"] = None
+        consumed = {field: coverage["nutrients"][field]["known_sum"] for field in targets}
+        complete = {field: coverage["nutrients"][field]["status"] == "complete" for field in targets}
+        return {
+            "date": today,
+            "nutrition_contract_version": 2,
+            "coverage": coverage,
+            "scope_complete": scope_complete or len(records) < 500,
+            "goal_type": goal_types,
+            "targets": {key: _display_number(value) for key, value in targets.items()},
+            "consumed": {key: _display_number(value) for key, value in consumed.items()},
+            "remaining": {key: _display_number(max(0, targets[key] - value)) if complete[key] else None
+                          for key, value in consumed.items()},
+            "over_by": {key: _display_number(max(0, value - targets[key])) for key, value in consumed.items()},
+            "under_by": {key: _display_number(max(0, targets[key] - value)) if complete[key] else None
+                         for key, value in consumed.items()},
+            "shortfalls": build_shortfalls(consumed, targets, records, coverage),
+            "progress_percent": {key: _progress_percent(value, targets[key])
+                                 for key, value in consumed.items()},
+            "status": {
+                key: ("over" if goal_types[key] == "upper_limit" and value > targets[key] else
+                      "unknown" if not complete[key] else _progress_status(key, value, targets[key], goal_types))
+                for key, value in consumed.items()
+            },
+        }
 
     consumed = {
         nutrient: sum(_number(record.get(field)) for record in records)
@@ -399,7 +460,7 @@ def build_daily_nutrition_progress(storage, user_id: str, user: dict, now: datet
         "under_by": {key: _display_number(value) for key, value in under_by.items()},
         "shortfalls": build_shortfalls(consumed, targets, records),
         "progress_percent": {
-            nutrient: round(consumed[nutrient] / max(0.1, targets[nutrient]) * 100, 1)
+            nutrient: _progress_percent(consumed[nutrient], targets[nutrient])
             for nutrient in targets
         },
         "status": {

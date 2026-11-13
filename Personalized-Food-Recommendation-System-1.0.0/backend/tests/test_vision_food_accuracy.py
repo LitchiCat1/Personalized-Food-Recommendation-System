@@ -50,18 +50,18 @@ class VisionFoodAccuracyTests(unittest.TestCase):
         self.assertEqual(matches[0]["source"], "USDA FNDDS")
         self.assertNotIn("菇", matches[0]["name_zh"])
 
-    def test_cabbage_uses_tfda_official_alias_not_dumplings(self):
+    def test_cooked_cabbage_uses_compatible_cooked_reference_not_raw_tfda(self):
         matches = self.match("炒高麗菜")
-        self.assertEqual(matches[0]["source"], "TFDA")
-        self.assertEqual(matches[0]["category"], "蔬菜類")
+        self.assertEqual(matches[0]["key"], "usda_fndds:2709891")
         self.assertTrue(matches[0]["match_notes"])
         self.assertNotIn("水餃", matches[0]["name_zh"])
 
-    def test_tfda_precedes_usda_even_if_usda_name_is_exact(self):
+    def test_raw_tfda_cannot_block_compatible_cooked_usda(self):
         subset = {key: self.database[key] for key in ("甘藍平均值", "usda_fndds:2709891")}
         matches = find_vision_food_matches(Storage(), subset, {"name_zh": "炒高麗菜"}, None, build_custom_food_search_result)
         self.assertTrue(any(food["source"] == "USDA FNDDS" for food in matches))
-        self.assertEqual(matches[0]["source"], "TFDA")
+        self.assertEqual(matches[0]["source"], "USDA FNDDS")
+        self.assertFalse(any(food["key"] == "甘藍平均值" for food in matches))
 
     def test_rice_sausage_cannot_become_pig_intestine(self):
         self.assertEqual(self.match("糯米腸", alternatives=["豬大腸", "大腸"]), [])
@@ -87,10 +87,11 @@ class VisionFoodAccuracyTests(unittest.TestCase):
         self.assertEqual(matches, [])
 
     def test_prepared_cup_noodles_cannot_use_dry_noodle_weight(self):
-        matches = self.match("泡麵", food_state="prepared")
+        matches = self.match("泡麵", food_state="prepared", components_scope="whole_dish_with_broth")
         self.assertEqual(matches[0]["key"], "usda_fndds:2709152")
         self.assertEqual(matches[0]["calories"], 66)
-        response = self.response([{"name_zh": "泡麵", "confidence": 0.95, "estimated_weight_g": 350}])
+        response = self.response([{"name_zh": "泡麵", "confidence": 0.95, "estimated_weight_g": 350,
+                                   "food_state": "prepared", "components_scope": "whole_dish_with_broth"}])
         self.assertEqual(response["summary"]["total_calories"], 231)
 
     def test_cooked_oil_noodles_prefer_tfda_wet_profile(self):
@@ -106,16 +107,17 @@ class VisionFoodAccuracyTests(unittest.TestCase):
 
     def test_fresh_cucumber_does_not_become_pickled_cucumber(self):
         for name in ("小黃瓜", "小黃瓜片"):
-            matches = self.match(name)
+            matches = self.match(name, food_state="raw")
             self.assertTrue(matches)
             self.assertFalse(any("醃" in food["name_zh"] for food in matches))
 
     def test_common_edamame_and_tofu_names_find_tfda_foods(self):
         for name in ("豆干", "毛豆"):
-            matches = self.match(name)
+            matches = self.match(name, food_state="raw" if name == "毛豆" else "prepared")
             self.assertTrue(matches)
             self.assertEqual(matches[0]["source"], "TFDA")
-            self.assertTrue(matches[0]["match_notes"])
+            if name == "豆干":
+                self.assertTrue(matches[0]["match_notes"])
 
     def test_soup_does_not_use_concentrated_stock(self):
         matches = self.match("高湯")

@@ -1,0 +1,51 @@
+{
+  "mode": "existing_frontend_helpers_with_mocked_fetch_and_network_adapter",
+  "mappedSourceUrl": null,
+  "mappedStatus": null,
+  "mappedMissingFields": [
+    "sodium",
+    "fiber",
+    "sugar"
+  ],
+  "serializedFood": {
+    "name": "測試食品",
+    "calories": 100,
+    "protein": 10,
+    "carbs": 10,
+    "sugar": 0,
+    "fat": 5,
+    "saturated_fat": 0,
+    "trans_fat": 0,
+    "sodium": null,
+    "fiber": null,
+    "is_fried": false,
+    "source": "web_reference",
+    "warnings": [
+      "test-only prior warning"
+    ]
+  },
+  "serializedMissingFieldsPreserved": false,
+  "serializedWeightPreserved": false,
+  "editDraft": {
+    "name": "測試",
+    "calories": "100",
+    "protein": "10",
+    "carbs": "10",
+    "sugar": "0",
+    "fat": "5",
+    "saturated_fat": "0",
+    "trans_fat": "0",
+    "sodium": "0",
+    "fiber": "0",
+    "is_fried": "false"
+  },
+  "weightEdit": {
+    "originalSodium": 800,
+    "doubledSodium": 1600,
+    "warningsAfterDoubling": [
+      "test-only prior warning"
+    ],
+    "restoredSodium": 800,
+    "cumulativeRoundingDriftObserved": false
+  }
+}

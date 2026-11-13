@@ -1,0 +1,329 @@
+{
+  "created_at": "2026-11-13T12:58:38.268808+00:00",
+  "max_requests": 7,
+  "mode": "documented_settings_small_comparison_not_accuracy_benchmark",
+  "requests": [
+    {
+      "endpoint": "search",
+      "case": "rice_taiwan",
+      "parameters": {
+        "search_depth": "basic",
+        "auto_parameters": false,
+        "topic": "general",
+        "include_answer": false,
+        "include_raw_content": false,
+        "include_images": false,
+        "include_usage": true,
+        "max_results": 5,
+        "query": "糯米腸 營養",
+        "country": "taiwan"
+      },
+      "http_status": 200,
+      "request_id": "d246962e-a0de-491b-974d-12a88c591558",
+      "usage": {
+        "credits": 1
+      },
+      "results": [
+        {
+          "url": "https://chinesecalorie.com/china/zh-hant/foods/snacks/jilin-sticky-rice-sausage-cn",
+          "title": "吉林糯米腸熱量與營養 | ChineseCalorie",
+          "score": 0.7923036
+        },
+        {
+          "url": "https://www.pizzafood.com.tw/products/%E6%B6%88%E8%B2%BB%E8%80%85%E9%87%91%E7%89%8C%E7%8D%8E%E3%80%90%E7%8B%80%E5%85%83%E7%B3%AF%E7%B1%B3%E8%85%B8%E3%80%91580%E5%85%8B6%E6%A2%9D",
+          "title": "消費者金牌獎【狀元糯米腸】580克/6條",
+          "score": 0.77167153
+        },
+        {
+          "url": "https://www.epochtimes.com/b5/26/4/7/n14736548.htm",
+          "title": "營養師傳授技巧 安心享用爆卡美食糯米腸 | 大紀元",
+          "score": 0.7272981
+        },
+        {
+          "url": "https://www.green-n-safe.com/Products/Content?id=MAQ0064ABCS",
+          "title": "古早味花生糯米腸 (220g/2條)｜永豐餘生技",
+          "score": 0.6798167
+        },
+        {
+          "url": "https://www.threads.com/@steven_go_fitness/post/DYJ9zBTks_5/%E5%90%83%E7%B3%AF%E7%B1%B3%E8%85%B8%E8%A6%81%E6%B3%A8%E6%84%8F%E7%9A%84%E4%BA%8B%E7%B3%AF%E7%B1%B3%E8%85%B8%E6%9C%80%E5%A4%A7%E7%9A%84%E5%95%8F%E9%A1%8C%E4%B8%8D%E6%98%AF%E4%B8%8D%E8%83%BD%E5%90%83%E8%80%8C%E6%98%AF%E5%BE%88%E5%AE%B9%E6%98%93%E5%9C%A8%E4%BD%A0%E6%B2%92%E6%84%9F%E8%A6%BA%E7%9A%84%E6%83%85%E6%B3%81%E4%B8%8B%E6%BE%B1%E7%B2%89%E6%B2%B9%E8%84%82%E9%88%89%E4%B8%80%E6%AC%A1%E5%90%83%E6%BB%BF%E5%B0%A4%E5%85%B6%E5%A4%9C%E5%B8%82%E9%A6%99%E8%85%B8%E6%94%A4%E9%82%A3%E7%A8%AE%E7%B3%AF%E7%B1%B3%E8%85%B8%E5%BE%88%E5%A4%9A%E6%9C%83%E5%85%88%E8%92%B8%E5%86%8D%E6%B2%B9%E7%82%B8%E5%86%8D%E5%88%B7%E9%86%AC%E7%86%B1%E9%87%8F%E4%B8%8D%E6%96%B7%E7%96%8A%E5%8A%A0%E4%BB%A5%E7%82%BA%E5%9C%A8%E5%90%83%E4%B8%80%E6%A2%9D",
+          "title": "吃糯米腸要注意的事 糯米腸最大的問題不是不能吃 而是很容易在你沒感覺的情況下 「澱粉＋油脂＋鈉」一次吃滿 尤其夜市、香腸攤那種糯米腸很多會先蒸 再油炸，再刷醬 熱量不斷疊加，以為在吃一條小點心， 但實際上比較像壓縮版便當",
+          "score": 0.4815148
+        }
+      ],
+      "elapsed_seconds": 1.96
+    },
+    {
+      "endpoint": "search",
+      "case": "exact_soup",
+      "parameters": {
+        "search_depth": "basic",
+        "auto_parameters": false,
+        "topic": "general",
+        "include_answer": false,
+        "include_raw_content": false,
+        "include_images": false,
+        "include_usage": true,
+        "max_results": 5,
+        "query": "\"香菇赤肉羹\" 營養",
+        "exact_match": true,
+        "include_domains": [
+          "green-n-safe.com"
+        ],
+        "include_domains_mode": "restrict"
+      },
+      "http_status": 200,
+      "request_id": "6612912d-80a2-4d8a-9b68-cedf31830993",
+      "usage": {
+        "credits": 1
+      },
+      "results": [
+        {
+          "url": "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS",
+          "title": "香菇赤肉羹｜永豐餘生技",
+          "score": 0.76454014
+        },
+        {
+          "url": "https://www.green-n-safe.com/Products/Content?id=UAA3240C",
+          "title": "台式小吃組｜永豐餘生技",
+          "score": 0.44013837
+        },
+        {
+          "url": "https://www.green-n-safe.com/Products/Content?id=MFA0004ABCS",
+          "title": "香菇鮮筍雞茸粥｜永豐餘生技",
+          "score": 0.34587815
+        },
+        {
+          "url": "https://www.green-n-safe.com/Products/Content?id=MEC0023ABCS",
+          "title": "老菜脯黑蒜雞湯｜永豐餘生技",
+          "score": 0.33993718
+        },
+        {
+          "url": "https://www.green-n-safe.com/Products/Content?id=MAC0075ABCS",
+          "title": "麻油放養雞｜永豐餘生技",
+          "score": 0.33111975
+        }
+      ],
+      "elapsed_seconds": 3.626
+    },
+    {
+      "endpoint": "search",
+      "case": "exact_fake",
+      "parameters": {
+        "search_depth": "basic",
+        "auto_parameters": false,
+        "topic": "general",
+        "include_answer": false,
+        "include_raw_content": false,
+        "include_images": false,
+        "include_usage": true,
+        "max_results": 5,
+        "query": "\"不存在品牌_測試XQ_20261113藍光地瓜球\" 營養標示",
+        "exact_match": true
+      },
+      "http_status": 200,
+      "request_id": "fcaf1735-d5b9-4aa9-9db4-98b534017e2b",
+      "usage": {
+        "credits": 1
+      },
+      "results": [
+        {
+          "url": "https://www.facebook.com/TWsweetpotato/videos/%E5%9B%9B%E5%80%8B%E4%B8%8D%E5%90%8C%E6%84%8F%E5%9C%B0%E7%93%9C%E7%90%83%E9%80%B2%E5%9C%8B%E9%9A%9B%EF%B8%8F%E5%85%A8%E7%90%83%E7%AC%AC%E4%B8%80%E5%8C%85%EF%B8%8F%E7%AC%A6%E5%90%88%E7%BE%8E%E5%9C%8Bfda%E9%A3%9F%E5%93%81%E7%87%9F%E9%A4%8A%E6%A8%99%E7%A4%BA%E7%9A%84%E5%9C%B0%E7%93%9C%E7%90%83%E7%B6%93sgs%E5%8F%B0%E7%81%A3%E6%AA%A2%E6%B8%AC%E5%A4%A7%E8%85%B8%E6%A1%BF%E8%8F%8C%E4%BA%BA%E5%B7%A5%E8%89%B2%E7%B4%A0%E9%98%B2%E8%85%90%E5%8A%91%E5%9D%87%E7%82%BA%E9%AB%98%E6%A8%99%E6%BA%96%E9%99%B0%E6%80%A7%E9%9B%B6%E6%AA%A2%E5%87%BA%E6%B2%B9%E5%93%81%E6%9B%B4%E7%AC%A6%E5%90%883m%E5%9C%8B%E9%9A%9B%E9%85%B8%E5%83%B9%E8%A9%A6%E7%B4%99%E6%B8%AC%E8%A9%A6%E6%A8%99/633506654507309",
+          "title": "❌四個不同意❌ 🌕地瓜球進國際🌕 ‼️全球第一包‼️ 符合🇺 ...",
+          "score": 0.3116363
+        },
+        {
+          "url": "https://www.facebook.com/TWsweetpotato/posts/%E5%9B%9B%E5%80%8B%E4%B8%8D%E5%90%8C%E6%84%8F%E5%9C%B0%E7%93%9C%E7%90%83%E9%80%B2%E5%9C%8B%E9%9A%9B%EF%B8%8F%E5%85%A8%E7%90%83%E7%AC%AC%E4%B8%80%E5%8C%85%EF%B8%8F%E7%AC%A6%E5%90%88%E7%BE%8E%E5%9C%8Bfda%E9%A3%9F%E5%93%81%E7%87%9F%E9%A4%8A%E6%A8%99%E7%A4%BA%E7%9A%84%E5%9C%B0%E7%93%9C%E7%90%83%E7%B6%93sgs%E5%8F%B0%E7%81%A3%E6%AA%A2%E6%B8%AC%E5%A4%A7%E8%85%B8%E6%A1%BF%E8%8F%8C%E4%BA%BA%E5%B7%A5%E8%89%B2%E7%B4%A0%E9%98%B2%E8%85%90%E5%8A%91%E5%9D%87%E7%82%BA%E9%AB%98%E6%A8%99%E6%BA%96%E9%99%B0%E6%80%A7%E9%9B%B6%E6%AA%A2%E5%87%BA%E6%B2%B9%E5%93%81%E6%9B%B4%E7%AC%A6%E5%90%883m%E5%9C%8B%E9%9A%9B%E9%85%B8%E5%83%B9%E8%A9%A6%E7%B4%99%E6%B8%AC%E8%A9%A6%E6%A8%99/876050243072183?locale=hi_IN",
+          "title": "台灣番薯丸-地瓜球第一品牌（品牌總部）",
+          "score": 0.27308947
+        },
+        {
+          "url": "https://www.tahsda.org.tw/communitymedicine/files/20161126_RAOHEStreetMarketNight/QQ%E7%8E%8B%E5%AD%90%E5%9C%B0%E7%93%9C%E7%90%83.pdf",
+          "title": "QQ王子地瓜球",
+          "score": 0.22337708
+        },
+        {
+          "url": "https://www.threads.com/@tw_sweetpotato/post/DMKZ3_mSpLW/%E6%98%AF%E4%B8%8D%E6%98%AF%E4%BB%A5%E7%82%BA%E5%9C%B0%E7%93%9C%E7%90%83%E4%B8%8A%E4%BA%86%E5%85%B6%E4%BB%96%E9%A1%8F%E8%89%B2%E5%B0%B1%E6%B2%92%E4%BA%8B%E4%BA%86",
+          "title": "是不是以為地瓜球上了其他顏色就沒事了🙂",
+          "score": 0.08137364
+        },
+        {
+          "url": "https://www.youtube.com/watch?v=zBHtJlAxRaw",
+          "title": "地瓜球遭批「乾硬如石頭」　業者：沒加發粉熱漲冷縮｜華視新聞 20240421",
+          "score": 0.073963374
+        }
+      ],
+      "elapsed_seconds": 1.86
+    },
+    {
+      "endpoint": "extract",
+      "case": "basic_markdown",
+      "parameters": {
+        "urls": [
+          "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS"
+        ],
+        "format": "markdown",
+        "include_usage": true,
+        "include_images": false,
+        "timeout": 20,
+        "extract_depth": "basic"
+      },
+      "http_status": 200,
+      "request_id": "17c05565-d4fe-4438-9e02-d821668bf527",
+      "usage": {
+        "credits": 0
+      },
+      "results": [
+        {
+          "url": "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS",
+          "characters": 7800,
+          "sha256": "f3e910650351fed56cecc3dae5b15293b16619f54506ab54c7b4ccf09dce4693",
+          "numeric_markers": {
+            "94.6": true,
+            "283.8": true,
+            "1506": true,
+            "502": true,
+            "300": true
+          },
+          "label_markers": {
+            "香菇赤肉羹": true,
+            "營養標示": true,
+            "每100": false,
+            "蛋白質": true,
+            "鈉": true
+          }
+        }
+      ],
+      "failed_results": [],
+      "elapsed_seconds": 0.861
+    },
+    {
+      "endpoint": "extract",
+      "case": "advanced_markdown",
+      "parameters": {
+        "urls": [
+          "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS"
+        ],
+        "format": "markdown",
+        "include_usage": true,
+        "include_images": false,
+        "timeout": 20,
+        "extract_depth": "advanced"
+      },
+      "http_status": 200,
+      "request_id": "3bfe17a9-609b-4f01-b921-35d7c2e80b76",
+      "usage": {
+        "credits": 1
+      },
+      "results": [
+        {
+          "url": "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS",
+          "characters": 7800,
+          "sha256": "f3e910650351fed56cecc3dae5b15293b16619f54506ab54c7b4ccf09dce4693",
+          "numeric_markers": {
+            "94.6": true,
+            "283.8": true,
+            "1506": true,
+            "502": true,
+            "300": true
+          },
+          "label_markers": {
+            "香菇赤肉羹": true,
+            "營養標示": true,
+            "每100": false,
+            "蛋白質": true,
+            "鈉": true
+          }
+        }
+      ],
+      "failed_results": [],
+      "elapsed_seconds": 0.837
+    },
+    {
+      "endpoint": "extract",
+      "case": "advanced_targeted",
+      "parameters": {
+        "urls": [
+          "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS"
+        ],
+        "format": "markdown",
+        "include_usage": true,
+        "include_images": false,
+        "timeout": 20,
+        "extract_depth": "advanced",
+        "chunks_per_source": 5,
+        "query": "香菇赤肉羹 營養標示 每一份量 本包裝含 每份 每100公克 熱量 蛋白質 脂肪 碳水化合物 鈉"
+      },
+      "http_status": 200,
+      "request_id": "297a698a-97c3-42b0-836c-8d039f96d63e",
+      "usage": {
+        "credits": 0
+      },
+      "results": [
+        {
+          "url": "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS",
+          "characters": 7800,
+          "sha256": "f3e910650351fed56cecc3dae5b15293b16619f54506ab54c7b4ccf09dce4693",
+          "numeric_markers": {
+            "94.6": true,
+            "283.8": true,
+            "1506": true,
+            "502": true,
+            "300": true
+          },
+          "label_markers": {
+            "香菇赤肉羹": true,
+            "營養標示": true,
+            "每100": false,
+            "蛋白質": true,
+            "鈉": true
+          }
+        }
+      ],
+      "failed_results": [],
+      "elapsed_seconds": 0.84
+    },
+    {
+      "endpoint": "extract",
+      "case": "basic_text_control",
+      "parameters": {
+        "urls": [
+          "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS"
+        ],
+        "format": "text",
+        "include_usage": true,
+        "include_images": false,
+        "timeout": 20,
+        "extract_depth": "basic"
+      },
+      "http_status": 200,
+      "request_id": "84964155-11c4-4353-8604-19dedf70290a",
+      "usage": {
+        "credits": 0
+      },
+      "results": [
+        {
+          "url": "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS",
+          "characters": 2384,
+          "sha256": "f4471d1b01fa664a144565a280ea0e98ff2a93ce0ab6d35b3d3a85ebc81c8459",
+          "numeric_markers": {
+            "94.6": true,
+            "283.8": true,
+            "1506": true,
+            "502": true,
+            "300": true
+          },
+          "label_markers": {
+            "香菇赤肉羹": true,
+            "營養標示": true,
+            "每100": false,
+            "蛋白質": true,
+            "鈉": true
+          }
+        }
+      ],
+      "failed_results": [],
+      "elapsed_seconds": 0.856
+    }
+  ],
+  "reported_credits": 4
+}

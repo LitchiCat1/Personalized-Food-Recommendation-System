@@ -1,10 +1,14 @@
 from collections import defaultdict
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+import threading
 import uuid
 
 from repositories.sqlite_db import SqliteDatabase, from_json, to_json, utc_iso
 from services.app_time_service import app_now, app_today
 from services.nutrient_service import NUTRITION_FIELDS, get_nutrient_value, nutrient_number
+from services.nutrition_profile_service import NutritionProfileError
+from services.record_nutrition_service import aggregate_record_coverage, enrich_record_nutrition
 
 
 # 飲食紀錄表的欄位（不含流水號 id）。insert / update / select 都照這個順序。
@@ -13,6 +17,7 @@ RECORD_COLUMNS = (
     "total_calories", "total_protein", "total_carbs", "total_fat",
     "total_sodium", "total_fiber", "total_sugar",
     "total_saturated_fat", "total_trans_fat", "source",
+    "nutrition_contract_version", "nutrition_context",
 )
 RECORD_SELECT = ", ".join(RECORD_COLUMNS)
 
@@ -42,10 +47,14 @@ CREATE TABLE IF NOT EXISTS records (
     total_sugar DOUBLE PRECISION DEFAULT 0,
     total_saturated_fat DOUBLE PRECISION DEFAULT 0,
     total_trans_fat DOUBLE PRECISION DEFAULT 0,
-    source TEXT DEFAULT 'camera'
+    source TEXT DEFAULT 'camera',
+    nutrition_contract_version INTEGER,
+    nutrition_context JSONB
 );
 CREATE INDEX IF NOT EXISTS idx_records_user_timestamp ON records (user_id, timestamp DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_records_user_client_record ON records (user_id, client_record_id);
+ALTER TABLE records ADD COLUMN IF NOT EXISTS nutrition_contract_version INTEGER;
+ALTER TABLE records ADD COLUMN IF NOT EXISTS nutrition_context JSONB;
 CREATE TABLE IF NOT EXISTS custom_foods (
     owner_key TEXT PRIMARY KEY,
     food_id TEXT NOT NULL,
@@ -84,6 +93,7 @@ class StorageRepository:
         self.mem_users = mem_users
         self.mem_records = mem_records
         self.mem_custom_foods = mem_custom_foods
+        self._record_lock = threading.RLock()
         self.mem_restaurant_menus: dict = {}
         self.mem_restaurant_menu_failures: dict = {}
         if self.use_sql:
@@ -118,7 +128,9 @@ class StorageRepository:
                 total_sugar REAL DEFAULT 0,
                 total_saturated_fat REAL DEFAULT 0,
                 total_trans_fat REAL DEFAULT 0,
-                source TEXT DEFAULT 'camera'
+                source TEXT DEFAULT 'camera',
+                nutrition_contract_version INTEGER,
+                nutrition_context TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_records_user_timestamp ON records (user_id, timestamp DESC);
             CREATE UNIQUE INDEX IF NOT EXISTS idx_records_user_client_record ON records (user_id, client_record_id);
@@ -190,6 +202,7 @@ class StorageRepository:
         record = dict(row)
         record.pop("id", None)
         record["foods"] = from_json(record.get("foods")) or []
+        record["nutrition_context"] = from_json(record.get("nutrition_context"))
         return self._enrich_record_totals(record)
 
     @staticmethod
@@ -210,6 +223,8 @@ class StorageRepository:
             record.get("total_saturated_fat", 0),
             record.get("total_trans_fat", 0),
             record.get("source", "camera"),
+            record.get("nutrition_contract_version"),
+            to_json(record.get("nutrition_context")),
         )
 
     def get_user(self, user_id: str):
@@ -269,6 +284,10 @@ class StorageRepository:
         if not record or "foods" not in record:
             return record
 
+        record = deepcopy(record)
+        if record.get("nutrition_contract_version") == 2:
+            return enrich_record_nutrition(record)
+
         foods = record.get("foods") or []
         if foods:
             for nutrient in NUTRITION_FIELDS:
@@ -277,9 +296,10 @@ class StorageRepository:
                     2,
                 )
         record["contains_fried_food"] = any(food.get("is_fried") is True for food in foods)
-        return record
+        return enrich_record_nutrition(record)
 
     def insert_record(self, record: dict):
+        record = deepcopy(record)
         if not record.get("client_record_id"):
             record = {**record, "client_record_id": f"server_record_{uuid.uuid4().hex}"}
         existing = self.get_record_by_client_record_id(record.get("user_id"), record.get("client_record_id"))
@@ -302,9 +322,13 @@ class StorageRepository:
                 return {**existing, "_deduplicated": True}
             return self._enrich_record_totals(record)
         if self.use_mongo:
-            self.db.records.insert_one(record)
+            self.db.records.insert_one(deepcopy(record))
         else:
-            self.mem_records.append(record)
+            with self._record_lock:
+                existing = self.get_record_by_client_record_id(record.get("user_id"), record.get("client_record_id"))
+                if existing:
+                    return {**existing, "_deduplicated": True}
+                self.mem_records.append(record)
         return self._enrich_record_totals(record)
 
     def upsert_record(self, record: dict):
@@ -327,62 +351,118 @@ class StorageRepository:
                 return self._enrich_record_totals(record)
         return None
 
-    def update_record(self, record: dict):
+    def update_record(self, record: dict, *, expected_revision=None, nutrition_contract_version=None):
+        record = deepcopy(record)
+        legacy_client = nutrition_contract_version == 1
         user_id = record.get("user_id")
         client_record_id = record.get("client_record_id")
         if not user_id or not client_record_id:
             return None
+        if expected_revision is not None and (type(expected_revision) is not int or expected_revision < 0):
+            raise NutritionProfileError("invalid_record", "expected_revision must be a nonnegative integer")
 
         if self.use_sql:
             values = self._record_values(record)
             # 前兩個是 user_id / client_record_id，放到 WHERE
             assignments = ", ".join(f"{column} = ?" for column in RECORD_COLUMNS[2:])
+            revision_filter = ""
+            revision_params = ()
+            if expected_revision is not None:
+                if self.sql.dialect == "postgres":
+                    revision_filter = (" AND nutrition_contract_version = 2"
+                                       " AND jsonb_typeof(nutrition_context -> 'revision') = 'number'"
+                                       " AND (nutrition_context ->> 'revision') = ?")
+                    revision_params = (str(expected_revision),)
+                else:
+                    revision_filter = (" AND nutrition_contract_version = 2"
+                                       " AND json_type(nutrition_context, '$.revision') = 'integer'"
+                                       " AND json_extract(nutrition_context, '$.revision') = ?")
+                    revision_params = (expected_revision,)
+            if legacy_client:
+                revision_filter += " AND (nutrition_contract_version IS NULL OR nutrition_contract_version <> 2)"
             with self.sql.transaction():
                 changed = self.sql.execute(
-                    f"UPDATE records SET {assignments} WHERE user_id = ? AND client_record_id = ?",
-                    (*values[2:], user_id, client_record_id),
+                    f"UPDATE records SET {assignments} WHERE user_id = ? AND client_record_id = ?{revision_filter}",
+                    (*values[2:], user_id, client_record_id, *revision_params),
                 )
                 if not changed:
+                    current = self.get_record_by_client_record_id(user_id, client_record_id)
+                    if legacy_client and current and current.get("nutrition_contract_version") == 2:
+                        raise NutritionProfileError("upgrade_required", "Nutrition contract version 2 is required")
                     return None
                 return self.get_record_by_client_record_id(user_id, client_record_id)
 
         if self.use_mongo:
+            query = {"user_id": user_id, "client_record_id": client_record_id}
+            if expected_revision is not None:
+                query.update({"nutrition_contract_version": 2, "nutrition_context.revision": expected_revision})
+            if legacy_client:
+                query["nutrition_contract_version"] = {"$ne": 2}
             result = self.db.records.update_one(
-                {"user_id": user_id, "client_record_id": client_record_id},
+                query,
                 {"$set": record},
             )
             if result.matched_count == 0:
+                current = self.get_record_by_client_record_id(user_id, client_record_id)
+                if legacy_client and current and current.get("nutrition_contract_version") == 2:
+                    raise NutritionProfileError("upgrade_required", "Nutrition contract version 2 is required")
                 return None
             return self.get_record_by_client_record_id(user_id, client_record_id)
 
-        for index, existing in enumerate(self.mem_records):
-            if existing.get("user_id") == user_id and existing.get("client_record_id") == client_record_id:
-                self.mem_records[index] = record
-                return self._enrich_record_totals(record)
+        with self._record_lock:
+            for index, existing in enumerate(self.mem_records):
+                if existing.get("user_id") == user_id and existing.get("client_record_id") == client_record_id:
+                    if legacy_client and existing.get("nutrition_contract_version") == 2:
+                        raise NutritionProfileError("upgrade_required", "Nutrition contract version 2 is required")
+                    if expected_revision is not None and (
+                        existing.get("nutrition_contract_version") != 2 or
+                        type(existing.get("nutrition_context", {}).get("revision")) is not int or
+                        existing["nutrition_context"]["revision"] != expected_revision
+                    ):
+                        return None
+                    self.mem_records[index] = record
+                    return self._enrich_record_totals(record)
         return None
 
-    def delete_record(self, user_id: str, client_record_id: str):
+    def delete_record(self, user_id: str, client_record_id: str, *, nutrition_contract_version=None):
+        legacy_client = nutrition_contract_version == 1
+
+        def check_legacy_access(record):
+            if legacy_client and record and record.get("nutrition_contract_version") == 2:
+                raise NutritionProfileError("upgrade_required", "Nutrition contract version 2 is required")
+
         if self.use_sql:
             with self.sql.transaction():
                 existing = self.get_record_by_client_record_id(user_id, client_record_id)
+                check_legacy_access(existing)
                 if existing:
-                    self.sql.execute(
-                        "DELETE FROM records WHERE user_id = ? AND client_record_id = ?",
+                    version_filter = (" AND (nutrition_contract_version IS NULL OR nutrition_contract_version <> 2)"
+                                      if legacy_client else "")
+                    changed = self.sql.execute(
+                        f"DELETE FROM records WHERE user_id = ? AND client_record_id = ?{version_filter}",
                         (user_id, client_record_id),
                     )
+                    if not changed:
+                        check_legacy_access(self.get_record_by_client_record_id(user_id, client_record_id))
+                        return None
             return existing
 
         if self.use_mongo:
-            record = self.db.records.find_one_and_delete(
-                {"user_id": user_id, "client_record_id": client_record_id}
-            )
+            query = {"user_id": user_id, "client_record_id": client_record_id}
+            if legacy_client:
+                query["nutrition_contract_version"] = {"$ne": 2}
+            record = self.db.records.find_one_and_delete(query)
+            if record is None:
+                check_legacy_access(self.get_record_by_client_record_id(user_id, client_record_id))
             if record:
                 record.pop("_id", None)
             return self._enrich_record_totals(record) if record else None
 
-        for index, record in enumerate(self.mem_records):
-            if record.get("user_id") == user_id and record.get("client_record_id") == client_record_id:
-                return self._enrich_record_totals(self.mem_records.pop(index))
+        with self._record_lock:
+            for index, record in enumerate(self.mem_records):
+                if record.get("user_id") == user_id and record.get("client_record_id") == client_record_id:
+                    check_legacy_access(record)
+                    return self._enrich_record_totals(self.mem_records.pop(index))
         return None
 
     def get_records(self, user_id: str, date_str: str | None = None, limit: int = 50, offset: int = 0):
@@ -410,10 +490,31 @@ class StorageRepository:
         slice_records = records[offset:offset + limit]
         return [self._enrich_record_totals(r) for r in slice_records]
 
-    def get_today_records(self, user_id: str):
-        return self.get_records(user_id, app_today(), limit=500)
+    def get_all_records(self, user_id: str, date_str: str | None = None):
+        """Read a complete aggregation range without the UI pagination limit."""
+        if self.use_sql:
+            query = f"SELECT {RECORD_SELECT} FROM records WHERE user_id = ?"
+            params = [user_id]
+            if date_str:
+                query += " AND timestamp LIKE ?"
+                params.append(f"{date_str}%")
+            query += " ORDER BY timestamp DESC"
+            return [self._record_from_row(row) for row in self.sql.query_all(query, params)]
+        if self.use_mongo:
+            query = {"user_id": user_id}
+            if date_str:
+                query["timestamp"] = {"$regex": f"^{date_str}"}
+            return [self._enrich_record_totals(row)
+                    for row in self.db.records.find(query, {"_id": 0}).sort("timestamp", -1)]
+        records = [row for row in self.mem_records if row.get("user_id") == user_id
+                   and (not date_str or str(row.get("timestamp", "")).startswith(date_str))]
+        return [self._enrich_record_totals(row) for row in sorted(
+            records, key=lambda row: str(row.get("timestamp", "")), reverse=True)]
 
-    def get_history(self, user_id: str, days: int):
+    def get_today_records(self, user_id: str):
+        return self.get_all_records(user_id, app_today())
+
+    def get_history(self, user_id: str, days: int, *, nutrition_contract_version=1):
         end_date = app_now().replace(tzinfo=None)
         start_date = end_date - timedelta(days=days)
         # 上限用「明天」且不含：紀錄的時間後面還有微秒和時區（+08:00），先前用字串
@@ -422,74 +523,40 @@ class StorageRepository:
         end_key = (end_date + timedelta(days=1)).strftime("%Y-%m-%d")
 
         if self.use_sql:
-            nutrient_sums = ",\n                       ".join(
-                f"SUM(total_{nutrient}) AS {nutrient}" for nutrient in NUTRITION_FIELDS
-            )
-            rows = self.sql.query_all(
-                f"""
-                SELECT substr(timestamp, 1, 10) AS date,
-                       COUNT(*) AS record_count,
-                       {nutrient_sums}
-                FROM records
-                WHERE user_id = ?
-                  AND timestamp >= ?
-                  AND timestamp < ?
-                GROUP BY substr(timestamp, 1, 10)
-                ORDER BY date ASC
-                """,
+            records = [self._record_from_row(row) for row in self.sql.query_all(
+                f"SELECT {RECORD_SELECT} FROM records WHERE user_id = ? AND timestamp >= ? AND timestamp < ?",
                 (user_id, start_key, end_key),
-            )
-            return [
-                {
-                    "date": row["date"],
-                    "record_count": int(row["record_count"] or 0),
-                    **{nutrient: round(row[nutrient] or 0, 1) for nutrient in NUTRITION_FIELDS},
-                }
-                for row in rows
-            ]
+            )]
+        elif self.use_mongo:
+            records = [self._enrich_record_totals(row) for row in self.db.records.find(
+                {"user_id": user_id, "timestamp": {"$gte": start_key, "$lt": end_key}}, {"_id": 0},
+            )]
+        else:
+            records = [self._enrich_record_totals(row) for row in self.mem_records
+                       if row.get("user_id") == user_id
+                       and start_key <= str(row.get("timestamp", "")) < end_key]
+        if nutrition_contract_version != 2 and any(
+            record.get("nutrition_contract_version") == 2 for record in records
+        ):
+            raise NutritionProfileError("upgrade_required", "Nutrition contract version 2 is required")
 
-        if self.use_mongo:
-            pipeline = [
-                {
-                    "$match": {
-                        "user_id": user_id,
-                        "timestamp": {"$gte": start_key, "$lt": end_key},
-                    }
-                },
-                {
-                    "$group": {
-                        "_id": {"$substr": ["$timestamp", 0, 10]},
-                        "record_count": {"$sum": 1},
-                        **{
-                            nutrient: {"$sum": f"$total_{nutrient}"}
-                            for nutrient in NUTRITION_FIELDS
-                        },
-                    }
-                },
-                {"$sort": {"_id": 1}},
-            ]
-            daily = list(self.db.records.aggregate(pipeline))
-            return [
-                {
-                    "date": d["_id"],
-                    "record_count": d["record_count"],
-                    **{nutrient: d.get(nutrient, 0) for nutrient in NUTRITION_FIELDS},
-                }
-                for d in daily
-            ]
-
-        agg = defaultdict(lambda: {"record_count": 0, **{nutrient: 0 for nutrient in NUTRITION_FIELDS}})
-        for record in self.mem_records:
-            if record.get("user_id") != user_id:
-                continue
-            day = str(record.get("timestamp", ""))[:10]
-            if not day or not (start_key <= day < end_key):
-                continue
-            agg[day]["record_count"] += 1
-            record = self._enrich_record_totals(record)
-            for nutrient in NUTRITION_FIELDS:
-                agg[day][nutrient] += record.get(f"total_{nutrient}", 0)
-        return [{"date": k, **v} for k, v in sorted(agg.items())]
+        grouped = defaultdict(list)
+        for record in records:
+            grouped[str(record.get("timestamp", ""))[:10]].append(record)
+        result = []
+        for day, daily_records in sorted(grouped.items()):
+            row = {"date": day, "record_count": len(daily_records)}
+            if nutrition_contract_version == 2:
+                coverage = aggregate_record_coverage(daily_records)
+                row.update({nutrient: coverage["nutrients"][nutrient]["known_sum"]
+                            for nutrient in NUTRITION_FIELDS})
+                row["nutrition_coverage"] = coverage
+            else:
+                row.update({nutrient: round(sum(nutrient_number(record.get(f"total_{nutrient}"))
+                                               for record in daily_records), 1)
+                            for nutrient in NUTRITION_FIELDS})
+            result.append(row)
+        return result
 
     def get_custom_foods(self, user_id: str | None = None):
         if self.use_sql:

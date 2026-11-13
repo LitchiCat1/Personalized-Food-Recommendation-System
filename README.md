@@ -146,6 +146,10 @@ python backend/app.py
 
 打開 http://localhost:5000 註冊帳號就能用。後端的 `/health` 會顯示資料庫檔案的位置。
 
+Windows 完成背景排程設定後，也可以雙擊下載內容根目錄的 `start-server.bat`／`stop-server.bat`
+啟動或停止後端。兩個檔案使用 `NutriLens Backend` 工作排程，不包含個人的 SQLite 路徑；
+第一次架設與更新注意事項見 [Windows 伺服器操作說明](docs/Local_Server_Deployment.md)。
+
 ### 讓其他裝置連進來
 
 預設只有這台電腦連得到。要給別人用：

@@ -1,0 +1,10 @@
+﻿index,users,purpose,duration_s,requested_seconds,completed,passed,successful_users,failed_users,requests,success,failed,p95_ms,max_ms,first_requests,first_failed,first_p95_ms,later_requests,later_failed,later_p95_ms
+1,30,coarse_search,7.955,20,False,False,19,11,163,152,11,4568.09,7936.65,30,11,7921.91,133,0,174.99
+2,20,find_current_baseline,3.922,20,False,False,19,1,153,152,1,1777.17,2434.92,20,1,2431.11,133,0,199.51
+3,10,find_current_baseline,20.402,20,True,True,10,0,227,227,0,208.17,1481.48,10,0,1477.84,217,0,188.91
+4,15,binary_refinement,20.924,20,True,True,15,0,379,379,0,183.38,2249.95,15,0,2248.58,364,0,178.57
+5,17,binary_refinement,21.34,20,True,True,17,0,416,416,0,215.35,2262.4,17,0,2260.21,399,0,179.58
+6,18,binary_refinement,21.015,20,True,True,18,0,466,466,0,186.85,2307.22,18,0,2302.2,448,0,170.78
+7,19,binary_refinement,21.087,20,True,True,19,0,446,446,0,329.0,2373.64,19,0,2364.91,427,0,179.22
+8,19,long_confirmation,120.61,120,True,True,19,0,2602,2602,0,188.77,2360.23,19,0,2357.39,2583,0,182.55
+9,20,adjacent_failure_recheck,5.297,20,False,False,19,1,153,152,1,1867.26,4189.77,20,1,3756.86,133,0,168.73

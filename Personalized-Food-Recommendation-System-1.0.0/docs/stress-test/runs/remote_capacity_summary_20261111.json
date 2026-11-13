@@ -1,0 +1,31 @@
+{
+  "target": "https://node.taile9a8dc.ts.net/",
+  "app_version": "v1.0.0",
+  "scenario": "50 dedicated accounts; authenticated mixed read/write journey; no paid APIs",
+  "first_run": "remote_summary_20261111-213539.json",
+  "repeat_run": "remote_summary_20261111-214021.json",
+  "levels": [
+    {"concurrency": 1, "requests": 9, "request_success_rate_pct": 100.0, "user_success_rate_pct": 100.0, "rps": 3.39, "p50_ms": 168.87, "p95_ms": 818.35, "max_ms": 1117.84, "transport_errors": 0},
+    {"concurrency": 5, "requests": 45, "request_success_rate_pct": 100.0, "user_success_rate_pct": 100.0, "rps": 14.56, "p50_ms": 159.12, "p95_ms": 1784.14, "max_ms": 1806.50, "transport_errors": 0},
+    {"concurrency": 10, "requests": 90, "request_success_rate_pct": 100.0, "user_success_rate_pct": 100.0, "rps": 24.05, "p50_ms": 170.54, "p95_ms": 2254.02, "max_ms": 2324.03, "transport_errors": 0},
+    {"concurrency": 20, "requests": 180, "request_success_rate_pct": 100.0, "user_success_rate_pct": 100.0, "rps": 29.79, "p50_ms": 172.21, "p95_ms": 3602.93, "max_ms": 4652.77, "transport_errors": 0},
+    {"concurrency": 30, "requests": 270, "request_success_rate_pct": 98.89, "user_success_rate_pct": 90.0, "rps": 31.71, "p50_ms": 170.25, "p95_ms": 5254.84, "max_ms": 6437.88, "transport_errors": 3},
+    {"concurrency": 40, "requests": 360, "request_success_rate_pct": 100.0, "user_success_rate_pct": 100.0, "rps": 33.45, "p50_ms": 167.85, "p95_ms": 6181.70, "max_ms": 9514.95, "transport_errors": 0},
+    {"concurrency": 50, "requests": 450, "request_success_rate_pct": 100.0, "user_success_rate_pct": 100.0, "rps": 18.90, "p50_ms": 163.08, "p95_ms": 10001.04, "max_ms": 22481.93, "transport_errors": 0}
+  ],
+  "repeat_30": {"requests": 270, "request_success_rate_pct": 100.0, "user_success_rate_pct": 100.0, "rps": 26.01, "p50_ms": 156.51, "p95_ms": 5997.81, "max_ms": 8950.32, "transport_errors": 0},
+  "login": {"attempted": 50, "successful": 50, "p50_ms": 1681.06, "p95_ms": 1859.83, "max_ms": 1869.03},
+  "cleanup": {"first_run_remaining_records": 0, "repeat_run_remaining_records": 0},
+  "derived": {
+    "scope": "Historical short burst only; mixed P95 includes fresh-session first request and redundant cleanup. This is not a sustained capacity test.",
+    "last_burst_level_meeting_mixed_2s_p95_reference": 5,
+    "first_burst_level_over_mixed_2s_p95_reference": 10,
+    "highest_completed_burst_level": 50,
+    "maximum_supported_users": null,
+    "observed_transport_errors": "3 TLS EOF errors at 30 users in first run; none in 30-user repeat",
+    "capacity_statement": "最大可用人數未知。原混合 P95 跨越 2 秒參考線不可解讀成 5 人容量上限；主要長延遲集中在新 Session 首請求。後續持續測試因 TLS 與健康檢查錯誤中止，未完成任何 60 秒階梯或 180 秒持續測試。",
+    "updated_report": "../report-20261111/index.html",
+    "updated_analysis": "../report-20261111/analysis.json",
+    "deployment_note": "突發測試在 21:47 重啟前，連線探測與持續補測在重啟後；不能假定部署環境完全相同。"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "interrupted_at": "2026-11-12T00:21:44+08:00",
+  "reason": "HTTP 502 during paced login preparation; independent health and root probes also returned 502; stopped local PID 21776 to prevent repeated per-account cleanup attempts while unavailable",
+  "business_started": false,
+  "business_requests": 0,
+  "temporary_record_writes": 0,
+  "tracked_tokens_at_interruption": 21,
+  "token_state_file": "_active_sessions.json",
+  "note": "The initial load summary was saved before login preparation completed and has stale token counts. Consult the active session state and recovery_summary.json for cleanup. This run cannot validate 19-user capacity."
+}

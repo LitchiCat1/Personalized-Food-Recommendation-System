@@ -1,0 +1,1281 @@
+{
+  "target": "https://node.taile9a8dc.ts.net",
+  "started_at": "2026-11-11T22:34:24.528+08:00",
+  "load_id": "223424",
+  "accounts": 100,
+  "retained_records_per_account": 3,
+  "stage_seconds_requested": 60,
+  "soak_seconds_requested": 180,
+  "stages": [
+    {
+      "phase": "burst",
+      "concurrency": 1,
+      "started": true,
+      "completed": true,
+      "reference_pass": true,
+      "cycle_count": 1,
+      "users_with_failed_cycles": 0,
+      "users_with_successful_cycles": 1,
+      "requests": 8,
+      "success": 8,
+      "failed": 0,
+      "success_pct": 100.0,
+      "p50_ms": 161.34,
+      "p95_ms": 1304.65,
+      "p99_ms": 1791.15,
+      "max_ms": 1912.77,
+      "duration_s": 3.043,
+      "rps": 2.629,
+      "first_request": {
+        "requests": 1,
+        "success": 1,
+        "failed": 0,
+        "success_pct": 100.0,
+        "p50_ms": 1912.77,
+        "p95_ms": 1912.77,
+        "p99_ms": 1912.77,
+        "max_ms": 1912.77,
+        "duration_s": null,
+        "rps": null
+      },
+      "later_api": {
+        "requests": 7,
+        "success": 7,
+        "failed": 0,
+        "success_pct": 100.0,
+        "p50_ms": 157.9,
+        "p95_ms": 173.79,
+        "p99_ms": 174.98,
+        "max_ms": 175.28,
+        "duration_s": null,
+        "rps": null
+      }
+    },
+    {
+      "phase": "burst",
+      "concurrency": 5,
+      "started": true,
+      "completed": true,
+      "reference_pass": true,
+      "cycle_count": 5,
+      "users_with_failed_cycles": 0,
+      "users_with_successful_cycles": 5,
+      "requests": 40,
+      "success": 40,
+      "failed": 0,
+      "success_pct": 100.0,
+      "p50_ms": 157.06,
+      "p95_ms": 1823.27,
+      "p99_ms": 1840.97,
+      "max_ms": 1848.26,
+      "duration_s": 2.975,
+      "rps": 13.444,
+      "first_request": {
+        "requests": 5,
+        "success": 5,
+        "failed": 0,
+        "success_pct": 100.0,
+        "p50_ms": 1822.94,
+        "p95_ms": 1844.52,
+        "p99_ms": 1847.51,
+        "max_ms": 1848.26,
+        "duration_s": null,
+        "rps": null
+      },
+      "later_api": {
+        "requests": 35,
+        "success": 35,
+        "failed": 0,
+        "success_pct": 100.0,
+        "p50_ms": 154.46,
+        "p95_ms": 178.05,
+        "p99_ms": 194.03,
+        "max_ms": 201.8,
+        "duration_s": null,
+        "rps": null
+      }
+    },
+    {
+      "phase": "burst",
+      "concurrency": 10,
+      "started": true,
+      "completed": true,
+      "reference_pass": false,
+      "cycle_count": 10,
+      "users_with_failed_cycles": 0,
+      "users_with_successful_cycles": 10,
+      "requests": 80,
+      "success": 80,
+      "failed": 0,
+      "success_pct": 100.0,
+      "p50_ms": 156.67,
+      "p95_ms": 2589.19,
+      "p99_ms": 2629.23,
+      "max_ms": 2632.26,
+      "duration_s": 3.757,
+      "rps": 21.292,
+      "first_request": {
+        "requests": 10,
+        "success": 10,
+        "failed": 0,
+        "success_pct": 100.0,
+        "p50_ms": 2586.25,
+        "p95_ms": 2630.54,
+        "p99_ms": 2631.92,
+        "max_ms": 2632.26,
+        "duration_s": null,
+        "rps": null
+      },
+      "later_api": {
+        "requests": 70,
+        "success": 70,
+        "failed": 0,
+        "success_pct": 100.0,
+        "p50_ms": 154.0,
+        "p95_ms": 181.77,
+        "p99_ms": 184.95,
+        "max_ms": 185.13,
+        "duration_s": null,
+        "rps": null
+      }
+    },
+    {
+      "phase": "burst",
+      "concurrency": 20,
+      "started": true,
+      "completed": true,
+      "reference_pass": false,
+      "cycle_count": 20,
+      "users_with_failed_cycles": 1,
+      "users_with_successful_cycles": 19,
+      "requests": 153,
+      "success": 152,
+      "failed": 1,
+      "success_pct": 99.346,
+      "p50_ms": 164.73,
+      "p95_ms": 4380.7,
+      "p99_ms": 4710.99,
+      "max_ms": 4967.66,
+      "duration_s": 6.201,
+      "rps": 24.673,
+      "first_request": {
+        "requests": 20,
+        "success": 19,
+        "failed": 1,
+        "success_pct": 95.0,
+        "p50_ms": 4171.91,
+        "p95_ms": 4725.17,
+        "p99_ms": 4919.16,
+        "max_ms": 4967.66,
+        "duration_s": null,
+        "rps": null
+      },
+      "later_api": {
+        "requests": 133,
+        "success": 133,
+        "failed": 0,
+        "success_pct": 100.0,
+        "p50_ms": 160.96,
+        "p95_ms": 184.78,
+        "p99_ms": 236.11,
+        "max_ms": 249.88,
+        "duration_s": null,
+        "rps": null
+      }
+    },
+    {
+      "phase": "burst",
+      "concurrency": 30,
+      "started": true,
+      "completed": true,
+      "reference_pass": false,
+      "cycle_count": 30,
+      "users_with_failed_cycles": 11,
+      "users_with_successful_cycles": 19,
+      "requests": 163,
+      "success": 152,
+      "failed": 11,
+      "success_pct": 93.252,
+      "p50_ms": 175.45,
+      "p95_ms": 6790.08,
+      "p99_ms": 7356.96,
+      "max_ms": 7566.25,
+      "duration_s": 8.213,
+      "rps": 19.846,
+      "first_request": {
+        "requests": 30,
+        "success": 19,
+        "failed": 11,
+        "success_pct": 63.333,
+        "p50_ms": 6030.05,
+        "p95_ms": 7357.53,
+        "p99_ms": 7506.15,
+        "max_ms": 7566.25,
+        "duration_s": null,
+        "rps": null
+      },
+      "later_api": {
+        "requests": 133,
+        "success": 133,
+        "failed": 0,
+        "success_pct": 100.0,
+        "p50_ms": 170.54,
+        "p95_ms": 238.23,
+        "p99_ms": 524.42,
+        "max_ms": 687.9,
+        "duration_s": null,
+        "rps": null
+      }
+    },
+    {
+      "phase": "burst",
+      "concurrency": 50,
+      "started": true,
+      "completed": true,
+      "reference_pass": false,
+      "cycle_count": 50,
+      "users_with_failed_cycles": 17,
+      "users_with_successful_cycles": 33,
+      "requests": 281,
+      "success": 264,
+      "failed": 17,
+      "success_pct": 93.95,
+      "p50_ms": 162.39,
+      "p95_ms": 12800.58,
+      "p99_ms": 13822.75,
+      "max_ms": 13949.68,
+      "duration_s": 15.053,
+      "rps": 18.667,
+      "first_request": {
+        "requests": 50,
+        "success": 33,
+        "failed": 17,
+        "success_pct": 66.0,
+        "p50_ms": 10285.52,
+        "p95_ms": 13840.21,
+        "p99_ms": 13930.96,
+        "max_ms": 13949.68,
+        "duration_s": null,
+        "rps": null
+      },
+      "later_api": {
+        "requests": 231,
+        "success": 231,
+        "failed": 0,
+        "success_pct": 100.0,
+        "p50_ms": 158.4,
+        "p95_ms": 336.72,
+        "p99_ms": 617.4,
+        "max_ms": 839.01,
+        "duration_s": null,
+        "rps": null
+      }
+    },
+    {
+      "phase": "burst",
+      "concurrency": 75,
+      "started": true,
+      "completed": true,
+      "reference_pass": false,
+      "cycle_count": 75,
+      "users_with_failed_cycles": 36,
+      "users_with_successful_cycles": 39,
+      "requests": 348,
+      "success": 312,
+      "failed": 36,
+      "success_pct": 89.655,
+      "p50_ms": 239.39,
+      "p95_ms": 16330.26,
+      "p99_ms": 16940.68,
+      "max_ms": 17426.73,
+      "duration_s": 17.711,
+      "rps": 19.649,
+      "first_request": {
+        "requests": 75,
+        "success": 39,
+        "failed": 36,
+        "success_pct": 52.0,
+        "p50_ms": 13510.23,
+        "p95_ms": 16931.92,
+        "p99_ms": 17414.77,
+        "max_ms": 17426.73,
+        "duration_s": null,
+        "rps": null
+      },
+      "later_api": {
+        "requests": 273,
+        "success": 273,
+        "failed": 0,
+        "success_pct": 100.0,
+        "p50_ms": 214.12,
+        "p95_ms": 314.0,
+        "p99_ms": 341.54,
+        "max_ms": 364.04,
+        "duration_s": null,
+        "rps": null
+      }
+    },
+    {
+      "phase": "burst",
+      "concurrency": 100,
+      "started": true,
+      "completed": true,
+      "reference_pass": false,
+      "cycle_count": 100,
+      "users_with_failed_cycles": 61,
+      "users_with_successful_cycles": 39,
+      "requests": 373,
+      "success": 312,
+      "failed": 61,
+      "success_pct": 83.646,
+      "p50_ms": 170.58,
+      "p95_ms": 18347.55,
+      "p99_ms": 20173.59,
+      "max_ms": 20364.94,
+      "duration_s": 20.414,
+      "rps": 18.272,
+      "first_request": {
+        "requests": 100,
+        "success": 39,
+        "failed": 61,
+        "success_pct": 39.0,
+        "p50_ms": 16065.28,
+        "p95_ms": 20154.5,
+        "p99_ms": 20220.21,
+        "max_ms": 20364.94,
+        "duration_s": null,
+        "rps": null
+      },
+      "later_api": {
+        "requests": 273,
+        "success": 273,
+        "failed": 0,
+        "success_pct": 100.0,
+        "p50_ms": 167.01,
+        "p95_ms": 183.7,
+        "p99_ms": 190.57,
+        "max_ms": 204.55,
+        "duration_s": null,
+        "rps": null
+      }
+    },
+    {
+      "phase": "steady",
+      "concurrency": 1,
+      "started": true,
+      "completed": false,
+      "reference_pass": false,
+      "cycle_count": 1,
+      "users_with_failed_cycles": 0,
+      "users_with_successful_cycles": 1,
+      "requests": 7,
+      "success": 7,
+      "failed": 0,
+      "success_pct": 100.0,
+      "p50_ms": 160.26,
+      "p95_ms": 168.69,
+      "p99_ms": 169.04,
+      "max_ms": 169.13,
+      "duration_s": 1.832,
+      "rps": 3.821
+    }
+  ],
+  "generator_resources": [
+    {
+      "timestamp": "2026-11-11T22:36:17.484+08:00",
+      "phase": "burst",
+      "concurrency": 1,
+      "local_process_cpu_percent": 91.0,
+      "local_host_cpu_percent": 32.7,
+      "local_process_rss_mb": 43.88,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:36:22.645+08:00",
+      "phase": "burst",
+      "concurrency": 1,
+      "local_process_cpu_percent": 0.3,
+      "local_host_cpu_percent": 27.7,
+      "local_process_rss_mb": 43.52,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:36:27.806+08:00",
+      "phase": "burst",
+      "concurrency": 5,
+      "local_process_cpu_percent": 120.8,
+      "local_host_cpu_percent": 34.3,
+      "local_process_rss_mb": 45.12,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:36:32.991+08:00",
+      "phase": "burst",
+      "concurrency": 10,
+      "local_process_cpu_percent": 218.8,
+      "local_host_cpu_percent": 40.0,
+      "local_process_rss_mb": 50.14,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:36:38.159+08:00",
+      "phase": "burst",
+      "concurrency": 10,
+      "local_process_cpu_percent": 134.5,
+      "local_host_cpu_percent": 31.9,
+      "local_process_rss_mb": 46.13,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:36:43.354+08:00",
+      "phase": "burst",
+      "concurrency": 20,
+      "local_process_cpu_percent": 504.0,
+      "local_host_cpu_percent": 64.7,
+      "local_process_rss_mb": 58.79,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:36:48.510+08:00",
+      "phase": "burst",
+      "concurrency": 20,
+      "local_process_cpu_percent": 212.1,
+      "local_host_cpu_percent": 46.0,
+      "local_process_rss_mb": 52.98,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:36:53.687+08:00",
+      "phase": "burst",
+      "concurrency": 30,
+      "local_process_cpu_percent": 329.3,
+      "local_host_cpu_percent": 54.8,
+      "local_process_rss_mb": 58.11,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:36:58.857+08:00",
+      "phase": "burst",
+      "concurrency": 30,
+      "local_process_cpu_percent": 830.8,
+      "local_host_cpu_percent": 98.2,
+      "local_process_rss_mb": 75.23,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:37:04.014+08:00",
+      "phase": "burst",
+      "concurrency": 30,
+      "local_process_cpu_percent": 18.8,
+      "local_host_cpu_percent": 49.0,
+      "local_process_rss_mb": 73.67,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:37:09.205+08:00",
+      "phase": "burst",
+      "concurrency": 50,
+      "local_process_cpu_percent": 636.3,
+      "local_host_cpu_percent": 84.3,
+      "local_process_rss_mb": 79.59,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:37:14.385+08:00",
+      "phase": "burst",
+      "concurrency": 50,
+      "local_process_cpu_percent": 651.5,
+      "local_host_cpu_percent": 90.1,
+      "local_process_rss_mb": 90.36,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:37:19.552+08:00",
+      "phase": "burst",
+      "concurrency": 50,
+      "local_process_cpu_percent": 680.7,
+      "local_host_cpu_percent": 79.4,
+      "local_process_rss_mb": 105.21,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:37:24.724+08:00",
+      "phase": "burst",
+      "concurrency": 50,
+      "local_process_cpu_percent": 2.1,
+      "local_host_cpu_percent": 17.3,
+      "local_process_rss_mb": 99.03,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:37:29.894+08:00",
+      "phase": "burst",
+      "concurrency": 75,
+      "local_process_cpu_percent": 789.6,
+      "local_host_cpu_percent": 76.8,
+      "local_process_rss_mb": 105.06,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:37:35.085+08:00",
+      "phase": "burst",
+      "concurrency": 75,
+      "local_process_cpu_percent": 747.8,
+      "local_host_cpu_percent": 72.9,
+      "local_process_rss_mb": 113.39,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:37:40.254+08:00",
+      "phase": "burst",
+      "concurrency": 75,
+      "local_process_cpu_percent": 1080.0,
+      "local_host_cpu_percent": 99.9,
+      "local_process_rss_mb": 134.08,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:37:45.418+08:00",
+      "phase": "burst",
+      "concurrency": 75,
+      "local_process_cpu_percent": 354.6,
+      "local_host_cpu_percent": 43.1,
+      "local_process_rss_mb": 137.8,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:37:50.583+08:00",
+      "phase": "burst",
+      "concurrency": 100,
+      "local_process_cpu_percent": 412.9,
+      "local_host_cpu_percent": 44.1,
+      "local_process_rss_mb": 71.54,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:37:55.751+08:00",
+      "phase": "burst",
+      "concurrency": 100,
+      "local_process_cpu_percent": 550.9,
+      "local_host_cpu_percent": 61.3,
+      "local_process_rss_mb": 82.61,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:38:00.946+08:00",
+      "phase": "burst",
+      "concurrency": 100,
+      "local_process_cpu_percent": 962.4,
+      "local_host_cpu_percent": 99.9,
+      "local_process_rss_mb": 100.62,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:38:06.136+08:00",
+      "phase": "burst",
+      "concurrency": 100,
+      "local_process_cpu_percent": 950.8,
+      "local_host_cpu_percent": 99.8,
+      "local_process_rss_mb": 119.28,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:38:11.299+08:00",
+      "phase": "burst",
+      "concurrency": 100,
+      "local_process_cpu_percent": 322.9,
+      "local_host_cpu_percent": 56.4,
+      "local_process_rss_mb": 119.5,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T22:38:16.463+08:00",
+      "phase": "steady",
+      "concurrency": 1,
+      "local_process_cpu_percent": 13.3,
+      "local_host_cpu_percent": 16.4,
+      "local_process_rss_mb": 119.58,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    }
+  ],
+  "stop_reason": "persistent business errors exceeded 5% over the last 30 seconds",
+  "maximum_supported_users": null,
+  "remote_resource_monitoring": false,
+  "initial_health": {
+    "app_version": "v1.0.0",
+    "auth_provider": "local-sqlite",
+    "auth_required": true,
+    "cached_restaurant_menus": 36,
+    "custom_foods": 0,
+    "database": "sqlite",
+    "database_path": null,
+    "deployed_branch": "local",
+    "deployed_commit": "local",
+    "disease_rule_review_status": {
+      "guideline_screening": 3,
+      "requires_clinical_personalization": 1,
+      "screening_rule": 1
+    },
+    "disease_rules": 5,
+    "foods_in_db": 12,
+    "foods_in_tfda": 2181,
+    "mongo": false,
+    "openai_enabled": true,
+    "places_enabled": true,
+    "recognition_engine": "gemini-vision-db-lookup",
+    "restaurants": 20,
+    "started_at": "2026-11-11T21:47:11.356665+08:00",
+    "status": "ok"
+  },
+  "updated_at": "2026-11-11T22:38:51.295+08:00",
+  "health": {
+    "requests": 24,
+    "success": 24,
+    "failed": 0,
+    "success_pct": 100.0,
+    "p50_ms": 157.64,
+    "p95_ms": 186.51,
+    "p99_ms": 1523.36,
+    "max_ms": 1922.03,
+    "duration_s": null,
+    "rps": null
+  },
+  "outstanding_tokens": 0,
+  "pending_temporary_records": 0,
+  "steady_staircase_stopped_reason": "1 users did not pass reference; higher sustained levels not attempted",
+  "final_health": {
+    "app_version": "v1.0.0",
+    "auth_provider": "local-sqlite",
+    "auth_required": true,
+    "cached_restaurant_menus": 36,
+    "custom_foods": 0,
+    "database": "sqlite",
+    "database_path": null,
+    "deployed_branch": "local",
+    "deployed_commit": "local",
+    "disease_rule_review_status": {
+      "guideline_screening": 3,
+      "requires_clinical_personalization": 1,
+      "screening_rule": 1
+    },
+    "disease_rules": 5,
+    "foods_in_db": 12,
+    "foods_in_tfda": 2181,
+    "mongo": false,
+    "openai_enabled": true,
+    "places_enabled": true,
+    "recognition_engine": "gemini-vision-db-lookup",
+    "restaurants": 20,
+    "started_at": "2026-11-11T21:47:11.356665+08:00",
+    "status": "ok"
+  },
+  "verification": {
+    "accounts_checked": 100,
+    "accounts_valid": 100,
+    "checks": [
+      {
+        "account": "stress_test_20261111_051",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_052",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_053",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_054",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_055",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_056",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_057",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_058",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_059",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_060",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_061",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_062",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_063",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_064",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_065",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_066",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_067",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_068",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_069",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_070",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_071",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_072",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_073",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_074",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_075",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_076",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_077",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_078",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_079",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_080",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_081",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_082",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_083",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_084",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_085",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_086",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_087",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_088",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_089",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_090",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_091",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_092",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_093",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_094",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_095",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_096",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_097",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_098",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_099",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_100",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_101",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_102",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_103",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_104",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_105",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_106",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_107",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_108",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_109",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_110",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_111",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_112",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_113",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_114",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_115",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_116",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_117",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_118",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_119",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_120",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_121",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_122",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_123",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_124",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_125",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_126",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_127",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_128",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_129",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_130",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_131",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_132",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_133",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_134",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_135",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_136",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_137",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_138",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_139",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_140",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_141",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_142",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_143",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_144",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_145",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_146",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_147",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_148",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_149",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_150",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      }
+    ],
+    "pending_temporary_records": 0,
+    "outstanding_tokens": 0
+  },
+  "finished_at": "2026-11-11T22:38:51.295+08:00"
+}

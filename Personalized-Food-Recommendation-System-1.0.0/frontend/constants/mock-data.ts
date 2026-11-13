@@ -1,0 +1,276 @@
+/**
+ * Mock Data for NutriLens App
+ * Aligned with PRD requirements
+ */
+
+// ─── Dashboard ──────────────────────────────────────────────
+export const DAILY_NUTRITION = {
+  calories: { current: 1450, target: 2100, unit: 'kcal' },
+  protein: { current: 85, target: 130, unit: 'g', color: '#60A5FA', label: '蛋白質' },
+  carbs: { current: 160, target: 250, unit: 'g', color: '#FB923C', label: '總碳水化合物' },
+  sugar: { current: 12, target: 25, unit: 'g', color: '#F59E0B', label: '精緻糖' },
+  fat: { current: 42, target: 70, unit: 'g', color: '#A78BFA', label: '總脂肪' },
+  saturated_fat: { current: 8, target: 20, unit: 'g', color: '#8B5CF6', label: '飽和脂肪' },
+  trans_fat: { current: 0, target: 0, unit: 'g', color: '#EF4444', label: '反式脂肪' },
+  // PRD: 鈉含量、纖維素追蹤 (高血壓/腎臟病患者需要)
+  sodium: { current: 1800, target: 2000, unit: 'mg', color: '#F472B6', label: '鈉 (Sodium)' },
+  fiber: { current: 18, target: 25, unit: 'g', color: '#4ADE80', label: '膳食纖維' },
+};
+
+export type MealEntry = {
+  id: string;
+  name: string;
+  calories: number;
+  time: string;
+  mealType: '早餐' | '午餐' | '晚餐' | '點心';
+  emoji: string;
+  protein: number;
+  carbs: number;
+  fat: number;
+  sodium: number;
+  fiber: number;
+  sugar?: number;
+  saturated_fat?: number;
+  trans_fat?: number;
+  is_fried?: boolean;
+  // PRD: 疾病禁忌標記
+  warnings?: string[];
+};
+
+export const TODAY_MEALS: MealEntry[] = [
+  {
+    id: '1',
+    name: '燕麥優格碗',
+    calories: 380,
+    time: '08:15',
+    mealType: '早餐',
+    emoji: '🥣',
+    protein: 15,
+    carbs: 52,
+    fat: 12,
+    sodium: 180,
+    fiber: 6,
+  },
+  {
+    id: '2',
+    name: '雞胸肉沙拉',
+    calories: 420,
+    time: '12:30',
+    mealType: '午餐',
+    emoji: '🥗',
+    protein: 38,
+    carbs: 28,
+    fat: 14,
+    sodium: 520,
+    fiber: 5,
+  },
+  {
+    id: '3',
+    name: '香蕉蛋白奶昔',
+    calories: 280,
+    time: '15:00',
+    mealType: '點心',
+    emoji: '🥤',
+    protein: 22,
+    carbs: 35,
+    fat: 6,
+    sodium: 120,
+    fiber: 3,
+  },
+  {
+    id: '4',
+    name: '鮭魚飯糰套餐',
+    calories: 520,
+    time: '18:45',
+    mealType: '晚餐',
+    emoji: '🍱',
+    protein: 32,
+    carbs: 58,
+    fat: 16,
+    sodium: 980,
+    fiber: 4,
+    warnings: ['高鈉'],
+  },
+];
+
+// PRD: 預警機制 — 超量攝取/禁忌食物即時警示
+export type HealthAlert = {
+  id: string;
+  type: 'warning' | 'danger' | 'info';
+  title: string;
+  message: string;
+  icon: string;
+};
+
+export const HEALTH_ALERTS: HealthAlert[] = [
+  {
+    id: '1',
+    type: 'warning',
+    title: '鈉含量接近上限',
+    message: '今日鈉攝取已達 1,800mg（上限 2,000mg），建議晚餐選擇低鈉餐點。',
+    icon: '⚠️',
+  },
+  {
+    id: '2',
+    type: 'info',
+    title: '蛋白質攝取良好',
+    message: '已達每日目標的 65%，繼續保持均衡攝取。',
+    icon: '💪',
+  },
+];
+
+// ─── Scanner ────────────────────────────────────────────────
+export const SCANNER_PLACEHOLDER_RESULT = {
+  foodName: '等待辨識...',
+  confidence: 0,
+  nutrition: {
+    calories: '--' as string | number,
+    protein: '--' as string | number,
+    carbs: '--' as string | number,
+    fat: '--' as string | number,
+    sodium: '--' as string | number,
+    fiber: '--' as string | number,
+  },
+};
+
+// PRD: 多目標偵測 — 支援 Bounding Box 多食物同時辨識
+export type DetectedFood = {
+  id: string;
+  foodName: string;
+  confidence: number;
+  source?: string;
+  needsConfirmation?: boolean;
+  missingNutritionFields?: string[];
+  boundingBox: { x: number; y: number; w: number; h: number };
+  estimatedWeight: number; // grams
+  originalEstimatedWeight?: number;
+  portionRange?: { minG: number; maxG: number; uncertaintyPercent: number };
+  portionEstimationMethod?: string;
+  reliability?: {
+    level: 'high' | 'medium' | 'low';
+    score: number;
+    reasons: string[];
+  };
+  nutrition: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    sodium: number;
+    fiber: number;
+    sugar?: number;
+    saturated_fat?: number;
+    trans_fat?: number;
+    is_fried?: boolean;
+  };
+  originalNutrition?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    sodium: number;
+    fiber: number;
+    sugar?: number;
+    saturated_fat?: number;
+    trans_fat?: number;
+    is_fried?: boolean;
+  };
+  portionAdjusted?: boolean;
+  // PRD: 硬性排除規則 — GI 指數、過敏原
+  gi: 'low' | 'medium' | 'high';
+  allergens: string[];
+  warnings: string[];
+};
+
+export const SCANNER_DEMO_RESULTS: DetectedFood[] = [
+  {
+    id: '1',
+    foodName: '白飯',
+    confidence: 96.2,
+    boundingBox: { x: 0.1, y: 0.2, w: 0.35, h: 0.3 },
+    estimatedWeight: 200,
+    nutrition: { calories: 260, protein: 5, carbs: 57, fat: 0.6, sodium: 2, fiber: 0.6 },
+    gi: 'high',
+    allergens: ['麩質'],
+    warnings: ['高 GI 食物 — 糖尿病患者請注意'],
+  },
+  {
+    id: '2',
+    foodName: '滷肉',
+    confidence: 91.8,
+    boundingBox: { x: 0.5, y: 0.15, w: 0.3, h: 0.25 },
+    estimatedWeight: 80,
+    nutrition: { calories: 225, protein: 18, carbs: 5, fat: 15, sodium: 680, fiber: 0 },
+    gi: 'low',
+    allergens: ['大豆'],
+    warnings: ['高鈉 — 高血壓患者請注意'],
+  },
+  {
+    id: '3',
+    foodName: '燙青菜',
+    confidence: 88.5,
+    boundingBox: { x: 0.15, y: 0.55, w: 0.25, h: 0.2 },
+    estimatedWeight: 120,
+    nutrition: { calories: 35, protein: 3, carbs: 4, fat: 0.5, sodium: 15, fiber: 3.2 },
+    gi: 'low',
+    allergens: [],
+    warnings: [],
+  },
+];
+
+// ─── Profile ────────────────────────────────────────────────
+// 這裡先前有一份 USER_PROFILE（示範用的「王小明」：175cm / 72kg / 高血壓 /
+// 對花生與蝦蟹過敏）。它不只是 store 的預設值——「我的」頁在後端回 404 時
+// 會把整份 POST 上去，於是每個新帳號都帶著一個沒人說過的高血壓診斷。
+// 起始檔案改放 constants/profile-defaults.ts，疾病與過敏原一律留空。
+
+// PRD: 可選的疾病標籤列表
+export const AVAILABLE_CONDITIONS = [
+  { id: 'diabetes', label: '糖尿病', icon: '🩸', color: '#F87171', description: '限制高 GI、控醣' },
+  { id: 'hypertension', label: '高血壓', icon: '❤️‍🩹', color: '#FB923C', description: '限制鈉攝取 < 2000mg' },
+  { id: 'kidney', label: '慢性腎臟病', icon: '🫘', color: '#FBBF24', description: '限制蛋白質、磷、鉀' },
+  { id: 'gout', label: '痛風', icon: '🦴', color: '#A78BFA', description: '限制高普林食物' },
+  { id: 'hyperlipidemia', label: '高血脂', icon: '🫀', color: '#F472B6', description: '限制飽和脂肪、膽固醇' },
+];
+
+// PRD: 可選的過敏原列表
+export const AVAILABLE_ALLERGENS = [
+  '花生', '堅果', '蝦蟹', '貝類', '魚', '蛋', '牛奶', '大豆', '麩質', '芝麻',
+];
+
+
+// ─── History / Trends (NEW — PRD 飲食趨勢回顧) ──────────────
+export type DailyRecord = {
+  date: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  sodium: number;
+};
+
+export const WEEKLY_HISTORY: DailyRecord[] = [
+  { date: '04/11', calories: 2050, protein: 120, carbs: 230, fat: 65, sodium: 1900 },
+  { date: '04/12', calories: 1880, protein: 105, carbs: 210, fat: 58, sodium: 2100 },
+  { date: '04/13', calories: 2200, protein: 130, carbs: 260, fat: 72, sodium: 1750 },
+  { date: '04/14', calories: 1950, protein: 115, carbs: 225, fat: 60, sodium: 2300 },
+  { date: '04/15', calories: 2100, protein: 128, carbs: 240, fat: 68, sodium: 1800 },
+  { date: '04/16', calories: 1780, protein: 98, carbs: 195, fat: 55, sodium: 1650 },
+  { date: '04/17', calories: 1450, protein: 85, carbs: 160, fat: 42, sodium: 1800 },
+];
+
+export const WEEKLY_SUMMARY = {
+  avgCalories: 1916,
+  avgProtein: 112,
+  avgCarbs: 217,
+  avgFat: 60,
+  avgSodium: 1900,
+  calorieGoalHitDays: 4,
+  totalDays: 7,
+  trend: 'stable' as 'improving' | 'stable' | 'declining',
+  insights: [
+    { icon: '✅', text: '蛋白質攝取穩定達標，均值 112g/日' },
+    { icon: '⚠️', text: '鈉攝取波動大，04/14 超標至 2,300mg' },
+    { icon: '📉', text: '今日熱量偏低，建議補充 650 kcal 的均衡晚餐' },
+  ],
+};

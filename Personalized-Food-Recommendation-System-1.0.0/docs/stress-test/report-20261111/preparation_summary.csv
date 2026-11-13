@@ -1,0 +1,4 @@
+﻿run_id,started_at,finished_at,login_attempts,login_success,login_failed,business_requests,business_failures,monitor_requests,monitor_failures,stop_reason
+persistent-20261111-215033,2026-11-11T21:50:33.725943+08:00,2026-11-11T21:50:57.121409+08:00,50,19,31,0,0,0,0,RuntimeError: One or more accounts failed preparation; no load test started
+persistent-20261111-215245,2026-11-11T21:52:45.228040+08:00,2026-11-11T21:53:45.468471+08:00,50,19,31,0,0,0,0,RuntimeError: One or more accounts failed preparation; no load test started
+persistent-20261111-215732,2026-11-11T21:57:32.954120+08:00,2026-11-11T21:58:21.695551+08:00,18,18,0,14,0,3,3,three consecutive failed health probes

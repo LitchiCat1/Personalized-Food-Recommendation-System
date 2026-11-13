@@ -1,0 +1,240 @@
+{
+  "run_id": "20261111-213539",
+  "started_at": "2026-11-11T21:35:39+08:00",
+  "finished_at": "2026-11-11T21:38:23+08:00",
+  "base_url": "https://node.taile9a8dc.ts.net",
+  "app_version": "v1.0.0",
+  "database": "local-sqlite",
+  "scenario": "authenticated mixed read/write journey; no paid APIs",
+  "account_count": 50,
+  "levels_requested": [
+    1,
+    5,
+    10,
+    20,
+    30,
+    40,
+    50
+  ],
+  "levels_completed": [
+    1,
+    5,
+    10,
+    20,
+    30,
+    40,
+    50
+  ],
+  "total_requests": 1404,
+  "successful_requests": 1401,
+  "overall_success_rate_pct": 99.79,
+  "login_summary": {
+    "attempted": 50,
+    "successful": 50,
+    "latency": {
+      "min_ms": 1587.81,
+      "avg_ms": 1696.71,
+      "p50_ms": 1681.06,
+      "p95_ms": 1859.83,
+      "p99_ms": 1864.96,
+      "max_ms": 1869.03
+    }
+  },
+  "journey_levels": [
+    {
+      "concurrency": 1,
+      "users": 1,
+      "requests": 9,
+      "successful_requests": 9,
+      "failed_requests": 0,
+      "request_success_rate_pct": 100.0,
+      "successful_users": 1,
+      "user_success_rate_pct": 100.0,
+      "wall_seconds": 2.659,
+      "rps": 3.39,
+      "latency": {
+        "min_ms": 149.11,
+        "avg_ms": 295.13,
+        "p50_ms": 168.87,
+        "p95_ms": 818.35,
+        "p99_ms": 1057.94,
+        "max_ms": 1117.84
+      },
+      "status_counts": {
+        "200": 7,
+        "201": 1,
+        "404": 1
+      },
+      "sample_errors": []
+    },
+    {
+      "concurrency": 5,
+      "users": 5,
+      "requests": 45,
+      "successful_requests": 45,
+      "failed_requests": 0,
+      "request_success_rate_pct": 100.0,
+      "successful_users": 5,
+      "user_success_rate_pct": 100.0,
+      "wall_seconds": 3.09,
+      "rps": 14.56,
+      "latency": {
+        "min_ms": 145.13,
+        "avg_ms": 340.94,
+        "p50_ms": 159.12,
+        "p95_ms": 1784.14,
+        "p99_ms": 1802.04,
+        "max_ms": 1806.5
+      },
+      "status_counts": {
+        "200": 35,
+        "201": 5,
+        "404": 5
+      },
+      "sample_errors": []
+    },
+    {
+      "concurrency": 10,
+      "users": 10,
+      "requests": 90,
+      "successful_requests": 90,
+      "failed_requests": 0,
+      "request_success_rate_pct": 100.0,
+      "successful_users": 10,
+      "user_success_rate_pct": 100.0,
+      "wall_seconds": 3.742,
+      "rps": 24.05,
+      "latency": {
+        "min_ms": 148.46,
+        "avg_ms": 405.47,
+        "p50_ms": 170.54,
+        "p95_ms": 2254.02,
+        "p99_ms": 2323.93,
+        "max_ms": 2324.03
+      },
+      "status_counts": {
+        "200": 70,
+        "201": 10,
+        "404": 10
+      },
+      "sample_errors": []
+    },
+    {
+      "concurrency": 20,
+      "users": 20,
+      "requests": 180,
+      "successful_requests": 180,
+      "failed_requests": 0,
+      "request_success_rate_pct": 100.0,
+      "successful_users": 20,
+      "user_success_rate_pct": 100.0,
+      "wall_seconds": 6.042,
+      "rps": 29.79,
+      "latency": {
+        "min_ms": 148.46,
+        "avg_ms": 586.13,
+        "p50_ms": 172.21,
+        "p95_ms": 3602.93,
+        "p99_ms": 4285.37,
+        "max_ms": 4652.77
+      },
+      "status_counts": {
+        "200": 140,
+        "201": 20,
+        "404": 20
+      },
+      "sample_errors": []
+    },
+    {
+      "concurrency": 30,
+      "users": 30,
+      "requests": 270,
+      "successful_requests": 267,
+      "failed_requests": 3,
+      "request_success_rate_pct": 98.89,
+      "successful_users": 27,
+      "user_success_rate_pct": 90.0,
+      "wall_seconds": 8.514,
+      "rps": 31.71,
+      "latency": {
+        "min_ms": 147.09,
+        "avg_ms": 722.81,
+        "p50_ms": 170.25,
+        "p95_ms": 5254.84,
+        "p99_ms": 6249.29,
+        "max_ms": 6437.88
+      },
+      "status_counts": {
+        "200": 207,
+        "201": 30,
+        "404": 30,
+        "0": 3
+      },
+      "sample_errors": [
+        "auth_user: SSLError: HTTPSConnectionPool(host='node.taile9a8dc.ts.net', port=443): Max retries exceeded with url: /auth/user (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1081)')))",
+        "auth_user: SSLError: HTTPSConnectionPool(host='node.taile9a8dc.ts.net', port=443): Max retries exceeded with url: /auth/user (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1081)')))",
+        "auth_user: SSLError: HTTPSConnectionPool(host='node.taile9a8dc.ts.net', port=443): Max retries exceeded with url: /auth/user (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1081)')))"
+      ]
+    },
+    {
+      "concurrency": 40,
+      "users": 40,
+      "requests": 360,
+      "successful_requests": 360,
+      "failed_requests": 0,
+      "request_success_rate_pct": 100.0,
+      "successful_users": 40,
+      "user_success_rate_pct": 100.0,
+      "wall_seconds": 10.762,
+      "rps": 33.45,
+      "latency": {
+        "min_ms": 147.96,
+        "avg_ms": 849.27,
+        "p50_ms": 167.85,
+        "p95_ms": 6181.7,
+        "p99_ms": 8949.57,
+        "max_ms": 9514.95
+      },
+      "status_counts": {
+        "200": 280,
+        "201": 40,
+        "404": 40
+      },
+      "sample_errors": []
+    },
+    {
+      "concurrency": 50,
+      "users": 50,
+      "requests": 450,
+      "successful_requests": 450,
+      "failed_requests": 0,
+      "request_success_rate_pct": 100.0,
+      "successful_users": 50,
+      "user_success_rate_pct": 100.0,
+      "wall_seconds": 23.811,
+      "rps": 18.9,
+      "latency": {
+        "min_ms": 147.42,
+        "avg_ms": 1239.15,
+        "p50_ms": 163.08,
+        "p95_ms": 10001.04,
+        "p99_ms": 17486.46,
+        "max_ms": 22481.93
+      },
+      "status_counts": {
+        "200": 350,
+        "201": 50,
+        "404": 50
+      },
+      "sample_errors": []
+    }
+  ],
+  "cleanup": {
+    "removed": 0,
+    "remaining": [],
+    "errors": [],
+    "clean": true
+  },
+  "latency_reference_ms": 2000.0,
+  "conclusion": "本次測試最高完成級別為 50 個同時使用者；該級別請求成功率 100.0%，P95 10001ms。這是本次測試條件下的觀測結果，不等於系統理論上限。"
+}

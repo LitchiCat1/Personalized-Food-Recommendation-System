@@ -1,0 +1,12 @@
+{
+  "started_at": "2026-11-12T00:23:50.712+08:00",
+  "operation": "verify original seed records and logout tracked preparation tokens",
+  "tokens_before": 21,
+  "checks": [],
+  "completed": false,
+  "pending_temporary_records": 0,
+  "health_status": 0,
+  "reason": "Service unhealthy; no per-account verification or logout requests attempted",
+  "finished_at": "2026-11-12T00:23:59.397+08:00",
+  "outstanding_tokens": 21
+}

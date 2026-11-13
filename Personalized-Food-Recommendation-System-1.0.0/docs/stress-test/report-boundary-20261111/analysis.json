@@ -1,0 +1,2511 @@
+{
+  "conclusion": "本輪已驗證最高 20 人保持連線操作約 60 秒，1,421 次請求全部成功，約 95% 在 0.23 秒內回應。這是本次路徑與操作頻率的通過證據，真正的系統最大容量仍未確定。",
+  "highest_confirmed_users": 20,
+  "best_confirmation": {
+    "run": "boundary-20261111-233553",
+    "stage_index": 9,
+    "purpose": "confirm_highest_ten_user_step",
+    "phase": "soak",
+    "users": 20,
+    "attempt": 2,
+    "started": true,
+    "passed": true,
+    "warmup_requests": 20,
+    "warmup_success": 20,
+    "warmup_failed": 0,
+    "duration_s": 60.485,
+    "requests": 1421,
+    "failed": 0,
+    "p95_ms": 229.66,
+    "p99_ms": 362.95,
+    "max_ms": 668.44
+  },
+  "maximum_supported_users": null,
+  "stages": [
+    {
+      "run": "boundary-20261111-233120",
+      "stage_index": 0,
+      "purpose": "baseline_recheck",
+      "phase": "steady",
+      "users": 18,
+      "attempt": 1,
+      "started": true,
+      "passed": true,
+      "warmup_requests": 18,
+      "warmup_success": 18,
+      "warmup_failed": 0,
+      "duration_s": 20.607,
+      "requests": 497,
+      "failed": 0,
+      "p95_ms": 188.08,
+      "p99_ms": 369.89,
+      "max_ms": 394.03
+    },
+    {
+      "run": "boundary-20261111-233120",
+      "stage_index": 1,
+      "purpose": "search",
+      "phase": "steady",
+      "users": 19,
+      "attempt": 1,
+      "started": true,
+      "passed": true,
+      "warmup_requests": 19,
+      "warmup_success": 19,
+      "warmup_failed": 0,
+      "duration_s": 20.641,
+      "requests": 532,
+      "failed": 0,
+      "p95_ms": 196.44,
+      "p99_ms": 216.73,
+      "max_ms": 660.59
+    },
+    {
+      "run": "boundary-20261111-233120",
+      "stage_index": 2,
+      "purpose": "search",
+      "phase": "steady",
+      "users": 20,
+      "attempt": 1,
+      "started": false,
+      "passed": false,
+      "warmup_requests": 20,
+      "warmup_success": 19,
+      "warmup_failed": 1,
+      "duration_s": null,
+      "requests": 0,
+      "failed": 0,
+      "p95_ms": null,
+      "p99_ms": null,
+      "max_ms": null
+    },
+    {
+      "run": "boundary-20261111-233120",
+      "stage_index": 3,
+      "purpose": "repeat_first_failure",
+      "phase": "steady",
+      "users": 20,
+      "attempt": 2,
+      "started": false,
+      "passed": false,
+      "warmup_requests": 20,
+      "warmup_success": 19,
+      "warmup_failed": 1,
+      "duration_s": null,
+      "requests": 0,
+      "failed": 0,
+      "p95_ms": null,
+      "p99_ms": null,
+      "max_ms": null
+    },
+    {
+      "run": "boundary-20261111-233120",
+      "stage_index": 4,
+      "purpose": "confirm_highest_passing_level",
+      "phase": "soak",
+      "users": 19,
+      "attempt": 2,
+      "started": true,
+      "passed": true,
+      "warmup_requests": 19,
+      "warmup_success": 19,
+      "warmup_failed": 0,
+      "duration_s": 60.613,
+      "requests": 1372,
+      "failed": 0,
+      "p95_ms": 175.57,
+      "p99_ms": 200.6,
+      "max_ms": 628.27
+    },
+    {
+      "run": "boundary-20261111-233120",
+      "stage_index": 5,
+      "purpose": "final_boundary_recheck",
+      "phase": "steady",
+      "users": 20,
+      "attempt": 3,
+      "started": false,
+      "passed": false,
+      "warmup_requests": 20,
+      "warmup_success": 19,
+      "warmup_failed": 1,
+      "duration_s": null,
+      "requests": 0,
+      "failed": 0,
+      "p95_ms": null,
+      "p99_ms": null,
+      "max_ms": null
+    },
+    {
+      "run": "boundary-20261111-233553",
+      "stage_index": 0,
+      "purpose": "ten_user_step",
+      "phase": "steady",
+      "users": 20,
+      "attempt": 1,
+      "started": true,
+      "passed": true,
+      "warmup_requests": 20,
+      "warmup_success": 20,
+      "warmup_failed": 0,
+      "duration_s": 20.999,
+      "requests": 560,
+      "failed": 0,
+      "p95_ms": 202.54,
+      "p99_ms": 237.14,
+      "max_ms": 273.49
+    },
+    {
+      "run": "boundary-20261111-233553",
+      "stage_index": 1,
+      "purpose": "ten_user_step",
+      "phase": "steady",
+      "users": 30,
+      "attempt": 1,
+      "started": false,
+      "passed": false,
+      "warmup_requests": 30,
+      "warmup_success": 20,
+      "warmup_failed": 10,
+      "duration_s": null,
+      "requests": 0,
+      "failed": 0,
+      "p95_ms": null,
+      "p99_ms": null,
+      "max_ms": null
+    },
+    {
+      "run": "boundary-20261111-233553",
+      "stage_index": 2,
+      "purpose": "ten_user_step",
+      "phase": "steady",
+      "users": 40,
+      "attempt": 1,
+      "started": false,
+      "passed": false,
+      "warmup_requests": 40,
+      "warmup_success": 20,
+      "warmup_failed": 20,
+      "duration_s": null,
+      "requests": 0,
+      "failed": 0,
+      "p95_ms": null,
+      "p99_ms": null,
+      "max_ms": null
+    },
+    {
+      "run": "boundary-20261111-233553",
+      "stage_index": 3,
+      "purpose": "ten_user_step",
+      "phase": "steady",
+      "users": 50,
+      "attempt": 1,
+      "started": false,
+      "passed": false,
+      "warmup_requests": 50,
+      "warmup_success": 20,
+      "warmup_failed": 30,
+      "duration_s": null,
+      "requests": 0,
+      "failed": 0,
+      "p95_ms": null,
+      "p99_ms": null,
+      "max_ms": null
+    },
+    {
+      "run": "boundary-20261111-233553",
+      "stage_index": 4,
+      "purpose": "ten_user_step",
+      "phase": "steady",
+      "users": 60,
+      "attempt": 1,
+      "started": false,
+      "passed": false,
+      "warmup_requests": 60,
+      "warmup_success": 20,
+      "warmup_failed": 40,
+      "duration_s": null,
+      "requests": 0,
+      "failed": 0,
+      "p95_ms": null,
+      "p99_ms": null,
+      "max_ms": null
+    },
+    {
+      "run": "boundary-20261111-233553",
+      "stage_index": 5,
+      "purpose": "ten_user_step",
+      "phase": "steady",
+      "users": 70,
+      "attempt": 1,
+      "started": false,
+      "passed": false,
+      "warmup_requests": 70,
+      "warmup_success": 20,
+      "warmup_failed": 50,
+      "duration_s": null,
+      "requests": 0,
+      "failed": 0,
+      "p95_ms": null,
+      "p99_ms": null,
+      "max_ms": null
+    },
+    {
+      "run": "boundary-20261111-233553",
+      "stage_index": 6,
+      "purpose": "ten_user_step",
+      "phase": "steady",
+      "users": 80,
+      "attempt": 1,
+      "started": false,
+      "passed": false,
+      "warmup_requests": 80,
+      "warmup_success": 20,
+      "warmup_failed": 60,
+      "duration_s": null,
+      "requests": 0,
+      "failed": 0,
+      "p95_ms": null,
+      "p99_ms": null,
+      "max_ms": null
+    },
+    {
+      "run": "boundary-20261111-233553",
+      "stage_index": 7,
+      "purpose": "ten_user_step",
+      "phase": "steady",
+      "users": 90,
+      "attempt": 1,
+      "started": false,
+      "passed": false,
+      "warmup_requests": 90,
+      "warmup_success": 20,
+      "warmup_failed": 70,
+      "duration_s": null,
+      "requests": 0,
+      "failed": 0,
+      "p95_ms": null,
+      "p99_ms": null,
+      "max_ms": null
+    },
+    {
+      "run": "boundary-20261111-233553",
+      "stage_index": 8,
+      "purpose": "ten_user_step",
+      "phase": "steady",
+      "users": 100,
+      "attempt": 1,
+      "started": false,
+      "passed": false,
+      "warmup_requests": 100,
+      "warmup_success": 20,
+      "warmup_failed": 80,
+      "duration_s": null,
+      "requests": 0,
+      "failed": 0,
+      "p95_ms": null,
+      "p99_ms": null,
+      "max_ms": null
+    },
+    {
+      "run": "boundary-20261111-233553",
+      "stage_index": 9,
+      "purpose": "confirm_highest_ten_user_step",
+      "phase": "soak",
+      "users": 20,
+      "attempt": 2,
+      "started": true,
+      "passed": true,
+      "warmup_requests": 20,
+      "warmup_success": 20,
+      "warmup_failed": 0,
+      "duration_s": 60.485,
+      "requests": 1421,
+      "failed": 0,
+      "p95_ms": 229.66,
+      "p99_ms": 362.95,
+      "max_ms": 668.44
+    }
+  ],
+  "source_sha256": {
+    "D:\\SH\\web\\Personalized-Food-Recommendation-System-0.0.9-new\\Personalized-Food-Recommendation-System-0.0.9\\docs\\stress-test\\runs\\boundary-20261111-233120\\load_summary_233120.json": "6c5d35d38bba44f68bae6ecae01977d308c41cad5dccf520998760f1a3654bdf",
+    "D:\\SH\\web\\Personalized-Food-Recommendation-System-0.0.9-new\\Personalized-Food-Recommendation-System-0.0.9\\docs\\stress-test\\runs\\boundary-20261111-233120\\load_requests_233120.csv": "cac17565e076cb257c0496ce8d0777f762dbe0938c33fd326d1eb2dfbe63db33",
+    "D:\\SH\\web\\Personalized-Food-Recommendation-System-0.0.9-new\\Personalized-Food-Recommendation-System-0.0.9\\docs\\stress-test\\runs\\boundary-20261111-233553\\load_summary_233553.json": "3e6f00a14f03eb006b0f695238817f814811b230ea32c2c974dc790f78af5923",
+    "D:\\SH\\web\\Personalized-Food-Recommendation-System-0.0.9-new\\Personalized-Food-Recommendation-System-0.0.9\\docs\\stress-test\\runs\\boundary-20261111-233553\\load_requests_233553.csv": "b29172ee2b575d75697a20b0938e126e589cf93467f69a48ec5eefc49174e871"
+  },
+  "runs": [
+    {
+      "target": "https://node.taile9a8dc.ts.net",
+      "started_at": "2026-11-11T23:31:20.586+08:00",
+      "load_id": "233120",
+      "accounts": 100,
+      "retained_records_per_account": 3,
+      "stage_seconds_requested": 20,
+      "soak_seconds_requested": 60,
+      "stages": [
+        {
+          "phase": "steady",
+          "concurrency": 18,
+          "started": true,
+          "completed": true,
+          "reference_pass": true,
+          "cycle_count": 71,
+          "users_with_failed_cycles": 0,
+          "users_with_successful_cycles": 18,
+          "requests": 497,
+          "success": 497,
+          "failed": 0,
+          "success_pct": 100.0,
+          "p50_ms": 150.83,
+          "p95_ms": 188.08,
+          "p99_ms": 369.89,
+          "max_ms": 394.03,
+          "duration_s": 20.607,
+          "rps": 24.118,
+          "attempt": 1,
+          "purpose": "baseline_recheck",
+          "row_start": 19,
+          "row_end": 539,
+          "finished_at": "2026-11-11T23:32:07.491+08:00"
+        },
+        {
+          "phase": "steady",
+          "concurrency": 19,
+          "started": true,
+          "completed": true,
+          "reference_pass": true,
+          "cycle_count": 76,
+          "users_with_failed_cycles": 0,
+          "users_with_successful_cycles": 19,
+          "requests": 532,
+          "success": 532,
+          "failed": 0,
+          "success_pct": 100.0,
+          "p50_ms": 151.44,
+          "p95_ms": 196.44,
+          "p99_ms": 216.73,
+          "max_ms": 660.59,
+          "duration_s": 20.641,
+          "rps": 25.774,
+          "attempt": 1,
+          "purpose": "search",
+          "row_start": 541,
+          "row_end": 1097,
+          "finished_at": "2026-11-11T23:32:36.162+08:00"
+        },
+        {
+          "phase": "steady",
+          "concurrency": 20,
+          "started": false,
+          "completed": false,
+          "reason": "warmup connection failed",
+          "reference_pass": false,
+          "warmup": {
+            "requests": 20,
+            "success": 19,
+            "failed": 1,
+            "success_pct": 95.0,
+            "p50_ms": 1371.79,
+            "p95_ms": 1410.67,
+            "p99_ms": 1419.94,
+            "max_ms": 1422.26,
+            "duration_s": null,
+            "rps": null
+          },
+          "attempt": 1,
+          "purpose": "search",
+          "row_start": 1098,
+          "row_end": 1119,
+          "finished_at": "2026-11-11T23:32:44.146+08:00"
+        },
+        {
+          "phase": "steady",
+          "concurrency": 20,
+          "started": false,
+          "completed": false,
+          "reason": "warmup connection failed",
+          "reference_pass": false,
+          "warmup": {
+            "requests": 20,
+            "success": 19,
+            "failed": 1,
+            "success_pct": 95.0,
+            "p50_ms": 1368.85,
+            "p95_ms": 1382.59,
+            "p99_ms": 1396.3,
+            "max_ms": 1399.73,
+            "duration_s": null,
+            "rps": null
+          },
+          "attempt": 2,
+          "purpose": "repeat_first_failure",
+          "row_start": 1120,
+          "row_end": 1141,
+          "finished_at": "2026-11-11T23:32:50.678+08:00"
+        },
+        {
+          "phase": "soak",
+          "concurrency": 19,
+          "started": true,
+          "completed": true,
+          "reference_pass": true,
+          "cycle_count": 196,
+          "users_with_failed_cycles": 0,
+          "users_with_successful_cycles": 19,
+          "requests": 1372,
+          "success": 1372,
+          "failed": 0,
+          "success_pct": 100.0,
+          "p50_ms": 151.44,
+          "p95_ms": 175.57,
+          "p99_ms": 200.6,
+          "max_ms": 628.27,
+          "duration_s": 60.613,
+          "rps": 22.635,
+          "attempt": 2,
+          "purpose": "confirm_highest_passing_level",
+          "row_start": 1141,
+          "row_end": 2545,
+          "finished_at": "2026-11-11T23:33:57.859+08:00"
+        },
+        {
+          "phase": "steady",
+          "concurrency": 20,
+          "started": false,
+          "completed": false,
+          "reason": "warmup connection failed",
+          "reference_pass": false,
+          "warmup": {
+            "requests": 20,
+            "success": 19,
+            "failed": 1,
+            "success_pct": 95.0,
+            "p50_ms": 1238.8,
+            "p95_ms": 1329.38,
+            "p99_ms": 1330.06,
+            "max_ms": 1330.23,
+            "duration_s": null,
+            "rps": null
+          },
+          "attempt": 3,
+          "purpose": "final_boundary_recheck",
+          "row_start": 2545,
+          "row_end": 2566,
+          "finished_at": "2026-11-11T23:34:03.910+08:00"
+        }
+      ],
+      "generator_resources": [
+        {
+          "timestamp": "2026-11-11T23:31:42.852+08:00",
+          "phase": "steady",
+          "concurrency": 18,
+          "local_process_cpu_percent": 355.7,
+          "local_host_cpu_percent": 33.7,
+          "local_process_rss_mb": 46.97,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:31:47.997+08:00",
+          "phase": "steady",
+          "concurrency": 18,
+          "local_process_cpu_percent": 203.8,
+          "local_host_cpu_percent": 25.0,
+          "local_process_rss_mb": 60.59,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:31:53.153+08:00",
+          "phase": "steady",
+          "concurrency": 18,
+          "local_process_cpu_percent": 0.9,
+          "local_host_cpu_percent": 12.3,
+          "local_process_rss_mb": 60.47,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:31:58.309+08:00",
+          "phase": "steady",
+          "concurrency": 18,
+          "local_process_cpu_percent": 6.7,
+          "local_host_cpu_percent": 11.1,
+          "local_process_rss_mb": 60.64,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:32:03.462+08:00",
+          "phase": "steady",
+          "concurrency": 18,
+          "local_process_cpu_percent": 7.3,
+          "local_host_cpu_percent": 12.3,
+          "local_process_rss_mb": 60.74,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:32:08.620+08:00",
+          "phase": "steady",
+          "concurrency": 18,
+          "local_process_cpu_percent": 7.0,
+          "local_host_cpu_percent": 19.6,
+          "local_process_rss_mb": 46.7,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:32:13.771+08:00",
+          "phase": "steady",
+          "concurrency": 19,
+          "local_process_cpu_percent": 252.1,
+          "local_host_cpu_percent": 28.5,
+          "local_process_rss_mb": 57.81,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:32:18.931+08:00",
+          "phase": "steady",
+          "concurrency": 19,
+          "local_process_cpu_percent": 69.0,
+          "local_host_cpu_percent": 16.2,
+          "local_process_rss_mb": 62.68,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:32:24.095+08:00",
+          "phase": "steady",
+          "concurrency": 19,
+          "local_process_cpu_percent": 7.3,
+          "local_host_cpu_percent": 12.3,
+          "local_process_rss_mb": 62.8,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:32:29.261+08:00",
+          "phase": "steady",
+          "concurrency": 19,
+          "local_process_cpu_percent": 5.4,
+          "local_host_cpu_percent": 12.2,
+          "local_process_rss_mb": 62.9,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:32:34.422+08:00",
+          "phase": "steady",
+          "concurrency": 19,
+          "local_process_cpu_percent": 3.6,
+          "local_host_cpu_percent": 22.8,
+          "local_process_rss_mb": 62.94,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:32:39.584+08:00",
+          "phase": "steady",
+          "concurrency": 20,
+          "local_process_cpu_percent": 96.9,
+          "local_host_cpu_percent": 25.1,
+          "local_process_rss_mb": 51.51,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:32:44.742+08:00",
+          "phase": "steady",
+          "concurrency": 20,
+          "local_process_cpu_percent": 243.3,
+          "local_host_cpu_percent": 34.6,
+          "local_process_rss_mb": 51.93,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:32:49.902+08:00",
+          "phase": "steady",
+          "concurrency": 20,
+          "local_process_cpu_percent": 294.7,
+          "local_host_cpu_percent": 30.2,
+          "local_process_rss_mb": 62.9,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:32:55.080+08:00",
+          "phase": "soak",
+          "concurrency": 19,
+          "local_process_cpu_percent": 230.2,
+          "local_host_cpu_percent": 25.6,
+          "local_process_rss_mb": 62.2,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:33:00.227+08:00",
+          "phase": "soak",
+          "concurrency": 19,
+          "local_process_cpu_percent": 94.7,
+          "local_host_cpu_percent": 18.6,
+          "local_process_rss_mb": 68.19,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:33:05.382+08:00",
+          "phase": "soak",
+          "concurrency": 19,
+          "local_process_cpu_percent": 6.7,
+          "local_host_cpu_percent": 11.1,
+          "local_process_rss_mb": 68.34,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:33:10.541+08:00",
+          "phase": "soak",
+          "concurrency": 19,
+          "local_process_cpu_percent": 5.8,
+          "local_host_cpu_percent": 12.9,
+          "local_process_rss_mb": 68.5,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:33:15.693+08:00",
+          "phase": "soak",
+          "concurrency": 19,
+          "local_process_cpu_percent": 2.4,
+          "local_host_cpu_percent": 9.2,
+          "local_process_rss_mb": 68.54,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:33:20.850+08:00",
+          "phase": "soak",
+          "concurrency": 19,
+          "local_process_cpu_percent": 3.0,
+          "local_host_cpu_percent": 10.1,
+          "local_process_rss_mb": 68.61,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:33:26.007+08:00",
+          "phase": "soak",
+          "concurrency": 19,
+          "local_process_cpu_percent": 4.5,
+          "local_host_cpu_percent": 11.1,
+          "local_process_rss_mb": 68.67,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:33:31.162+08:00",
+          "phase": "soak",
+          "concurrency": 19,
+          "local_process_cpu_percent": 4.5,
+          "local_host_cpu_percent": 16.9,
+          "local_process_rss_mb": 68.79,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:33:36.325+08:00",
+          "phase": "soak",
+          "concurrency": 19,
+          "local_process_cpu_percent": 5.8,
+          "local_host_cpu_percent": 16.1,
+          "local_process_rss_mb": 68.85,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:33:41.542+08:00",
+          "phase": "soak",
+          "concurrency": 19,
+          "local_process_cpu_percent": 5.7,
+          "local_host_cpu_percent": 22.6,
+          "local_process_rss_mb": 68.93,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:33:46.701+08:00",
+          "phase": "soak",
+          "concurrency": 19,
+          "local_process_cpu_percent": 4.2,
+          "local_host_cpu_percent": 14.2,
+          "local_process_rss_mb": 69.0,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:33:51.860+08:00",
+          "phase": "soak",
+          "concurrency": 19,
+          "local_process_cpu_percent": 6.1,
+          "local_host_cpu_percent": 13.9,
+          "local_process_rss_mb": 69.08,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:33:57.041+08:00",
+          "phase": "soak",
+          "concurrency": 19,
+          "local_process_cpu_percent": 6.0,
+          "local_host_cpu_percent": 14.2,
+          "local_process_rss_mb": 69.12,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:34:02.204+08:00",
+          "phase": "steady",
+          "concurrency": 20,
+          "local_process_cpu_percent": 209.1,
+          "local_host_cpu_percent": 30.6,
+          "local_process_rss_mb": 64.0,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        }
+      ],
+      "stop_reason": null,
+      "maximum_supported_users": null,
+      "remote_resource_monitoring": false,
+      "method": "adaptive boundary search; persistent independent account sessions; 7 CRUD requests per cycle; 4-6 seconds think time",
+      "source_population": "D:\\SH\\web\\Personalized-Food-Recommendation-System-0.0.9-new\\Personalized-Food-Recommendation-System-0.0.9\\docs\\stress-test\\runs\\population-20261111-2230",
+      "max_accounts": 100,
+      "confirmation_seconds": 60,
+      "reference": {
+        "p95_ms_below": 2000,
+        "request_failure_ratio_below": 0.01,
+        "users_with_failed_cycles_ratio_below": 0.01
+      },
+      "note": "Highest passing level is specific to this client, route and workload. A warmup failure is not a sustained-business failure.",
+      "initial_health": {
+        "app_version": "v1.0.0",
+        "auth_provider": "local-sqlite",
+        "auth_required": true,
+        "cached_restaurant_menus": 36,
+        "custom_foods": 0,
+        "database": "sqlite",
+        "database_path": null,
+        "deployed_branch": "local",
+        "deployed_commit": "local",
+        "disease_rule_review_status": {
+          "guideline_screening": 3,
+          "requires_clinical_personalization": 1,
+          "screening_rule": 1
+        },
+        "disease_rules": 5,
+        "foods_in_db": 12,
+        "foods_in_tfda": 2181,
+        "mongo": false,
+        "openai_enabled": true,
+        "places_enabled": true,
+        "recognition_engine": "gemini-vision-db-lookup",
+        "restaurants": 20,
+        "started_at": "2026-11-11T21:47:11.356665+08:00",
+        "status": "ok"
+      },
+      "updated_at": "2026-11-11T23:34:12.351+08:00",
+      "health": {
+        "requests": 28,
+        "success": 28,
+        "failed": 0,
+        "success_pct": 100.0,
+        "p50_ms": 149.45,
+        "p95_ms": 193.59,
+        "p99_ms": 1095.98,
+        "max_ms": 1426.88,
+        "duration_s": null,
+        "rps": null
+      },
+      "outstanding_tokens": 0,
+      "pending_temporary_records": 0,
+      "confirmation_passed": true,
+      "next_level_recheck_passed": false,
+      "short_test_passing_levels": [
+        18,
+        19
+      ],
+      "failing_attempt_levels": [
+        20,
+        20
+      ],
+      "highest_short_test_passing_level": 19,
+      "adjacent_failing_level": 20,
+      "search_end": "Adjacent boundary tested",
+      "final_health": {
+        "app_version": "v1.0.0",
+        "auth_provider": "local-sqlite",
+        "auth_required": true,
+        "cached_restaurant_menus": 36,
+        "custom_foods": 0,
+        "database": "sqlite",
+        "database_path": null,
+        "deployed_branch": "local",
+        "deployed_commit": "local",
+        "disease_rule_review_status": {
+          "guideline_screening": 3,
+          "requires_clinical_personalization": 1,
+          "screening_rule": 1
+        },
+        "disease_rules": 5,
+        "foods_in_db": 12,
+        "foods_in_tfda": 2181,
+        "mongo": false,
+        "openai_enabled": true,
+        "places_enabled": true,
+        "recognition_engine": "gemini-vision-db-lookup",
+        "restaurants": 20,
+        "started_at": "2026-11-11T21:47:11.356665+08:00",
+        "status": "ok"
+      },
+      "verification": {
+        "accounts_checked": 20,
+        "accounts_valid": 20,
+        "checks": [
+          {
+            "account": "stress_test_20261111_051",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_052",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_053",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_054",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_055",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_056",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_057",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_058",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_059",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_060",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_061",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_062",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_063",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_064",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_065",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_066",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_067",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_068",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_069",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_070",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          }
+        ],
+        "pending_temporary_records": 0,
+        "outstanding_tokens": 0
+      },
+      "finished_at": "2026-11-11T23:34:12.351+08:00"
+    },
+    {
+      "target": "https://node.taile9a8dc.ts.net",
+      "started_at": "2026-11-11T23:35:53.588+08:00",
+      "load_id": "233553",
+      "accounts": 100,
+      "retained_records_per_account": 3,
+      "stage_seconds_requested": 20,
+      "soak_seconds_requested": 60,
+      "stages": [
+        {
+          "phase": "steady",
+          "concurrency": 20,
+          "started": true,
+          "completed": true,
+          "reference_pass": true,
+          "cycle_count": 80,
+          "users_with_failed_cycles": 0,
+          "users_with_successful_cycles": 20,
+          "requests": 560,
+          "success": 560,
+          "failed": 0,
+          "success_pct": 100.0,
+          "p50_ms": 153.66,
+          "p95_ms": 202.54,
+          "p99_ms": 237.14,
+          "max_ms": 273.49,
+          "duration_s": 20.999,
+          "rps": 26.668,
+          "attempt": 1,
+          "purpose": "ten_user_step",
+          "row_start": 21,
+          "row_end": 606,
+          "finished_at": "2026-11-11T23:36:42.955+08:00"
+        },
+        {
+          "phase": "steady",
+          "concurrency": 30,
+          "started": false,
+          "completed": false,
+          "reason": "warmup connection failed",
+          "reference_pass": false,
+          "warmup": {
+            "requests": 30,
+            "success": 20,
+            "failed": 10,
+            "success_pct": 66.667,
+            "p50_ms": 1380.2,
+            "p95_ms": 1507.81,
+            "p99_ms": 1513.43,
+            "max_ms": 1514.93,
+            "duration_s": null,
+            "rps": null
+          },
+          "attempt": 1,
+          "purpose": "ten_user_step",
+          "row_start": 619,
+          "row_end": 650,
+          "finished_at": "2026-11-11T23:37:02.264+08:00"
+        },
+        {
+          "phase": "steady",
+          "concurrency": 40,
+          "started": false,
+          "completed": false,
+          "reason": "warmup connection failed",
+          "reference_pass": false,
+          "warmup": {
+            "requests": 40,
+            "success": 20,
+            "failed": 20,
+            "success_pct": 50.0,
+            "p50_ms": 1169.45,
+            "p95_ms": 1419.83,
+            "p99_ms": 1425.86,
+            "max_ms": 1429.31,
+            "duration_s": null,
+            "rps": null
+          },
+          "attempt": 1,
+          "purpose": "ten_user_step",
+          "row_start": 662,
+          "row_end": 704,
+          "finished_at": "2026-11-11T23:37:23.422+08:00"
+        },
+        {
+          "phase": "steady",
+          "concurrency": 50,
+          "started": false,
+          "completed": false,
+          "reason": "warmup connection failed",
+          "reference_pass": false,
+          "warmup": {
+            "requests": 50,
+            "success": 20,
+            "failed": 30,
+            "success_pct": 40.0,
+            "p50_ms": 958.63,
+            "p95_ms": 1680.43,
+            "p99_ms": 1682.72,
+            "max_ms": 1683.32,
+            "duration_s": null,
+            "rps": null
+          },
+          "attempt": 1,
+          "purpose": "ten_user_step",
+          "row_start": 716,
+          "row_end": 769,
+          "finished_at": "2026-11-11T23:37:46.813+08:00"
+        },
+        {
+          "phase": "steady",
+          "concurrency": 60,
+          "started": false,
+          "completed": false,
+          "reason": "warmup connection failed",
+          "reference_pass": false,
+          "warmup": {
+            "requests": 60,
+            "success": 20,
+            "failed": 40,
+            "success_pct": 33.333,
+            "p50_ms": 969.88,
+            "p95_ms": 1410.73,
+            "p99_ms": 1497.93,
+            "max_ms": 1539.64,
+            "duration_s": null,
+            "rps": null
+          },
+          "attempt": 1,
+          "purpose": "ten_user_step",
+          "row_start": 781,
+          "row_end": 844,
+          "finished_at": "2026-11-11T23:38:11.769+08:00"
+        },
+        {
+          "phase": "steady",
+          "concurrency": 70,
+          "started": false,
+          "completed": false,
+          "reason": "warmup connection failed",
+          "reference_pass": false,
+          "warmup": {
+            "requests": 70,
+            "success": 20,
+            "failed": 50,
+            "success_pct": 28.571,
+            "p50_ms": 950.1,
+            "p95_ms": 1410.99,
+            "p99_ms": 1664.06,
+            "max_ms": 1918.24,
+            "duration_s": null,
+            "rps": null
+          },
+          "attempt": 1,
+          "purpose": "ten_user_step",
+          "row_start": 856,
+          "row_end": 929,
+          "finished_at": "2026-11-11T23:38:38.775+08:00"
+        },
+        {
+          "phase": "steady",
+          "concurrency": 80,
+          "started": false,
+          "completed": false,
+          "reason": "warmup connection failed",
+          "reference_pass": false,
+          "warmup": {
+            "requests": 80,
+            "success": 20,
+            "failed": 60,
+            "success_pct": 25.0,
+            "p50_ms": 951.96,
+            "p95_ms": 1419.96,
+            "p99_ms": 1504.09,
+            "max_ms": 1631.81,
+            "duration_s": null,
+            "rps": null
+          },
+          "attempt": 1,
+          "purpose": "ten_user_step",
+          "row_start": 941,
+          "row_end": 1024,
+          "finished_at": "2026-11-11T23:39:07.887+08:00"
+        },
+        {
+          "phase": "steady",
+          "concurrency": 90,
+          "started": false,
+          "completed": false,
+          "reason": "warmup connection failed",
+          "reference_pass": false,
+          "warmup": {
+            "requests": 90,
+            "success": 20,
+            "failed": 70,
+            "success_pct": 22.222,
+            "p50_ms": 1049.45,
+            "p95_ms": 1410.22,
+            "p99_ms": 1440.09,
+            "max_ms": 1456.49,
+            "duration_s": null,
+            "rps": null
+          },
+          "attempt": 1,
+          "purpose": "ten_user_step",
+          "row_start": 1037,
+          "row_end": 1131,
+          "finished_at": "2026-11-11T23:39:39.566+08:00"
+        },
+        {
+          "phase": "steady",
+          "concurrency": 100,
+          "started": false,
+          "completed": false,
+          "reason": "warmup connection failed",
+          "reference_pass": false,
+          "warmup": {
+            "requests": 100,
+            "success": 20,
+            "failed": 80,
+            "success_pct": 20.0,
+            "p50_ms": 1129.98,
+            "p95_ms": 1440.78,
+            "p99_ms": 1530.87,
+            "max_ms": 1570.89,
+            "duration_s": null,
+            "rps": null
+          },
+          "attempt": 1,
+          "purpose": "ten_user_step",
+          "row_start": 1143,
+          "row_end": 1247,
+          "finished_at": "2026-11-11T23:40:15.058+08:00"
+        },
+        {
+          "phase": "soak",
+          "concurrency": 20,
+          "started": true,
+          "completed": true,
+          "reference_pass": true,
+          "cycle_count": 203,
+          "users_with_failed_cycles": 0,
+          "users_with_successful_cycles": 20,
+          "requests": 1421,
+          "success": 1421,
+          "failed": 0,
+          "success_pct": 100.0,
+          "p50_ms": 168.59,
+          "p95_ms": 229.66,
+          "p99_ms": 362.95,
+          "max_ms": 668.44,
+          "duration_s": 60.485,
+          "rps": 23.493,
+          "attempt": 2,
+          "purpose": "confirm_highest_ten_user_step",
+          "row_start": 1248,
+          "row_end": 2702,
+          "finished_at": "2026-11-11T23:41:23.116+08:00"
+        }
+      ],
+      "generator_resources": [
+        {
+          "timestamp": "2026-11-11T23:36:17.719+08:00",
+          "phase": "steady",
+          "concurrency": 20,
+          "local_process_cpu_percent": 353.5,
+          "local_host_cpu_percent": 41.8,
+          "local_process_rss_mb": 47.01,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:36:22.882+08:00",
+          "phase": "steady",
+          "concurrency": 20,
+          "local_process_cpu_percent": 200.4,
+          "local_host_cpu_percent": 30.6,
+          "local_process_rss_mb": 62.75,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:36:28.049+08:00",
+          "phase": "steady",
+          "concurrency": 20,
+          "local_process_cpu_percent": 2.4,
+          "local_host_cpu_percent": 15.8,
+          "local_process_rss_mb": 62.68,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:36:33.249+08:00",
+          "phase": "steady",
+          "concurrency": 20,
+          "local_process_cpu_percent": 3.6,
+          "local_host_cpu_percent": 11.8,
+          "local_process_rss_mb": 62.8,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:36:38.408+08:00",
+          "phase": "steady",
+          "concurrency": 20,
+          "local_process_cpu_percent": 7.9,
+          "local_host_cpu_percent": 10.5,
+          "local_process_rss_mb": 62.91,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:36:43.563+08:00",
+          "phase": "steady",
+          "concurrency": 20,
+          "local_process_cpu_percent": 5.8,
+          "local_host_cpu_percent": 9.9,
+          "local_process_rss_mb": 47.96,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:36:48.727+08:00",
+          "phase": "steady",
+          "concurrency": 20,
+          "local_process_cpu_percent": 13.0,
+          "local_host_cpu_percent": 12.8,
+          "local_process_rss_mb": 48.17,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:36:53.879+08:00",
+          "phase": "steady",
+          "concurrency": 20,
+          "local_process_cpu_percent": 0.0,
+          "local_host_cpu_percent": 9.4,
+          "local_process_rss_mb": 48.12,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:36:59.038+08:00",
+          "phase": "steady",
+          "concurrency": 30,
+          "local_process_cpu_percent": 235.7,
+          "local_host_cpu_percent": 26.3,
+          "local_process_rss_mb": 58.7,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:37:04.191+08:00",
+          "phase": "steady",
+          "concurrency": 30,
+          "local_process_cpu_percent": 241.3,
+          "local_host_cpu_percent": 28.1,
+          "local_process_rss_mb": 61.91,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:37:09.353+08:00",
+          "phase": "steady",
+          "concurrency": 30,
+          "local_process_cpu_percent": 0.0,
+          "local_host_cpu_percent": 10.4,
+          "local_process_rss_mb": 61.94,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:37:14.515+08:00",
+          "phase": "steady",
+          "concurrency": 40,
+          "local_process_cpu_percent": 51.5,
+          "local_host_cpu_percent": 24.9,
+          "local_process_rss_mb": 63.23,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:37:19.678+08:00",
+          "phase": "steady",
+          "concurrency": 40,
+          "local_process_cpu_percent": 271.2,
+          "local_host_cpu_percent": 26.5,
+          "local_process_rss_mb": 76.06,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:37:24.848+08:00",
+          "phase": "steady",
+          "concurrency": 40,
+          "local_process_cpu_percent": 308.0,
+          "local_host_cpu_percent": 34.0,
+          "local_process_rss_mb": 86.21,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:37:30.012+08:00",
+          "phase": "steady",
+          "concurrency": 40,
+          "local_process_cpu_percent": 6.4,
+          "local_host_cpu_percent": 12.5,
+          "local_process_rss_mb": 86.26,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:37:35.518+08:00",
+          "phase": "steady",
+          "concurrency": 50,
+          "local_process_cpu_percent": 32.6,
+          "local_host_cpu_percent": 12.4,
+          "local_process_rss_mb": 86.73,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:37:40.727+08:00",
+          "phase": "steady",
+          "concurrency": 50,
+          "local_process_cpu_percent": 278.3,
+          "local_host_cpu_percent": 29.2,
+          "local_process_rss_mb": 94.12,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:37:45.890+08:00",
+          "phase": "steady",
+          "concurrency": 50,
+          "local_process_cpu_percent": 398.0,
+          "local_host_cpu_percent": 37.9,
+          "local_process_rss_mb": 113.89,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:37:51.067+08:00",
+          "phase": "steady",
+          "concurrency": 50,
+          "local_process_cpu_percent": 80.0,
+          "local_host_cpu_percent": 17.9,
+          "local_process_rss_mb": 117.18,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:37:56.227+08:00",
+          "phase": "steady",
+          "concurrency": 50,
+          "local_process_cpu_percent": 0.6,
+          "local_host_cpu_percent": 11.3,
+          "local_process_rss_mb": 117.18,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:38:01.387+08:00",
+          "phase": "steady",
+          "concurrency": 60,
+          "local_process_cpu_percent": 165.0,
+          "local_host_cpu_percent": 22.6,
+          "local_process_rss_mb": 117.83,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:38:06.567+08:00",
+          "phase": "steady",
+          "concurrency": 60,
+          "local_process_cpu_percent": 358.1,
+          "local_host_cpu_percent": 35.3,
+          "local_process_rss_mb": 133.26,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:38:11.735+08:00",
+          "phase": "steady",
+          "concurrency": 60,
+          "local_process_cpu_percent": 418.1,
+          "local_host_cpu_percent": 43.4,
+          "local_process_rss_mb": 153.95,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:38:16.896+08:00",
+          "phase": "steady",
+          "concurrency": 60,
+          "local_process_cpu_percent": 13.3,
+          "local_host_cpu_percent": 12.9,
+          "local_process_rss_mb": 153.73,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:38:22.057+08:00",
+          "phase": "steady",
+          "concurrency": 60,
+          "local_process_cpu_percent": 0.3,
+          "local_host_cpu_percent": 11.6,
+          "local_process_rss_mb": 153.73,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:38:27.217+08:00",
+          "phase": "steady",
+          "concurrency": 70,
+          "local_process_cpu_percent": 234.0,
+          "local_host_cpu_percent": 25.0,
+          "local_process_rss_mb": 155.66,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:38:32.369+08:00",
+          "phase": "steady",
+          "concurrency": 70,
+          "local_process_cpu_percent": 350.6,
+          "local_host_cpu_percent": 34.0,
+          "local_process_rss_mb": 172.67,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:38:37.537+08:00",
+          "phase": "steady",
+          "concurrency": 70,
+          "local_process_cpu_percent": 420.2,
+          "local_host_cpu_percent": 39.3,
+          "local_process_rss_mb": 193.91,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:38:42.696+08:00",
+          "phase": "steady",
+          "concurrency": 70,
+          "local_process_cpu_percent": 88.4,
+          "local_host_cpu_percent": 19.3,
+          "local_process_rss_mb": 197.63,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:38:47.856+08:00",
+          "phase": "steady",
+          "concurrency": 70,
+          "local_process_cpu_percent": 0.3,
+          "local_host_cpu_percent": 9.7,
+          "local_process_rss_mb": 197.63,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:38:53.006+08:00",
+          "phase": "steady",
+          "concurrency": 80,
+          "local_process_cpu_percent": 153.5,
+          "local_host_cpu_percent": 19.6,
+          "local_process_rss_mb": 198.54,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:38:58.176+08:00",
+          "phase": "steady",
+          "concurrency": 80,
+          "local_process_cpu_percent": 335.1,
+          "local_host_cpu_percent": 32.5,
+          "local_process_rss_mb": 209.09,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:39:03.334+08:00",
+          "phase": "steady",
+          "concurrency": 80,
+          "local_process_cpu_percent": 421.4,
+          "local_host_cpu_percent": 41.0,
+          "local_process_rss_mb": 107.39,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:39:08.505+08:00",
+          "phase": "steady",
+          "concurrency": 80,
+          "local_process_cpu_percent": 342.1,
+          "local_host_cpu_percent": 36.1,
+          "local_process_rss_mb": 102.95,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:39:13.666+08:00",
+          "phase": "steady",
+          "concurrency": 80,
+          "local_process_cpu_percent": 12.4,
+          "local_host_cpu_percent": 12.6,
+          "local_process_rss_mb": 103.06,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:39:18.824+08:00",
+          "phase": "steady",
+          "concurrency": 80,
+          "local_process_cpu_percent": 0.9,
+          "local_host_cpu_percent": 10.0,
+          "local_process_rss_mb": 103.12,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:39:23.975+08:00",
+          "phase": "steady",
+          "concurrency": 90,
+          "local_process_cpu_percent": 260.6,
+          "local_host_cpu_percent": 27.0,
+          "local_process_rss_mb": 108.94,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:39:29.146+08:00",
+          "phase": "steady",
+          "concurrency": 90,
+          "local_process_cpu_percent": 388.9,
+          "local_host_cpu_percent": 35.4,
+          "local_process_rss_mb": 127.58,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:39:34.336+08:00",
+          "phase": "steady",
+          "concurrency": 90,
+          "local_process_cpu_percent": 430.5,
+          "local_host_cpu_percent": 42.0,
+          "local_process_rss_mb": 145.86,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:39:39.515+08:00",
+          "phase": "steady",
+          "concurrency": 90,
+          "local_process_cpu_percent": 410.0,
+          "local_host_cpu_percent": 42.2,
+          "local_process_rss_mb": 162.8,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:39:44.675+08:00",
+          "phase": "steady",
+          "concurrency": 90,
+          "local_process_cpu_percent": 12.7,
+          "local_host_cpu_percent": 13.2,
+          "local_process_rss_mb": 162.59,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:39:49.835+08:00",
+          "phase": "steady",
+          "concurrency": 90,
+          "local_process_cpu_percent": 0.6,
+          "local_host_cpu_percent": 11.4,
+          "local_process_rss_mb": 162.59,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:39:54.995+08:00",
+          "phase": "steady",
+          "concurrency": 100,
+          "local_process_cpu_percent": 228.6,
+          "local_host_cpu_percent": 26.1,
+          "local_process_rss_mb": 164.68,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:40:00.155+08:00",
+          "phase": "steady",
+          "concurrency": 100,
+          "local_process_cpu_percent": 353.4,
+          "local_host_cpu_percent": 34.9,
+          "local_process_rss_mb": 176.32,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:40:05.315+08:00",
+          "phase": "steady",
+          "concurrency": 100,
+          "local_process_cpu_percent": 435.7,
+          "local_host_cpu_percent": 39.8,
+          "local_process_rss_mb": 194.3,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:40:10.495+08:00",
+          "phase": "steady",
+          "concurrency": 100,
+          "local_process_cpu_percent": 432.9,
+          "local_host_cpu_percent": 39.1,
+          "local_process_rss_mb": 212.58,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:40:15.665+08:00",
+          "phase": "steady",
+          "concurrency": 100,
+          "local_process_cpu_percent": 361.2,
+          "local_host_cpu_percent": 38.1,
+          "local_process_rss_mb": 82.91,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:40:20.828+08:00",
+          "phase": "soak",
+          "concurrency": 20,
+          "local_process_cpu_percent": 255.7,
+          "local_host_cpu_percent": 27.5,
+          "local_process_rss_mb": 87.03,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:40:26.005+08:00",
+          "phase": "soak",
+          "concurrency": 20,
+          "local_process_cpu_percent": 86.3,
+          "local_host_cpu_percent": 16.2,
+          "local_process_rss_mb": 91.77,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:40:31.169+08:00",
+          "phase": "soak",
+          "concurrency": 20,
+          "local_process_cpu_percent": 5.7,
+          "local_host_cpu_percent": 14.6,
+          "local_process_rss_mb": 91.81,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:40:36.364+08:00",
+          "phase": "soak",
+          "concurrency": 20,
+          "local_process_cpu_percent": 7.5,
+          "local_host_cpu_percent": 82.2,
+          "local_process_rss_mb": 91.84,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:40:41.555+08:00",
+          "phase": "soak",
+          "concurrency": 20,
+          "local_process_cpu_percent": 6.3,
+          "local_host_cpu_percent": 30.7,
+          "local_process_rss_mb": 91.85,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:40:46.725+08:00",
+          "phase": "soak",
+          "concurrency": 20,
+          "local_process_cpu_percent": 7.3,
+          "local_host_cpu_percent": 23.4,
+          "local_process_rss_mb": 91.86,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:40:51.886+08:00",
+          "phase": "soak",
+          "concurrency": 20,
+          "local_process_cpu_percent": 7.6,
+          "local_host_cpu_percent": 22.1,
+          "local_process_rss_mb": 91.89,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:40:57.048+08:00",
+          "phase": "soak",
+          "concurrency": 20,
+          "local_process_cpu_percent": 6.1,
+          "local_host_cpu_percent": 25.3,
+          "local_process_rss_mb": 92.03,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:41:02.203+08:00",
+          "phase": "soak",
+          "concurrency": 20,
+          "local_process_cpu_percent": 5.8,
+          "local_host_cpu_percent": 24.8,
+          "local_process_rss_mb": 91.17,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:41:07.369+08:00",
+          "phase": "soak",
+          "concurrency": 20,
+          "local_process_cpu_percent": 5.1,
+          "local_host_cpu_percent": 26.8,
+          "local_process_rss_mb": 91.2,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:41:12.529+08:00",
+          "phase": "soak",
+          "concurrency": 20,
+          "local_process_cpu_percent": 5.8,
+          "local_host_cpu_percent": 30.6,
+          "local_process_rss_mb": 91.2,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:41:17.692+08:00",
+          "phase": "soak",
+          "concurrency": 20,
+          "local_process_cpu_percent": 5.8,
+          "local_host_cpu_percent": 19.1,
+          "local_process_rss_mb": 91.21,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        },
+        {
+          "timestamp": "2026-11-11T23:41:22.844+08:00",
+          "phase": "soak",
+          "concurrency": 20,
+          "local_process_cpu_percent": 10.9,
+          "local_host_cpu_percent": 37.5,
+          "local_process_rss_mb": 91.21,
+          "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+        }
+      ],
+      "stop_reason": null,
+      "maximum_supported_users": null,
+      "remote_resource_monitoring": false,
+      "method": "10-user increments; independent account HTTP sessions; 20-second business stages if all sessions warm; 7 CRUD calls per cycle; 4-6 second think time",
+      "source_population": "D:\\SH\\web\\Personalized-Food-Recommendation-System-0.0.9-new\\Personalized-Food-Recommendation-System-0.0.9\\docs\\stress-test\\runs\\population-20261111-2230",
+      "max_accounts": 100,
+      "confirmation_seconds": 60,
+      "reference": {
+        "p95_ms_below": 2000,
+        "request_failure_ratio_below": 0.01,
+        "users_with_failed_cycles_ratio_below": 0.01
+      },
+      "note": "Highest passing level is specific to this client, route and workload. A warmup failure is not a sustained-business failure.",
+      "initial_health": {
+        "app_version": "v1.0.0",
+        "auth_provider": "local-sqlite",
+        "auth_required": true,
+        "cached_restaurant_menus": 36,
+        "custom_foods": 0,
+        "database": "sqlite",
+        "database_path": null,
+        "deployed_branch": "local",
+        "deployed_commit": "local",
+        "disease_rule_review_status": {
+          "guideline_screening": 3,
+          "requires_clinical_personalization": 1,
+          "screening_rule": 1
+        },
+        "disease_rules": 5,
+        "foods_in_db": 12,
+        "foods_in_tfda": 2181,
+        "mongo": false,
+        "openai_enabled": true,
+        "places_enabled": true,
+        "recognition_engine": "gemini-vision-db-lookup",
+        "restaurants": 20,
+        "started_at": "2026-11-11T21:47:11.356665+08:00",
+        "status": "ok"
+      },
+      "updated_at": "2026-11-11T23:41:59.219+08:00",
+      "health": {
+        "requests": 60,
+        "success": 60,
+        "failed": 0,
+        "success_pct": 100.0,
+        "p50_ms": 154.11,
+        "p95_ms": 198.56,
+        "p99_ms": 852.29,
+        "max_ms": 1373.52,
+        "duration_s": null,
+        "rps": null
+      },
+      "outstanding_tokens": 0,
+      "pending_temporary_records": 0,
+      "requested_levels": [
+        20,
+        30,
+        40,
+        50,
+        60,
+        70,
+        80,
+        90,
+        100
+      ],
+      "short_test_passing_levels": [
+        20
+      ],
+      "failing_attempt_levels": [
+        30,
+        40,
+        50,
+        60,
+        70,
+        80,
+        90,
+        100
+      ],
+      "highest_short_test_passing_level": 20,
+      "confirmation_passed": true,
+      "search_end": "Requested 10-user increments completed",
+      "final_health": {
+        "app_version": "v1.0.0",
+        "auth_provider": "local-sqlite",
+        "auth_required": true,
+        "cached_restaurant_menus": 36,
+        "custom_foods": 0,
+        "database": "sqlite",
+        "database_path": null,
+        "deployed_branch": "local",
+        "deployed_commit": "local",
+        "disease_rule_review_status": {
+          "guideline_screening": 3,
+          "requires_clinical_personalization": 1,
+          "screening_rule": 1
+        },
+        "disease_rules": 5,
+        "foods_in_db": 12,
+        "foods_in_tfda": 2181,
+        "mongo": false,
+        "openai_enabled": true,
+        "places_enabled": true,
+        "recognition_engine": "gemini-vision-db-lookup",
+        "restaurants": 20,
+        "started_at": "2026-11-11T21:47:11.356665+08:00",
+        "status": "ok"
+      },
+      "verification": {
+        "accounts_checked": 100,
+        "accounts_valid": 100,
+        "checks": [
+          {
+            "account": "stress_test_20261111_051",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_052",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_053",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_054",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_055",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_056",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_057",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_058",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_059",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_060",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_061",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_062",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_063",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_064",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_065",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_066",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_067",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_068",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_069",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_070",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_071",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_072",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_073",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_074",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_075",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_076",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_077",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_078",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_079",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_080",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_081",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_082",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_083",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_084",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_085",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_086",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_087",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_088",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_089",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_090",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_091",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_092",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_093",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_094",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_095",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_096",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_097",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_098",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_099",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_100",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_101",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_102",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_103",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_104",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_105",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_106",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_107",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_108",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_109",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_110",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_111",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_112",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_113",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_114",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_115",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_116",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_117",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_118",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_119",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_120",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_121",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_122",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_123",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_124",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_125",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_126",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_127",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_128",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_129",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_130",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_131",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_132",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_133",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_134",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_135",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_136",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_137",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_138",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_139",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_140",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_141",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_142",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_143",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_144",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_145",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_146",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_147",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_148",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_149",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          },
+          {
+            "account": "stress_test_20261111_150",
+            "seed_records_valid": true,
+            "temporary_records_remaining": 0,
+            "record_count": 3
+          }
+        ],
+        "pending_temporary_records": 0,
+        "outstanding_tokens": 0
+      },
+      "finished_at": "2026-11-11T23:41:59.219+08:00"
+    }
+  ],
+  "error_types": {
+    "SSLError": 363
+  },
+  "unique_accounts_verified": 100,
+  "verification_checks": 120,
+  "health_failed": 0,
+  "http_5xx": 0,
+  "request_count": 5510,
+  "business_requests": 4382,
+  "business_failed": 0,
+  "limitations": [
+    "Single load generator, one public network path, no remote host monitoring.",
+    "One independent health-check Session additionally uses the ingress path.",
+    "Short 20-second search stages and 60-second confirmations do not establish long-term capacity.",
+    "A warmup failure prevents starting the requested business cohort; unstarted cohorts have no business latency.",
+    "20-user warmup results differed across attempts; no fixed global or Tailscale limit established."
+  ]
+}

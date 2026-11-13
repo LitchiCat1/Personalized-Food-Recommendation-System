@@ -1,0 +1,951 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, Pressable, Linking, Modal, ScrollView } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
+import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
+import { useStore } from '@/store/useStore';
+import type { DetectedFood } from '@/constants/mock-data';
+import AppContainer from '@/components/AppContainer';
+import ScreenHeader from '@/components/ui/screen-header';
+import SectionBlock from '@/components/ui/section-block';
+import DataPill from '@/components/ui/data-pill';
+import PrimaryButton from '@/components/ui/primary-button';
+import SecondaryButton from '@/components/ui/secondary-button';
+import SegmentedControl from '@/components/ui/segmented-control';
+import FeedbackBanner from '@/components/ui/feedback-banner';
+import FoodMap from '@/components/maps/FoodMap';
+import { saveRecord } from '@/lib/scanner';
+import { getAutoMealType } from '@/lib/meal';
+import { resolveImageBase64 } from '@/lib/image';
+import { describeLocation, resolveLocation } from '@/lib/location';
+import { describeIndexProgress, describeIndexRun, indexVenuesUntilDone, type VenueIndexProgress } from '@/lib/venue-indexing';
+import {
+  fetchHealthyFoodRecommendations,
+  fetchRestaurantAiSummary,
+  fetchRestaurantDetailedMenu,
+  indexNearbyVenues,
+  type HealthyFoodRestaurant,
+  type RestaurantAiSummary,
+  type HealthyFoodResponse,
+} from '@/lib/api';
+
+
+const RADIUS_OPTIONS = [
+  { value: '1', label: '1 km' },
+  { value: '3', label: '3 km' },
+  { value: '5', label: '5 km' },
+];
+
+const CATEGORY_OPTIONS = [
+  { value: 'all', label: '全部' },
+  { value: '便當', label: '便當' },
+  { value: '小吃', label: '小吃' },
+  { value: '早餐', label: '早餐' },
+  { value: '飲料', label: '飲料' },
+  { value: '沙拉', label: '沙拉' },
+];
+
+export default function RecommendScreen() {
+  const user = useStore((state) => state.user);
+  const apiBaseUrl = useStore((state) => state.apiBaseUrl);
+  const accessToken = useStore((state) => state.accessToken);
+  const addMealFromScan = useStore((state) => state.addMealFromScan);
+  const invalidateDietaryRecords = useStore((state) => state.invalidateDietaryRecords);
+
+  const [radiusKm, setRadiusKm] = useState(3);
+  const [category, setCategory] = useState('all');
+  const [healthyLoading, setHealthyLoading] = useState(false);
+  const [healthyError, setHealthyError] = useState<string | null>(null);
+  const [healthyData, setHealthyData] = useState<HealthyFoodResponse | null>(null);
+  const [summaryByRestaurant, setSummaryByRestaurant] = useState<Record<string, RestaurantAiSummary>>({});
+  const [summaryLoadingKey, setSummaryLoadingKey] = useState<string | null>(null);
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
+  const [locationLabel, setLocationLabel] = useState('尚未取得定位');
+  const [viewingMenuRest, setViewingMenuRest] = useState<HealthyFoodRestaurant | null>(null);
+  const [menuLoading, setMenuLoading] = useState(false);
+  const [menuElapsedSeconds, setMenuElapsedSeconds] = useState(0);
+  const [addingFoodName, setAddingFoodName] = useState<string | null>(null);
+  const [uploadingMenu, setUploadingMenu] = useState(false);
+  const [photoSourceTarget, setPhotoSourceTarget] = useState<HealthyFoodRestaurant | null>(null);
+  const [menuUploadFeedback, setMenuUploadFeedback] = useState<{ tone: 'success' | 'error'; title: string; message?: string } | null>(null);
+  const [pageFeedback, setPageFeedback] = useState<{ tone: 'success' | 'error'; title: string; message?: string } | null>(null);
+  const [indexingVenues, setIndexingVenues] = useState(false);
+  const [indexProgress, setIndexProgress] = useState<VenueIndexProgress | null>(null);
+
+  const captureMenuPhoto = async (source: 'camera' | 'library'): Promise<string | null> => {
+    if (source === 'camera') {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        setMenuUploadFeedback({ tone: 'error', title: '需要相機權限', message: '請至系統設定開啟相機權限，才能拍攝菜單照片。' });
+        return null;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        base64: true,
+        quality: 0.8,
+      });
+      if (result.canceled) return null;
+      return resolveImageBase64(result.assets?.[0]);
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      base64: true,
+      quality: 0.8,
+    });
+    if (result.canceled) return null;
+    return resolveImageBase64(result.assets?.[0]);
+  };
+
+  const handleUploadMenuPhoto = (restaurant: HealthyFoodRestaurant) => {
+    setPhotoSourceTarget(restaurant);
+  };
+
+  const runMenuPhotoUpload = async (restaurant: HealthyFoodRestaurant, source: 'camera' | 'library') => {
+    setPhotoSourceTarget(null);
+    setMenuUploadFeedback(null);
+    setMenuLoading(true);
+    setUploadingMenu(true);
+    try {
+      const base64 = await captureMenuPhoto(source);
+      if (!base64) {
+        throw new Error('圖片無法讀取，請重新選擇照片或改用相機拍攝。');
+      }
+      const response = await fetchRestaurantDetailedMenu(
+        apiBaseUrl,
+        {
+          restaurant_id: restaurant.restaurant_id,
+          name: restaurant.name,
+          address: restaurant.address,
+          user_id: user.userId,
+          lat: restaurant.lat,
+          lng: restaurant.lng,
+          distance_km: restaurant.distance_km,
+          menu_image: base64,
+        },
+        { accessToken }
+      );
+      setViewingMenuRest((prev) =>
+        prev ? { ...prev, recommended_items: response.recommended_items, filtered_items: response.filtered_items } : null
+      );
+      if (response.menu_recognition?.recognition_status === 'error') {
+        setMenuUploadFeedback({
+          tone: 'error',
+          title: '菜單辨識失敗',
+          message: response.menu_recognition.recognition_error || '請確認照片清晰包含菜單品項與價格，或稍後再試一次。',
+        });
+        return;
+      }
+      const itemCount = (response.recommended_items?.length || 0) + (response.filtered_items?.length || 0);
+      if (itemCount === 0) {
+        setMenuUploadFeedback({
+          tone: 'error',
+          title: '沒有辨識到餐點',
+          message: response.menu_recognition?.recognition_error || '請確認照片清晰包含菜單品項與價格，或稍後再試一次。',
+        });
+      } else {
+        setMenuUploadFeedback({ tone: 'success', title: 'AI 辨識完成', message: '已成功解析實體菜單圖片並產生個人化推薦！' });
+      }
+    } catch (err: any) {
+      setMenuUploadFeedback({ tone: 'error', title: '菜單辨識失敗', message: err?.message || '請選擇更清晰的菜單照片' });
+    } finally {
+      setMenuLoading(false);
+      setUploadingMenu(false);
+    }
+  };
+
+  const mapRestaurants = healthyData?.restaurants || [];
+  const mapLocation = healthyData?.location || null;
+  const selectedRestaurant = mapRestaurants.find((restaurant) => restaurant.restaurant_id === selectedRestaurantId) || mapRestaurants[0] || null;
+
+  const handleQuickAddRecord = async (item: {
+    item_name?: string;
+    name?: string;
+    calories?: number;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+    sodium?: number;
+    sugar?: number;
+    saturated_fat?: number;
+    trans_fat?: number;
+    fiber?: number;
+    price?: number;
+  }) => {
+    const foodName = item.item_name || item.name || '推薦餐點';
+    const clientRecordId = `rec_${Date.now()}`;
+    setAddingFoodName(foodName);
+    try {
+      const foodItem = {
+        name: foodName,
+        calories: Number(item.calories ?? 350),
+        protein: Number(item.protein ?? 15),
+        carbs: Number(item.carbs ?? 45),
+        fat: Number(item.fat ?? 10),
+        sodium: Number(item.sodium ?? 500),
+        sugar: Number(item.sugar ?? 0),
+        saturated_fat: Number(item.saturated_fat ?? 0),
+        trans_fat: Number(item.trans_fat ?? 0),
+        fiber: Number(item.fiber ?? (foodName.includes('青菜') || foodName.includes('沙拉') || foodName.includes('蔬菜') ? 3.5 : 1.0)),
+        source: 'manual',
+      };
+
+      const detectedFoodItem: DetectedFood = {
+        id: clientRecordId,
+        foodName,
+        confidence: 100,
+        source: 'manual',
+        needsConfirmation: false,
+        boundingBox: { x: 0, y: 0, w: 0, h: 0 },
+        estimatedWeight: 200,
+        portionRange: { minG: 200, maxG: 200, uncertaintyPercent: 0 },
+        portionEstimationMethod: 'nutrition_label_serving_size',
+        reliability: { level: 'high', score: 0.9, reasons: ['來自 AI 個人化推薦'] },
+        nutrition: foodItem,
+        gi: 'medium',
+        allergens: [],
+        warnings: [],
+      };
+
+      await saveRecord({
+        apiBaseUrl,
+        userId: user.userId,
+        clientRecordId,
+        foods: [detectedFoodItem],
+        source: 'manual',
+        auth: { accessToken },
+        mealType: getAutoMealType(),
+      });
+      invalidateDietaryRecords();
+      addMealFromScan([detectedFoodItem]);
+      setPageFeedback({ tone: 'success', title: '已新增紀錄', message: `已成功將「${foodName} (${foodItem.calories} kcal)」加入今日飲食紀錄！` });
+    } catch (err: any) {
+      setPageFeedback({ tone: 'error', title: '新增紀錄失敗', message: err?.message || '請稍後再試' });
+    } finally {
+      setAddingFoodName(null);
+    }
+  };
+
+  const handleHealthyFoodSearch = async () => {
+    setHealthyLoading(true);
+    setHealthyError(null);
+    try {
+      const location = await resolveLocation();
+      const { lat, lng } = location;
+      setLocationLabel(describeLocation(location));
+
+      const result = await fetchHealthyFoodRecommendations(
+        apiBaseUrl,
+        user.userId,
+        { lat, lng, radiusKm, category },
+        { accessToken }
+      );
+      setHealthyData(result);
+      setSelectedRestaurantId(result.restaurants?.[0]?.restaurant_id || null);
+    } catch (err: any) {
+      setHealthyError(err?.message || '無法取得健康餐點推薦');
+    } finally {
+      setHealthyLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!menuLoading) {
+      setMenuElapsedSeconds(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      setMenuElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [menuLoading]);
+
+  /** 這家店有沒有可顯示的菜單資料——標題列的上傳鍵與空狀態卡片要用同一個判斷。 */
+  const menuRecommendedItems = useMemo(
+    () => (viewingMenuRest?.recommended_items || []).filter(
+      (item) => item.nutrition_available !== false && !item.item_name.includes('到店後選擇')
+    ),
+    [viewingMenuRest]
+  );
+  const menuHasItems = menuRecommendedItems.length > 0 || (viewingMenuRest?.filtered_items || []).length > 0;
+
+  const handleLoadRestaurantSummary = async (restaurant: HealthyFoodRestaurant) => {
+    setSummaryLoadingKey(restaurant.restaurant_id);
+    try {
+      const result = await fetchRestaurantAiSummary(
+        apiBaseUrl,
+        user.userId,
+        { restaurant, category },
+        { accessToken }
+      );
+      setSummaryByRestaurant((current: Record<string, RestaurantAiSummary>) => ({
+        ...current,
+        [restaurant.restaurant_id]: result.summary,
+      }));
+    } catch (err: any) {
+      setPageFeedback({ tone: 'error', title: '無法取得 AI 摘要', message: err?.message });
+    } finally {
+      setSummaryLoadingKey(null);
+    }
+  };
+
+  const handleViewMenu = async (restaurant: HealthyFoodRestaurant) => {
+    setViewingMenuRest(restaurant);
+    setMenuUploadFeedback(null);
+    if ((restaurant.recommended_items || []).length === 0 || !restaurant.nutrition_available) {
+      setMenuLoading(true);
+      try {
+        const response = await fetchRestaurantDetailedMenu(
+          apiBaseUrl,
+          {
+            restaurant_id: restaurant.restaurant_id,
+            name: restaurant.name,
+            address: restaurant.address,
+            user_id: user.userId,
+            lat: restaurant.lat,
+            lng: restaurant.lng,
+            distance_km: restaurant.distance_km,
+          },
+          { accessToken }
+        );
+        setViewingMenuRest((prev: HealthyFoodRestaurant | null) =>
+          prev ? { ...prev, recommended_items: response.recommended_items, filtered_items: response.filtered_items } : null
+        );
+      } catch (err: any) {
+        // 先前這裡只有 console.log，使用者看到的是一個永遠空白的菜單視窗。
+        setMenuUploadFeedback({
+          tone: 'error',
+          title: '這家店還沒有可比對的菜單',
+          message: err?.message || '可以直接拍一張菜單照片上傳，之後就能逐道菜過濾。',
+        });
+      } finally {
+        setMenuLoading(false);
+      }
+    }
+  };
+
+  // 沒建檔就只能用店名比對疾病禁忌，這是整個推薦最大的落差。
+  // 原本建檔入口埋在「我的」分頁，這裡直接做，做完重跑一次搜尋。
+  // 後端一次只做得完一部分，有進度就自動接著送，按一次就建完。
+  const handleIndexNearby = async () => {
+    setIndexingVenues(true);
+    setIndexProgress(null);
+    setPageFeedback(null);
+    try {
+      const location = await resolveLocation();
+      const run = await indexVenuesUntilDone(
+        () =>
+          indexNearbyVenues(
+            apiBaseUrl,
+            user.userId,
+            { lat: location.lat, lng: location.lng, radiusKm, category },
+            // 一次建檔可能跑好幾分鐘，每一輪都拿最新的登入憑證，中途換發過也不會被擋
+            { accessToken: useStore.getState().accessToken }
+          ),
+        setIndexProgress
+      );
+      const report = describeIndexRun(run);
+      setPageFeedback({ ...report, message: report.message || undefined });
+      await handleHealthyFoodSearch();
+    } catch (err: any) {
+      setPageFeedback({ tone: 'error', title: '建立菜單檔案失敗', message: err?.message });
+    } finally {
+      setIndexingVenues(false);
+      setIndexProgress(null);
+    }
+  };
+
+  const handleOpenNavigation = (restaurant: HealthyFoodRestaurant) => {
+    const query = encodeURIComponent(`${restaurant.name} ${restaurant.address}`);
+    const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
+    Linking.openURL(url);
+  };
+
+  const handleOpenRestaurantWebsite = (restaurant: HealthyFoodRestaurant) => {
+    if (restaurant.menu_link) {
+      Linking.openURL(restaurant.menu_link.url);
+    }
+  };
+
+  const handleOpenRestaurantInfo = (restaurant: HealthyFoodRestaurant) => {
+    const query = encodeURIComponent(`${restaurant.name} ${restaurant.address}`);
+    const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
+    Linking.openURL(url);
+  };
+
+  return (
+    <AppContainer>
+      <ScreenHeader
+        title="智慧推薦"
+        subtitle="查看符合個人條件的餐點，再用定位找附近可行店家。"
+        badge="地圖搜尋"
+        badgeTone="success"
+      />
+
+      {pageFeedback ? (
+        <FeedbackBanner
+          tone={pageFeedback.tone}
+          title={pageFeedback.title}
+          message={pageFeedback.message}
+          onDismiss={() => setPageFeedback(null)}
+        />
+      ) : null}
+
+      <SectionBlock title="附近店家推薦" subtitle="Google Places 只提供真實店家位置；實際餐點營養仍建議用掃描確認。">
+            <View style={styles.searchRow}>
+              <PrimaryButton
+                label={healthyLoading ? '搜尋中' : '更新地圖'}
+                onPress={handleHealthyFoodSearch}
+                // 建檔中重新搜尋，結果換掉後建檔按鈕和它的進度會一起消失；建完會自動重搜
+                disabled={indexingVenues}
+                fullWidth={false}
+                icon={healthyLoading ? <ActivityIndicator size="small" color={Palette.text.inverse} /> : <Ionicons name="location-outline" size={17} color={Palette.text.inverse} />}
+              />
+            </View>
+            <Text style={styles.optionLabel}>搜尋半徑</Text>
+            <SegmentedControl options={RADIUS_OPTIONS} value={String(radiusKm)} onChange={(value) => setRadiusKm(Number(value))} />
+            <Text style={styles.optionLabel}>店家類型</Text>
+            <View style={styles.categoryWrap}>
+              {CATEGORY_OPTIONS.map((option) => (
+                <Pressable key={option.value} accessibilityRole="button" aria-pressed={category === option.value} onPress={() => setCategory(option.value)} style={[styles.categoryChip, category === option.value && styles.categoryChipActive]}>
+                  <Text style={[styles.categoryText, category === option.value && styles.categoryTextActive]}>{option.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.locationText}>{locationLabel}</Text>
+            {healthyError ? (
+              <View style={styles.apiErrorBox}>
+                <Text style={styles.errorText}>{healthyError}</Text>
+                {/* 先前這裡直接印出後端網址與 Bearer token 狀態，
+                    對使用者沒有意義，也把伺服器位址攤在畫面上。 */}
+                <Text style={styles.errorMeta}>
+                  {accessToken ? '請確認網路連線後再按一次「更新地圖」。' : '你的登入可能已過期，請重新登入後再試。'}
+                </Text>
+              </View>
+            ) : null}
+          </SectionBlock>
+
+          {healthyData?.data_source_warning ? (
+            <View style={styles.fakeDataWarning}>
+              <Ionicons name="warning-outline" size={16} color={Palette.status.error} />
+              <Text style={styles.fakeDataWarningText}>{healthyData.data_source_warning}</Text>
+            </View>
+          ) : null}
+
+          {healthyData?.nutrition_note ? (
+            <View style={styles.nutritionNotice}>
+              <View style={styles.openingNotice}>
+                <Ionicons name="information-circle-outline" size={15} color={Palette.text.secondary} />
+                <Text style={styles.openingNoticeText}>{healthyData.nutrition_note}</Text>
+              </View>
+              {healthyData.nutrition_available ? null : (
+                <SecondaryButton
+                  label={indexingVenues ? describeIndexProgress(indexProgress) : '建立附近店家菜單檔案'}
+                  onPress={handleIndexNearby}
+                  disabled={indexingVenues}
+                />
+              )}
+            </View>
+          ) : null}
+
+          {healthyData?.calorie_note ? (
+            <View style={styles.openingNotice}>
+              <Ionicons name="flame-outline" size={15} color={Palette.text.secondary} />
+              <Text style={styles.openingNoticeText}>{healthyData.calorie_note}</Text>
+            </View>
+          ) : null}
+
+          {healthyData?.opening_note ? (
+            <View style={styles.openingNotice}>
+              <Ionicons name="time-outline" size={15} color={Palette.text.secondary} />
+              <Text style={styles.openingNoticeText}>{healthyData.opening_note}</Text>
+            </View>
+          ) : null}
+
+          {mapRestaurants.length === 0 && healthyData && !healthyLoading ? (
+            <View style={styles.openingNotice}>
+              <Ionicons name="moon-outline" size={15} color={Palette.text.secondary} />
+              <Text style={styles.openingNoticeText}>
+                {healthyData.calorie_note
+                  ? '今天沒有適合的餐點可以推薦，詳見上方說明。'
+                  : '附近現在沒有營業中的店家。可以稍後再看，或改用掃描記錄手邊的餐點。'}
+              </Text>
+            </View>
+          ) : null}
+
+          {mapRestaurants.length && mapLocation ? (
+            <>
+              <View style={styles.mapCard}>
+                <FoodMap
+                  location={mapLocation}
+                  restaurants={mapRestaurants}
+                  selectedRestaurantId={selectedRestaurant?.restaurant_id || null}
+                  onSelectRestaurant={setSelectedRestaurantId}
+                />
+                {selectedRestaurant ? (
+                  <View style={styles.selectedMapInfo}>
+                    <View style={styles.mapTitleRow}>
+                      <Text style={styles.restaurantName}>{selectedRestaurant.name}</Text>
+                      {selectedRestaurant.rating ? <DataPill tone="info">★ {selectedRestaurant.rating.toFixed(1)}</DataPill> : null}
+                    </View>
+                    <Text style={styles.restaurantMeta}>{selectedRestaurant.address || '尚無地址'} · {selectedRestaurant.distance_km} km</Text>
+                    <SecondaryButton label="開啟 Google Maps 導航" onPress={() => handleOpenNavigation(selectedRestaurant)} icon={<Ionicons name="navigate-outline" size={15} color={Palette.accent.green} />} />
+                  </View>
+                ) : null}
+              </View>
+
+              {mapRestaurants.map((restaurant, index) => (
+                <RestaurantCard
+                  key={restaurant.restaurant_id}
+                  restaurant={restaurant}
+                  index={index}
+                  addingFoodName={addingFoodName}
+                  selected={selectedRestaurantId === restaurant.restaurant_id}
+                  summary={summaryByRestaurant[restaurant.restaurant_id]}
+                  summaryLoading={summaryLoadingKey === restaurant.restaurant_id}
+                  onSelect={() => setSelectedRestaurantId(restaurant.restaurant_id)}
+                  onSummary={() => handleLoadRestaurantSummary(restaurant)}
+                  onNavigate={() => handleOpenNavigation(restaurant)}
+                  onViewMenu={() => handleViewMenu(restaurant)}
+                  onOpenRestaurantWebsite={() => handleOpenRestaurantWebsite(restaurant)}
+                  onOpenRestaurantInfo={() => handleOpenRestaurantInfo(restaurant)}
+                  onQuickAddRecord={handleQuickAddRecord}
+                />
+              ))}
+            </>
+          ) : null}
+
+      <Modal
+        visible={viewingMenuRest !== null}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setViewingMenuRest(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1, paddingRight: Spacing.sm }}>
+                <Text style={styles.modalTitle}>{viewingMenuRest?.name}</Text>
+                <Text style={styles.restaurantMeta}>{viewingMenuRest?.address}</Text>
+              </View>
+              {/* 圖示本身沒有文字，不給 label 的話輔助技術只會念到一個空按鈕，
+                  而 24px 的圖示也不到 44px 的最小點擊範圍。 */}
+              <Pressable
+                onPress={() => setViewingMenuRest(null)}
+                accessibilityRole="button"
+                accessibilityLabel="關閉菜單"
+                hitSlop={10}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color={Palette.text.primary} />
+              </Pressable>
+            </View>
+
+            {menuHasItems ? (
+              <View style={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm, alignItems: 'flex-start' }}>
+                <SecondaryButton
+                  disabled={uploadingMenu}
+                  icon={<Ionicons name="camera-outline" size={14} color={Palette.accent.green} />}
+                  label={uploadingMenu ? '正在用 AI 辨識菜單…' : '更新實體菜單照片'}
+                  onPress={() => viewingMenuRest && handleUploadMenuPhoto(viewingMenuRest)}
+                />
+              </View>
+            ) : null}
+
+            {menuUploadFeedback ? (
+              <View style={{ paddingHorizontal: Spacing.lg }}>
+                <FeedbackBanner
+                  tone={menuUploadFeedback.tone}
+                  title={menuUploadFeedback.title}
+                  message={menuUploadFeedback.message}
+                  onDismiss={() => setMenuUploadFeedback(null)}
+                />
+              </View>
+            ) : null}
+
+            {menuLoading ? (
+              <View style={{ justifyContent: 'center', alignItems: 'center', paddingVertical: Spacing.xl, paddingHorizontal: Spacing.lg, gap: Spacing.xs }}>
+                <ActivityIndicator size="large" color={Palette.accent.green} />
+                <Text style={[styles.emptyText, { marginTop: Spacing.md }]}>正在讀取或使用 AI 即時解析菜單…</Text>
+                <Text style={[styles.restaurantMeta, { textAlign: 'center' }]}>
+                  已等待 {menuElapsedSeconds} 秒。第一次分析一家店大約需要 20~40 秒，之後會直接使用建檔結果。
+                </Text>
+              </View>
+            ) : (
+              <ScrollView contentContainerStyle={styles.modalScroll}>
+                <Text style={styles.modalSectionTitle}>餐點安全分析</Text>
+                {(() => {
+                  const validRecItems = menuRecommendedItems;
+                  const validFilteredItems = viewingMenuRest?.filtered_items || [];
+
+                  if (!menuHasItems) {
+                    return (
+                      <View style={{ padding: Spacing.lg, alignItems: 'center', backgroundColor: Palette.bg.wash, borderRadius: Radius.lg, borderWidth: 1, borderColor: Palette.border.subtle, marginVertical: Spacing.md, gap: Spacing.sm }}>
+                        <Ionicons name="document-text-outline" size={32} color={Palette.text.tertiary} />
+                        <Text style={[styles.itemName, { textAlign: 'center', marginBottom: 2 }]}>線上查無此店菜單</Text>
+                        <Text style={[styles.restaurantMeta, { textAlign: 'center', marginBottom: Spacing.xs }]}>
+                          此為 Google Places 真實店家，線上找不到菜單。拍一張店內菜單上傳，Gemini Vision 會辨識菜色並依你的疾病與過敏原給出 3~5 項推薦。
+                        </Text>
+                        <SecondaryButton
+                          disabled={uploadingMenu}
+                          icon={<Ionicons name="camera-outline" size={16} color={Palette.accent.green} />}
+                          label={uploadingMenu ? '正在用 AI 辨識菜單…' : '拍照或上傳實體菜單'}
+                          onPress={() => viewingMenuRest && handleUploadMenuPhoto(viewingMenuRest)}
+                        />
+                      </View>
+                    );
+                  }
+
+                  return (
+                    <>
+                      {validRecItems.length === 0 ? (
+                        <Text style={styles.emptyText}>沒有符合條件的餐點</Text>
+                      ) : (
+                        validRecItems.map((item) => (
+                          <View key={item.item_name} style={styles.menuItemCard}>
+                            <View style={styles.menuItemHeader}>
+                              <Text style={styles.menuItemName}>{item.item_name}</Text>
+                              <Text style={styles.menuItemPrice}>${item.price}</Text>
+                            </View>
+                            <MenuVerifiedPill verified={item.menu_verified} />
+                            <View style={styles.nutritionRow}>
+                              <NutritionMini label="熱量" value={`${item.calories} kcal`} color={Palette.accent.green} />
+                              <NutritionMini label="蛋白質" value={`${item.protein} g`} color={Palette.accent.blue} />
+                              <NutritionMini label="鈉" value={`${item.sodium} mg`} color={Palette.accent.pink} />
+                            </View>
+                            {item.reasons && item.reasons.length > 0 ? (
+                              <Text style={styles.customizationText}>判定依據：{item.reasons.join('、')}</Text>
+                            ) : null}
+                            <View style={{ marginTop: Spacing.xs, alignItems: 'flex-end' }}>
+                              <SecondaryButton
+                                disabled={addingFoodName === item.item_name}
+                                label={addingFoodName === item.item_name ? '新增中...' : '+ 加入今日紀錄'}
+                                onPress={() => handleQuickAddRecord(item)}
+                                icon={<Ionicons name="add-circle-outline" size={14} color={Palette.accent.green} />}
+                              />
+                            </View>
+                          </View>
+                        ))
+                      )}
+
+                      <Text style={[styles.modalSectionTitle, { marginTop: Spacing.xl }]}>不符合 / 需注意餐點</Text>
+                      {validFilteredItems.length === 0 ? (
+                        <Text style={styles.emptyText}>此店無需要排除的餐點</Text>
+                      ) : (
+                        validFilteredItems.map((item) => (
+                          <View key={item.item_name} style={styles.menuItemCard}>
+                            <View style={styles.menuItemHeader}>
+                              <Text style={styles.menuItemName}>{item.item_name}</Text>
+                            </View>
+                            {item.reasons && item.reasons.length > 0 ? (
+                              <Text style={styles.warningText}>⚠️ 排除原因：{item.reasons.join('、')}</Text>
+                            ) : null}
+                          </View>
+                        ))
+                      )}
+                    </>
+                  );
+                })()}
+
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <PhotoSourceModal
+        visible={photoSourceTarget !== null}
+        onCancel={() => setPhotoSourceTarget(null)}
+        onSelectCamera={() => photoSourceTarget && runMenuPhotoUpload(photoSourceTarget, 'camera')}
+        onSelectLibrary={() => photoSourceTarget && runMenuPhotoUpload(photoSourceTarget, 'library')}
+      />
+
+    </AppContainer>
+  );
+}
+
+function PhotoSourceModal({ visible, onCancel, onSelectCamera, onSelectLibrary }: {
+  visible: boolean;
+  onCancel: () => void;
+  onSelectCamera: () => void;
+  onSelectLibrary: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={styles.photoSourceOverlay}>
+        <Pressable accessibilityLabel="取消上傳菜單照片" style={StyleSheet.absoluteFill} onPress={onCancel} />
+        <View style={styles.photoSourceCard}>
+          <Text style={styles.modalTitle}>上傳菜單照片</Text>
+          <Text style={styles.restaurantMeta}>選擇照片來源</Text>
+          <SecondaryButton label="📷 拍照" onPress={onSelectCamera} icon={<Ionicons name="camera-outline" size={16} color={Palette.accent.green} />} />
+          <SecondaryButton label="📁 從相簿選擇" onPress={onSelectLibrary} icon={<Ionicons name="image-outline" size={16} color={Palette.accent.green} />} />
+          <SecondaryButton label="取消" onPress={onCancel} />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function RestaurantCard({
+  restaurant,
+  index,
+  selected,
+  summary,
+  summaryLoading,
+  addingFoodName,
+  onSelect,
+  onSummary,
+  onNavigate,
+  onViewMenu,
+  onOpenRestaurantWebsite,
+  onOpenRestaurantInfo,
+  onQuickAddRecord,
+}: {
+  restaurant: HealthyFoodRestaurant;
+  index: number;
+  selected: boolean;
+  summary?: RestaurantAiSummary;
+  summaryLoading: boolean;
+  addingFoodName: string | null;
+  onSelect: () => void;
+  onSummary: () => void;
+  onNavigate: () => void;
+  onViewMenu: () => void;
+  onOpenRestaurantWebsite: () => void;
+  onOpenRestaurantInfo: () => void;
+  onQuickAddRecord: (item: any) => void;
+}) {
+  return (
+    <View style={[styles.restaurantCard, selected && styles.restaurantCardSelected]}>
+      <View style={styles.mealTop}>
+        <View style={styles.rankBadge}><Text style={styles.rankText}>{index + 1}</Text></View>
+        <View style={styles.mealInfo}>
+          <Text style={styles.restaurantName}>{restaurant.name}</Text>
+          <Text style={styles.restaurantMeta}>{restaurant.tags.slice(0, 2).join('、')} · {restaurant.distance_km} km · {restaurant.is_open === null || restaurant.is_open === undefined ? '營業時間未知' : restaurant.is_open ? '營業中' : '休息中'}</Text>
+        </View>
+        {restaurant.rating ? <DataPill tone="info">★ {restaurant.rating.toFixed(1)}</DataPill> : null}
+      </View>
+      <View style={styles.pillRow}>
+        {restaurant.tags.slice(0, 4).map((tag) => <DataPill key={tag} tone="success">{tag}</DataPill>)}
+      </View>
+      {restaurant.recommended_items.slice(0, 5).map((item) => (
+        <View key={`${restaurant.restaurant_id}_${item.item_id || item.item_name}`} style={styles.restaurantItem}>
+          <View style={styles.itemNameRow}>
+            <Text style={styles.itemName}>{item.item_name}</Text>
+            <MenuVerifiedPill verified={item.menu_verified} />
+          </View>
+          {item.nutrition_available ? (
+            <View style={styles.nutritionRow}>
+              <NutritionMini label="熱量" value={`${item.calories} kcal`} color={Palette.accent.green} />
+              <NutritionMini label="蛋白質" value={`${item.protein} g`} color={Palette.accent.blue} />
+              <NutritionMini label="鈉" value={`${item.sodium} mg`} color={Palette.accent.pink} />
+            </View>
+          ) : (
+            <Text style={styles.restaurantMeta}>菜單價格與營養資料需到店後用掃描或手動搜尋確認。</Text>
+          )}
+        </View>
+      ))}
+      <View style={styles.restaurantActions}>
+        <SecondaryButton label="完整菜單" onPress={onViewMenu} icon={<Ionicons name="restaurant-outline" size={14} color={Palette.accent.green} />} />
+        {restaurant.menu_link ? (
+          <SecondaryButton label="店家網站" onPress={onOpenRestaurantWebsite} icon={<Ionicons name="open-outline" size={14} color={Palette.accent.green} />} />
+        ) : null}
+        <SecondaryButton label="地圖標示" onPress={onSelect} />
+        <SecondaryButton label={summaryLoading ? '產生中' : 'AI 摘要'} onPress={onSummary} />
+        <SecondaryButton label="導航" onPress={onNavigate} />
+      </View>
+      {summary ? (
+        <View style={styles.aiSummaryBox}>
+          <Text style={styles.itemName}>AI 推測：{summary.restaurant_type}</Text>
+          <Text style={styles.restaurantMeta}>可能販售：{summary.likely_foods.join('、') || '不確定'}</Text>
+          <Text style={styles.restaurantMeta}>價格：約 {summary.price_range_twd.min}-{summary.price_range_twd.max} 元</Text>
+          {(summary.recommended_foods || []).length ? (
+            <View style={styles.personalizedRecommendations}>
+              <View style={styles.personalizedTitleRow}>
+                <Ionicons name="sparkles-outline" size={16} color={Palette.accent.green} />
+                <Text style={styles.personalizedTitle}>疾病與今日進度提醒</Text>
+              </View>
+              {/* 這裡的品項是 Gemini 從店名推測的，這家店沒有建檔菜單。
+                  先前每一項旁邊有「加入今日紀錄」，按下去會用菜名關鍵字
+                  現編一組營養數字（麵/飯/便當 → 550 kcal / 750 mg），
+                  標成 confidence 100、reliability high 存進健康紀錄，
+                  而且整條路徑沒有跑過 evaluate_medical_risk——過敏原、
+                  反式脂肪、單餐鈉上限全部沒有檢查。按鈕已移除。 */}
+              {(summary.recommended_foods || []).map((item, itemIndex) => (
+                <View key={`${item.name}_${itemIndex}`} style={styles.personalizedItem}>
+                  <Text style={styles.personalizedFood}>{item.name}</Text>
+                  <Text style={styles.restaurantMeta}>{item.reason}</Text>
+                </View>
+              ))}
+              <Text style={styles.aiGuessCaveat}>
+                以上是 AI 依店名推測的，這家店還沒有菜單資料，也沒有經過疾病禁忌與過敏原檢查。
+                到店後請用「掃描」記錄實際餐點。
+              </Text>
+            </View>
+          ) : null}
+          <Text style={styles.restaurantMeta}>建議：{summary.health_tips.join('、') || '到店後確認餐點內容'}</Text>
+          <Text style={styles.errorMeta}>{summary.source_note}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+
+/**
+ * 這一道是怎麼過關的：逐道菜比對，還是只靠店名猜。
+ *
+ * 沒有這個標記時，兩種來源的推薦卡長得一模一樣——而它們的可信度差很多。
+ * 後端只有 16 家店建過菜單，其餘店家 Google Places 只給店名與類型。
+ */
+function MenuVerifiedPill({ verified }: { verified?: boolean }) {
+  if (verified === undefined) return null;
+  return (
+    <View style={[styles.verifyPill, verified ? styles.verifyPillOk : styles.verifyPillGuess]}>
+      <Ionicons
+        name={verified ? 'checkmark-circle-outline' : 'help-circle-outline'}
+        size={12}
+        color={verified ? Palette.accent.green : Palette.status.warning}
+      />
+      <Text style={[styles.verifyPillText, { color: verified ? Palette.accent.green : Palette.status.warning }]}>
+        {verified ? '逐道菜比對' : '僅店名比對'}
+      </Text>
+    </View>
+  );
+}
+
+function NutritionMini({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <View style={styles.nutritionMini}>
+      <Text style={styles.nutritionMiniLabel}>{label}</Text>
+      <Text style={[styles.nutritionMiniValue, { color }]}>{value}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  itemNameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.xs },
+  verifyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    alignSelf: 'flex-start',
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginTop: 2,
+  },
+  verifyPillOk: { backgroundColor: Palette.accent.greenDim, borderColor: 'rgba(31,157,114,0.26)' },
+  verifyPillGuess: { backgroundColor: Palette.accent.orangeDim, borderColor: 'rgba(245,158,11,0.28)' },
+  verifyPillText: { ...Typography.small, fontSize: 11 },
+  emptyText: { ...Typography.body, color: Palette.text.tertiary, textAlign: 'center' },
+  nutritionNotice: {
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  openingNotice: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    backgroundColor: Palette.bg.card, borderRadius: Radius.lg, padding: Spacing.md,
+  },
+  openingNoticeText: { ...Typography.small, color: Palette.text.secondary, flex: 1 },
+  fakeDataWarning: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm,
+    backgroundColor: Palette.status.errorDim,
+    borderLeftWidth: 3, borderLeftColor: Palette.status.error,
+    borderRadius: Radius.lg, padding: Spacing.md,
+  },
+  fakeDataWarningText: { ...Typography.small, color: Palette.status.error, flex: 1, fontWeight: '600', lineHeight: 18 },
+  mealTop: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
+  mealInfo: { flex: 1, gap: Spacing.sm },
+  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  nutritionRow: { flexDirection: 'row', gap: Spacing.sm },
+  nutritionMini: { flex: 1, backgroundColor: Palette.bg.card, borderRadius: Radius.lg, padding: Spacing.sm },
+  nutritionMiniLabel: { ...Typography.small, color: Palette.text.tertiary },
+  nutritionMiniValue: { ...Typography.caption, ...Typography.number },
+  searchRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center', marginBottom: Spacing.md },
+  optionLabel: { ...Typography.small, color: Palette.text.tertiary, marginTop: Spacing.md, marginBottom: Spacing.sm },
+  categoryWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  categoryChip: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    backgroundColor: Palette.bg.elevated,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.md,
+    justifyContent: 'center',
+  },
+  categoryChipActive: { borderColor: 'rgba(31,157,114,0.26)', backgroundColor: Palette.accent.greenDim },
+  categoryText: { ...Typography.small, color: Palette.text.secondary },
+  categoryTextActive: { color: Palette.accent.green },
+  locationText: { ...Typography.small, color: Palette.text.tertiary, marginTop: Spacing.md },
+  apiErrorBox: {
+    marginTop: Spacing.sm,
+    backgroundColor: Palette.accent.orangeDim,
+    borderColor: 'rgba(245,158,11,0.2)',
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.sm,
+  },
+  errorText: { ...Typography.small, color: Palette.status.warning },
+  errorMeta: { ...Typography.small, color: Palette.text.tertiary, marginTop: 2 },
+  mapCard: {
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius.xl,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    padding: Spacing.md,
+    ...Shadows.card,
+  },
+  selectedMapInfo: { marginTop: Spacing.md, gap: Spacing.sm, backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, padding: Spacing.md },
+  mapTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
+  restaurantCard: {
+    backgroundColor: Palette.bg.card,
+    borderRadius: Radius.xl,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Palette.border.subtle,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+    ...Shadows.soft,
+  },
+  restaurantCardSelected: { borderColor: 'rgba(31,157,114,0.36)' },
+  rankBadge: { width: 38, height: 38, borderRadius: 19, backgroundColor: Palette.bg.mint, alignItems: 'center', justifyContent: 'center' },
+  rankText: { ...Typography.bodyBold, color: Palette.accent.green },
+  restaurantName: { ...Typography.bodyBold, color: Palette.text.primary, flex: 1 },
+  restaurantMeta: { ...Typography.caption, color: Palette.text.secondary },
+  restaurantItem: { backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, padding: Spacing.md, gap: Spacing.sm },
+  itemName: { ...Typography.caption, color: Palette.text.primary, fontWeight: '700' },
+  restaurantActions: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' },
+  aiSummaryBox: {
+    gap: Spacing.sm,
+    backgroundColor: Palette.accent.blueDim,
+    borderColor: 'rgba(47,128,237,0.18)',
+    borderWidth: 1,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+  },
+  personalizedRecommendations: { borderTopWidth: 1, borderTopColor: Palette.border.subtle, paddingTop: Spacing.sm, gap: Spacing.sm },
+  personalizedTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  personalizedTitle: { ...Typography.caption, color: Palette.text.primary, fontWeight: '700' },
+  personalizedItem: { gap: 2 },
+  personalizedFood: { ...Typography.caption, color: Palette.accent.green, fontWeight: '700' },
+  aiGuessCaveat: { ...Typography.small, color: Palette.status.warning, marginTop: Spacing.sm, lineHeight: 18 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
+  photoSourceOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
+  photoSourceCard: { width: '100%', maxWidth: 360, backgroundColor: Palette.bg.card, borderRadius: Radius.xl, borderWidth: 1, borderColor: Palette.border.subtle, padding: Spacing.lg, gap: Spacing.sm, ...Shadows.soft },
+  modalContent: { width: '100%', maxWidth: 500, maxHeight: '80%', backgroundColor: Palette.bg.card, borderRadius: Radius.xl, borderWidth: 1, borderColor: Palette.border.subtle, padding: Spacing.lg, ...Shadows.soft },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+  modalCloseButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  modalTitle: { ...Typography.bodyBold, color: Palette.text.primary },
+  modalScroll: { gap: Spacing.md },
+  modalSectionTitle: { ...Typography.bodyBold, color: Palette.text.primary, marginTop: Spacing.sm },
+  menuItemCard: { backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, borderWidth: 1, borderColor: Palette.border.subtle, padding: Spacing.md, gap: Spacing.sm },
+  menuItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  menuItemName: { ...Typography.caption, color: Palette.text.primary, fontWeight: '700' },
+  menuItemPrice: { ...Typography.caption, color: Palette.text.secondary },
+  customizationText: { ...Typography.small, color: Palette.accent.green, marginTop: Spacing.xs },
+  warningText: { ...Typography.small, color: Palette.status.warning, marginTop: Spacing.xs },
+});
+

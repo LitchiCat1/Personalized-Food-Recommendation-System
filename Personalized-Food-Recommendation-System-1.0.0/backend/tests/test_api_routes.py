@@ -1,0 +1,1388 @@
+import base64
+import importlib
+import os
+import sys
+import unittest
+from datetime import datetime, timedelta, timezone
+
+import requests
+
+from services.app_time_service import app_now
+from services.venue_index_service import reset_venue_index_state
+from unittest.mock import patch
+
+# 在任何測試 import app 之前：不讀 backend/.env.local（裡面是真的金鑰），
+# DATABASE_PATH 設成空字串（不設的話後端會開本機正式的 SQLite 檔），
+# 拿掉 DATABASE_URL（有的話後端會連 Supabase），測試只寫記憶體。
+os.environ["NUTRILENS_SKIP_LOCAL_ENV"] = "1"
+os.environ["DATABASE_PATH"] = ""
+os.environ.pop("DATABASE_URL", None)
+
+
+class ApiTestBase(unittest.TestCase):
+    """共用的 app 啟動與登入輔助。
+
+    測試類別彼此繼承會把父類別的測試全部再跑一遍，所以骨架放這裡，
+    各組測試只繼承骨架。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        os.environ["AUTH_REQUIRED"] = "true"
+        sys.modules.pop("app", None)
+        cls.app_module = importlib.import_module("app")
+        cls.app_module.app.config["TESTING"] = True
+
+    def setUp(self):
+        self.client = self.app_module.app.test_client()
+        self.app_module._mem_users.clear()
+        self.app_module._mem_records.clear()
+        self.app_module._mem_custom_foods.clear()
+        # 菜單快取掛在 storage 上，不清會從別的測試漏過來
+        self.app_module.storage.mem_restaurant_menus.clear()
+        self.app_module.storage.mem_restaurant_menu_failures.clear()
+        # 建檔的進行中名單與降速紀錄是模組層級的，同樣要清
+        reset_venue_index_state()
+        # 付費路由的限流是跨測試累計的；建檔路由也在內，不清會被前面的測試用光
+        self.app_module._paid_api_limiter.reset()
+        self.app_module._general_limiter.reset()
+        self.app_module._auth_limiter.reset()
+        self.app_module._auth_ip_limiter.reset()
+        # 帳號也是跨測試累計的，不清的話後面的測試會撞到「已經註冊過」
+        self.app_module.auth_repo.mem_users.clear()
+        self.app_module.auth_repo.mem_sessions.clear()
+        self.app_module.storage.upsert_user({"user_id": "user-a", "name": "User A", "health_conditions": ["hypertension"], "allergens": ["egg"]})
+
+    def auth_headers(self):
+        return {"Authorization": "Bearer test-token"}
+
+    def mock_auth(self, user_id="user-a"):
+        return patch.object(self.app_module, "verify_access_token", return_value={"id": user_id})
+
+    def _seed_menu(self, name, address, text, deadline=None):
+        return {
+            "items": [
+                {
+                    "item_id": f"{name}_{index}",
+                    "name": f"{name} 餐點{index}",
+                    "price": 110 + index,
+                    "calories": 500,
+                    "protein": 25,
+                    "carbs": 55,
+                    "fat": 16,
+                    "sugar": 3,
+                    "saturated_fat": 4,
+                    "trans_fat": 0,
+                    "fiber": 5,
+                    "sodium": 600,
+                }
+                for index in range(4)
+            ]
+        }
+
+
+class ApiRouteTests(ApiTestBase):
+    def test_medical_metadata_route_exposes_governance_metadata(self):
+        response = self.client.get("/medical-metadata")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertIn("disease_rules", data)
+        self.assertIn("allergen_taxonomy", data)
+        self.assertGreater(data["disease_rules"]["count"], 0)
+        self.assertGreater(data["allergen_taxonomy"]["count"], 0)
+
+    def test_medical_metadata_keeps_the_clinical_wording_out_of_the_app_copy(self):
+        """給使用者看的那句話不能是「需要臨床人員確認要採用哪一邊」。
+
+        那句話在畫面上的意思是這個 App 自己也不知道該用哪個數字。審閱用的
+        全文與逐項數字改放 threshold_conflict_review_note / threshold_conflicts，
+        資料一樣完整。
+        """
+        response = self.client.get("/medical-metadata")
+        data = response.get_json()
+
+        self.assertIn("profile_limits", data)
+        self.assertIn("diet_types", data)
+        if data.get("threshold_conflicts"):
+            self.assertNotIn("臨床人員", data["threshold_conflict_note"])
+            self.assertIn("臨床人員", data["threshold_conflict_review_note"])
+
+    def test_user_route_repairs_a_legacy_diet_type_on_read(self):
+        """舊帳號存的「均衡飲食」不在前端選單裡，會讓儲存鈕永遠是灰的。"""
+        self.app_module.storage.upsert_user({"user_id": "user-a", "name": "User A", "diet_type": "均衡飲食"})
+
+        with self.mock_auth("user-a"):
+            response = self.client.get("/user/user-a", headers=self.auth_headers())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(response.get_json()["diet_type"], ["葷食", "素食"])
+
+    def test_a_save_without_the_flag_does_not_mark_an_account_unfilled(self):
+        """舊版前端不知道有 profile_complete 這個欄位。
+
+        後端會先於前端上線，那段期間舊前端每存一次檔（「勾一個疾病」也是送
+        整份檔案）都會少送這個欄位。如果因此寫成 False，等新前端上線，這些
+        早就填完資料的人會被「還沒填寫你的基本資料」攔下來。
+        """
+        self.app_module.storage.upsert_user(
+            {"user_id": "user-a", "name": "A", "profile_complete": True, "diet_type": "葷食"}
+        )
+        with self.mock_auth("user-a"):
+            response = self.client.post(
+                "/user",
+                json={"user_id": "user-a", "name": "A", "height": 170, "weight": 65, "age": 30},
+                headers=self.auth_headers(),
+            )
+        self.assertTrue(response.get_json()["user"]["profile_complete"])
+
+        # 沒有資料列的才算新帳號；而會建空白檔案的路徑一定會明確送 false。
+        with self.mock_auth("user-a"):
+            blank = self.client.post(
+                "/user",
+                json={"user_id": "user-a", "name": "A", "height": 170, "weight": 65,
+                      "age": 30, "profile_complete": False},
+                headers=self.auth_headers(),
+            )
+        self.assertFalse(blank.get_json()["user"]["profile_complete"])
+
+    def test_user_route_rejects_out_of_range_body_numbers(self):
+        with self.mock_auth("user-a"):
+            response = self.client.post(
+                "/user",
+                json={"user_id": "user-a", "name": "A", "height": 1, "weight": 50, "age": 22},
+                headers=self.auth_headers(),
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("身高", response.get_json()["error"])
+
+    def test_user_route_rejects_missing_token_when_auth_required(self):
+        response = self.client.get("/user/user-a")
+        self.assertEqual(response.status_code, 401)
+
+    def test_user_route_rejects_cross_user_access(self):
+        with self.mock_auth("user-a"):
+            response = self.client.get("/user/user-b", headers=self.auth_headers())
+        self.assertEqual(response.status_code, 403)
+
+    def test_vision_food_accepts_raw_base64_and_browser_data_uri(self):
+        image_base64 = base64.b64encode(b"\x89PNG\r\n\x1a\nmock-image").decode("ascii")
+
+        for image_payload in (image_base64, f"data:image/png;base64,{image_base64}"):
+            with self.subTest(data_uri=image_payload.startswith("data:")):
+                with self.mock_auth("user-a"):
+                    with patch.object(self.app_module, "get_gemini_api_keys", return_value=["test-key"]):
+                        with patch.object(
+                            self.app_module,
+                            "call_gemini_food_recognition_with_rotation",
+                            return_value={"items": []},
+                        ) as recognize:
+                            response = self.client.post(
+                                "/predict/vision-food",
+                                json={"image": image_payload, "user_id": "user-a"},
+                                headers=self.auth_headers(),
+                            )
+
+                self.assertEqual(response.status_code, 200)
+                recognize.assert_called_once_with(image_base64, "image/png", ["test-key"])
+
+    def test_vision_food_rejects_invalid_image_payloads(self):
+        invalid_payloads = ("", "not-base64", "data:text/plain;base64,SGVsbG8=")
+
+        for image_payload in invalid_payloads:
+            with self.subTest(image_payload=image_payload):
+                response = self.client.post("/predict/vision-food", json={"image": image_payload})
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("error", response.get_json())
+
+    def test_menu_photo_route_exposes_recognition_failure(self):
+        image_base64 = base64.b64encode(b"\x89PNG\r\n\x1a\nmenu-image").decode("ascii")
+        parsed = {
+            "items": [],
+            "recognition_status": "error",
+            "recognition_error": "Gemini HTTP 429: quota exceeded",
+        }
+
+        with self.mock_auth("user-a"):
+            with patch.object(self.app_module, "parse_menu_image_with_gemini", return_value=parsed):
+                response = self.client.post(
+                    "/restaurant/menu",
+                    json={
+                        "restaurant_id": "menu-test-restaurant",
+                        "name": "測試菜單辨識店",
+                        "user_id": "user-a",
+                        "menu_image": image_base64,
+                    },
+                    headers=self.auth_headers(),
+                )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["recommended_items"], [])
+        self.assertEqual(data["menu_recognition"]["recognition_status"], "error")
+        self.assertIn("429", data["menu_recognition"]["recognition_error"])
+
+    def test_menu_route_blocks_a_dish_the_disease_rules_reject(self):
+        """/restaurant/menu 必須真的擋掉疾病禁忌。
+
+        先前這裡判斷的是 medical_risk.get("action") == "BLOCK"，
+        但 evaluate_medical_risk 沒有 action 這個鍵，所以恆為 False：
+        一份 1500mg 鈉的炸雞排會被放進推薦區，而算好的 block_reasons 整個被丟掉。
+        user-a 在 setUp 裡就有高血壓。
+        """
+        parsed = {
+            "items": [
+                {
+                    "item_id": "salty",
+                    "name": "炸雞排便當",
+                    "price": 100,
+                    "calories": 700,
+                    "protein": 30,
+                    "carbs": 60,
+                    "fat": 30,
+                    "sugar": 3,
+                    "saturated_fat": 8,
+                    "trans_fat": 2.0,
+                    "fiber": 3,
+                    "sodium": 1500,
+                    "is_fried": True,
+                },
+                {
+                    "item_id": "mild",
+                    "name": "清蒸雞肉飯",
+                    "price": 100,
+                    "calories": 500,
+                    "protein": 25,
+                    "carbs": 55,
+                    "fat": 10,
+                    "sugar": 2,
+                    "saturated_fat": 3,
+                    "trans_fat": 0,
+                    "fiber": 5,
+                    "sodium": 400,
+                    "is_fried": False,
+                },
+            ],
+        }
+
+        # 先建檔進菜單快取，路由就會直接讀它，不會去呼叫 Gemini。
+        self.app_module.storage.save_restaurant_menu(
+            "重鹹便當店", parsed["items"], venue={"address": "台北市", "lat": 25.03, "lng": 121.56}
+        )
+
+        with self.mock_auth("user-a"):
+            response = self.client.post(
+                "/restaurant/menu",
+                json={
+                    "restaurant_id": "sodium-test",
+                    "name": "重鹹便當店",
+                    "user_id": "user-a",
+                },
+                headers=self.auth_headers(),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        recommended = [item["item_name"] for item in data["recommended_items"]]
+        filtered = [item["item_name"] for item in data["filtered_items"]]
+
+        self.assertNotIn("炸雞排便當", recommended)
+        self.assertIn("炸雞排便當", filtered)
+        self.assertIn("清蒸雞肉飯", recommended)
+
+        blocked = next(item for item in data["filtered_items"] if item["item_name"] == "炸雞排便當")
+        self.assertTrue(blocked["reasons"], "被擋下來卻沒有給任何理由")
+        self.assertTrue(
+            any("鈉" in reason for reason in blocked["reasons"]),
+            f"理由裡沒有提到鈉：{blocked['reasons']}",
+        )
+
+    MENU_PHOTO_ITEMS = [
+        {"item_id": "salty", "name": "炸雞排便當", "price": 100, "calories": 700, "protein": 30, "carbs": 60,
+         "fat": 30, "sugar": 3, "saturated_fat": 8, "trans_fat": 2.0, "fiber": 3, "sodium": 1500, "is_fried": True},
+        {"item_id": "mild", "name": "清蒸雞肉飯", "price": 100, "calories": 500, "protein": 25, "carbs": 55,
+         "fat": 10, "sugar": 2, "saturated_fat": 3, "trans_fat": 0, "fiber": 5, "sodium": 400, "is_fried": False},
+        # 很貴但健康：預算拿掉之後不能因為價格被排除
+        {"item_id": "pricey", "name": "清蒸鱸魚套餐", "price": 2000, "calories": 480, "protein": 32, "carbs": 45,
+         "fat": 12, "sugar": 2, "saturated_fat": 2, "trans_fat": 0, "fiber": 4, "sodium": 380, "is_fried": False},
+    ]
+
+    def post_menu_photo(self, parsed, payload=None):
+        image_base64 = base64.b64encode(b"\x89PNG\r\n\x1a\nmenu-image").decode("ascii")
+        with self.mock_auth("user-a"):
+            with patch.object(self.app_module, "parse_menu_image_with_gemini", return_value=parsed) as parse:
+                response = self.client.post(
+                    "/menu/photo-check",
+                    json=payload if payload is not None else {"user_id": "user-a", "menu_image": image_base64},
+                    headers=self.auth_headers(),
+                )
+        return response, parse
+
+    def test_menu_photo_check_sorts_every_dish_by_whether_it_can_be_eaten(self):
+        response, _ = self.post_menu_photo({"items": self.MENU_PHOTO_ITEMS, "recognition_status": "recognized"})
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        edible = [item["item_name"] for item in data["safe_items"] + data["caution_items"]]
+        blocked = {item["item_name"]: item["reasons"] for item in data["not_recommended_items"]}
+        # user-a 有高血壓：1500mg 鈉的炸雞排要擋，而且要說出原因
+        self.assertIn("炸雞排便當", blocked)
+        self.assertTrue(any("鈉" in reason for reason in blocked["炸雞排便當"]))
+        self.assertIn("清蒸雞肉飯", edible)
+        # 價格不再是排除條件
+        self.assertIn("清蒸鱸魚套餐", edible)
+        self.assertFalse(any("預算" in reason for reasons in blocked.values() for reason in reasons))
+        self.assertEqual(data["total_items"], 3)
+        self.assertIn("僅供參考", data["disclaimer"])
+        for item in data["caution_items"]:
+            self.assertTrue(item["medical_risk"]["has_caution"])
+        for item in data["safe_items"]:
+            self.assertFalse(item["medical_risk"]["has_caution"])
+
+    def test_menu_photo_check_lists_all_dishes_not_only_the_top_five(self):
+        items = [
+            {**self.MENU_PHOTO_ITEMS[1], "item_id": f"mild-{index}", "name": f"清蒸雞肉飯{index}"}
+            for index in range(8)
+        ]
+        response, _ = self.post_menu_photo({"items": items, "recognition_status": "recognized"})
+        data = response.get_json()
+        self.assertEqual(len(data["safe_items"]) + len(data["caution_items"]), 8)
+
+    def test_menu_photo_check_reports_a_recognition_failure(self):
+        response, _ = self.post_menu_photo({
+            "items": [], "recognition_status": "error", "recognition_error": "Gemini HTTP 429: quota exceeded",
+        })
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("429", response.get_json()["error"])
+
+    def test_menu_photo_check_needs_a_photo(self):
+        response, parse = self.post_menu_photo({"items": []}, payload={"user_id": "user-a"})
+        self.assertEqual(response.status_code, 400)
+        parse.assert_not_called()
+
+    def test_menu_photo_check_needs_a_login(self):
+        response = self.client.post("/menu/photo-check", json={"menu_image": "abc"})
+        self.assertEqual(response.status_code, 401)
+
+    def test_restaurant_menu_no_longer_filters_by_price(self):
+        self.app_module.storage.save_restaurant_menu(
+            "高價清淡店", self.MENU_PHOTO_ITEMS[1:], venue={"address": "台北市", "lat": 25.03, "lng": 121.56}
+        )
+        with self.mock_auth("user-a"):
+            response = self.client.post(
+                "/restaurant/menu",
+                json={"restaurant_id": "pricey-test", "name": "高價清淡店", "user_id": "user-a"},
+                headers=self.auth_headers(),
+            )
+        data = response.get_json()
+        self.assertIn("清蒸鱸魚套餐", [item["item_name"] for item in data["recommended_items"]])
+        self.assertEqual(data["filtered_items"], [])
+
+    def test_record_route_deduplicates_client_record_id(self):
+        payload = {
+            "user_id": "user-a",
+            "client_record_id": "client-record-1",
+            "meal_type": "午餐",
+            "foods": [{"name": "apple", "calories": 80}],
+            "total_calories": 80,
+            "source": "manual",
+        }
+
+        with self.mock_auth("user-a"):
+            first_response = self.client.post("/record", json=payload, headers=self.auth_headers())
+            second_response = self.client.post("/record", json=payload, headers=self.auth_headers())
+            records_response = self.client.get("/records/user-a", headers=self.auth_headers())
+
+        self.assertEqual(first_response.status_code, 201)
+        self.assertFalse(first_response.get_json()["deduplicated"])
+        self.assertEqual(second_response.status_code, 200)
+        self.assertTrue(second_response.get_json()["deduplicated"])
+        self.assertEqual(len(records_response.get_json()["records"]), 1)
+
+    def test_record_route_generates_client_record_id_when_missing(self):
+        payload = {
+            "user_id": "user-a",
+            "meal_type": "午餐",
+            "foods": [{"name": "apple", "calories": 80}],
+            "total_calories": 80,
+            "source": "manual",
+        }
+
+        with self.mock_auth("user-a"):
+            response = self.client.post("/record", json=payload, headers=self.auth_headers())
+
+        self.assertEqual(response.status_code, 201)
+        data = response.get_json()
+        self.assertFalse(data["deduplicated"])
+        self.assertTrue(data["record"]["client_record_id"].startswith("server_record_"))
+
+    def test_record_route_creates_today_and_historical_manual_records(self):
+        local_timezone = timezone(timedelta(hours=8))
+        local_now = datetime.now(local_timezone)
+        timestamps = (
+            local_now.replace(microsecond=123000).isoformat(),
+            (local_now - timedelta(days=45)).replace(microsecond=456000).isoformat(),
+        )
+
+        for index, timestamp in enumerate(timestamps):
+            with self.subTest(timestamp=timestamp):
+                payload = {
+                    "user_id": "user-a",
+                    "client_record_id": f"manual-date-{index}",
+                    "timestamp": timestamp,
+                    "foods": [{
+                        "name": "  手動豆漿  ",
+                        "calories": 120,
+                        "protein": 8.5,
+                        "carbs": 10,
+                        "fat": 4,
+                        "sodium": 95,
+                        "fiber": 2,
+                    }],
+                    "source": "manual",
+                }
+                with self.mock_auth("user-a"):
+                    response = self.client.post("/record", json=payload, headers=self.auth_headers())
+
+                self.assertEqual(response.status_code, 201)
+                record = response.get_json()["record"]
+                self.assertEqual(record["timestamp"], timestamp)
+                self.assertEqual(record["foods"][0]["name"], "手動豆漿")
+                self.assertEqual(record["source"], "manual")
+                self.assertEqual(record["meal_type"], "午餐")
+
+    def test_record_route_rejects_future_calendar_date(self):
+        local_timezone = timezone(timedelta(hours=8))
+        future_timestamp = (datetime.now(local_timezone) + timedelta(days=1)).isoformat()
+        payload = {
+            "user_id": "user-a",
+            "client_record_id": "future-manual-record",
+            "timestamp": future_timestamp,
+            "foods": [{"name": "未來餐點", "calories": 100}],
+            "source": "manual",
+        }
+
+        with self.mock_auth("user-a"):
+            response = self.client.post("/record", json=payload, headers=self.auth_headers())
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["error"], "紀錄日期不得晚於今天")
+        self.assertIsNone(self.app_module.storage.get_record_by_client_record_id("user-a", "future-manual-record"))
+
+    def test_record_route_rejects_invalid_food_values(self):
+        invalid_foods = (
+            [{"name": "   ", "calories": 80}],
+            [{"name": "豆漿", "calories": "not-a-number"}],
+            [{"name": "豆漿", "sodium": -1}],
+        )
+
+        for index, foods in enumerate(invalid_foods):
+            with self.subTest(foods=foods):
+                with self.mock_auth("user-a"):
+                    response = self.client.post(
+                        "/record",
+                        json={
+                            "user_id": "user-a",
+                            "client_record_id": f"invalid-create-{index}",
+                            "foods": foods,
+                            "source": "manual",
+                        },
+                        headers=self.auth_headers(),
+                    )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("error", response.get_json())
+
+    def _seed_places(self, names):
+        return [
+            {
+                "restaurant_id": f"google_{name}",
+                "name": name,
+                "address": "台北",
+                "tags": ["Google Places"],
+            }
+            for name in names
+        ]
+
+    def _index_two_venues(self, names=("真實店家 A", "真實店家 B")):
+        with patch.object(
+            self.app_module, "fetch_google_places_restaurants",
+            lambda *a, **k: self._seed_places(names),
+        ), patch.object(self.app_module, "enrich_restaurant_with_gemini", self._seed_menu):
+            return self.client.post("/restaurants/index/user-a", json={}, headers=self.auth_headers())
+
+    def test_menu_cache_is_keyed_on_place_id_not_the_venue_name(self):
+        """Places 新舊版 API 回的店名可能不同，用店名當 key 會重複分析。"""
+        storage = self.app_module.storage
+        storage.save_restaurant_menu(
+            "阿宏便當",
+            [{"name": "雞腿便當", "calories": 700, "protein": 30, "carbs": 80, "fat": 22, "fiber": 4, "sodium": 800}],
+            venue={"google_place_id": "place-xyz"},
+        )
+        # 同一家店，另一版 API 給了不同的店名，但 place_id 一樣
+        self.assertIsNotNone(storage.get_restaurant_menu("阿宏便當 板橋店", "place-xyz"))
+        # 沒有 place_id 時仍可用店名找回來
+        self.assertIsNotNone(storage.get_restaurant_menu("阿宏便當"))
+        self.assertIsNone(storage.get_restaurant_menu("完全不同的店", "place-other"))
+
+    def test_restaurant_index_builds_the_cache_and_skips_known_venues(self):
+        """建檔是獨立動作：第二次按時已建檔的店家不該再送去分析。"""
+        calls = []
+
+        def counting_menu(name, address, text, deadline=None):
+            calls.append(name)
+            return self._seed_menu(name, address, text, deadline)
+
+        with self.mock_auth("user-a"):
+            with patch.object(
+                self.app_module, "fetch_google_places_restaurants",
+                lambda *a, **k: self._seed_places(["建檔店 A", "建檔店 B"]),
+            ), patch.object(self.app_module, "enrich_restaurant_with_gemini", counting_menu):
+                first = self.client.post(
+                    "/restaurants/index/user-a", json={}, headers=self.auth_headers()
+                )
+                second = self.client.post(
+                    "/restaurants/index/user-a", json={}, headers=self.auth_headers()
+                )
+
+        self.assertEqual(first.status_code, 200)
+        first_body = first.get_json()
+        self.assertEqual(first_body["analysed"], 2)
+        self.assertEqual(first_body["already_cached"], 0)
+
+        second_body = second.get_json()
+        self.assertEqual(second_body["analysed"], 0)
+        self.assertEqual(second_body["already_cached"], 2)
+        self.assertEqual(len(calls), 2, f"第二次不該再分析：{calls}")
+
+    def test_restaurant_index_reports_when_nothing_is_nearby(self):
+        with self.mock_auth("user-a"):
+            with patch.object(
+                self.app_module, "fetch_google_places_restaurants", lambda *a, **k: []
+            ):
+                response = self.client.post(
+                    "/restaurants/index/user-a", json={}, headers=self.auth_headers()
+                )
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("搜尋不到店家", response.get_json()["error"])
+
+    def test_record_route_recalculates_totals_instead_of_trusting_payload(self):
+        payload = {
+            "user_id": "user-a",
+            "client_record_id": "manual-recalculated-record",
+            "foods": [
+                {
+                    "name": "炸豆腐",
+                    "calories": 120,
+                    "protein": 8.5,
+                    "carbs": 10,
+                    "refined_sugar": 1.5,
+                    "fat": 4,
+                    "saturated_fat": 0.8,
+                    "trans_fat": 0,
+                    "sodium": 95,
+                    "fiber": 2,
+                    "is_fried": True,
+                },
+                {
+                    "name": "香蕉",
+                    "calories": 90,
+                    "protein": 1,
+                    "carbs": 23,
+                    "sugar": 4.2,
+                    "fat": 0.3,
+                    "saturated_fat": 0.1,
+                    "trans_fat": 0,
+                    "sodium": 1,
+                    "fiber": 2.6,
+                    "is_fried": False,
+                },
+            ],
+            "total_calories": 9999,
+            "total_protein": 9999,
+            "total_sodium": 9999,
+            "source": "manual",
+        }
+
+        with self.mock_auth("user-a"):
+            response = self.client.post("/record", json=payload, headers=self.auth_headers())
+
+        self.assertEqual(response.status_code, 201)
+        record = response.get_json()["record"]
+        self.assertEqual(record["total_calories"], 210)
+        self.assertEqual(record["total_protein"], 9.5)
+        self.assertEqual(record["total_sodium"], 96)
+        self.assertEqual(record["total_fiber"], 4.6)
+        self.assertEqual(record["total_sugar"], 5.7)
+        self.assertEqual(record["total_saturated_fat"], 0.9)
+        self.assertEqual(record["total_trans_fat"], 0)
+        self.assertTrue(record["contains_fried_food"])
+        self.assertEqual(record["foods"][0]["sugar"], 1.5)
+
+    def test_record_route_keeps_existing_scanner_creation_compatible(self):
+        payload = {
+            "user_id": "user-a",
+            "client_record_id": "scanner-compatible-record",
+            "meal_type": "點心",
+            "foods": [{"name": "掃描蘋果", "calories": 80, "source": "camera"}],
+            "total_calories": 999,
+            "source": "camera",
+        }
+
+        with self.mock_auth("user-a"):
+            response = self.client.post("/record", json=payload, headers=self.auth_headers())
+
+        self.assertEqual(response.status_code, 201)
+        record = response.get_json()["record"]
+        self.assertEqual(record["meal_type"], "點心")
+        self.assertEqual(record["source"], "camera")
+        self.assertEqual(record["total_calories"], 80)
+        self.assertTrue(record["timestamp"])
+
+    def test_records_route_paginates_in_newest_first_order(self):
+        for index in range(1, 4):
+            self.app_module.storage.insert_record({
+                "user_id": "user-a",
+                "client_record_id": f"record-{index}",
+                "timestamp": f"2026-08-0{index}T12:00:00Z",
+                "foods": [],
+                "total_calories": index * 100,
+            })
+
+        with self.mock_auth("user-a"):
+            first_page = self.client.get("/records/user-a?limit=2&offset=0", headers=self.auth_headers())
+            second_page = self.client.get("/records/user-a?limit=2&offset=2", headers=self.auth_headers())
+
+        self.assertEqual(first_page.status_code, 200)
+        self.assertEqual([record["client_record_id"] for record in first_page.get_json()["records"]], ["record-3", "record-2"])
+        self.assertEqual([record["client_record_id"] for record in second_page.get_json()["records"]], ["record-1"])
+
+    def test_record_update_trims_names_and_recalculates_totals(self):
+        self.app_module.storage.insert_record({
+            "user_id": "user-a",
+            "client_record_id": "editable-record",
+            "timestamp": "2026-08-03T12:00:00Z",
+            "meal_type": "午餐",
+            "foods": [{"name": "原始名稱", "calories": 80}],
+            "total_calories": 80,
+            "source": "nutrition-label",
+        })
+        payload = {
+            "foods": [
+                {"name": "  豆漿  ", "calories": 120, "protein": 8.5, "carbs": 10, "fat": 4, "sodium": 95, "fiber": 2},
+                {"name": "香蕉", "calories": 90, "protein": 1, "carbs": 23, "fat": 0.3, "sodium": 1, "fiber": 2.6},
+            ],
+            "total_calories": 9999,
+        }
+
+        with self.mock_auth("user-a"):
+            response = self.client.patch(
+                "/records/user-a/editable-record",
+                json=payload,
+                headers=self.auth_headers(),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        record = response.get_json()["record"]
+        self.assertEqual(record["foods"][0]["name"], "豆漿")
+        self.assertEqual(record["total_calories"], 210)
+        self.assertEqual(record["total_protein"], 9.5)
+        self.assertEqual(record["total_fiber"], 4.6)
+        self.assertEqual(record["source"], "nutrition-label")
+
+    def test_record_update_rejects_blank_names_invalid_numbers_and_negatives(self):
+        self.app_module.storage.insert_record({
+            "user_id": "user-a",
+            "client_record_id": "invalid-record",
+            "timestamp": "2026-08-03T12:00:00Z",
+            "foods": [{"name": "原始名稱", "calories": 80}],
+        })
+        invalid_foods = (
+            [{"name": "   ", "calories": 80}],
+            [{"name": "豆漿", "calories": "not-a-number"}],
+            [{"name": "豆漿", "calories": -1}],
+        )
+
+        for foods in invalid_foods:
+            with self.subTest(foods=foods):
+                with self.mock_auth("user-a"):
+                    response = self.client.patch(
+                        "/records/user-a/invalid-record",
+                        json={"foods": foods},
+                        headers=self.auth_headers(),
+                    )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("error", response.get_json())
+
+        record = self.app_module.storage.get_record_by_client_record_id("user-a", "invalid-record")
+        self.assertEqual(record["foods"][0]["name"], "原始名稱")
+
+    def test_record_delete_removes_only_authenticated_users_record(self):
+        for user_id in ("user-a", "user-b"):
+            self.app_module.storage.insert_record({
+                "user_id": user_id,
+                "client_record_id": "shared-client-id",
+                "timestamp": "2026-08-03T12:00:00Z",
+                "foods": [{"name": user_id, "calories": 80}],
+            })
+
+        with self.mock_auth("user-a"):
+            response = self.client.delete(
+                "/records/user-a/shared-client-id",
+                headers=self.auth_headers(),
+            )
+            records_response = self.client.get("/records/user-a", headers=self.auth_headers())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(records_response.get_json()["records"], [])
+        self.assertIsNotNone(self.app_module.storage.get_record_by_client_record_id("user-b", "shared-client-id"))
+
+    def test_record_mutations_reject_cross_user_access(self):
+        self.app_module.storage.insert_record({
+            "user_id": "user-b",
+            "client_record_id": "private-record",
+            "timestamp": "2026-08-03T12:00:00Z",
+            "foods": [{"name": "私有紀錄", "calories": 80}],
+        })
+
+        with self.mock_auth("user-a"):
+            update_response = self.client.patch(
+                "/records/user-b/private-record",
+                json={"foods": [{"name": "越權修改", "calories": 1}]},
+                headers=self.auth_headers(),
+            )
+            delete_response = self.client.delete(
+                "/records/user-b/private-record",
+                headers=self.auth_headers(),
+            )
+
+        self.assertEqual(update_response.status_code, 403)
+        self.assertEqual(delete_response.status_code, 403)
+        self.assertIsNotNone(self.app_module.storage.get_record_by_client_record_id("user-b", "private-record"))
+
+    def test_custom_food_route_scopes_food_to_authenticated_user(self):
+        payload = {
+            "user_id": "user-a",
+            "name_zh": "油炸測試豆漿",
+            "nutrition_per_100g": {
+                "calories": 42,
+                "protein": 3.4,
+                "fat": 1.8,
+                "carbs": 4.1,
+                "sugar": 1.2,
+                "sodium": 5,
+            },
+        }
+
+        with self.mock_auth("user-a"):
+            response = self.client.post("/custom-food", json=payload, headers=self.auth_headers())
+
+        self.assertEqual(response.status_code, 201)
+        data = response.get_json()
+        self.assertEqual(data["food"]["user_id"], "user-a")
+        self.assertTrue(data["food"]["is_fried"])
+        self.assertIn("owner_key", data["food"])
+
+        with self.mock_auth("user-a"):
+            list_response = self.client.get("/custom-foods?user_id=user-a", headers=self.auth_headers())
+
+        self.assertEqual(list_response.status_code, 200)
+        list_data = list_response.get_json()
+        self.assertEqual(list_data["count"], 1)
+        self.assertEqual(list_data["foods"][0]["user_id"], "user-a")
+
+    def test_map_food_recommend_requires_google_places_key(self):
+        with patch.dict(os.environ, {"GOOGLE_PLACES_API_KEY": "", "GOOGLE_MAPS_API_KEY": ""}, clear=False):
+            with self.mock_auth("user-a"):
+                response = self.client.get("/map-food-recommend/user-a?lat=24.9890&lng=121.3443&radius_km=3&category=all", headers=self.auth_headers())
+        self.assertEqual(response.status_code, 503)
+
+    def test_health_metadata_in_map_food_route(self):
+        fake_restaurants = [
+            {
+                "restaurant_id": "google_place_1",
+                "name": "Healthy Bento",
+                "lat": 24.9891,
+                "lng": 121.3444,
+                "address": "Taipei",
+                "phone": "",
+                "google_place_id": "place_1",
+                "distance_km": 0.02,
+                "tags": ["Google Places", "healthy"],
+                "price_level": 1,
+                "is_open": True,
+                "rating": 4.3,
+                "user_ratings_total": 25,
+                "match_score": 88,
+                "data_source": "google_places",
+                "nutrition_available": False,
+                "recommended_items": [
+                    {
+                        "restaurant_id": "google_place_1",
+                        "restaurant_name": "Healthy Bento",
+                        "item_name": "Chicken bowl",
+                        "price": 120,
+                        "calories": 0,
+                        "protein": 0,
+                        "carbs": 0,
+                        "fat": 0,
+                        "sodium": 0,
+                        "match_score": 88,
+                        "nutrition_available": False,
+                        "reasons": ["Google Places result"],
+                    }
+                ],
+                "filtered_items": [],
+            }
+        ]
+
+        with self.mock_auth("user-a"):
+            with patch("services.healthy_food_service.fetch_google_places_restaurants", return_value=fake_restaurants):
+                response = self.client.get("/map-food-recommend/user-a?lat=24.9890&lng=121.3443&radius_km=3&category=all", headers=self.auth_headers())
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["data_source"], "google_places")
+
+    def test_restaurant_summary_uses_profile_disease_and_current_over_target_progress(self):
+        self.app_module.storage.upsert_user(
+            {
+                "user_id": "user-a",
+                "name": "User A",
+                "health_conditions": ["hypertension"],
+                "allergens": [],
+                "daily_calorie_target": 1800,
+            }
+        )
+        self.app_module.storage.insert_record(
+            {
+                "user_id": "user-a",
+                "client_record_id": "over-target-record",
+                "timestamp": app_now().isoformat(),
+                "total_calories": 1900,
+                "total_protein": 80,
+                "total_carbs": 200,
+                "total_fat": 60,
+                "total_sodium": 2300,
+                "total_fiber": 12,
+            }
+        )
+        fake_summary = {
+            "restaurant_type": "便當店",
+            "likely_foods": ["便當"],
+            "recommended_foods": [{"name": "少醬蔬菜餐", "reason": "鈉已超標"}],
+            "price_range_twd": {"min": 100, "max": 150},
+            "health_tips": ["醬汁另外放"],
+            "confidence": "medium",
+            "source_note": "test",
+        }
+
+        with self.mock_auth("user-a"):
+            with patch.object(self.app_module, "build_restaurant_ai_summary", return_value=fake_summary) as build_summary:
+                response = self.client.post(
+                    "/map-food-recommend/user-a/restaurant-summary",
+                    json={"restaurant": {"name": "Healthy Bento"}, "category": "bento"},
+                    headers=self.auth_headers(),
+                )
+
+        self.assertEqual(response.status_code, 200)
+        args = build_summary.call_args.args
+        self.assertEqual(args[1], "bento")
+        self.assertEqual(args[2], ["hypertension"])
+        self.assertEqual(args[3]["status"]["sodium"], "over")
+        self.assertEqual(args[3]["over_by"]["sodium"], 300)
+        self.assertIn("hypertension", args[4])
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class PaidRouteProtectionTests(ApiTestBase):
+    """會呼叫 Gemini / Places 的路由不能任人打——那是按次計費的。"""
+
+    def setUp(self):
+        super().setUp()
+        self.app_module._paid_api_limiter.reset()
+        self.app_module._general_limiter.reset()
+
+    def test_the_cost_incurring_routes_reject_anonymous_callers(self):
+        for method, path, payload in (
+            ("post", "/ocr/nutrition-label", {"image": "x"}),
+            ("post", "/restaurant/menu", {"name": "某某小吃"}),
+            ("get", "/health/gemini", None),
+        ):
+            with self.subTest(path=path):
+                response = (
+                    self.client.post(path, json=payload)
+                    if method == "post"
+                    else self.client.get(path)
+                )
+                self.assertEqual(response.status_code, 401, f"{path} 沒有擋下未驗證的呼叫")
+
+    def test_a_signed_in_caller_gets_through(self):
+        with self.mock_auth("user-a"):
+            response = self.client.post(
+                "/restaurant/menu", json={}, headers=self.auth_headers()
+            )
+        # 缺少店名是 400，重點是沒有被 401 擋在門外
+        self.assertEqual(response.status_code, 400)
+
+    def test_repeated_calls_are_throttled(self):
+        with self.mock_auth("user-a"):
+            statuses = [
+                self.client.post(
+                    "/restaurant/menu", json={"name": f"店{index}"}, headers=self.auth_headers()
+                ).status_code
+                for index in range(40)
+            ]
+        self.assertIn(429, statuses, "限流沒有生效")
+
+    def test_the_throttle_response_says_when_to_retry(self):
+        with self.mock_auth("user-a"):
+            last = None
+            for index in range(40):
+                last = self.client.post(
+                    "/restaurant/menu", json={"name": f"店{index}"}, headers=self.auth_headers()
+                )
+                if last.status_code == 429:
+                    break
+        self.assertEqual(last.status_code, 429)
+        self.assertIn("Retry-After", last.headers)
+
+
+class PaidRouteRateLimitTests(ApiTestBase):
+    """掃描、附近店家、店家摘要也是按次計費的，先前這三條沒有限流。"""
+
+    IMAGE = base64.b64encode(b"\x89PNG\r\n\x1a\nmock-image").decode("ascii")
+
+    def setUp(self):
+        super().setUp()
+        self.app_module._paid_api_limiter.max_calls = 2
+        self.addCleanup(setattr, self.app_module._paid_api_limiter, "max_calls", 12)
+
+    def _three_calls(self, send):
+        with self.mock_auth("user-a"):
+            statuses = [send().status_code for _ in range(3)]
+        self.assertNotIn(429, statuses[:2], statuses)
+        self.assertEqual(statuses[2], 429, statuses)
+
+    def test_scanning_is_rate_limited(self):
+        with patch.object(self.app_module, "get_gemini_api_keys", return_value=["test-key"]), \
+             patch.object(self.app_module, "call_gemini_food_recognition_with_rotation", return_value={"items": []}):
+            self._three_calls(lambda: self.client.post(
+                "/predict/vision-food", json={"image": self.IMAGE, "user_id": "user-a"}, headers=self.auth_headers()
+            ))
+
+    def test_the_nearby_store_search_is_rate_limited(self):
+        with patch("services.healthy_food_service.fetch_google_places_restaurants", return_value=[]):
+            self._three_calls(lambda: self.client.get(
+                "/map-food-recommend/user-a?lat=24.9890&lng=121.3443&radius_km=3&category=all",
+                headers=self.auth_headers(),
+            ))
+
+    def test_the_store_summary_is_rate_limited(self):
+        with patch.object(self.app_module, "build_restaurant_ai_summary", return_value={"restaurant_type": "便當店"}):
+            self._three_calls(lambda: self.client.post(
+                "/map-food-recommend/user-a/restaurant-summary",
+                json={"restaurant": {"name": "Healthy Bento"}},
+                headers=self.auth_headers(),
+            ))
+
+
+class GeminiErrorMessageTests(ApiTestBase):
+    """Gemini 連不上時，回給前端的錯誤不能夾帶金鑰。
+
+    掃描頁會把後端的錯誤原文直接顯示在畫面上，先前回的是 str(e)，
+    而 requests 的連線錯誤會印出整串網址。
+    """
+
+    KEY = "AIzaFAKE_SECRET_KEY"
+    IMAGE = base64.b64encode(b"\x89PNG\r\n\x1a\nmock-image").decode("ascii")
+
+    def test_a_connection_failure_does_not_echo_the_key(self):
+        error = requests.ConnectionError(
+            "HTTPSConnectionPool(host='generativelanguage.googleapis.com', port=443): "
+            f"Max retries exceeded with url: /v1beta/models/m:generateContent?key={self.KEY}"
+        )
+        for path in ("/predict/vision-food", "/ocr/nutrition-label"):
+            with self.subTest(path=path):
+                with self.mock_auth("user-a"), \
+                     patch.object(self.app_module, "get_gemini_api_keys", return_value=[self.KEY]), \
+                     patch("requests.post", side_effect=error):
+                    response = self.client.post(
+                        path, json={"image": self.IMAGE, "user_id": "user-a"}, headers=self.auth_headers()
+                    )
+
+                self.assertEqual(response.status_code, 502)
+                self.assertNotIn(self.KEY, response.get_data(as_text=True))
+                self.assertIn("請稍後再試", response.get_json()["error"])
+
+    def test_an_unexpected_failure_does_not_echo_its_message(self):
+        for path, target in (
+            ("/predict/vision-food", "call_gemini_food_recognition_with_rotation"),
+            ("/ocr/nutrition-label", "call_gemini_nutrition_ocr_with_rotation"),
+        ):
+            with self.subTest(path=path):
+                with self.mock_auth("user-a"), \
+                     patch.object(self.app_module, "get_gemini_api_keys", return_value=[self.KEY]), \
+                     patch.object(self.app_module, target, side_effect=KeyError(f"key={self.KEY}")):
+                    response = self.client.post(
+                        path, json={"image": self.IMAGE, "user_id": "user-a"}, headers=self.auth_headers()
+                    )
+
+                self.assertEqual(response.status_code, 500)
+                self.assertNotIn(self.KEY, response.get_data(as_text=True))
+
+
+class JsonErrorTests(ApiTestBase):
+    """查詢參數寫錯或後端出錯，都要回 JSON。
+
+    先前回的是 Flask 的 HTML 錯誤頁，前端解析不了，只能顯示一句看不懂的錯。
+    """
+
+    def test_a_non_numeric_query_number_is_a_400_with_a_message(self):
+        with self.mock_auth("user-a"):
+            for path in ("/history/user-a?days=abc", "/search/food?q=rice&limit=abc"):
+                with self.subTest(path=path):
+                    response = self.client.get(path, headers=self.auth_headers())
+                    self.assertEqual(response.status_code, 400)
+                    self.assertIn("有效數字", response.get_json()["error"])
+
+    def test_a_non_text_store_name_or_address_is_a_400(self):
+        with self.mock_auth("user-a"):
+            for body in ({"name": 3}, {"name": "測試店", "address": 5}):
+                with self.subTest(body=body):
+                    response = self.client.post("/restaurant/menu", json=body, headers=self.auth_headers())
+                    self.assertEqual(response.status_code, 400)
+                    self.assertIn("文字", response.get_json()["error"])
+
+    def test_a_menu_is_not_analysed_for_someone_without_a_profile(self):
+        # 先前先花一次 Gemini 分析菜單、寫進共用快取，最後才回「使用者不存在」
+        with self.mock_auth("user-without-profile"), \
+             patch.object(self.app_module, "enrich_restaurant_with_gemini") as analyse:
+            response = self.client.post("/restaurant/menu", json={"name": "沒看過的店"}, headers=self.auth_headers())
+        self.assertEqual(response.status_code, 404)
+        analyse.assert_not_called()
+        self.assertIsNone(self.app_module.storage.get_restaurant_menu("沒看過的店"))
+
+    def test_out_of_range_history_days_are_clamped_like_record_limits(self):
+        with self.mock_auth("user-a"):
+            data = self.client.get("/history/user-a?days=99999", headers=self.auth_headers()).get_json()
+        self.assertEqual(data["days"], 365)
+
+    def test_a_body_that_is_not_a_json_object_is_a_400_not_a_crash(self):
+        # 先前送 JSON 陣列或字串時 data.get() 直接 AttributeError（500）
+        with self.mock_auth("user-a"):
+            for path in ("/auth/signup", "/auth/login", "/custom-food", "/user", "/record"):
+                for body in ([1, 2], "text"):
+                    with self.subTest(path=path, body=body):
+                        response = self.client.post(path, json=body, headers=self.auth_headers())
+                        self.assertEqual(response.status_code, 400)
+                        self.assertIn("JSON 物件", response.get_json()["error"])
+
+    def test_a_missing_or_broken_json_body_is_a_json_400(self):
+        # 先前沒帶 JSON 是 415、壞掉的 JSON 是 400，兩個都是 Flask 的 HTML 錯誤頁
+        with self.mock_auth("user-a"):
+            for path in ("/user", "/record"):
+                for kwargs in ({}, {"data": "{", "content_type": "application/json"}):
+                    with self.subTest(path=path, kwargs=kwargs):
+                        response = self.client.post(path, headers=self.auth_headers(), **kwargs)
+                        self.assertEqual(response.status_code, 400)
+                        self.assertIn("error", response.get_json())
+
+    def test_a_wrong_method_is_a_json_405_that_lists_the_allowed_ones(self):
+        response = self.client.put("/record", json={})
+        self.assertEqual(response.status_code, 405)
+        self.assertIn("error", response.get_json())
+        self.assertIn("POST", response.headers["Allow"])
+
+    def test_the_bmr_calculator_checks_its_numbers_like_the_profile_does(self):
+        ok = self.client.post("/calculate/bmr", json={"gender": "female", "weight": 55, "height": 160, "age": 22})
+        self.assertEqual(ok.status_code, 200)
+        self.assertEqual(ok.get_json()["bmr"], 1279)
+        for body in ('{"height": "abc"}', '{"weight": null}', '{"height": 1}', "null", "[1]"):
+            with self.subTest(body=body):
+                response = self.client.post("/calculate/bmr", data=body, content_type="application/json")
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("error", response.get_json())
+
+    def test_an_unexpected_error_is_a_json_500_without_the_details(self):
+        self.app_module.app.config["PROPAGATE_EXCEPTIONS"] = False
+        self.addCleanup(self.app_module.app.config.__setitem__, "PROPAGATE_EXCEPTIONS", None)
+        with self.mock_auth("user-a"), \
+             patch.object(self.app_module, "build_history_response", side_effect=RuntimeError("internal detail")):
+            response = self.client.get("/history/user-a", headers=self.auth_headers())
+        self.assertEqual(response.status_code, 500)
+        self.assertNotIn("internal detail", response.get_data(as_text=True))
+        self.assertIn("error", response.get_json())
+
+
+def fake_response(status, body=b"", url="https://example.test/"):
+    response = requests.Response()
+    response.status_code = status
+    response._content = body if isinstance(body, bytes) else body.encode("utf-8")
+    response.url = url
+    response.reason = "test"
+    return response
+
+
+class ExternalApiFailureTests(ApiTestBase):
+    """Gemini 與 Google Places 失敗時：回什麼、重試幾次、金鑰會不會跑出去。全部是模擬的回應。"""
+
+    KEY = "AIzaFAKE_GEMINI_KEY_FOR_TESTS"
+    PLACES_KEY = "AIzaFAKE_PLACES_KEY_FOR_TESTS"
+    IMAGE = base64.b64encode(b"\x89PNG\r\n\x1a\nmock-image").decode("ascii")
+    SCAN_ROUTES = ("/predict/vision-food", "/ocr/nutrition-label")
+
+    def setUp(self):
+        super().setUp()
+        from services.google_places_service import clear_search_cache
+        from services.nutrition_label_service import forget_forbidden_gemini_models
+
+        clear_search_cache()
+        forget_forbidden_gemini_models()
+        self.addCleanup(clear_search_cache)
+        self.addCleanup(forget_forbidden_gemini_models)
+
+    def scan(self, path, post):
+        with self.mock_auth("user-a"), \
+             patch.object(self.app_module, "get_gemini_api_keys", return_value=[self.KEY]), \
+             patch("requests.post", side_effect=post):
+            return self.client.post(path, json={"image": self.IMAGE, "user_id": "user-a"}, headers=self.auth_headers())
+
+    def test_a_gemini_timeout_is_a_502_that_says_to_try_again(self):
+        for path in self.SCAN_ROUTES:
+            with self.subTest(path=path):
+                response = self.scan(path, requests.Timeout("read timed out"))
+                self.assertEqual(response.status_code, 502)
+                self.assertIn("稍後再試", response.get_json()["error"])
+
+    def test_a_used_up_quota_is_explained_without_echoing_googles_reply(self):
+        body = '{"error": {"code": 429, "message": "Quota exceeded for quota metric, project_number:987654321"}}'
+        for path in self.SCAN_ROUTES:
+            with self.subTest(path=path):
+                response = self.scan(path, lambda *a, **k: fake_response(429, body))
+                self.assertEqual(response.status_code, 502)
+                self.assertIn("額度", response.get_json()["error"])
+                self.assertNotIn("987654321", response.get_data(as_text=True))
+
+    def test_a_rejected_key_is_reported_as_a_key_problem(self):
+        body = '{"error": {"code": 403, "message": "API key not valid. Please pass a valid API key."}}'
+        for path in self.SCAN_ROUTES:
+            with self.subTest(path=path):
+                response = self.scan(path, lambda *a, **k: fake_response(403, body))
+                self.assertEqual(response.status_code, 502)
+                self.assertIn("金鑰", response.get_json()["error"])
+                self.assertNotIn("Please pass", response.get_data(as_text=True))
+
+    def test_an_unreadable_gemini_reply_is_a_500_without_details(self):
+        for path in self.SCAN_ROUTES:
+            with self.subTest(path=path):
+                response = self.scan(path, lambda *a, **k: fake_response(200, '{"candidates": []}'))
+                self.assertEqual(response.status_code, 500)
+                self.assertNotIn("list index", response.get_data(as_text=True))
+
+    def test_retries_stop_after_each_key_and_model_was_tried_once(self):
+        # 不會無限重試：每一組（金鑰, 模型）最多一次，然後回錯誤
+        calls = []
+
+        def busy(*args, **kwargs):
+            calls.append(kwargs.get("headers", {}).get("x-goog-api-key"))
+            return fake_response(503, '{"error": {"code": 503}}')
+
+        keys = ["key-1", "key-2", "key-3"]
+        with self.mock_auth("user-a"), \
+             patch.object(self.app_module, "get_gemini_api_keys", return_value=keys), \
+             patch("services.nutrition_label_service.get_gemini_models", return_value=["m-1", "m-2"]), \
+             patch("requests.post", side_effect=busy):
+            response = self.client.post(
+                "/predict/vision-food", json={"image": self.IMAGE, "user_id": "user-a"}, headers=self.auth_headers()
+            )
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(len(calls), 6)
+        self.assertEqual(sorted(set(calls)), keys)
+
+    def test_a_store_summary_timeout_is_a_502(self):
+        with self.mock_auth("user-a"), \
+             patch("services.restaurant_ai_service.get_gemini_api_keys", return_value=[self.KEY]), \
+             patch("requests.post", side_effect=requests.Timeout("read timed out")):
+            response = self.client.post(
+                "/map-food-recommend/user-a/restaurant-summary",
+                json={"restaurant": {"name": "Healthy Bento"}},
+                headers=self.auth_headers(),
+            )
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("稍後再試", response.get_json()["error"])
+
+    def places_search(self, post, get):
+        with self.mock_auth("user-a"), \
+             patch.dict(os.environ, {"GOOGLE_PLACES_API_KEY": self.PLACES_KEY}), \
+             patch("services.google_places_service.requests.post", side_effect=post), \
+             patch("services.google_places_service.requests.get", side_effect=get):
+            return self.client.get(
+                "/map-food-recommend/user-a?lat=24.9890&lng=121.3443&radius_km=3&category=all",
+                headers=self.auth_headers(),
+            )
+
+    def test_places_refusing_both_apis_falls_back_to_labelled_demo_stores(self):
+        # 既有設計：兩種 Places API 都失敗時改用內建示範店家，並明白標示不是真的店
+        denied = '{"status": "REQUEST_DENIED", "error_message": "The provided API key is invalid."}'
+        response = self.places_search(
+            lambda *a, **k: fake_response(403, '{"error": {"status": "PERMISSION_DENIED"}}'),
+            lambda *a, **k: fake_response(200, denied),
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["data_source"], "google_places_fallback")
+        self.assertIn("示範資料", data["data_source_warning"])
+        self.assertNotIn(self.PLACES_KEY, response.get_data(as_text=True))
+
+    def test_a_places_connection_error_does_not_write_the_key_to_the_log(self):
+        # 舊版 Places API 只收網址上的 key=；requests 連不上時的錯誤訊息會印出整串網址
+        def unreachable(url, params=None, **kwargs):
+            query = "&".join(f"{name}={value}" for name, value in (params or {}).items())
+            raise requests.ConnectionError(f"Max retries exceeded with url: {url}?{query}")
+
+        with patch("builtins.print") as printed:
+            response = self.places_search(lambda *a, **k: fake_response(500), unreachable)
+        self.assertEqual(response.get_json()["data_source"], "google_places_fallback")
+        self.assertNotIn(self.PLACES_KEY, response.get_data(as_text=True))
+        logged = "\n".join(" ".join(str(arg) for arg in call.args) for call in printed.call_args_list)
+        self.assertIn("ConnectionError", logged)
+        self.assertNotIn(self.PLACES_KEY, logged)
+
+
+class AuthDefaultTests(unittest.TestCase):
+    """預設就要驗證。先前只有偵測到 RENDER 才驗證，其他部署方式全部不設防。"""
+
+    def setUp(self):
+        self.saved = {
+            key: os.environ.pop(key, None) for key in ("AUTH_REQUIRED", "RENDER")
+        }
+
+    def tearDown(self):
+        for key, value in self.saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+    def test_auth_is_required_when_nothing_is_configured(self):
+        from services.auth_service import is_auth_required
+
+        self.assertTrue(is_auth_required())
+
+    def test_it_can_still_be_turned_off_explicitly_for_local_work(self):
+        from services.auth_service import is_auth_required
+
+        os.environ["AUTH_REQUIRED"] = "false"
+        self.assertFalse(is_auth_required())
+
+
+class VenueIndexListingTests(ApiTestBase):
+    """建檔完只回一個數字的話，出問題只能翻伺服器 log。"""
+
+    def _index_one(self):
+        places = [{
+            "restaurant_id": "google_p1", "name": "阿美飯館", "lat": 25.0338, "lng": 121.5645,
+            "address": "台北", "tags": ["Google Places"], "google_place_id": "p1",
+            "distance_km": 0.2, "match_score": 70, "is_open": True,
+            "opening_periods": [{"day": 1, "open_minute": 600, "close_minute": 1200}],
+        }]
+        with patch.object(self.app_module, "fetch_google_places_restaurants", lambda *a, **k: places), \
+             patch.object(self.app_module, "enrich_restaurant_with_gemini", self._seed_menu):
+            self.client.post("/restaurants/index/user-a", json={}, headers=self.auth_headers())
+
+    def test_the_indexed_venues_can_be_listed(self):
+        with self.mock_auth("user-a"):
+            self._index_one()
+            data = self.client.get(
+                "/restaurants/index/user-a", headers=self.auth_headers()
+            ).get_json()
+
+        self.assertEqual(data["count"], 1)
+        venue = data["venues"][0]
+        self.assertEqual(venue["name"], "阿美飯館")
+        self.assertGreater(venue["items"], 0)
+        self.assertTrue(venue["has_opening_hours"])
+        self.assertFalse(venue["stale"])
+
+    def test_listing_requires_the_owning_user(self):
+        with self.mock_auth("user-b"):
+            response = self.client.get("/restaurants/index/user-a", headers=self.auth_headers())
+        self.assertEqual(response.status_code, 403)
+
+    def test_an_empty_index_lists_nothing_rather_than_failing(self):
+        with self.mock_auth("user-a"):
+            data = self.client.get(
+                "/restaurants/index/user-a", headers=self.auth_headers()
+            ).get_json()
+        self.assertEqual(data["count"], 0)
+        self.assertEqual(data["venues"], [])
+
+    def test_indexing_is_rate_limited_like_the_other_paid_routes(self):
+        """每次建檔都會打 Places 和好幾家店的 Gemini，不能任人連續送。"""
+        self.app_module._paid_api_limiter.max_calls = 2
+        self.addCleanup(setattr, self.app_module._paid_api_limiter, "max_calls", 12)
+        places = [{"name": "限流測試店", "address": "台南", "google_place_id": "p-limit"}]
+        with self.mock_auth("user-a"), \
+             patch.object(self.app_module, "fetch_google_places_restaurants", lambda *a, **k: places), \
+             patch.object(self.app_module, "enrich_restaurant_with_gemini", self._seed_menu):
+            statuses = [
+                self.client.post("/restaurants/index/user-a", json={}, headers=self.auth_headers()).status_code
+                for _ in range(3)
+            ]
+        self.assertEqual(statuses, [200, 200, 429])
+
+    def test_rebuilding_retries_venues_that_failed_before(self):
+        """清除重建就是要照新規則重來，先前問不出菜單的店也要再問。"""
+        places = [{"name": "問不出來的店", "address": "台南", "google_place_id": "p-empty"}]
+        answers = [{"items": [], "failure": "no_items"}, {"items": [], "failure": "no_items"}]
+        calls = []
+
+        def menu(name, address, text, deadline=None):
+            calls.append(name)
+            return answers.pop(0) if answers else self._seed_menu(name, address, text, deadline)
+
+        with self.mock_auth("user-a"), \
+             patch.object(self.app_module, "fetch_google_places_restaurants", lambda *a, **k: places), \
+             patch.object(self.app_module, "enrich_restaurant_with_gemini", menu):
+            first = self.client.post("/restaurants/index/user-a", json={}, headers=self.auth_headers()).get_json()
+            second = self.client.post("/restaurants/index/user-a", json={}, headers=self.auth_headers()).get_json()
+            self.client.delete("/restaurants/index/user-a", headers=self.auth_headers())
+            third = self.client.post("/restaurants/index/user-a", json={}, headers=self.auth_headers()).get_json()
+
+        self.assertEqual(first["failed"], 1)
+        self.assertEqual(second["cooling_down"], 1)
+        self.assertEqual(len(calls), 2, calls)
+        self.assertEqual(third["failed"], 1)
+        self.assertEqual(third["cooling_down"], 0)
+
+
+class AllowedOriginNormalisationTests(unittest.TestCase):
+    """Render 給的是不帶協定的主機名，CORS 比對的是完整 origin。"""
+
+    def setUp(self):
+        import app as app_module
+
+        self.normalise = app_module._normalise_origin
+
+    def test_a_bare_hostname_becomes_an_https_origin(self):
+        self.assertEqual(self.normalise("nutrilens-web.onrender.com"), "https://nutrilens-web.onrender.com")
+
+    def test_an_explicit_scheme_is_left_alone(self):
+        self.assertEqual(self.normalise("https://example.com"), "https://example.com")
+        self.assertEqual(self.normalise("http://example.com"), "http://example.com")
+
+    def test_localhost_stays_on_http(self):
+        self.assertEqual(self.normalise("localhost:8081"), "http://localhost:8081")
+
+    def test_a_trailing_slash_is_dropped(self):
+        """origin 比對不含結尾斜線，多一個就永遠對不上。"""
+        self.assertEqual(self.normalise("https://example.com/"), "https://example.com")
+
+    def test_blank_entries_are_dropped(self):
+        self.assertEqual(self.normalise("   "), "")
+
+

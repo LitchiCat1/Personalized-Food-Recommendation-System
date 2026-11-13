@@ -1,0 +1,4452 @@
+{
+  "created_at": "2026-11-13T10:56:23.250767+00:00",
+  "results": [
+    {
+      "filename": "地瓜球.jpg",
+      "sha256": "748ee3e17771cae69d76da5ef129f2c0e25c9d8f6dfc1985781a1eaec2a04ecc",
+      "parsed": {
+        "meal_guess": "地瓜球",
+        "items": [
+          {
+            "name_zh": "地瓜球",
+            "name_en": "Sweet potato balls",
+            "confidence": 0.88,
+            "estimated_weight_g": 320,
+            "weight_confidence": 0.45,
+            "food_state": "prepared",
+            "count": 32,
+            "portion_description": "鋪有吸油紙巾的盤中堆疊一盤地瓜球，約32顆可見（堆疊下方可能仍有遮擋）",
+            "visual_evidence": "藍白花紋盤內鋪白色廚房紙巾，上方堆放數十顆金黃至橘黃色、表面微蓬鬆的油炸圓球狀點心",
+            "alternatives": [
+              "QQ蛋"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無比例尺，且地瓜球內部蓬鬆空心程度不一，單顆與總重量估算存在不確定性。",
+          "點心呈堆疊擺放，底層可能另有部分被遮蔽，count 僅計算目前可見個數。",
+          "外觀與部分無餡油炸球類點心（如炸湯圓或類似炸球）相近，依色澤與表皮膨鬆質感判為地瓜球。"
+        ]
+      },
+      "response": {
+        "engine": "gemini-vision-db-lookup",
+        "meal_warnings": [],
+        "nutrition_grounding": "database_only",
+        "database_sources": [
+          "user_custom_foods",
+          "TFDA",
+          "USDA FNDDS"
+        ],
+        "meal_guess": "地瓜球",
+        "detections": [],
+        "rejected_detections": [
+          {
+            "label": "地瓜球",
+            "confidence": 0.88,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "地瓜球",
+              "QQ蛋"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無比例尺，且地瓜球內部蓬鬆空心程度不一，單顆與總重量估算存在不確定性。",
+          "點心呈堆疊擺放，底層可能另有部分被遮蔽，count 僅計算目前可見個數。",
+          "外觀與部分無餡油炸球類點心（如炸湯圓或類似炸球）相近，依色澤與表皮膨鬆質感判為地瓜球。"
+        ],
+        "summary": {
+          "total_items": 0,
+          "recognized_items": 1,
+          "rejected_items": 1,
+          "nutrition_complete": false,
+          "nutrition_totals_scope": "matched_items_only",
+          "total_calories": 0,
+          "total_sodium": 0,
+          "requires_user_confirmation": true
+        }
+      },
+      "elapsed_seconds": 13.83
+    },
+    {
+      "filename": "多種菜色的便當.jpg",
+      "sha256": "1ba15472326f83205c3d2b7f5279808491376021c25622205f3fa33c8d6170ea",
+      "parsed": {
+        "meal_guess": "滷雞腿便當",
+        "items": [
+          {
+            "name_zh": "滷雞腿",
+            "name_en": "braised chicken drumstick",
+            "confidence": 0.95,
+            "estimated_weight_g": 85,
+            "weight_confidence": 0.55,
+            "food_state": "prepared",
+            "count": 1,
+            "portion_description": "1隻帶骨滷棒棒腿的可食肉與皮部分（已扣除骨重）",
+            "visual_evidence": "便當中央斜放1隻油亮醬褐色的棒棒腿，表面有滷製上色與雞皮紋理",
+            "alternatives": [
+              "雞腿",
+              "滷棒棒腿"
+            ]
+          },
+          {
+            "name_zh": "白飯",
+            "name_en": "steamed white rice",
+            "confidence": 0.98,
+            "estimated_weight_g": 200,
+            "weight_confidence": 0.6,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "便當盒底層鋪滿約一碗至一碗多份量的白飯",
+            "visual_evidence": "便當盒下半部可見大量粒粒分明的白色熟米飯，部分被雞腿與青菜覆蓋",
+            "alternatives": [
+              "白米飯",
+              "米飯"
+            ]
+          },
+          {
+            "name_zh": "葉菜",
+            "name_en": "cooked leafy greens",
+            "confidence": 0.85,
+            "estimated_weight_g": 45,
+            "weight_confidence": 0.5,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "左上格裝滿約一份小菜量的熟葉菜",
+            "visual_evidence": "便當左上格有鮮綠偏軟、葉面略皺且帶淡白綠梗的熟葉菜",
+            "alternatives": [
+              "青菜"
+            ]
+          },
+          {
+            "name_zh": "茄子",
+            "name_en": "cooked eggplant",
+            "confidence": 0.9,
+            "estimated_weight_g": 40,
+            "weight_confidence": 0.45,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "中上格被雞腿部分遮住的一份熟茄子",
+            "visual_evidence": "便當中上格可見深紫色光滑茄子外皮及表面少許蒜末，下半部被雞腿遮擋",
+            "alternatives": [
+              "紅燒茄子"
+            ]
+          },
+          {
+            "name_zh": "豆干",
+            "name_en": "braised diced dried tofu",
+            "confidence": 0.92,
+            "estimated_weight_g": 40,
+            "weight_confidence": 0.5,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "右上格與毛豆同炒的切丁滷豆干",
+            "visual_evidence": "便當右上格可見多塊切丁呈醬褐色的豆干，切面有氣孔紋理",
+            "alternatives": [
+              "豆乾",
+              "滷豆干"
+            ]
+          },
+          {
+            "name_zh": "毛豆",
+            "name_en": "edamame",
+            "confidence": 0.9,
+            "estimated_weight_g": 10,
+            "weight_confidence": 0.4,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "右上格混在豆干丁之間的少量毛豆仁",
+            "visual_evidence": "右上格豆干丁之間夾雜數顆綠色橢圓形去莢毛豆仁",
+            "alternatives": [
+              "毛豆仁"
+            ]
+          },
+          {
+            "name_zh": "葉菜",
+            "name_en": "cooked leafy greens",
+            "confidence": 0.85,
+            "estimated_weight_g": 65,
+            "weight_confidence": 0.5,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "右下側鋪在白飯上方約一份半小菜量的熟葉菜",
+            "visual_evidence": "便當右下方白飯上有切段淺綠粗梗與深綠葉片的炒青菜",
+            "alternatives": [
+              "青菜"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "左上格葉菜可能為大陸妹（福山萵苣）或小白菜，右下白飯上葉菜可能為小白菜或油菜，因烹調軟化難以完全確認菜種，故採保守命名。",
+          "中上格茄子旁有一小塊褐色物體，無法辨識是滷肉、豆製品或吸汁後的茄肉，未單獨列為品項。",
+          "中上格與右上格受雞腿部分遮擋，且照片無比例尺，各項重量估計具不確定性。"
+        ]
+      },
+      "response": {
+        "engine": "gemini-vision-db-lookup",
+        "meal_warnings": [],
+        "nutrition_grounding": "database_only",
+        "database_sources": [
+          "user_custom_foods",
+          "TFDA",
+          "USDA FNDDS"
+        ],
+        "meal_guess": "滷雞腿便當",
+        "detections": [
+          {
+            "label": "滷雞腿",
+            "name_zh": "滷雞腿",
+            "detected_name_zh": "滷雞腿",
+            "confidence": 0.95,
+            "needs_confirmation": true,
+            "source": "USDA FNDDS",
+            "nutrition_match_type": "reference",
+            "nutrition_source_url": "https://fdc.nal.usda.gov/food-details/2705988/nutrients",
+            "nutrition_status": "reference_estimate",
+            "bounding_box": {
+              "x": 0.08,
+              "y": 0.08,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 85.0,
+            "portion_range_g": {
+              "min_g": 51.0,
+              "max_g": 119.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "1隻帶骨滷棒棒腿的可食肉與皮部分（已扣除骨重）",
+            "visual_evidence": "便當中央斜放1隻油亮醬褐色的棒棒腿，表面有滷製上色與雞皮紋理",
+            "reliability": {
+              "level": "medium",
+              "score": 0.95,
+              "reasons": [
+                "Gemini Vision confidence 95%",
+                "database-only grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 179,
+              "protein": 19.0,
+              "carbs": 0.0,
+              "sugar": 0.0,
+              "fat": 11.4,
+              "saturated_fat": 3.1,
+              "trans_fat": 0.0,
+              "sodium": 337,
+              "fiber": 0.0,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認",
+              "份量描述：1隻帶骨滷棒棒腿的可食肉與皮部分（已扣除骨重）",
+              "本餐有 4 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "2705988",
+              "fdc_id": 2705988,
+              "food_code": "24133210",
+              "name_zh": "燉雞腿帶皮（USDA參考）",
+              "name_en": "Chicken leg, drumstick and thigh, stewed, skin eaten",
+              "aliases": [
+                "滷雞腿",
+                "滷全雞腿"
+              ],
+              "category": "Chicken, whole pieces",
+              "description": "Chicken leg, drumstick and thigh, stewed, skin eaten",
+              "unit": "per 100g",
+              "source": "USDA FNDDS",
+              "source_url": "https://fdc.nal.usda.gov/food-details/2705988/nutrients",
+              "reference_only": true,
+              "publication_date": "10/31/2024",
+              "protein": 22.4,
+              "fat": 13.4,
+              "carbs": 0.0,
+              "calories": 211,
+              "water": 63.2,
+              "sugar": 0.0,
+              "fiber": 0.0,
+              "sodium": 396,
+              "saturated_fat": 3.7,
+              "key": "usda_fndds:2705988",
+              "match_notes": [
+                "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認"
+              ]
+            },
+            "alternatives": []
+          },
+          {
+            "label": "白飯",
+            "name_zh": "白飯",
+            "detected_name_zh": "白飯",
+            "confidence": 0.98,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "name_or_alias",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "database_estimate",
+            "bounding_box": {
+              "x": 0.16,
+              "y": 0.16,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 200.0,
+            "portion_range_g": {
+              "min_g": 120.0,
+              "max_g": 280.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "便當盒底層鋪滿約一碗至一碗多份量的白飯",
+            "visual_evidence": "便當盒下半部可見大量粒粒分明的白色熟米飯，部分被雞腿與青菜覆蓋",
+            "reliability": {
+              "level": "medium",
+              "score": 0.98,
+              "reasons": [
+                "Gemini Vision confidence 98%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 366,
+              "protein": 6.2,
+              "carbs": 82.0,
+              "sugar": 0.0,
+              "fat": 0.6,
+              "saturated_fat": 0.2,
+              "trans_fat": 0.0,
+              "sodium": 4,
+              "fiber": 1.2,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "份量描述：便當盒底層鋪滿約一碗至一碗多份量的白飯",
+              "本餐有 4 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "A0550601",
+              "name_zh": "白飯",
+              "name_en": "Cooked rice",
+              "category": "穀物類",
+              "aliases": [],
+              "description": "樣品狀態:熟,白米加1.1倍的去離子水,用電鍋烹煮; 前處理描述:混合均勻打碎",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 183.0,
+              "protein": 3.1,
+              "fat": 0.3,
+              "carbs": 41.0,
+              "sodium": 2.0,
+              "fiber": 0.6,
+              "sugar": null,
+              "saturated_fat": 0.1,
+              "trans_fat": null,
+              "cholesterol": null,
+              "potassium": 40.0,
+              "calcium": 1.0,
+              "iron": 0.2,
+              "magnesium": 7.0,
+              "phosphorus": 39.0,
+              "zinc": 0.7,
+              "vitamin_a_iu": 0.0,
+              "vitamin_c": 0.9,
+              "vitamin_b1": 0.02,
+              "vitamin_b2": 0.01,
+              "vitamin_b6": 0.06,
+              "vitamin_b12": null,
+              "vitamin_d": null,
+              "vitamin_e": 0.04,
+              "folate": 9.0,
+              "water": 55.6,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "白飯",
+              "match_notes": []
+            },
+            "alternatives": []
+          },
+          {
+            "label": "茄子",
+            "name_zh": "茄子",
+            "detected_name_zh": "茄子",
+            "confidence": 0.9,
+            "needs_confirmation": true,
+            "source": "USDA FNDDS",
+            "nutrition_match_type": "reference",
+            "nutrition_source_url": "https://fdc.nal.usda.gov/food-details/2709930/nutrients",
+            "nutrition_status": "reference_estimate",
+            "bounding_box": {
+              "x": 0.08,
+              "y": 0.08,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 40.0,
+            "portion_range_g": {
+              "min_g": 24.0,
+              "max_g": 56.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "中上格被雞腿部分遮住的一份熟茄子",
+            "visual_evidence": "便當中上格可見深紫色光滑茄子外皮及表面少許蒜末，下半部被雞腿遮擋",
+            "reliability": {
+              "level": "medium",
+              "score": 0.9,
+              "reasons": [
+                "Gemini Vision confidence 90%",
+                "database-only grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 20,
+              "protein": 0.4,
+              "carbs": 2.5,
+              "sugar": 1.5,
+              "fat": 1.2,
+              "saturated_fat": 0.3,
+              "trans_fat": 0.0,
+              "sodium": 53,
+              "fiber": 1.2,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認",
+              "份量描述：中上格被雞腿部分遮住的一份熟茄子",
+              "本餐有 4 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "2709930",
+              "fdc_id": 2709930,
+              "food_code": "75217020",
+              "name_zh": "熟茄子加油（USDA參考）",
+              "name_en": "Eggplant, cooked, fat added",
+              "aliases": [
+                "炒茄子",
+                "紅燒茄子",
+                "醬燒茄子"
+              ],
+              "category": "Other vegetables and combinations",
+              "description": "Eggplant, cooked, fat added",
+              "unit": "per 100g",
+              "source": "USDA FNDDS",
+              "source_url": "https://fdc.nal.usda.gov/food-details/2709930/nutrients",
+              "reference_only": true,
+              "publication_date": "10/31/2024",
+              "protein": 1.03,
+              "fat": 2.92,
+              "carbs": 6.13,
+              "calories": 51.0,
+              "water": 88.9,
+              "sugar": 3.68,
+              "fiber": 3.1,
+              "sodium": 132,
+              "saturated_fat": 0.752,
+              "key": "usda_fndds:2709930",
+              "match_notes": [
+                "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認"
+              ]
+            },
+            "alternatives": []
+          }
+        ],
+        "rejected_detections": [
+          {
+            "label": "葉菜",
+            "confidence": 0.85,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "葉菜",
+              "青菜"
+            ]
+          },
+          {
+            "label": "豆干",
+            "confidence": 0.92,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "豆干",
+              "豆乾",
+              "滷豆干"
+            ]
+          },
+          {
+            "label": "毛豆",
+            "confidence": 0.9,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "毛豆",
+              "毛豆仁"
+            ]
+          },
+          {
+            "label": "葉菜",
+            "confidence": 0.85,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "葉菜",
+              "青菜"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "左上格葉菜可能為大陸妹（福山萵苣）或小白菜，右下白飯上葉菜可能為小白菜或油菜，因烹調軟化難以完全確認菜種，故採保守命名。",
+          "中上格茄子旁有一小塊褐色物體，無法辨識是滷肉、豆製品或吸汁後的茄肉，未單獨列為品項。",
+          "中上格與右上格受雞腿部分遮擋，且照片無比例尺，各項重量估計具不確定性。"
+        ],
+        "summary": {
+          "total_items": 3,
+          "recognized_items": 7,
+          "rejected_items": 4,
+          "nutrition_complete": false,
+          "nutrition_totals_scope": "matched_items_only",
+          "total_calories": 565,
+          "total_sodium": 394,
+          "requires_user_confirmation": true
+        }
+      },
+      "elapsed_seconds": 19.94
+    },
+    {
+      "filename": "多種菜色的便當2.jpg",
+      "sha256": "6316df7bcf546b9840b663154e905620bbc946be80763f3ce8566b30629a7f5a",
+      "parsed": {
+        "meal_guess": "烤雞腿便當",
+        "items": [
+          {
+            "name_zh": "烤雞腿",
+            "name_en": "roasted chicken leg",
+            "confidence": 0.92,
+            "estimated_weight_g": 170,
+            "weight_confidence": 0.55,
+            "food_state": "prepared",
+            "count": 1,
+            "portion_description": "1隻帶骨大雞腿，切為3塊，僅估計可食肉與皮重量",
+            "visual_evidence": "便當中央偏右下方，鋪在白飯上方的金黃褐色帶皮雞腿，表面有燒烤光澤與黑胡椒粒，切為兩塊腿排與一塊棒棒腿",
+            "alternatives": [
+              "炙烤雞腿",
+              "烤大雞腿"
+            ]
+          },
+          {
+            "name_zh": "白飯",
+            "name_en": "steamed white rice",
+            "confidence": 0.98,
+            "estimated_weight_g": 220,
+            "weight_confidence": 0.55,
+            "food_state": "prepared",
+            "count": 1,
+            "portion_description": "鋪滿便當盒下半部約1人份白飯",
+            "visual_evidence": "便當盒底部與前方可見大量粒粒分明的白色熟米飯，部分位於烤雞腿下方",
+            "alternatives": [
+              "白米飯",
+              "米飯"
+            ]
+          },
+          {
+            "name_zh": "炒高麗菜",
+            "name_en": "stir-fried cabbage",
+            "confidence": 0.95,
+            "estimated_weight_g": 80,
+            "weight_confidence": 0.5,
+            "food_state": "prepared",
+            "count": 1,
+            "portion_description": "便當左上角約1小份",
+            "visual_evidence": "便當盒左上角可見淡綠色折疊狀煮熟高麗菜葉片，帶有少許炒熟油亮感",
+            "alternatives": [
+              "高麗菜",
+              "炒甘藍"
+            ]
+          },
+          {
+            "name_zh": "咖哩馬鈴薯",
+            "name_en": "curry potato",
+            "confidence": 0.78,
+            "estimated_weight_g": 70,
+            "weight_confidence": 0.5,
+            "food_state": "prepared",
+            "count": 5,
+            "portion_description": "5塊切塊熟馬鈴薯，附少量濃稠咖哩醬汁",
+            "visual_evidence": "便當盒上方中央可見5塊裹著黃褐色濃稠咖哩醬的黃色塊狀物，質地外觀符合馬鈴薯",
+            "alternatives": [
+              "馬鈴薯塊"
+            ]
+          },
+          {
+            "name_zh": "紅蘿蔔",
+            "name_en": "cooked carrot",
+            "confidence": 0.9,
+            "estimated_weight_g": 15,
+            "weight_confidence": 0.45,
+            "food_state": "prepared",
+            "count": 3,
+            "portion_description": "可見約2小塊及右上方配菜中極少量細絲",
+            "visual_evidence": "便當上方中央雞腿縫隙處可見1塊橘紅色紅蘿蔔塊，左側高麗菜與雞腿交界處另有1片橘紅色紅蘿蔔片，右上角配菜中亦夾雜極少許紅蘿蔔絲",
+            "alternatives": [
+              "胡蘿蔔",
+              "熟紅蘿蔔"
+            ]
+          },
+          {
+            "name_zh": "炒淺綠色瓜類",
+            "name_en": "stir-fried light green gourd",
+            "confidence": 0.6,
+            "estimated_weight_g": 50,
+            "weight_confidence": 0.45,
+            "food_state": "prepared",
+            "count": 1,
+            "portion_description": "便當右上角約1小份",
+            "visual_evidence": "便當盒右上角可見呈彎曲條片狀、半透明淺綠白色的熟瓜類蔬菜，部分邊緣略帶青綠色外皮，可能為大黃瓜或蒲瓜（胡瓜）",
+            "alternatives": []
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無比例尺或標準參照物，且部分白飯被雞腿遮擋、雞腿內含骨頭，可食重量估計具較高不確定性。",
+          "上方中央黃色塊狀配菜以咖哩馬鈴薯可能性最高，但受黃褐色醬汁覆蓋影響，無法完全排除為地瓜等其他黃色根莖類。",
+          "右上角淺綠色切片配菜外觀偏向炒大黃瓜或蒲瓜（胡瓜），因烹調後軟化且無完整橫切面，採較保守之蔬菜分類命名。"
+        ]
+      },
+      "response": {
+        "engine": "gemini-vision-db-lookup",
+        "meal_warnings": [],
+        "nutrition_grounding": "database_only",
+        "database_sources": [
+          "user_custom_foods",
+          "TFDA",
+          "USDA FNDDS"
+        ],
+        "meal_guess": "烤雞腿便當",
+        "detections": [
+          {
+            "label": "烤雞腿",
+            "name_zh": "烤雞腿",
+            "detected_name_zh": "烤雞腿",
+            "confidence": 0.92,
+            "needs_confirmation": true,
+            "source": "USDA FNDDS",
+            "nutrition_match_type": "reference",
+            "nutrition_source_url": "https://fdc.nal.usda.gov/food-details/2705984/nutrients",
+            "nutrition_status": "reference_estimate",
+            "bounding_box": {
+              "x": 0.08,
+              "y": 0.08,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 170.0,
+            "portion_range_g": {
+              "min_g": 102.0,
+              "max_g": 238.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "1隻帶骨大雞腿，切為3塊，僅估計可食肉與皮重量",
+            "visual_evidence": "便當中央偏右下方，鋪在白飯上方的金黃褐色帶皮雞腿，表面有燒烤光澤與黑胡椒粒，切為兩塊腿排與一塊棒棒腿",
+            "reliability": {
+              "level": "medium",
+              "score": 0.92,
+              "reasons": [
+                "Gemini Vision confidence 92%",
+                "database-only grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 364,
+              "protein": 39.4,
+              "carbs": 0.0,
+              "sugar": 0.0,
+              "fat": 21.8,
+              "saturated_fat": 6.0,
+              "trans_fat": 0.0,
+              "sodium": 580,
+              "fiber": 0.0,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認",
+              "份量描述：1隻帶骨大雞腿，切為3塊，僅估計可食肉與皮重量",
+              "本餐有 2 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "2705984",
+              "fdc_id": 2705984,
+              "food_code": "24132230",
+              "name_zh": "烤雞腿帶皮（USDA參考）",
+              "name_en": "Chicken leg, drumstick and thigh, baked or broiled, skin eaten",
+              "aliases": [
+                "烤雞腿",
+                "烤全雞腿"
+              ],
+              "category": "Chicken, whole pieces",
+              "description": "Chicken leg, drumstick and thigh, baked or broiled, skin eaten",
+              "unit": "per 100g",
+              "source": "USDA FNDDS",
+              "source_url": "https://fdc.nal.usda.gov/food-details/2705984/nutrients",
+              "reference_only": true,
+              "publication_date": "10/31/2024",
+              "protein": 23.2,
+              "fat": 12.8,
+              "carbs": 0.0,
+              "calories": 214,
+              "water": 63.4,
+              "sugar": 0.0,
+              "fiber": 0.0,
+              "sodium": 341,
+              "saturated_fat": 3.54,
+              "key": "usda_fndds:2705984",
+              "match_notes": [
+                "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認"
+              ]
+            },
+            "alternatives": []
+          },
+          {
+            "label": "白飯",
+            "name_zh": "白飯",
+            "detected_name_zh": "白飯",
+            "confidence": 0.98,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "name_or_alias",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "database_estimate",
+            "bounding_box": {
+              "x": 0.16,
+              "y": 0.16,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 220.0,
+            "portion_range_g": {
+              "min_g": 132.0,
+              "max_g": 308.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "鋪滿便當盒下半部約1人份白飯",
+            "visual_evidence": "便當盒底部與前方可見大量粒粒分明的白色熟米飯，部分位於烤雞腿下方",
+            "reliability": {
+              "level": "medium",
+              "score": 0.98,
+              "reasons": [
+                "Gemini Vision confidence 98%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 403,
+              "protein": 6.8,
+              "carbs": 90.2,
+              "sugar": 0.0,
+              "fat": 0.7,
+              "saturated_fat": 0.2,
+              "trans_fat": 0.0,
+              "sodium": 4,
+              "fiber": 1.3,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "份量描述：鋪滿便當盒下半部約1人份白飯",
+              "本餐有 2 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "A0550601",
+              "name_zh": "白飯",
+              "name_en": "Cooked rice",
+              "category": "穀物類",
+              "aliases": [],
+              "description": "樣品狀態:熟,白米加1.1倍的去離子水,用電鍋烹煮; 前處理描述:混合均勻打碎",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 183.0,
+              "protein": 3.1,
+              "fat": 0.3,
+              "carbs": 41.0,
+              "sodium": 2.0,
+              "fiber": 0.6,
+              "sugar": null,
+              "saturated_fat": 0.1,
+              "trans_fat": null,
+              "cholesterol": null,
+              "potassium": 40.0,
+              "calcium": 1.0,
+              "iron": 0.2,
+              "magnesium": 7.0,
+              "phosphorus": 39.0,
+              "zinc": 0.7,
+              "vitamin_a_iu": 0.0,
+              "vitamin_c": 0.9,
+              "vitamin_b1": 0.02,
+              "vitamin_b2": 0.01,
+              "vitamin_b6": 0.06,
+              "vitamin_b12": null,
+              "vitamin_d": null,
+              "vitamin_e": 0.04,
+              "folate": 9.0,
+              "water": 55.6,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "白飯",
+              "match_notes": []
+            },
+            "alternatives": []
+          },
+          {
+            "label": "炒高麗菜",
+            "name_zh": "炒高麗菜",
+            "detected_name_zh": "炒高麗菜",
+            "confidence": 0.95,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "reference",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "reference_estimate",
+            "bounding_box": {
+              "x": 0.24,
+              "y": 0.24,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 80.0,
+            "portion_range_g": {
+              "min_g": 48.0,
+              "max_g": 112.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "便當左上角約1小份",
+            "visual_evidence": "便當盒左上角可見淡綠色折疊狀煮熟高麗菜葉片，帶有少許炒熟油亮感",
+            "reliability": {
+              "level": "medium",
+              "score": 0.95,
+              "reasons": [
+                "Gemini Vision confidence 95%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 18,
+              "protein": 1.0,
+              "carbs": 3.8,
+              "sugar": 2.2,
+              "fat": 0.1,
+              "saturated_fat": 0.0,
+              "trans_fat": 0.0,
+              "sodium": 9,
+              "fiber": 0.9,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化",
+              "份量描述：便當左上角約1小份",
+              "本餐有 2 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "E30001",
+              "name_zh": "甘藍平均值",
+              "name_en": "Cabbage; White cabbage",
+              "category": "蔬菜類",
+              "aliases": [
+                "高麗菜",
+                "包菜",
+                "洋白菜",
+                "玻璃菜",
+                "玉菜",
+                "捲心菜",
+                "球葉甘藍",
+                "結球甘藍",
+                "蕃芥藍"
+              ],
+              "description": "樣品狀態:生; 前處理描述:去粗莖,混合均勻打碎",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 23.0,
+              "protein": 1.3,
+              "fat": 0.1,
+              "carbs": 4.8,
+              "sodium": 11.0,
+              "fiber": 1.1,
+              "sugar": 2.7,
+              "saturated_fat": null,
+              "trans_fat": null,
+              "cholesterol": null,
+              "potassium": 187.0,
+              "calcium": 47.0,
+              "iron": 0.4,
+              "magnesium": 12.0,
+              "phosphorus": 30.0,
+              "zinc": 0.3,
+              "vitamin_a_iu": 52.0,
+              "vitamin_c": 37.2,
+              "vitamin_b1": 0.03,
+              "vitamin_b2": 0.02,
+              "vitamin_b6": 0.17,
+              "vitamin_b12": null,
+              "vitamin_d": null,
+              "vitamin_e": 0.24,
+              "folate": 19.9,
+              "water": 93.2,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "甘藍平均值",
+              "match_notes": [
+                "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+              ]
+            },
+            "alternatives": [
+              {
+                "code": "E3000401",
+                "name_zh": "冷凍甘藍",
+                "name_en": "Cabbage: frozen",
+                "category": "蔬菜類",
+                "aliases": [
+                  "高麗菜",
+                  "包菜",
+                  "洋白菜",
+                  "玻璃菜",
+                  "玉菜",
+                  "捲心菜",
+                  "球葉甘藍",
+                  "結球甘藍",
+                  "蕃芥藍"
+                ],
+                "description": "樣品狀態:冷凍包裝; 前處理描述:混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 20.0,
+                "protein": 1.3,
+                "fat": 0.1,
+                "carbs": 4.2,
+                "sodium": 21.0,
+                "fiber": 2.3,
+                "sugar": null,
+                "saturated_fat": null,
+                "trans_fat": null,
+                "cholesterol": null,
+                "potassium": 120.0,
+                "calcium": 49.0,
+                "iron": 0.3,
+                "magnesium": 14.0,
+                "phosphorus": 22.0,
+                "zinc": 0.2,
+                "vitamin_a_iu": 0.0,
+                "vitamin_c": 38.0,
+                "vitamin_b1": 0.03,
+                "vitamin_b2": 0.02,
+                "vitamin_b6": 0.05,
+                "vitamin_b12": null,
+                "vitamin_d": null,
+                "vitamin_e": null,
+                "folate": null,
+                "water": 93.9,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "冷凍甘藍",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              },
+              {
+                "code": "E3000103",
+                "name_zh": "甘藍(圓球形)",
+                "name_en": "Cabbage; White cabbage",
+                "category": "蔬菜類",
+                "aliases": [
+                  "高麗菜",
+                  "包菜",
+                  "洋白菜",
+                  "玻璃菜",
+                  "玉菜",
+                  "捲心菜",
+                  "球葉甘藍",
+                  "結球甘藍",
+                  "蕃芥藍"
+                ],
+                "description": "樣品狀態:生,圓球形; 前處理描述:去粗莖,混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 24.0,
+                "protein": 1.4,
+                "fat": 0.2,
+                "carbs": 4.9,
+                "sodium": 11.0,
+                "fiber": 1.3,
+                "sugar": null,
+                "saturated_fat": null,
+                "trans_fat": null,
+                "cholesterol": null,
+                "potassium": 183.0,
+                "calcium": 49.0,
+                "iron": 0.4,
+                "magnesium": 11.0,
+                "phosphorus": 30.0,
+                "zinc": 0.3,
+                "vitamin_a_iu": 121.0,
+                "vitamin_c": 40.4,
+                "vitamin_b1": 0.03,
+                "vitamin_b2": 0.03,
+                "vitamin_b6": 0.17,
+                "vitamin_b12": null,
+                "vitamin_d": null,
+                "vitamin_e": 0.51,
+                "folate": null,
+                "water": 92.9,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "甘藍(圓球形)",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              },
+              {
+                "code": "E3000102",
+                "name_zh": "甘藍(扁圓形)",
+                "name_en": "Cabbage; White cabbage",
+                "category": "蔬菜類",
+                "aliases": [
+                  "高麗菜",
+                  "包菜",
+                  "洋白菜",
+                  "玻璃菜",
+                  "玉菜",
+                  "捲心菜",
+                  "球葉甘藍",
+                  "結球甘藍",
+                  "蕃芥藍"
+                ],
+                "description": "樣品狀態:生,扁圓形; 前處理描述:去粗莖,混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 21.0,
+                "protein": 1.1,
+                "fat": 0.2,
+                "carbs": 4.3,
+                "sodium": 12.0,
+                "fiber": 0.9,
+                "sugar": 2.7,
+                "saturated_fat": null,
+                "trans_fat": null,
+                "cholesterol": null,
+                "potassium": 173.0,
+                "calcium": 58.0,
+                "iron": 0.3,
+                "magnesium": 11.0,
+                "phosphorus": 25.0,
+                "zinc": 0.2,
+                "vitamin_a_iu": 36.0,
+                "vitamin_c": 29.9,
+                "vitamin_b1": 0.03,
+                "vitamin_b2": 0.02,
+                "vitamin_b6": 0.08,
+                "vitamin_b12": null,
+                "vitamin_d": null,
+                "vitamin_e": 0.14,
+                "folate": 19.9,
+                "water": 93.9,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "甘藍(扁圓形)",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              },
+              {
+                "code": "E3000101",
+                "name_zh": "梨山甘藍(尖球形)",
+                "name_en": "Cabbage; White cabbage",
+                "category": "蔬菜類",
+                "aliases": [
+                  "高麗菜",
+                  "包菜",
+                  "洋白菜",
+                  "玻璃菜",
+                  "玉菜",
+                  "捲心菜",
+                  "球葉甘藍",
+                  "結球甘藍",
+                  "蕃芥藍"
+                ],
+                "description": "樣品狀態:生,尖球形; 前處理描述:去粗莖,混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 24.0,
+                "protein": 1.4,
+                "fat": 0.1,
+                "carbs": 5.1,
+                "sodium": 8.0,
+                "fiber": 1.0,
+                "sugar": null,
+                "saturated_fat": null,
+                "trans_fat": null,
+                "cholesterol": null,
+                "potassium": 205.0,
+                "calcium": 36.0,
+                "iron": 0.7,
+                "magnesium": 12.0,
+                "phosphorus": 36.0,
+                "zinc": 0.5,
+                "vitamin_a_iu": 0.0,
+                "vitamin_c": 41.1,
+                "vitamin_b1": 0.05,
+                "vitamin_b2": 0.02,
+                "vitamin_b6": 0.27,
+                "vitamin_b12": null,
+                "vitamin_d": null,
+                "vitamin_e": 0.08,
+                "folate": null,
+                "water": 92.9,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "梨山甘藍(尖球形)",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              }
+            ]
+          },
+          {
+            "label": "紅蘿蔔",
+            "name_zh": "紅蘿蔔",
+            "detected_name_zh": "紅蘿蔔",
+            "confidence": 0.9,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "reference",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "reference_estimate",
+            "bounding_box": {
+              "x": 0.16,
+              "y": 0.16,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 15.0,
+            "portion_range_g": {
+              "min_g": 9.0,
+              "max_g": 21.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "可見約2小塊及右上方配菜中極少量細絲",
+            "visual_evidence": "便當上方中央雞腿縫隙處可見1塊橘紅色紅蘿蔔塊，左側高麗菜與雞腿交界處另有1片橘紅色紅蘿蔔片，右上角配菜中亦夾雜極少許紅蘿蔔絲",
+            "reliability": {
+              "level": "medium",
+              "score": 0.9,
+              "reasons": [
+                "Gemini Vision confidence 90%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 6,
+              "protein": 0.2,
+              "carbs": 1.3,
+              "sugar": 0.9,
+              "fat": 0.0,
+              "saturated_fat": 0.0,
+              "trans_fat": 0.0,
+              "sodium": 13,
+              "fiber": 0.4,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化",
+              "份量描述：可見約2小塊及右上方配菜中極少量細絲",
+              "本餐有 2 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "E02001",
+              "name_zh": "胡蘿蔔平均值",
+              "name_en": "Carrot",
+              "category": "蔬菜類",
+              "aliases": [
+                "紅蘿蔔",
+                "紅菜頭",
+                "黃蘿蔔",
+                "丁香蘿蔔",
+                "人參",
+                "金筍"
+              ],
+              "description": "樣品狀態:生; 前處理描述:去蒂及皮,混合均勻打碎",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 39.0,
+              "protein": 1.1,
+              "fat": 0.1,
+              "carbs": 8.9,
+              "sodium": 89.0,
+              "fiber": 2.6,
+              "sugar": 6.3,
+              "saturated_fat": 0.0,
+              "trans_fat": null,
+              "cholesterol": null,
+              "potassium": 198.0,
+              "calcium": 27.0,
+              "iron": 0.3,
+              "magnesium": 11.0,
+              "phosphorus": 29.0,
+              "zinc": 0.2,
+              "vitamin_a_iu": 20718.0,
+              "vitamin_c": 5.4,
+              "vitamin_b1": 0.04,
+              "vitamin_b2": 0.04,
+              "vitamin_b6": 0.15,
+              "vitamin_b12": null,
+              "vitamin_d": null,
+              "vitamin_e": 0.42,
+              "folate": 16.5,
+              "water": 89.3,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "胡蘿蔔平均值",
+              "match_notes": [
+                "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+              ]
+            },
+            "alternatives": [
+              {
+                "code": "E0200101",
+                "name_zh": "胡蘿蔔",
+                "name_en": "Carrot",
+                "category": "蔬菜類",
+                "aliases": [
+                  "紅蘿蔔",
+                  "紅菜頭",
+                  "黃蘿蔔",
+                  "丁香蘿蔔",
+                  "人參",
+                  "金筍"
+                ],
+                "description": "樣品狀態:生; 前處理描述:去蒂及皮,混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 37.0,
+                "protein": 1.0,
+                "fat": 0.2,
+                "carbs": 8.5,
+                "sodium": 67.0,
+                "fiber": 2.7,
+                "sugar": 5.2,
+                "saturated_fat": 0.0,
+                "trans_fat": null,
+                "cholesterol": null,
+                "potassium": 267.0,
+                "calcium": 30.0,
+                "iron": 0.5,
+                "magnesium": 13.0,
+                "phosphorus": 39.0,
+                "zinc": 0.3,
+                "vitamin_a_iu": 11199.0,
+                "vitamin_c": 5.2,
+                "vitamin_b1": 0.05,
+                "vitamin_b2": 0.04,
+                "vitamin_b6": 0.13,
+                "vitamin_b12": null,
+                "vitamin_d": null,
+                "vitamin_e": 0.61,
+                "folate": 16.5,
+                "water": 89.6,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "胡蘿蔔",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              },
+              {
+                "code": "E0200201",
+                "name_zh": "黃胡蘿蔔",
+                "name_en": "Carrot",
+                "category": "蔬菜類",
+                "aliases": [
+                  "紅蘿蔔",
+                  "紅菜頭",
+                  "黃蘿蔔",
+                  "丁香蘿蔔",
+                  "人參",
+                  "金筍"
+                ],
+                "description": "樣品狀態:生,黃皮黃肉; 前處理描述:去蒂及皮,混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 42.0,
+                "protein": 1.1,
+                "fat": 0.3,
+                "carbs": 9.4,
+                "sodium": 65.0,
+                "fiber": 4.1,
+                "sugar": 3.9,
+                "saturated_fat": 0.1,
+                "trans_fat": null,
+                "cholesterol": null,
+                "potassium": 338.0,
+                "calcium": 28.0,
+                "iron": 0.3,
+                "magnesium": 12.0,
+                "phosphorus": 35.0,
+                "zinc": 0.0,
+                "vitamin_a_iu": 1623.0,
+                "vitamin_c": 3.2,
+                "vitamin_b1": 0.1,
+                "vitamin_b2": 0.03,
+                "vitamin_b6": 0.06,
+                "vitamin_b12": null,
+                "vitamin_d": null,
+                "vitamin_e": 2.11,
+                "folate": 21.8,
+                "water": 88.4,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "黃胡蘿蔔",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              },
+              {
+                "code": "E0200301",
+                "name_zh": "冷凍胡蘿蔔",
+                "name_en": "Carrot: frozen",
+                "category": "蔬菜類",
+                "aliases": [
+                  "紅蘿蔔",
+                  "紅菜頭",
+                  "黃蘿蔔",
+                  "丁香蘿蔔",
+                  "人參",
+                  "金筍"
+                ],
+                "description": "樣品狀態:冷凍袋裝; 前處理描述:混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 13.0,
+                "protein": 0.5,
+                "fat": 0.1,
+                "carbs": 3.0,
+                "sodium": 65.0,
+                "fiber": 2.2,
+                "sugar": null,
+                "saturated_fat": null,
+                "trans_fat": null,
+                "cholesterol": null,
+                "potassium": 120.0,
+                "calcium": 36.0,
+                "iron": 0.5,
+                "magnesium": 13.0,
+                "phosphorus": 25.0,
+                "zinc": 0.2,
+                "vitamin_a_iu": 35999.0,
+                "vitamin_c": 2.4,
+                "vitamin_b1": 0.03,
+                "vitamin_b2": 0.03,
+                "vitamin_b6": 0.01,
+                "vitamin_b12": null,
+                "vitamin_d": null,
+                "vitamin_e": null,
+                "folate": null,
+                "water": 96.0,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "冷凍胡蘿蔔",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              },
+              {
+                "code": "E0200102",
+                "name_zh": "向陽二號胡蘿蔔",
+                "name_en": "Carrot",
+                "category": "蔬菜類",
+                "aliases": [
+                  "紅蘿蔔",
+                  "紅菜頭",
+                  "黃蘿蔔",
+                  "丁香蘿蔔",
+                  "人參",
+                  "金筍"
+                ],
+                "description": "樣品狀態:生; 前處理描述:去蒂及皮,混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 44.0,
+                "protein": 0.6,
+                "fat": 0.1,
+                "carbs": 10.6,
+                "sodium": 92.0,
+                "fiber": 2.5,
+                "sugar": 7.3,
+                "saturated_fat": 0.0,
+                "trans_fat": null,
+                "cholesterol": null,
+                "potassium": 102.0,
+                "calcium": 24.0,
+                "iron": 0.2,
+                "magnesium": 9.0,
+                "phosphorus": 21.0,
+                "zinc": 0.3,
+                "vitamin_a_iu": 16718.0,
+                "vitamin_c": 6.6,
+                "vitamin_b1": 0.04,
+                "vitamin_b2": 0.03,
+                "vitamin_b6": 0.07,
+                "vitamin_b12": null,
+                "vitamin_d": null,
+                "vitamin_e": 0.26,
+                "folate": null,
+                "water": 88.1,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "向陽二號胡蘿蔔",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              }
+            ]
+          }
+        ],
+        "rejected_detections": [
+          {
+            "label": "咖哩馬鈴薯",
+            "confidence": 0.78,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "咖哩馬鈴薯",
+              "馬鈴薯塊"
+            ]
+          },
+          {
+            "label": "炒淺綠色瓜類",
+            "confidence": 0.6,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "炒淺綠色瓜類"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無比例尺或標準參照物，且部分白飯被雞腿遮擋、雞腿內含骨頭，可食重量估計具較高不確定性。",
+          "上方中央黃色塊狀配菜以咖哩馬鈴薯可能性最高，但受黃褐色醬汁覆蓋影響，無法完全排除為地瓜等其他黃色根莖類。",
+          "右上角淺綠色切片配菜外觀偏向炒大黃瓜或蒲瓜（胡瓜），因烹調後軟化且無完整橫切面，採較保守之蔬菜分類命名。"
+        ],
+        "summary": {
+          "total_items": 4,
+          "recognized_items": 6,
+          "rejected_items": 2,
+          "nutrition_complete": false,
+          "nutrition_totals_scope": "matched_items_only",
+          "total_calories": 791,
+          "total_sodium": 606,
+          "requires_user_confirmation": true
+        }
+      },
+      "elapsed_seconds": 28.79
+    },
+    {
+      "filename": "大腸包小腸.jpg",
+      "sha256": "04d13bd213e663af85b372e521b96c77229a78c4b3526fdcb21257d21a2d3132",
+      "parsed": {
+        "meal_guess": "烤香腸與糯米腸",
+        "items": [
+          {
+            "name_zh": "香腸",
+            "name_en": "Taiwanese sausage",
+            "confidence": 0.95,
+            "estimated_weight_g": 75,
+            "weight_confidence": 0.5,
+            "food_state": "prepared",
+            "count": 1,
+            "portion_description": "1條，烤熟完整尺寸",
+            "visual_evidence": "烤網上方呈紅褐色、表面有微焦烤痕的圓柱狀肉腸",
+            "alternatives": [
+              "烤香腸",
+              "台式香腸"
+            ]
+          },
+          {
+            "name_zh": "糯米腸",
+            "name_en": "glutinous rice sausage",
+            "confidence": 0.93,
+            "estimated_weight_g": 110,
+            "weight_confidence": 0.5,
+            "food_state": "prepared",
+            "count": 1,
+            "portion_description": "1條，烤熟完整尺寸",
+            "visual_evidence": "位於香腸下方、外皮呈微黃焦香的白色圓柱狀米腸",
+            "alternatives": [
+              "米腸",
+              "烤糯米腸"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無明確比例尺，僅能依常見台式烤香腸與糯米腸大小推估重量，weight_confidence 較低",
+          "糯米腸部分被香腸遮擋，實際長度與粗細可能有誤差",
+          "尚未切開或組裝成大腸包小腸，無法確認後續是否會加入配料或醬料"
+        ]
+      },
+      "response": {
+        "engine": "gemini-vision-db-lookup",
+        "meal_warnings": [],
+        "nutrition_grounding": "database_only",
+        "database_sources": [
+          "user_custom_foods",
+          "TFDA",
+          "USDA FNDDS"
+        ],
+        "meal_guess": "烤香腸與糯米腸",
+        "detections": [
+          {
+            "label": "香腸",
+            "name_zh": "香腸",
+            "detected_name_zh": "香腸",
+            "confidence": 0.95,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "reference",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "reference_estimate",
+            "bounding_box": {
+              "x": 0.08,
+              "y": 0.08,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 75.0,
+            "portion_range_g": {
+              "min_g": 45.0,
+              "max_g": 105.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "1條，烤熟完整尺寸",
+            "visual_evidence": "烤網上方呈紅褐色、表面有微焦烤痕的圓柱狀肉腸",
+            "reliability": {
+              "level": "medium",
+              "score": 0.95,
+              "reasons": [
+                "Gemini Vision confidence 95%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 266,
+              "protein": 12.8,
+              "carbs": 9.2,
+              "sugar": 7.6,
+              "fat": 19.7,
+              "saturated_fat": 7.5,
+              "trans_fat": 0.1,
+              "sodium": 770,
+              "fiber": 0.0,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化",
+              "份量描述：1條，烤熟完整尺寸",
+              "本餐有 1 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "R5300201",
+              "name_zh": "香腸",
+              "name_en": "Pork: sausage",
+              "category": "加工調理食品及其他類",
+              "aliases": [],
+              "description": "樣品狀態:生(豬肉,豬腸衣,鹽,糖,食品添加物等); 前處理描述:混合均勻打碎",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 354.0,
+              "protein": 17.0,
+              "fat": 26.3,
+              "carbs": 12.3,
+              "sodium": 1026.0,
+              "fiber": 0,
+              "sugar": 10.2,
+              "saturated_fat": 10.0,
+              "trans_fat": 0.095,
+              "cholesterol": 62.0,
+              "potassium": 284.0,
+              "calcium": 2.0,
+              "iron": 1.6,
+              "magnesium": 17.0,
+              "phosphorus": 152.0,
+              "zinc": 1.7,
+              "vitamin_a_iu": 68.0,
+              "vitamin_c": 26.0,
+              "vitamin_b1": 0.49,
+              "vitamin_b2": 0.16,
+              "vitamin_b6": 0.18,
+              "vitamin_b12": 0.79,
+              "vitamin_d": null,
+              "vitamin_e": 0.15,
+              "folate": 5.2,
+              "water": 41.2,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "香腸",
+              "match_notes": [
+                "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+              ]
+            },
+            "alternatives": [
+              {
+                "code": "R5300202",
+                "name_zh": "香腸(蒜味)",
+                "name_en": "Pork: sausage, garlic flavor",
+                "category": "加工調理食品及其他類",
+                "aliases": [],
+                "description": "樣品狀態:生(豬肉,豬腸衣,鹽,糖,蒜粉,食品添加物等); 前處理描述:混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 387.0,
+                "protein": 16.6,
+                "fat": 27.8,
+                "carbs": 17.7,
+                "sodium": 1021.0,
+                "fiber": 0,
+                "sugar": 12.5,
+                "saturated_fat": 10.2,
+                "trans_fat": 0.104,
+                "cholesterol": 63.0,
+                "potassium": 310.0,
+                "calcium": 6.0,
+                "iron": 1.2,
+                "magnesium": 18.0,
+                "phosphorus": 196.0,
+                "zinc": 1.8,
+                "vitamin_a_iu": 63.0,
+                "vitamin_c": 12.4,
+                "vitamin_b1": 0.47,
+                "vitamin_b2": 0.16,
+                "vitamin_b6": 0.17,
+                "vitamin_b12": 0.77,
+                "vitamin_d": null,
+                "vitamin_e": 0.22,
+                "folate": 7.5,
+                "water": 34.5,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "香腸(蒜味)",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              }
+            ]
+          }
+        ],
+        "rejected_detections": [
+          {
+            "label": "糯米腸",
+            "confidence": 0.93,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "糯米腸",
+              "米腸",
+              "烤糯米腸"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無明確比例尺，僅能依常見台式烤香腸與糯米腸大小推估重量，weight_confidence 較低",
+          "糯米腸部分被香腸遮擋，實際長度與粗細可能有誤差",
+          "尚未切開或組裝成大腸包小腸，無法確認後續是否會加入配料或醬料"
+        ],
+        "summary": {
+          "total_items": 1,
+          "recognized_items": 2,
+          "rejected_items": 1,
+          "nutrition_complete": false,
+          "nutrition_totals_scope": "matched_items_only",
+          "total_calories": 266,
+          "total_sodium": 770,
+          "requires_user_confirmation": true
+        }
+      },
+      "elapsed_seconds": 8.81
+    },
+    {
+      "filename": "水餃17顆左右.jpg",
+      "sha256": "77feff6300a674a375dc5380d10ffa8eefb88ba8f3d8eb54ef910630f79a7675",
+      "parsed": {
+        "meal_guess": "水餃",
+        "items": [
+          {
+            "name_zh": "水餃",
+            "name_en": "Boiled dumplings",
+            "confidence": 0.96,
+            "estimated_weight_g": 425,
+            "weight_confidence": 0.55,
+            "food_state": "prepared",
+            "count": 17,
+            "portion_description": "一盤約17顆熟水餃",
+            "visual_evidence": "中央白底藍花橢圓盤內盛裝多顆煮熟水餃，外皮有皺褶且微透出淡綠色，相互靠攏堆疊，約可辨識17顆",
+            "alternatives": [
+              "餃子",
+              "熟水餃"
+            ]
+          },
+          {
+            "name_zh": "沾醬",
+            "name_en": "Dipping sauce",
+            "confidence": 0.8,
+            "estimated_weight_g": 15,
+            "weight_confidence": 0.4,
+            "food_state": "prepared",
+            "count": 1,
+            "portion_description": "一小碟深褐色液體沾醬",
+            "visual_evidence": "左上角橘色小圓碟內盛裝深褐色光亮液體沾醬，外觀接近醬油",
+            "alternatives": [
+              "醬料"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "水餃相互堆疊且部分被遮擋，目測可見約17顆，實際顆數可能略有誤差。",
+          "水餃內部餡料無法直接看見，僅外皮隱約透出些許綠色，未推測具體口味或內餡成分。",
+          "左上角橘色小碟中的深色液體外觀似醬油，但無法確認是否另含烏醋、蒜汁或香油等調味料，因此以較保守的沾醬標示。",
+          "畫面最左上角邊緣可見部分橘色容器，但無法辨識內部是否有食物，未納入項目。",
+          "照片無比例尺且盤內水餃有堆疊，重量僅依常見台灣小吃盤具與水餃尺寸估算。"
+        ]
+      },
+      "response": {
+        "engine": "gemini-vision-db-lookup",
+        "meal_warnings": [],
+        "nutrition_grounding": "database_only",
+        "database_sources": [
+          "user_custom_foods",
+          "TFDA",
+          "USDA FNDDS"
+        ],
+        "meal_guess": "水餃",
+        "detections": [
+          {
+            "label": "水餃",
+            "name_zh": "水餃",
+            "detected_name_zh": "水餃",
+            "confidence": 0.96,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "reference",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "reference_estimate",
+            "bounding_box": {
+              "x": 0.08,
+              "y": 0.08,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 425.0,
+            "portion_range_g": {
+              "min_g": 255.0,
+              "max_g": 595.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "一盤約17顆熟水餃",
+            "visual_evidence": "中央白底藍花橢圓盤內盛裝多顆煮熟水餃，外皮有皺褶且微透出淡綠色，相互靠攏堆疊，約可辨識17顆",
+            "reliability": {
+              "level": "medium",
+              "score": 0.96,
+              "reasons": [
+                "Gemini Vision confidence 96%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 846,
+              "protein": 31.5,
+              "carbs": 83.7,
+              "sugar": 12.8,
+              "fat": 42.9,
+              "saturated_fat": 14.9,
+              "trans_fat": 0.5,
+              "sodium": 1279,
+              "fiber": 7.7,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "照片無法確認水餃內餡，暫採熟高麗菜水餃參考值，請確認內餡與總重量",
+              "份量描述：一盤約17顆熟水餃",
+              "本餐有 1 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "R2201501",
+              "name_zh": "熟水餃(高麗菜水餃)",
+              "name_en": "",
+              "category": "加工調理食品及其他類",
+              "aliases": [],
+              "description": "前處理描述:混合均勻打碎",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 199.0,
+              "protein": 7.4,
+              "fat": 10.1,
+              "carbs": 19.7,
+              "sodium": 301.0,
+              "fiber": 1.8,
+              "sugar": 3.0,
+              "saturated_fat": 3.5,
+              "trans_fat": 0.119,
+              "cholesterol": 18.0,
+              "potassium": 144.0,
+              "calcium": 15.0,
+              "iron": 0.6,
+              "magnesium": 15.0,
+              "phosphorus": 74.0,
+              "zinc": 0.8,
+              "vitamin_a_iu": 46.0,
+              "vitamin_c": 3.7,
+              "vitamin_b1": 0.13,
+              "vitamin_b2": 0.07,
+              "vitamin_b6": 0.04,
+              "vitamin_b12": 0.43,
+              "vitamin_d": 0.0,
+              "vitamin_e": 0.71,
+              "folate": 9.8,
+              "water": 61.8,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "熟水餃(高麗菜水餃)",
+              "match_notes": [
+                "照片無法確認水餃內餡，暫採熟高麗菜水餃參考值，請確認內餡與總重量"
+              ]
+            },
+            "alternatives": [
+              {
+                "code": "R2200801",
+                "name_zh": "冷凍豬肉熟水餃",
+                "name_en": "Dumpling: pork, cooked",
+                "category": "加工調理食品及其他類",
+                "aliases": [],
+                "description": "樣品狀態:冷凍包裝(豬肉,麵粉,蔬菜等); 前處理描述:混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 235.0,
+                "protein": 7.2,
+                "fat": 10.1,
+                "carbs": 28.9,
+                "sodium": 333.0,
+                "fiber": 2.1,
+                "sugar": 1.0,
+                "saturated_fat": 3.5,
+                "trans_fat": 0.027,
+                "cholesterol": 17.0,
+                "potassium": 114.0,
+                "calcium": 8.0,
+                "iron": 0.8,
+                "magnesium": 19.0,
+                "phosphorus": 101.0,
+                "zinc": 0.5,
+                "vitamin_a_iu": 146.0,
+                "vitamin_c": null,
+                "vitamin_b1": 0.12,
+                "vitamin_b2": 0.04,
+                "vitamin_b6": 0.14,
+                "vitamin_b12": 0.15,
+                "vitamin_d": null,
+                "vitamin_e": 1.64,
+                "folate": 17.9,
+                "water": 52.5,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "冷凍豬肉熟水餃",
+                "match_notes": [
+                  "照片無法確認水餃內餡，暫採熟高麗菜水餃參考值，請確認內餡與總重量"
+                ]
+              }
+            ]
+          }
+        ],
+        "rejected_detections": [
+          {
+            "label": "沾醬",
+            "confidence": 0.8,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "沾醬",
+              "醬料"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "水餃相互堆疊且部分被遮擋，目測可見約17顆，實際顆數可能略有誤差。",
+          "水餃內部餡料無法直接看見，僅外皮隱約透出些許綠色，未推測具體口味或內餡成分。",
+          "左上角橘色小碟中的深色液體外觀似醬油，但無法確認是否另含烏醋、蒜汁或香油等調味料，因此以較保守的沾醬標示。",
+          "畫面最左上角邊緣可見部分橘色容器，但無法辨識內部是否有食物，未納入項目。",
+          "照片無比例尺且盤內水餃有堆疊，重量僅依常見台灣小吃盤具與水餃尺寸估算。"
+        ],
+        "summary": {
+          "total_items": 1,
+          "recognized_items": 2,
+          "rejected_items": 1,
+          "nutrition_complete": false,
+          "nutrition_totals_scope": "matched_items_only",
+          "total_calories": 846,
+          "total_sodium": 1279,
+          "requires_user_confirmation": true
+        }
+      },
+      "elapsed_seconds": 31.51
+    },
+    {
+      "filename": "泡麵.jpg",
+      "sha256": "8caacd88b337e4ad0bdd6829cea16e3143dca9ad9b82ede2c144facf1a524d9c",
+      "parsed": {
+        "meal_guess": "泡麵",
+        "items": [
+          {
+            "name_zh": "泡麵（含湯）",
+            "name_en": "Instant noodles with soup",
+            "confidence": 0.98,
+            "estimated_weight_g": 360,
+            "weight_confidence": 0.65,
+            "food_state": "prepared",
+            "count": 1,
+            "portion_description": "一杯已沖泡的小型紙杯裝泡麵，包含麵條、湯汁及少量配料碎末",
+            "visual_evidence": "桌面上的紙杯內裝有已沖泡的捲曲泡麵與湯汁，筷子夾起一束麵條，麵條與湯面可見少量碎蔥與調味料",
+            "alternatives": [
+              "杯麵（含湯）",
+              "速食麵（含湯）",
+              "沖泡泡麵（含湯）"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "杯內實際剩餘湯量與水位深度受杯身遮擋無法完全確認，重量依一般小型杯麵完整沖泡狀態估算"
+        ]
+      },
+      "response": {
+        "engine": "gemini-vision-db-lookup",
+        "meal_warnings": [],
+        "nutrition_grounding": "database_only",
+        "database_sources": [
+          "user_custom_foods",
+          "TFDA",
+          "USDA FNDDS"
+        ],
+        "meal_guess": "泡麵",
+        "detections": [
+          {
+            "label": "泡麵（含湯）",
+            "name_zh": "泡麵（含湯）",
+            "detected_name_zh": "泡麵（含湯）",
+            "confidence": 0.98,
+            "needs_confirmation": true,
+            "source": "USDA FNDDS",
+            "nutrition_match_type": "reference",
+            "nutrition_source_url": "https://fdc.nal.usda.gov/food-details/2709152/nutrients",
+            "nutrition_status": "reference_estimate",
+            "bounding_box": {
+              "x": 0.08,
+              "y": 0.08,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 360.0,
+            "portion_range_g": {
+              "min_g": 216.0,
+              "max_g": 504.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "一杯已沖泡的小型紙杯裝泡麵，包含麵條、湯汁及少量配料碎末",
+            "visual_evidence": "桌面上的紙杯內裝有已沖泡的捲曲泡麵與湯汁，筷子夾起一束麵條，麵條與湯面可見少量碎蔥與調味料",
+            "reliability": {
+              "level": "medium",
+              "score": 0.98,
+              "reasons": [
+                "Gemini Vision confidence 98%",
+                "database-only grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 238,
+              "protein": 5.5,
+              "carbs": 32.5,
+              "sugar": 1.1,
+              "fat": 9.5,
+              "saturated_fat": 4.4,
+              "trans_fat": 0.0,
+              "sodium": 1015,
+              "fiber": 1.4,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認",
+              "份量描述：一杯已沖泡的小型紙杯裝泡麵，包含麵條、湯汁及少量配料碎末"
+            ],
+            "matched_food": {
+              "code": "2709152",
+              "fdc_id": 2709152,
+              "food_code": "58407030",
+              "name_zh": "沖泡泡麵含湯（USDA參考）",
+              "name_en": "Soup, ramen noodles, water added",
+              "aliases": [
+                "泡麵",
+                "杯麵",
+                "速食麵",
+                "沖泡泡麵"
+              ],
+              "category": "Ramen and Asian broth-based soups",
+              "description": "Soup, ramen noodles, water added",
+              "unit": "per 100g",
+              "source": "USDA FNDDS",
+              "source_url": "https://fdc.nal.usda.gov/food-details/2709152/nutrients",
+              "reference_only": true,
+              "publication_date": "10/31/2024",
+              "protein": 1.53,
+              "fat": 2.64,
+              "carbs": 9.04,
+              "calories": 66.0,
+              "water": 85.9,
+              "sugar": 0.3,
+              "fiber": 0.4,
+              "sodium": 282,
+              "saturated_fat": 1.22,
+              "key": "usda_fndds:2709152",
+              "match_notes": [
+                "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認"
+              ]
+            },
+            "alternatives": []
+          }
+        ],
+        "rejected_detections": [],
+        "uncertainty_notes": [
+          "杯內實際剩餘湯量與水位深度受杯身遮擋無法完全確認，重量依一般小型杯麵完整沖泡狀態估算"
+        ],
+        "summary": {
+          "total_items": 1,
+          "recognized_items": 1,
+          "rejected_items": 0,
+          "nutrition_complete": true,
+          "nutrition_totals_scope": "matched_items_only",
+          "total_calories": 238,
+          "total_sodium": 1015,
+          "requires_user_confirmation": true
+        }
+      },
+      "elapsed_seconds": 7.71
+    },
+    {
+      "filename": "滷肉飯.jpg",
+      "sha256": "df0250acc262bd391972b0b430c3403f0fde75ea2fee9bb8367abe15ca7a29f8",
+      "parsed": {
+        "meal_guess": "滷肉飯",
+        "items": [
+          {
+            "name_zh": "白飯",
+            "name_en": "White rice",
+            "confidence": 0.98,
+            "estimated_weight_g": 180,
+            "weight_confidence": 0.45,
+            "food_state": "prepared",
+            "count": 1,
+            "portion_description": "一碗底層白飯，部分沾到滷汁",
+            "visual_evidence": "碗底部與右側邊緣可見白色米飯粒，部分表面染有淺褐色滷汁",
+            "alternatives": [
+              "白米飯",
+              "米飯"
+            ]
+          },
+          {
+            "name_zh": "滷肉",
+            "name_en": "Braised pork belly",
+            "confidence": 0.96,
+            "estimated_weight_g": 80,
+            "weight_confidence": 0.45,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "鋪在白飯上方的手切滷豬肉塊",
+            "visual_evidence": "碗中央覆蓋多塊呈焦糖褐色、帶有油亮滷汁與肥瘦層次的手切五花肉塊",
+            "alternatives": [
+              "手切滷肉",
+              "滷五花肉",
+              "滷肉塊"
+            ]
+          },
+          {
+            "name_zh": "滷蛋",
+            "name_en": "Braised egg",
+            "confidence": 0.98,
+            "estimated_weight_g": 25,
+            "weight_confidence": 0.6,
+            "food_state": "prepared",
+            "count": 1,
+            "portion_description": "半顆對切去殼滷蛋",
+            "visual_evidence": "碗上方邊緣可見一塊對切水煮蛋，蛋白外圈呈滷製褐色，中央為完整黃色蛋黃",
+            "alternatives": [
+              "鹵蛋"
+            ]
+          },
+          {
+            "name_zh": "小黃瓜片",
+            "name_en": "Sliced cucumber",
+            "confidence": 0.9,
+            "estimated_weight_g": 15,
+            "weight_confidence": 0.5,
+            "food_state": "prepared",
+            "count": 4,
+            "portion_description": "4片薄切小黃瓜",
+            "visual_evidence": "碗右上方邊緣擺放4片圓形綠色帶皮薄片小黃瓜",
+            "alternatives": [
+              "黃瓜片",
+              "小黃瓜"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無比例尺或標準餐具作為參照，白飯、滷肉與碗的實際深度及重量估算不確定性較高",
+          "小黃瓜片外觀略帶光澤，無法完全確認為生鮮切片或微醃漬小黃瓜",
+          "滷汁多寡與碗底吸收程度無法精確判斷"
+        ]
+      },
+      "response": {
+        "engine": "gemini-vision-db-lookup",
+        "meal_warnings": [],
+        "nutrition_grounding": "database_only",
+        "database_sources": [
+          "user_custom_foods",
+          "TFDA",
+          "USDA FNDDS"
+        ],
+        "meal_guess": "滷肉飯",
+        "detections": [
+          {
+            "label": "白飯",
+            "name_zh": "白飯",
+            "detected_name_zh": "白飯",
+            "confidence": 0.98,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "name_or_alias",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "database_estimate",
+            "bounding_box": {
+              "x": 0.08,
+              "y": 0.08,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 180.0,
+            "portion_range_g": {
+              "min_g": 108.0,
+              "max_g": 252.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "一碗底層白飯，部分沾到滷汁",
+            "visual_evidence": "碗底部與右側邊緣可見白色米飯粒，部分表面染有淺褐色滷汁",
+            "reliability": {
+              "level": "medium",
+              "score": 0.98,
+              "reasons": [
+                "Gemini Vision confidence 98%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 329,
+              "protein": 5.6,
+              "carbs": 73.8,
+              "sugar": 0.0,
+              "fat": 0.5,
+              "saturated_fat": 0.2,
+              "trans_fat": 0.0,
+              "sodium": 4,
+              "fiber": 1.1,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "份量描述：一碗底層白飯，部分沾到滷汁",
+              "本餐有 1 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "A0550601",
+              "name_zh": "白飯",
+              "name_en": "Cooked rice",
+              "category": "穀物類",
+              "aliases": [],
+              "description": "樣品狀態:熟,白米加1.1倍的去離子水,用電鍋烹煮; 前處理描述:混合均勻打碎",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 183.0,
+              "protein": 3.1,
+              "fat": 0.3,
+              "carbs": 41.0,
+              "sodium": 2.0,
+              "fiber": 0.6,
+              "sugar": null,
+              "saturated_fat": 0.1,
+              "trans_fat": null,
+              "cholesterol": null,
+              "potassium": 40.0,
+              "calcium": 1.0,
+              "iron": 0.2,
+              "magnesium": 7.0,
+              "phosphorus": 39.0,
+              "zinc": 0.7,
+              "vitamin_a_iu": 0.0,
+              "vitamin_c": 0.9,
+              "vitamin_b1": 0.02,
+              "vitamin_b2": 0.01,
+              "vitamin_b6": 0.06,
+              "vitamin_b12": null,
+              "vitamin_d": null,
+              "vitamin_e": 0.04,
+              "folate": 9.0,
+              "water": 55.6,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "白飯",
+              "match_notes": []
+            },
+            "alternatives": []
+          },
+          {
+            "label": "滷肉",
+            "name_zh": "滷肉",
+            "detected_name_zh": "滷肉",
+            "confidence": 0.96,
+            "needs_confirmation": true,
+            "source": "USDA FNDDS",
+            "nutrition_match_type": "reference",
+            "nutrition_source_url": "https://fdc.nal.usda.gov/food-details/2705901/nutrients",
+            "nutrition_status": "reference_estimate",
+            "bounding_box": {
+              "x": 0.16,
+              "y": 0.16,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 80.0,
+            "portion_range_g": {
+              "min_g": 48.0,
+              "max_g": 112.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "鋪在白飯上方的手切滷豬肉塊",
+            "visual_evidence": "碗中央覆蓋多塊呈焦糖褐色、帶有油亮滷汁與肥瘦層次的手切五花肉塊",
+            "reliability": {
+              "level": "medium",
+              "score": 0.96,
+              "reasons": [
+                "Gemini Vision confidence 96%",
+                "database-only grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 323,
+              "protein": 21.3,
+              "carbs": 0.0,
+              "sugar": 0.0,
+              "fat": 25.8,
+              "saturated_fat": 9.4,
+              "trans_fat": 0.0,
+              "sodium": 358,
+              "fiber": 0.0,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認",
+              "份量描述：鋪在白飯上方的手切滷豬肉塊",
+              "本餐有 1 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "2705901",
+              "fdc_id": 2705901,
+              "food_code": "22708020",
+              "name_zh": "熟五花肉（USDA參考）",
+              "name_en": "Pork, belly",
+              "aliases": [
+                "滷肉",
+                "滷五花肉",
+                "滷豬肉",
+                "控肉",
+                "焢肉",
+                "五花肉塊"
+              ],
+              "category": "Pork",
+              "description": "Pork, belly",
+              "unit": "per 100g",
+              "source": "USDA FNDDS",
+              "source_url": "https://fdc.nal.usda.gov/food-details/2705901/nutrients",
+              "reference_only": true,
+              "publication_date": "10/31/2024",
+              "protein": 26.6,
+              "fat": 32.2,
+              "carbs": 0.0,
+              "calories": 404,
+              "water": 39.5,
+              "sugar": 0.0,
+              "fiber": 0.0,
+              "sodium": 448,
+              "saturated_fat": 11.7,
+              "key": "usda_fndds:2705901",
+              "match_notes": [
+                "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認"
+              ]
+            },
+            "alternatives": []
+          },
+          {
+            "label": "滷蛋",
+            "name_zh": "滷蛋",
+            "detected_name_zh": "滷蛋",
+            "confidence": 0.98,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "name_or_alias",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "database_estimate",
+            "bounding_box": {
+              "x": 0.24,
+              "y": 0.24,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 25.0,
+            "portion_range_g": {
+              "min_g": 15.0,
+              "max_g": 35.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "半顆對切去殼滷蛋",
+            "visual_evidence": "碗上方邊緣可見一塊對切水煮蛋，蛋白外圈呈滷製褐色，中央為完整黃色蛋黃",
+            "reliability": {
+              "level": "medium",
+              "score": 0.98,
+              "reasons": [
+                "Gemini Vision confidence 98%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 48,
+              "protein": 3.9,
+              "carbs": 1.6,
+              "sugar": 1.1,
+              "fat": 2.9,
+              "saturated_fat": 1.0,
+              "trans_fat": 0.0,
+              "sodium": 146,
+              "fiber": 0.0,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "份量描述：半顆對切去殼滷蛋",
+              "本餐有 1 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "K0120101",
+              "name_zh": "雞滷蛋(市售)",
+              "name_en": "Hen's egg: stewed",
+              "category": "蛋類",
+              "aliases": [],
+              "description": "樣品狀態:熟,雞蛋製品(雞蛋,醬油,調味料等); 前處理描述:混合均勻打碎",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 191.0,
+              "protein": 15.7,
+              "fat": 11.4,
+              "carbs": 6.4,
+              "sodium": 583.0,
+              "fiber": 0,
+              "sugar": 4.3,
+              "saturated_fat": 4.1,
+              "trans_fat": null,
+              "cholesterol": 502.0,
+              "potassium": 91.0,
+              "calcium": 61.0,
+              "iron": 2.7,
+              "magnesium": 15.0,
+              "phosphorus": 222.0,
+              "zinc": 2.1,
+              "vitamin_a_iu": 517.0,
+              "vitamin_c": 0.0,
+              "vitamin_b1": 0.02,
+              "vitamin_b2": 0.34,
+              "vitamin_b6": 0.18,
+              "vitamin_b12": 1.13,
+              "vitamin_d": null,
+              "vitamin_e": 2.5,
+              "folate": 45.6,
+              "water": 64.7,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "雞滷蛋(市售)",
+              "match_notes": []
+            },
+            "alternatives": [
+              {
+                "code": "K01201",
+                "name_zh": "滷蛋平均值",
+                "name_en": "Hen's egg: stewed",
+                "category": "蛋類",
+                "aliases": [],
+                "description": "樣品狀態:熟,雞蛋製品; 前處理描述:混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 184.0,
+                "protein": 16.4,
+                "fat": 11.1,
+                "carbs": 4.6,
+                "sodium": 1156.0,
+                "fiber": 0,
+                "sugar": 4.3,
+                "saturated_fat": 3.8,
+                "trans_fat": null,
+                "cholesterol": 479.0,
+                "potassium": 163.0,
+                "calcium": 52.0,
+                "iron": 2.7,
+                "magnesium": 21.0,
+                "phosphorus": 230.0,
+                "zinc": 2.0,
+                "vitamin_a_iu": 385.0,
+                "vitamin_c": 0.0,
+                "vitamin_b1": 0.04,
+                "vitamin_b2": 0.44,
+                "vitamin_b6": 0.18,
+                "vitamin_b12": 1.0,
+                "vitamin_d": null,
+                "vitamin_e": 2.56,
+                "folate": 45.6,
+                "water": 64.3,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "滷蛋平均值",
+                "match_notes": []
+              }
+            ]
+          }
+        ],
+        "rejected_detections": [
+          {
+            "label": "小黃瓜片",
+            "confidence": 0.9,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "小黃瓜片",
+              "黃瓜片",
+              "小黃瓜"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無比例尺或標準餐具作為參照，白飯、滷肉與碗的實際深度及重量估算不確定性較高",
+          "小黃瓜片外觀略帶光澤，無法完全確認為生鮮切片或微醃漬小黃瓜",
+          "滷汁多寡與碗底吸收程度無法精確判斷"
+        ],
+        "summary": {
+          "total_items": 3,
+          "recognized_items": 4,
+          "rejected_items": 1,
+          "nutrition_complete": false,
+          "nutrition_totals_scope": "matched_items_only",
+          "total_calories": 700,
+          "total_sodium": 508,
+          "requires_user_confirmation": true
+        }
+      },
+      "elapsed_seconds": 10.69
+    },
+    {
+      "filename": "牛肉麵.jpg",
+      "sha256": "bbda03716fb172ddfb002f7d87ab38ae3e7a82dc8f073c8d3a68458e3159da33",
+      "parsed": {
+        "meal_guess": "紅燒牛肉麵",
+        "items": [
+          {
+            "name_zh": "紅燒牛肉",
+            "name_en": "Braised beef chunks",
+            "confidence": 0.95,
+            "estimated_weight_g": 120,
+            "weight_confidence": 0.45,
+            "food_state": "prepared",
+            "count": 4,
+            "portion_description": "4大塊帶筋瘦肉",
+            "visual_evidence": "碗中下方可見4塊深褐色燉煮牛肉塊，表面有肉類纖維紋理",
+            "alternatives": [
+              "滷牛肉"
+            ]
+          },
+          {
+            "name_zh": "熟麵條",
+            "name_en": "Cooked wheat noodles",
+            "confidence": 0.95,
+            "estimated_weight_g": 200,
+            "weight_confidence": 0.4,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "碗中份量約1份",
+            "visual_evidence": "碗中央可見浸在湯中的米白色寬扁熟麵條",
+            "alternatives": [
+              "熟白麵",
+              "白麵條"
+            ]
+          },
+          {
+            "name_zh": "小白菜",
+            "name_en": "Pak choi",
+            "confidence": 0.78,
+            "estimated_weight_g": 60,
+            "weight_confidence": 0.45,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "約1小把切段鋪於上方",
+            "visual_evidence": "碗上方10點至2點鐘方向可見翠綠葉片與寬扁帶有縱向條紋的白色菜梗",
+            "alternatives": []
+          },
+          {
+            "name_zh": "蔥花",
+            "name_en": "Chopped scallions",
+            "confidence": 0.92,
+            "estimated_weight_g": 8,
+            "weight_confidence": 0.4,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "少量撒於碗緣與肉旁",
+            "visual_evidence": "碗左下側及肉塊旁可見切碎的綠色蔥圈",
+            "alternatives": [
+              "青蔥花",
+              "蔥末"
+            ]
+          },
+          {
+            "name_zh": "牛肉湯",
+            "name_en": "Beef broth",
+            "confidence": 0.92,
+            "estimated_weight_g": 350,
+            "weight_confidence": 0.35,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "約大半碗湯汁",
+            "visual_evidence": "碗內盛裝深紅褐色湯汁，表面浮有油脂小泡",
+            "alternatives": [
+              "紅燒牛肉湯"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無比例尺或標準餐具尺寸參照，麵條與湯汁重量估計受碗深影響，誤差可能較大。",
+          "上方綠色葉菜外觀特徵符合小白菜，但因切段且受熱微軟，仍不排除為其他類似葉菜（如青江菜或萵苣類）。",
+          "碗底中央6點鐘方向肉塊旁可見少許紅色塊狀物，因部分浸於湯中且面積過小，無法確認為番茄塊或紅辣椒，未列入項目。"
+        ]
+      },
+      "response": {
+        "engine": "gemini-vision-db-lookup",
+        "meal_warnings": [],
+        "nutrition_grounding": "database_only",
+        "database_sources": [
+          "user_custom_foods",
+          "TFDA",
+          "USDA FNDDS"
+        ],
+        "meal_guess": "紅燒牛肉麵",
+        "detections": [
+          {
+            "label": "紅燒牛肉",
+            "name_zh": "紅燒牛肉",
+            "detected_name_zh": "紅燒牛肉",
+            "confidence": 0.95,
+            "needs_confirmation": true,
+            "source": "USDA FNDDS",
+            "nutrition_match_type": "reference",
+            "nutrition_source_url": "https://fdc.nal.usda.gov/food-details/2705849/nutrients",
+            "nutrition_status": "reference_estimate",
+            "bounding_box": {
+              "x": 0.08,
+              "y": 0.08,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 120.0,
+            "portion_range_g": {
+              "min_g": 72.0,
+              "max_g": 168.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "4大塊帶筋瘦肉",
+            "visual_evidence": "碗中下方可見4塊深褐色燉煮牛肉塊，表面有肉類纖維紋理",
+            "reliability": {
+              "level": "medium",
+              "score": 0.95,
+              "reasons": [
+                "Gemini Vision confidence 95%",
+                "database-only grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 301,
+              "protein": 34.1,
+              "carbs": 0.0,
+              "sugar": 0.0,
+              "fat": 18.5,
+              "saturated_fat": 7.3,
+              "trans_fat": 0.0,
+              "sodium": 444,
+              "fiber": 0.0,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認",
+              "份量描述：4大塊帶筋瘦肉",
+              "本餐有 1 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "2705849",
+              "fdc_id": 2705849,
+              "food_code": "21410000",
+              "name_zh": "燉牛肉（USDA參考）",
+              "name_en": "Beef, stew meat",
+              "aliases": [
+                "滷牛腱",
+                "紅燒牛肉",
+                "燉牛肉",
+                "牛腱",
+                "牛肉塊"
+              ],
+              "category": "Beef, excludes ground",
+              "description": "Beef, stew meat",
+              "unit": "per 100g",
+              "source": "USDA FNDDS",
+              "source_url": "https://fdc.nal.usda.gov/food-details/2705849/nutrients",
+              "reference_only": true,
+              "publication_date": "10/31/2024",
+              "protein": 28.4,
+              "fat": 15.4,
+              "carbs": 0.0,
+              "calories": 251,
+              "water": 54.9,
+              "sugar": 0.0,
+              "fiber": 0.0,
+              "sodium": 370,
+              "saturated_fat": 6.08,
+              "key": "usda_fndds:2705849",
+              "match_notes": [
+                "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認"
+              ]
+            },
+            "alternatives": []
+          },
+          {
+            "label": "熟麵條",
+            "name_zh": "熟麵條",
+            "detected_name_zh": "熟麵條",
+            "confidence": 0.95,
+            "needs_confirmation": true,
+            "source": "USDA FNDDS",
+            "nutrition_match_type": "reference",
+            "nutrition_source_url": "https://fdc.nal.usda.gov/food-details/2708352/nutrients",
+            "nutrition_status": "reference_estimate",
+            "bounding_box": {
+              "x": 0.16,
+              "y": 0.16,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 200.0,
+            "portion_range_g": {
+              "min_g": 120.0,
+              "max_g": 280.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "碗中份量約1份",
+            "visual_evidence": "碗中央可見浸在湯中的米白色寬扁熟麵條",
+            "reliability": {
+              "level": "medium",
+              "score": 0.95,
+              "reasons": [
+                "Gemini Vision confidence 95%",
+                "database-only grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 274,
+              "protein": 9.0,
+              "carbs": 50.0,
+              "sugar": 0.8,
+              "fat": 4.1,
+              "saturated_fat": 0.8,
+              "trans_fat": 0.0,
+              "sodium": 472,
+              "fiber": 2.4,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認",
+              "份量描述：碗中份量約1份",
+              "本餐有 1 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "2708352",
+              "fdc_id": 2708352,
+              "food_code": "56112000",
+              "name_zh": "熟麵條（USDA參考）",
+              "name_en": "Noodles, cooked",
+              "aliases": [
+                "熟麵條",
+                "白麵條",
+                "陽春麵條",
+                "細麵條"
+              ],
+              "category": "Pasta, noodles, cooked grains",
+              "description": "Noodles, cooked",
+              "unit": "per 100g",
+              "source": "USDA FNDDS",
+              "source_url": "https://fdc.nal.usda.gov/food-details/2708352/nutrients",
+              "reference_only": true,
+              "publication_date": "10/31/2024",
+              "protein": 4.51,
+              "fat": 2.06,
+              "carbs": 25.0,
+              "calories": 137,
+              "water": 67.3,
+              "sugar": 0.4,
+              "fiber": 1.2,
+              "sodium": 236,
+              "saturated_fat": 0.417,
+              "key": "usda_fndds:2708352",
+              "match_notes": [
+                "營養採 USDA 一般食物參考值；實際配方、含水量、油鹽與品牌可能不同，請確認"
+              ]
+            },
+            "alternatives": []
+          },
+          {
+            "label": "小白菜",
+            "name_zh": "小白菜",
+            "detected_name_zh": "小白菜",
+            "confidence": 0.78,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "reference",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "reference_estimate",
+            "bounding_box": {
+              "x": 0.24,
+              "y": 0.24,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 60.0,
+            "portion_range_g": {
+              "min_g": 36.0,
+              "max_g": 84.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "約1小把切段鋪於上方",
+            "visual_evidence": "碗上方10點至2點鐘方向可見翠綠葉片與寬扁帶有縱向條紋的白色菜梗",
+            "reliability": {
+              "level": "medium",
+              "score": 0.78,
+              "reasons": [
+                "Gemini Vision confidence 78%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 8,
+              "protein": 0.7,
+              "carbs": 1.4,
+              "sugar": 0.2,
+              "fat": 0.1,
+              "saturated_fat": 0.1,
+              "trans_fat": 0.0,
+              "sodium": 31,
+              "fiber": 0.8,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化",
+              "份量描述：約1小把切段鋪於上方",
+              "本餐有 1 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "E3200602",
+              "name_zh": "小白菜(土植)(3月取樣)",
+              "name_en": "Pak-choi",
+              "category": "蔬菜類",
+              "aliases": [
+                "土白菜",
+                "青菜",
+                "白菜",
+                "不結球白菜",
+                "水白菜"
+              ],
+              "description": "樣品狀態:生; 前處理描述:去根部,混合均勻打碎",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 14.0,
+              "protein": 1.2,
+              "fat": 0.1,
+              "carbs": 2.4,
+              "sodium": 51.0,
+              "fiber": 1.4,
+              "sugar": 0.4,
+              "saturated_fat": 0.1,
+              "trans_fat": 0.0,
+              "cholesterol": null,
+              "potassium": 256.0,
+              "calcium": 122.0,
+              "iron": 1.5,
+              "magnesium": 18.0,
+              "phosphorus": 26.0,
+              "zinc": 0.3,
+              "vitamin_a_iu": 1015.0,
+              "vitamin_c": 24.2,
+              "vitamin_b1": 0.03,
+              "vitamin_b2": 0.07,
+              "vitamin_b6": 0.09,
+              "vitamin_b12": null,
+              "vitamin_d": 0.0,
+              "vitamin_e": 0.89,
+              "folate": 93.3,
+              "water": 95.3,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "小白菜(土植)(3月取樣)",
+              "match_notes": [
+                "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+              ]
+            },
+            "alternatives": [
+              {
+                "code": "E3200601",
+                "name_zh": "小白菜(土植)(1月取樣)",
+                "name_en": "Pak-choi",
+                "category": "蔬菜類",
+                "aliases": [
+                  "土白菜",
+                  "青菜",
+                  "白菜",
+                  "不結球白菜",
+                  "水白菜"
+                ],
+                "description": "樣品狀態:生; 前處理描述:去根部,混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 10.0,
+                "protein": 1.2,
+                "fat": 0.2,
+                "carbs": 1.5,
+                "sodium": 110.0,
+                "fiber": 1.3,
+                "sugar": null,
+                "saturated_fat": 0.0,
+                "trans_fat": null,
+                "cholesterol": null,
+                "potassium": 109.0,
+                "calcium": 99.0,
+                "iron": 1.9,
+                "magnesium": 16.0,
+                "phosphorus": 24.0,
+                "zinc": 0.3,
+                "vitamin_a_iu": 1362.0,
+                "vitamin_c": 14.8,
+                "vitamin_b1": 0.03,
+                "vitamin_b2": 0.05,
+                "vitamin_b6": 0.06,
+                "vitamin_b12": null,
+                "vitamin_d": null,
+                "vitamin_e": 0.57,
+                "folate": null,
+                "water": 96.4,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "小白菜(土植)(1月取樣)",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              },
+              {
+                "code": "E3200701",
+                "name_zh": "小白菜(水耕)(1月取樣)",
+                "name_en": "Pak-choi,",
+                "category": "蔬菜類",
+                "aliases": [
+                  "土白菜",
+                  "青菜",
+                  "白菜",
+                  "不結球白菜",
+                  "水白菜"
+                ],
+                "description": "樣品狀態:生; 前處理描述:去根部,混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 13.0,
+                "protein": 1.5,
+                "fat": 0.1,
+                "carbs": 2.1,
+                "sodium": 9.0,
+                "fiber": 1.5,
+                "sugar": null,
+                "saturated_fat": 0.0,
+                "trans_fat": null,
+                "cholesterol": null,
+                "potassium": 359.0,
+                "calcium": 67.0,
+                "iron": 2.2,
+                "magnesium": 35.0,
+                "phosphorus": 31.0,
+                "zinc": 0.3,
+                "vitamin_a_iu": 1099.0,
+                "vitamin_c": 19.2,
+                "vitamin_b1": 0.04,
+                "vitamin_b2": 0.07,
+                "vitamin_b6": 0.02,
+                "vitamin_b12": null,
+                "vitamin_d": null,
+                "vitamin_e": 0.49,
+                "folate": null,
+                "water": 95.3,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "小白菜(水耕)(1月取樣)",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              },
+              {
+                "code": "E3200801",
+                "name_zh": "小白菜(有機)(1月取樣)",
+                "name_en": "Pak-choi:organic",
+                "category": "蔬菜類",
+                "aliases": [
+                  "土白菜",
+                  "青菜",
+                  "白菜",
+                  "不結球白菜",
+                  "水白菜"
+                ],
+                "description": "樣品狀態:生; 前處理描述:去根部,混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 9.0,
+                "protein": 1.8,
+                "fat": 0.2,
+                "carbs": 0.8,
+                "sodium": 79.0,
+                "fiber": 1.5,
+                "sugar": null,
+                "saturated_fat": 0.0,
+                "trans_fat": null,
+                "cholesterol": null,
+                "potassium": 218.0,
+                "calcium": 133.0,
+                "iron": 1.2,
+                "magnesium": 18.0,
+                "phosphorus": 30.0,
+                "zinc": 0.6,
+                "vitamin_a_iu": 1193.0,
+                "vitamin_c": 20.0,
+                "vitamin_b1": 0.05,
+                "vitamin_b2": 0.07,
+                "vitamin_b6": 0.07,
+                "vitamin_b12": null,
+                "vitamin_d": null,
+                "vitamin_e": 0.58,
+                "folate": null,
+                "water": 96.2,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "小白菜(有機)(1月取樣)",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              },
+              {
+                "code": "E3200603",
+                "name_zh": "小白菜(土植)(4月取樣)",
+                "name_en": "Pak-choi,",
+                "category": "蔬菜類",
+                "aliases": [
+                  "土白菜",
+                  "青菜",
+                  "白菜",
+                  "不結球白菜",
+                  "水白菜"
+                ],
+                "description": "樣品狀態:生; 前處理描述:去根部,混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 13.0,
+                "protein": 1.1,
+                "fat": 0.2,
+                "carbs": 2.2,
+                "sodium": 125.0,
+                "fiber": 1.2,
+                "sugar": null,
+                "saturated_fat": null,
+                "trans_fat": null,
+                "cholesterol": null,
+                "potassium": 139.0,
+                "calcium": 73.0,
+                "iron": 1.1,
+                "magnesium": 16.0,
+                "phosphorus": 32.0,
+                "zinc": 0.4,
+                "vitamin_a_iu": 611.0,
+                "vitamin_c": 23.7,
+                "vitamin_b1": 0.04,
+                "vitamin_b2": 0.05,
+                "vitamin_b6": 0.09,
+                "vitamin_b12": null,
+                "vitamin_d": null,
+                "vitamin_e": 0.67,
+                "folate": null,
+                "water": 95.8,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "小白菜(土植)(4月取樣)",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              }
+            ]
+          },
+          {
+            "label": "蔥花",
+            "name_zh": "蔥花",
+            "detected_name_zh": "蔥花",
+            "confidence": 0.92,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "reference",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "reference_estimate",
+            "bounding_box": {
+              "x": 0.08,
+              "y": 0.08,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 8.0,
+            "portion_range_g": {
+              "min_g": 4.8,
+              "max_g": 11.2,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "少量撒於碗緣與肉旁",
+            "visual_evidence": "碗左下側及肉塊旁可見切碎的綠色蔥圈",
+            "reliability": {
+              "level": "medium",
+              "score": 0.92,
+              "reasons": [
+                "Gemini Vision confidence 92%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 2,
+              "protein": 0.1,
+              "carbs": 0.5,
+              "sugar": 0.2,
+              "fat": 0.0,
+              "saturated_fat": 0.0,
+              "trans_fat": 0.0,
+              "sodium": 0,
+              "fiber": 0.2,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化",
+              "份量描述：少量撒於碗緣與肉旁",
+              "本餐有 1 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "E23001",
+              "name_zh": "青蔥平均值",
+              "name_en": "Welsh onion, Bunching onion, Green onion",
+              "category": "蔬菜類",
+              "aliases": [],
+              "description": "樣品狀態:生; 前處理描述:去根部及葉尾與外葉,混合均勻打碎",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 31.0,
+              "protein": 1.3,
+              "fat": 0.2,
+              "carbs": 6.6,
+              "sodium": 1.0,
+              "fiber": 2.2,
+              "sugar": 3.1,
+              "saturated_fat": 0.1,
+              "trans_fat": 0.0,
+              "cholesterol": null,
+              "potassium": 194.0,
+              "calcium": 38.0,
+              "iron": 0.6,
+              "magnesium": 14.0,
+              "phosphorus": 26.0,
+              "zinc": 0.3,
+              "vitamin_a_iu": 186.0,
+              "vitamin_c": 15.3,
+              "vitamin_b1": 0.06,
+              "vitamin_b2": 0.07,
+              "vitamin_b6": 0.08,
+              "vitamin_b12": null,
+              "vitamin_d": 0.0,
+              "vitamin_e": 1.18,
+              "folate": 52.2,
+              "water": 91.4,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "青蔥平均值",
+              "match_notes": [
+                "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+              ]
+            },
+            "alternatives": [
+              {
+                "code": "E2300101",
+                "name_zh": "青蔥(有機)",
+                "name_en": "Welsh onion, Bunching onion, Green onion",
+                "category": "蔬菜類",
+                "aliases": [
+                  "蔥",
+                  "葉蔥",
+                  "蔥仔"
+                ],
+                "description": "樣品狀態:生,冷藏袋裝; 前處理描述:去根部,外葉及葉尾,混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 31.0,
+                "protein": 1.1,
+                "fat": 0.2,
+                "carbs": 6.8,
+                "sodium": 1.0,
+                "fiber": 2.7,
+                "sugar": 3.7,
+                "saturated_fat": 0.1,
+                "trans_fat": 0.0,
+                "cholesterol": null,
+                "potassium": 210.0,
+                "calcium": 38.0,
+                "iron": 0.9,
+                "magnesium": 19.0,
+                "phosphorus": 32.0,
+                "zinc": 0.3,
+                "vitamin_a_iu": 122.0,
+                "vitamin_c": 9.3,
+                "vitamin_b1": 0.06,
+                "vitamin_b2": 0.06,
+                "vitamin_b6": 0.09,
+                "vitamin_b12": null,
+                "vitamin_d": 0.0,
+                "vitamin_e": 0.14,
+                "folate": 58.3,
+                "water": 91.3,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "青蔥(有機)",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              }
+            ]
+          }
+        ],
+        "rejected_detections": [
+          {
+            "label": "牛肉湯",
+            "confidence": 0.92,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "牛肉湯",
+              "紅燒牛肉湯"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無比例尺或標準餐具尺寸參照，麵條與湯汁重量估計受碗深影響，誤差可能較大。",
+          "上方綠色葉菜外觀特徵符合小白菜，但因切段且受熱微軟，仍不排除為其他類似葉菜（如青江菜或萵苣類）。",
+          "碗底中央6點鐘方向肉塊旁可見少許紅色塊狀物，因部分浸於湯中且面積過小，無法確認為番茄塊或紅辣椒，未列入項目。"
+        ],
+        "summary": {
+          "total_items": 4,
+          "recognized_items": 5,
+          "rejected_items": 1,
+          "nutrition_complete": false,
+          "nutrition_totals_scope": "matched_items_only",
+          "total_calories": 585,
+          "total_sodium": 947,
+          "requires_user_confirmation": true
+        }
+      },
+      "elapsed_seconds": 15.43
+    },
+    {
+      "filename": "肉羹麵.jpg",
+      "sha256": "8d7172732fbee7640f97c7a33baccc0e4ae70cbae1840d74b24d39b2139a19e4",
+      "parsed": {
+        "meal_guess": "羹麵",
+        "items": [
+          {
+            "name_zh": "油麵",
+            "name_en": "cooked yellow oil noodles",
+            "confidence": 0.9,
+            "estimated_weight_g": 180,
+            "weight_confidence": 0.5,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "一碗份量的熟油麵",
+            "visual_evidence": "碗中浸於湯汁內的淡黃色中等粗細圓麵條",
+            "alternatives": [
+              "黃麵",
+              "熟油麵"
+            ]
+          },
+          {
+            "name_zh": "羹塊",
+            "name_en": "fish or meat paste chunks",
+            "confidence": 0.7,
+            "estimated_weight_g": 100,
+            "weight_confidence": 0.45,
+            "food_state": "prepared",
+            "count": 4,
+            "portion_description": "4塊中等大小的白色羹塊",
+            "visual_evidence": "湯麵上方可見4塊白色、表面凹凸不平的成型羹塊（可能為花枝羹、魚羹或裹漿肉羹）",
+            "alternatives": [
+              "羹類肉塊"
+            ]
+          },
+          {
+            "name_zh": "羹湯",
+            "name_en": "thickened soup broth",
+            "confidence": 0.9,
+            "estimated_weight_g": 250,
+            "weight_confidence": 0.4,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "約大半碗的勾芡湯底（含少量蛋花與油蔥）",
+            "visual_evidence": "碗內略帶透明琥珀色且具濃稠感的高湯，底部與中央可見白色蛋花及深褐色調味醬汁與油蔥碎",
+            "alternatives": [
+              "羹湯底",
+              "勾芡湯"
+            ]
+          },
+          {
+            "name_zh": "香菜",
+            "name_en": "cilantro",
+            "confidence": 0.9,
+            "estimated_weight_g": 3,
+            "weight_confidence": 0.5,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "一小撮切碎的葉片",
+            "visual_evidence": "湯麵正中央最上層有一小撮鮮綠色鋸齒狀葉片",
+            "alternatives": [
+              "芫荽"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "碗中4塊白色羹塊無法僅從外觀完全區分為花枝羹、魚羹或肉羹，已採用較保守的名稱「羹塊」並降低信心度。",
+          "湯麵中央深褐色醬汁及油蔥酥因與湯汁混合，無法獨立分離估重，已併入羹湯考量。",
+          "左側邊緣小碟內的淡黃色捲曲條狀小菜（疑似無骨鴨掌或涼拌類）因位於畫面邊緣且被裁切，未納入已確認項目。",
+          "右上側背景小盤內的棕色條狀小菜（疑似滷豬皮或涼拌類）因位於背景且裁切不完整，未納入已確認項目。",
+          "右側邊緣小盤內的褐色切片狀小菜（疑似滷豬肝）因位於畫面邊緣且被裁切，未納入已確認項目。",
+          "照片無明確比例尺，重量僅依一般台灣小吃湯碗大小推估。"
+        ]
+      },
+      "response": {
+        "engine": "gemini-vision-db-lookup",
+        "meal_warnings": [],
+        "nutrition_grounding": "database_only",
+        "database_sources": [
+          "user_custom_foods",
+          "TFDA",
+          "USDA FNDDS"
+        ],
+        "meal_guess": "羹麵",
+        "detections": [
+          {
+            "label": "油麵",
+            "name_zh": "油麵",
+            "detected_name_zh": "油麵",
+            "confidence": 0.9,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "name_or_alias",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "database_estimate",
+            "bounding_box": {
+              "x": 0.08,
+              "y": 0.08,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 180.0,
+            "portion_range_g": {
+              "min_g": 108.0,
+              "max_g": 252.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "一碗份量的熟油麵",
+            "visual_evidence": "碗中浸於湯汁內的淡黃色中等粗細圓麵條",
+            "reliability": {
+              "level": "medium",
+              "score": 0.9,
+              "reasons": [
+                "Gemini Vision confidence 90%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 293,
+              "protein": 9.9,
+              "carbs": 56.2,
+              "sugar": 0.0,
+              "fat": 3.2,
+              "saturated_fat": 0.5,
+              "trans_fat": 0.0,
+              "sodium": 121,
+              "fiber": 1.1,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "份量描述：一碗份量的熟油麵",
+              "本餐有 2 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "R2001101",
+              "name_zh": "衛生油麵",
+              "name_en": "Oil noodle (cooked)",
+              "category": "加工調理食品及其他類",
+              "aliases": [],
+              "description": "樣品狀態:濕麵條(麵粉,食油,鹼粉等); 前處理描述:混合均勻打碎",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 163.0,
+              "protein": 5.5,
+              "fat": 1.8,
+              "carbs": 31.2,
+              "sodium": 67.0,
+              "fiber": 0.6,
+              "sugar": null,
+              "saturated_fat": 0.3,
+              "trans_fat": null,
+              "cholesterol": null,
+              "potassium": 49.0,
+              "calcium": 12.0,
+              "iron": 0.4,
+              "magnesium": 12.0,
+              "phosphorus": 49.0,
+              "zinc": 0.3,
+              "vitamin_a_iu": 3.0,
+              "vitamin_c": 0.0,
+              "vitamin_b1": 0.01,
+              "vitamin_b2": 0.01,
+              "vitamin_b6": 0.02,
+              "vitamin_b12": null,
+              "vitamin_d": null,
+              "vitamin_e": 3.92,
+              "folate": 27.5,
+              "water": 61.2,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "衛生油麵",
+              "match_notes": []
+            },
+            "alternatives": []
+          },
+          {
+            "label": "香菜",
+            "name_zh": "香菜",
+            "detected_name_zh": "香菜",
+            "confidence": 0.9,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "reference",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "reference_estimate",
+            "bounding_box": {
+              "x": 0.08,
+              "y": 0.08,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 3.0,
+            "portion_range_g": {
+              "min_g": 1.8,
+              "max_g": 4.2,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "一小撮切碎的葉片",
+            "visual_evidence": "湯麵正中央最上層有一小撮鮮綠色鋸齒狀葉片",
+            "reliability": {
+              "level": "medium",
+              "score": 0.9,
+              "reasons": [
+                "Gemini Vision confidence 90%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 1,
+              "protein": 0.1,
+              "carbs": 0.1,
+              "sugar": 0.0,
+              "fat": 0.0,
+              "saturated_fat": 0.0,
+              "trans_fat": 0.0,
+              "sodium": 1,
+              "fiber": 0.1,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化",
+              "份量描述：一小撮切碎的葉片",
+              "本餐有 2 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "E4000101",
+              "name_zh": "芫荽",
+              "name_en": "Chinese parsley",
+              "category": "蔬菜類",
+              "aliases": [
+                "香菜",
+                "香荽",
+                "胡荽",
+                "蒝荽",
+                "芫蓑",
+                "松鬚菜"
+              ],
+              "description": "樣品狀態:生; 前處理描述:去根部,混合均勻打碎",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 26.0,
+              "protein": 2.3,
+              "fat": 0.3,
+              "carbs": 4.5,
+              "sodium": 17.0,
+              "fiber": 3.2,
+              "sugar": null,
+              "saturated_fat": null,
+              "trans_fat": null,
+              "cholesterol": null,
+              "potassium": 303.0,
+              "calcium": 61.0,
+              "iron": 2.4,
+              "magnesium": 17.0,
+              "phosphorus": 38.0,
+              "zinc": 0.4,
+              "vitamin_a_iu": 12085.0,
+              "vitamin_c": 71.9,
+              "vitamin_b1": 0.06,
+              "vitamin_b2": 0.17,
+              "vitamin_b6": 0.13,
+              "vitamin_b12": null,
+              "vitamin_d": null,
+              "vitamin_e": 0.46,
+              "folate": null,
+              "water": 91.5,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "芫荽",
+              "match_notes": [
+                "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+              ]
+            },
+            "alternatives": [
+              {
+                "code": "E2700101",
+                "name_zh": "九層塔",
+                "name_en": "Basil; Common basil; Sweet basil",
+                "category": "蔬菜類",
+                "aliases": [
+                  "千層塔",
+                  "羅勒",
+                  "家佩蘭",
+                  "零陵菜",
+                  "香菜(草)",
+                  "薰草",
+                  "西王母菜",
+                  "塞香菜",
+                  "光明子",
+                  "醒頭香"
+                ],
+                "description": "樣品狀態:生; 前處理描述:去粗梗,混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 27.0,
+                "protein": 2.9,
+                "fat": 0.3,
+                "carbs": 4.4,
+                "sodium": 2.0,
+                "fiber": 3.4,
+                "sugar": 0.1,
+                "saturated_fat": 0.1,
+                "trans_fat": 0.0,
+                "cholesterol": null,
+                "potassium": 347.0,
+                "calcium": 191.0,
+                "iron": 4.7,
+                "magnesium": 42.0,
+                "phosphorus": 53.0,
+                "zinc": 0.6,
+                "vitamin_a_iu": 16050.0,
+                "vitamin_c": 13.8,
+                "vitamin_b1": 0.07,
+                "vitamin_b2": 0.23,
+                "vitamin_b6": 0.32,
+                "vitamin_b12": null,
+                "vitamin_d": 0.0,
+                "vitamin_e": 0.09,
+                "folate": null,
+                "water": 91.0,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "九層塔",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              }
+            ]
+          }
+        ],
+        "rejected_detections": [
+          {
+            "label": "羹塊",
+            "confidence": 0.7,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "羹塊",
+              "羹類肉塊"
+            ]
+          },
+          {
+            "label": "羹湯",
+            "confidence": 0.9,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "羹湯",
+              "羹湯底",
+              "勾芡湯"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "碗中4塊白色羹塊無法僅從外觀完全區分為花枝羹、魚羹或肉羹，已採用較保守的名稱「羹塊」並降低信心度。",
+          "湯麵中央深褐色醬汁及油蔥酥因與湯汁混合，無法獨立分離估重，已併入羹湯考量。",
+          "左側邊緣小碟內的淡黃色捲曲條狀小菜（疑似無骨鴨掌或涼拌類）因位於畫面邊緣且被裁切，未納入已確認項目。",
+          "右上側背景小盤內的棕色條狀小菜（疑似滷豬皮或涼拌類）因位於背景且裁切不完整，未納入已確認項目。",
+          "右側邊緣小盤內的褐色切片狀小菜（疑似滷豬肝）因位於畫面邊緣且被裁切，未納入已確認項目。",
+          "照片無明確比例尺，重量僅依一般台灣小吃湯碗大小推估。"
+        ],
+        "summary": {
+          "total_items": 2,
+          "recognized_items": 4,
+          "rejected_items": 2,
+          "nutrition_complete": false,
+          "nutrition_totals_scope": "matched_items_only",
+          "total_calories": 294,
+          "total_sodium": 122,
+          "requires_user_confirmation": true
+        }
+      },
+      "elapsed_seconds": 22.54
+    },
+    {
+      "filename": "臭豆腐.jpg",
+      "sha256": "9b58806887be6d07ffee74b918e981324807cdc0e1ead0c48e71365771bb2b64",
+      "parsed": {
+        "meal_guess": "炸臭豆腐",
+        "items": [
+          {
+            "name_zh": "炸臭豆腐",
+            "name_en": "Fried stinky tofu",
+            "confidence": 0.95,
+            "estimated_weight_g": 240,
+            "weight_confidence": 0.55,
+            "food_state": "prepared",
+            "count": 13,
+            "portion_description": "盤中中央至右側堆疊約13塊切塊炸臭豆腐",
+            "visual_evidence": "多塊金黃色、表面呈酥脆多孔狀的方形及長方形切塊炸豆腐堆疊於盤上",
+            "alternatives": [
+              "脆皮臭豆腐",
+              "臭豆腐"
+            ]
+          },
+          {
+            "name_zh": "台式泡菜",
+            "name_en": "Taiwanese pickled cabbage",
+            "confidence": 0.92,
+            "estimated_weight_g": 55,
+            "weight_confidence": 0.5,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "盤子左側一小堆醃漬高麗菜",
+            "visual_evidence": "盤子左側有一堆呈乳白微黃、帶光澤的片狀醃漬高麗菜，並可見少許紅蘿蔔細絲",
+            "alternatives": [
+              "高麗菜泡菜"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無比例尺可供參考，重量為依常見份量推估",
+          "炸臭豆腐堆疊於後方與底部的塊數可能受遮擋，實際總塊數可能略多於可見的13塊",
+          "盤面上未見明顯淋醬或獨立醬料碟，故未列入醬料"
+        ]
+      },
+      "response": {
+        "engine": "gemini-vision-db-lookup",
+        "meal_warnings": [],
+        "nutrition_grounding": "database_only",
+        "database_sources": [
+          "user_custom_foods",
+          "TFDA",
+          "USDA FNDDS"
+        ],
+        "meal_guess": "炸臭豆腐",
+        "detections": [
+          {
+            "label": "台式泡菜",
+            "name_zh": "台式泡菜",
+            "detected_name_zh": "台式泡菜",
+            "confidence": 0.92,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "name_or_alias",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "database_estimate",
+            "bounding_box": {
+              "x": 0.16,
+              "y": 0.16,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 55.0,
+            "portion_range_g": {
+              "min_g": 33.0,
+              "max_g": 77.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "盤子左側一小堆醃漬高麗菜",
+            "visual_evidence": "盤子左側有一堆呈乳白微黃、帶光澤的片狀醃漬高麗菜，並可見少許紅蘿蔔細絲",
+            "reliability": {
+              "level": "medium",
+              "score": 0.92,
+              "reasons": [
+                "Gemini Vision confidence 92%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 32,
+              "protein": 0.5,
+              "carbs": 7.2,
+              "sugar": 6.2,
+              "fat": 0.2,
+              "saturated_fat": 0.1,
+              "trans_fat": 0.0,
+              "sodium": 182,
+              "fiber": 0.4,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "份量描述：盤子左側一小堆醃漬高麗菜",
+              "本餐有 1 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "R4400101",
+              "name_zh": "台式泡菜",
+              "name_en": "",
+              "category": "加工調理食品及其他類",
+              "aliases": [],
+              "description": "前處理描述:混合均勻打碎",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 59.0,
+              "protein": 0.9,
+              "fat": 0.3,
+              "carbs": 13.1,
+              "sodium": 330.0,
+              "fiber": 0.8,
+              "sugar": 11.2,
+              "saturated_fat": 0.1,
+              "trans_fat": 0.0,
+              "cholesterol": null,
+              "potassium": 132.0,
+              "calcium": 25.0,
+              "iron": 0.0,
+              "magnesium": 9.0,
+              "phosphorus": 16.0,
+              "zinc": 0.0,
+              "vitamin_a_iu": 198.0,
+              "vitamin_c": 11.3,
+              "vitamin_b1": 0.0,
+              "vitamin_b2": 0.0,
+              "vitamin_b6": 0.0,
+              "vitamin_b12": null,
+              "vitamin_d": 0.0,
+              "vitamin_e": 0.12,
+              "folate": 10.8,
+              "water": 84.4,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "台式泡菜",
+              "match_notes": []
+            },
+            "alternatives": []
+          }
+        ],
+        "rejected_detections": [
+          {
+            "label": "炸臭豆腐",
+            "confidence": 0.95,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "炸臭豆腐",
+              "脆皮臭豆腐",
+              "臭豆腐"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無比例尺可供參考，重量為依常見份量推估",
+          "炸臭豆腐堆疊於後方與底部的塊數可能受遮擋，實際總塊數可能略多於可見的13塊",
+          "盤面上未見明顯淋醬或獨立醬料碟，故未列入醬料"
+        ],
+        "summary": {
+          "total_items": 1,
+          "recognized_items": 2,
+          "rejected_items": 1,
+          "nutrition_complete": false,
+          "nutrition_totals_scope": "matched_items_only",
+          "total_calories": 32,
+          "total_sodium": 182,
+          "requires_user_confirmation": true
+        }
+      },
+      "elapsed_seconds": 13.57
+    },
+    {
+      "filename": "蔥油餅.jpg",
+      "sha256": "9df29009acf2e2a3b64429c2daeb9418702d317b981ff3e45e7e46a93cc50858",
+      "parsed": {
+        "meal_guess": "蔥抓餅加蛋",
+        "items": [
+          {
+            "name_zh": "蔥抓餅",
+            "name_en": "Flaky scallion pancake",
+            "confidence": 0.95,
+            "estimated_weight_g": 140,
+            "weight_confidence": 0.65,
+            "food_state": "prepared",
+            "count": 1,
+            "portion_description": "約1整片，直徑約15公分，蓬鬆分層",
+            "visual_evidence": "盤中圓形煎至微黃焦脆的千層麵餅，表面抓鬆並可見散布的切碎青蔥段",
+            "alternatives": [
+              "抓餅",
+              "手抓餅"
+            ]
+          },
+          {
+            "name_zh": "煎蛋",
+            "name_en": "Fried egg",
+            "confidence": 0.75,
+            "estimated_weight_g": 50,
+            "weight_confidence": 0.4,
+            "food_state": "prepared",
+            "count": 1,
+            "portion_description": "約1顆，壓在蔥抓餅下方僅露出邊緣",
+            "visual_evidence": "蔥抓餅右側及右下方邊緣底層露出明顯的鮮黃色熟蛋邊緣",
+            "alternatives": [
+              "煎雞蛋"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "煎蛋大部分被蔥抓餅遮住，僅右側邊緣可見黃色蛋皮，因此無法確定是否為整顆蛋或僅半顆、散蛋及實際厚度",
+          "無明確重量比例尺，僅能依盤緣筷子推估餅皮尺寸與重量"
+        ]
+      },
+      "response": {
+        "engine": "gemini-vision-db-lookup",
+        "meal_warnings": [],
+        "nutrition_grounding": "database_only",
+        "database_sources": [
+          "user_custom_foods",
+          "TFDA",
+          "USDA FNDDS"
+        ],
+        "meal_guess": "蔥抓餅加蛋",
+        "detections": [
+          {
+            "label": "蔥抓餅",
+            "name_zh": "蔥抓餅",
+            "detected_name_zh": "蔥抓餅",
+            "confidence": 0.95,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "name_or_alias",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "database_estimate",
+            "bounding_box": {
+              "x": 0.08,
+              "y": 0.08,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 140.0,
+            "portion_range_g": {
+              "min_g": 84.0,
+              "max_g": 196.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "約1整片，直徑約15公分，蓬鬆分層",
+            "visual_evidence": "盤中圓形煎至微黃焦脆的千層麵餅，表面抓鬆並可見散布的切碎青蔥段",
+            "reliability": {
+              "level": "medium",
+              "score": 0.95,
+              "reasons": [
+                "Gemini Vision confidence 95%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 427,
+              "protein": 11.6,
+              "carbs": 65.7,
+              "sugar": 3.2,
+              "fat": 13.0,
+              "saturated_fat": 2.7,
+              "trans_fat": 0.1,
+              "sodium": 360,
+              "fiber": 3.4,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "份量描述：約1整片，直徑約15公分，蓬鬆分層"
+            ],
+            "matched_food": {
+              "code": "R2700101",
+              "name_zh": "蔥油餅",
+              "name_en": "",
+              "category": "加工調理食品及其他類",
+              "aliases": [],
+              "description": "前處理描述:混合均勻打碎",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 305.0,
+              "protein": 8.3,
+              "fat": 9.3,
+              "carbs": 46.9,
+              "sodium": 257.0,
+              "fiber": 2.4,
+              "sugar": 2.3,
+              "saturated_fat": 1.9,
+              "trans_fat": 0.075,
+              "cholesterol": 6.0,
+              "potassium": 63.0,
+              "calcium": 19.0,
+              "iron": 0.4,
+              "magnesium": 11.0,
+              "phosphorus": 41.0,
+              "zinc": 0.5,
+              "vitamin_a_iu": 69.0,
+              "vitamin_c": 0.0,
+              "vitamin_b1": 0.03,
+              "vitamin_b2": 0.05,
+              "vitamin_b6": 0.03,
+              "vitamin_b12": 0.09,
+              "vitamin_d": 0.0,
+              "vitamin_e": 5.77,
+              "folate": 19.9,
+              "water": 34.3,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "蔥油餅",
+              "match_notes": []
+            },
+            "alternatives": []
+          },
+          {
+            "label": "煎蛋",
+            "name_zh": "煎蛋",
+            "detected_name_zh": "煎蛋",
+            "confidence": 0.75,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "name_or_alias",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "database_estimate",
+            "bounding_box": {
+              "x": 0.16,
+              "y": 0.16,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 50.0,
+            "portion_range_g": {
+              "min_g": 30.0,
+              "max_g": 70.0,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "約1顆，壓在蔥抓餅下方僅露出邊緣",
+            "visual_evidence": "蔥抓餅右側及右下方邊緣底層露出明顯的鮮黃色熟蛋邊緣",
+            "reliability": {
+              "level": "medium",
+              "score": 0.75,
+              "reasons": [
+                "Gemini Vision confidence 75%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 80,
+              "protein": 6.8,
+              "carbs": 2.5,
+              "sugar": 0.0,
+              "fat": 5.7,
+              "saturated_fat": 1.9,
+              "trans_fat": 0.0,
+              "sodium": 72,
+              "fiber": 0.0,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "份量描述：約1顆，壓在蔥抓餅下方僅露出邊緣"
+            ],
+            "matched_food": {
+              "code": "K0150101",
+              "name_zh": "煎蛋(不加油)",
+              "name_en": "Hen's egg: fried without oil",
+              "category": "蛋類",
+              "aliases": [],
+              "description": "前處理描述:雞蛋去殼打勻,小火加熱不沾鍋2~3分鐘,分五次倒入蛋液,兩面煎熟後,取出放冷均質",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 161.0,
+              "protein": 13.5,
+              "fat": 11.3,
+              "carbs": 4.9,
+              "sodium": 145.0,
+              "fiber": 0,
+              "sugar": null,
+              "saturated_fat": 3.8,
+              "trans_fat": null,
+              "cholesterol": 473.0,
+              "potassium": 135.0,
+              "calcium": 58.0,
+              "iron": 9.8,
+              "magnesium": 13.0,
+              "phosphorus": 215.0,
+              "zinc": 1.8,
+              "vitamin_a_iu": 382.0,
+              "vitamin_c": 0.0,
+              "vitamin_b1": 0.07,
+              "vitamin_b2": 0.62,
+              "vitamin_b6": 0.12,
+              "vitamin_b12": 0.43,
+              "vitamin_d": null,
+              "vitamin_e": 2.68,
+              "folate": null,
+              "water": 69.0,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "煎蛋(不加油)",
+              "match_notes": []
+            },
+            "alternatives": []
+          }
+        ],
+        "rejected_detections": [],
+        "uncertainty_notes": [
+          "煎蛋大部分被蔥抓餅遮住，僅右側邊緣可見黃色蛋皮，因此無法確定是否為整顆蛋或僅半顆、散蛋及實際厚度",
+          "無明確重量比例尺，僅能依盤緣筷子推估餅皮尺寸與重量"
+        ],
+        "summary": {
+          "total_items": 2,
+          "recognized_items": 2,
+          "rejected_items": 0,
+          "nutrition_complete": true,
+          "nutrition_totals_scope": "matched_items_only",
+          "total_calories": 507,
+          "total_sodium": 432,
+          "requires_user_confirmation": true
+        }
+      },
+      "elapsed_seconds": 13.49
+    },
+    {
+      "filename": "蛋糕.jpg",
+      "sha256": "c697e9b9a27f09c2fb81c4f982175584138aa2f68165f17636ba503e76c9bb18",
+      "parsed": {
+        "meal_guess": "堅果奶油蛋糕",
+        "items": [
+          {
+            "name_zh": "堅果奶油蛋糕",
+            "name_en": "Whole cream cake with nuts and chocolate toppings",
+            "confidence": 0.92,
+            "estimated_weight_g": 600,
+            "weight_confidence": 0.35,
+            "food_state": "prepared",
+            "count": 1,
+            "portion_description": "整顆圓形蛋糕（依表面藍莓與榛果比例推測約6吋，不含非可食插牌）",
+            "visual_evidence": "整顆圓形米白色奶油霜抹面蛋糕，側面與表面帶有細碎堅果粒；頂部有淺褐色奶油擠花、約7顆帶皮榛果、2顆藍莓、1團巧克力脆片與2片圓形深色巧克力片，底部邊緣可見深色蛋糕體，上方插有品牌插牌。",
+            "alternatives": [
+              "鮮奶油蛋糕",
+              "蛋糕",
+              "整顆蛋糕"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無比例尺且為去背背景，僅依表面藍莓與榛果大小推測為約6吋蛋糕，重量估計信心度較低。",
+          "蛋糕內部結構、蛋糕體口味與夾層餡料無法從外觀判別，未推測內餡種類。",
+          "頂部的「SHINEHOUSE・BAKERY」插牌為非可食裝飾物，未計入可食重量。"
+        ]
+      },
+      "response": {
+        "engine": "gemini-vision-db-lookup",
+        "meal_warnings": [],
+        "nutrition_grounding": "database_only",
+        "database_sources": [
+          "user_custom_foods",
+          "TFDA",
+          "USDA FNDDS"
+        ],
+        "meal_guess": "堅果奶油蛋糕",
+        "detections": [],
+        "rejected_detections": [
+          {
+            "label": "堅果奶油蛋糕",
+            "confidence": 0.92,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "堅果奶油蛋糕",
+              "鮮奶油蛋糕",
+              "蛋糕",
+              "整顆蛋糕"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無比例尺且為去背背景，僅依表面藍莓與榛果大小推測為約6吋蛋糕，重量估計信心度較低。",
+          "蛋糕內部結構、蛋糕體口味與夾層餡料無法從外觀判別，未推測內餡種類。",
+          "頂部的「SHINEHOUSE・BAKERY」插牌為非可食裝飾物，未計入可食重量。"
+        ],
+        "summary": {
+          "total_items": 0,
+          "recognized_items": 1,
+          "rejected_items": 1,
+          "nutrition_complete": false,
+          "nutrition_totals_scope": "matched_items_only",
+          "total_calories": 0,
+          "total_sodium": 0,
+          "requires_user_confirmation": true
+        }
+      },
+      "elapsed_seconds": 12.87
+    },
+    {
+      "filename": "陽春麵.jpg",
+      "sha256": "e1f6b690a2607eac640c2766f7c5dd9df36908e700dbe995af4d16cd1abb9583",
+      "parsed": {
+        "meal_guess": "陽春湯麵",
+        "items": [
+          {
+            "name_zh": "熟白麵條",
+            "name_en": "Cooked wheat noodles",
+            "confidence": 0.92,
+            "estimated_weight_g": 180,
+            "weight_confidence": 0.4,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "約一碗份量的熟麵條",
+            "visual_evidence": "碗中央及右側可見大量米白色細長熟麵條",
+            "alternatives": [
+              "熟麵條",
+              "白麵條"
+            ]
+          },
+          {
+            "name_zh": "綠色葉菜",
+            "name_en": "Cooked leafy green vegetables",
+            "confidence": 0.75,
+            "estimated_weight_g": 70,
+            "weight_confidence": 0.4,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "鋪於碗左側與右上方的燙青菜段",
+            "visual_evidence": "碗左側及右上方可見鮮綠色葉片與寬扁淺白綠色菜梗",
+            "alternatives": [
+              "葉菜",
+              "燙青菜"
+            ]
+          },
+          {
+            "name_zh": "蔥花",
+            "name_en": "Chopped green onions",
+            "confidence": 0.95,
+            "estimated_weight_g": 3,
+            "weight_confidence": 0.35,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "少量撒於麵條與青菜表面",
+            "visual_evidence": "麵條與青菜上方散落十餘個綠色環狀蔥花",
+            "alternatives": [
+              "青蔥末",
+              "蔥末"
+            ]
+          },
+          {
+            "name_zh": "麵湯",
+            "name_en": "Noodle soup broth",
+            "confidence": 0.9,
+            "estimated_weight_g": 250,
+            "weight_confidence": 0.3,
+            "food_state": "prepared",
+            "count": null,
+            "portion_description": "浸潤麵條與青菜的清湯",
+            "visual_evidence": "碗內底部及麵條縫隙可見淡褐色清澈湯汁",
+            "alternatives": [
+              "清湯",
+              "高湯"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無比例尺且無法判斷碗的實際深度，麵條與湯汁重量估計不確定性較高",
+          "綠色葉菜外觀可能為小白菜或青江菜，無法完全確認品種",
+          "無法確認麵條下方是否藏有其他配料或肉片",
+          "菜葉表面可見極微小的紅色點狀物，疑似少量辣椒碎或調味料微粒，因過小未列為獨立項目"
+        ]
+      },
+      "response": {
+        "engine": "gemini-vision-db-lookup",
+        "meal_warnings": [],
+        "nutrition_grounding": "database_only",
+        "database_sources": [
+          "user_custom_foods",
+          "TFDA",
+          "USDA FNDDS"
+        ],
+        "meal_guess": "陽春湯麵",
+        "detections": [
+          {
+            "label": "蔥花",
+            "name_zh": "蔥花",
+            "detected_name_zh": "蔥花",
+            "confidence": 0.95,
+            "needs_confirmation": true,
+            "source": "TFDA",
+            "nutrition_match_type": "reference",
+            "nutrition_source_url": "https://data.gov.tw/dataset/8543",
+            "nutrition_status": "reference_estimate",
+            "bounding_box": {
+              "x": 0.24,
+              "y": 0.24,
+              "w": 0.32,
+              "h": 0.24
+            },
+            "estimated_weight_g": 3.0,
+            "portion_range_g": {
+              "min_g": 1.8,
+              "max_g": 4.2,
+              "uncertainty_percent": 40
+            },
+            "portion_estimation_method": "gemini_vision_portion_estimate_v1",
+            "portion_description": "少量撒於麵條與青菜表面",
+            "visual_evidence": "麵條與青菜上方散落十餘個綠色環狀蔥花",
+            "reliability": {
+              "level": "medium",
+              "score": 0.95,
+              "reasons": [
+                "Gemini Vision confidence 95%",
+                "TFDA / database grounding",
+                "Vision and database are combined to reduce false positives.",
+                "Needs user confirmation because the match is uncertain."
+              ]
+            },
+            "nutrition": {
+              "calories": 1,
+              "protein": 0.0,
+              "carbs": 0.2,
+              "sugar": 0.1,
+              "fat": 0.0,
+              "saturated_fat": 0.0,
+              "trans_fat": 0.0,
+              "sodium": 0,
+              "fiber": 0.1,
+              "is_fried": false
+            },
+            "gi": "medium",
+            "allergens": [],
+            "warnings": [
+              "影像辨識與份量為估計值，請確認食品名稱與可食重量",
+              "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化",
+              "份量描述：少量撒於麵條與青菜表面",
+              "本餐有 3 項尚未計入，營養合計不完整"
+            ],
+            "matched_food": {
+              "code": "E23001",
+              "name_zh": "青蔥平均值",
+              "name_en": "Welsh onion, Bunching onion, Green onion",
+              "category": "蔬菜類",
+              "aliases": [],
+              "description": "樣品狀態:生; 前處理描述:去根部及葉尾與外葉,混合均勻打碎",
+              "source_url": "https://data.gov.tw/dataset/8543",
+              "calories": 31.0,
+              "protein": 1.3,
+              "fat": 0.2,
+              "carbs": 6.6,
+              "sodium": 1.0,
+              "fiber": 2.2,
+              "sugar": 3.1,
+              "saturated_fat": 0.1,
+              "trans_fat": 0.0,
+              "cholesterol": null,
+              "potassium": 194.0,
+              "calcium": 38.0,
+              "iron": 0.6,
+              "magnesium": 14.0,
+              "phosphorus": 26.0,
+              "zinc": 0.3,
+              "vitamin_a_iu": 186.0,
+              "vitamin_c": 15.3,
+              "vitamin_b1": 0.06,
+              "vitamin_b2": 0.07,
+              "vitamin_b6": 0.08,
+              "vitamin_b12": null,
+              "vitamin_d": 0.0,
+              "vitamin_e": 1.18,
+              "folate": 52.2,
+              "water": 91.4,
+              "unit": "per 100g",
+              "source": "TFDA",
+              "key": "青蔥平均值",
+              "match_notes": [
+                "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+              ]
+            },
+            "alternatives": [
+              {
+                "code": "E2300101",
+                "name_zh": "青蔥(有機)",
+                "name_en": "Welsh onion, Bunching onion, Green onion",
+                "category": "蔬菜類",
+                "aliases": [
+                  "蔥",
+                  "葉蔥",
+                  "蔥仔"
+                ],
+                "description": "樣品狀態:生,冷藏袋裝; 前處理描述:去根部,外葉及葉尾,混合均勻打碎",
+                "source_url": "https://data.gov.tw/dataset/8543",
+                "calories": 31.0,
+                "protein": 1.1,
+                "fat": 0.2,
+                "carbs": 6.8,
+                "sodium": 1.0,
+                "fiber": 2.7,
+                "sugar": 3.7,
+                "saturated_fat": 0.1,
+                "trans_fat": 0.0,
+                "cholesterol": null,
+                "potassium": 210.0,
+                "calcium": 38.0,
+                "iron": 0.9,
+                "magnesium": 19.0,
+                "phosphorus": 32.0,
+                "zinc": 0.3,
+                "vitamin_a_iu": 122.0,
+                "vitamin_c": 9.3,
+                "vitamin_b1": 0.06,
+                "vitamin_b2": 0.06,
+                "vitamin_b6": 0.09,
+                "vitamin_b12": null,
+                "vitamin_d": 0.0,
+                "vitamin_e": 0.14,
+                "folate": 58.3,
+                "water": 91.3,
+                "unit": "per 100g",
+                "source": "TFDA",
+                "key": "青蔥(有機)",
+                "match_notes": [
+                  "營養採原態食材參考值，未包含烹調用油、醬汁與生熟重量變化"
+                ]
+              }
+            ]
+          }
+        ],
+        "rejected_detections": [
+          {
+            "label": "熟白麵條",
+            "confidence": 0.92,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "熟白麵條",
+              "熟麵條",
+              "白麵條"
+            ]
+          },
+          {
+            "label": "綠色葉菜",
+            "confidence": 0.75,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "綠色葉菜",
+              "葉菜",
+              "燙青菜"
+            ]
+          },
+          {
+            "label": "麵湯",
+            "confidence": 0.9,
+            "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+            "recognition_status": "recognized",
+            "nutrition_status": "unmatched",
+            "search_hints": [
+              "麵湯",
+              "清湯",
+              "高湯"
+            ]
+          }
+        ],
+        "uncertainty_notes": [
+          "照片無比例尺且無法判斷碗的實際深度，麵條與湯汁重量估計不確定性較高",
+          "綠色葉菜外觀可能為小白菜或青江菜，無法完全確認品種",
+          "無法確認麵條下方是否藏有其他配料或肉片",
+          "菜葉表面可見極微小的紅色點狀物，疑似少量辣椒碎或調味料微粒，因過小未列為獨立項目"
+        ],
+        "summary": {
+          "total_items": 1,
+          "recognized_items": 4,
+          "rejected_items": 3,
+          "nutrition_complete": false,
+          "nutrition_totals_scope": "matched_items_only",
+          "total_calories": 1,
+          "total_sodium": 0,
+          "requires_user_confirmation": true
+        }
+      },
+      "elapsed_seconds": 16.69
+    }
+  ]
+}

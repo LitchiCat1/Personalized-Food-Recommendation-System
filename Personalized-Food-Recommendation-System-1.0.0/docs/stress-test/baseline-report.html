@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NutriLens v1.0.0 壓力測試基線報告</title>
+  <style>
+    :root { color-scheme: light; --bg:#f6f8f7; --surface:#fff; --ink:#14201b; --muted:#63736c; --line:#dbe6e0; --green:#1f9d72; --blue:#2f80ed; --orange:#ed8a19; --red:#d94b4b; }
+    * { box-sizing: border-box; }
+    body { margin:0; padding:32px 20px 48px; background:var(--bg); color:var(--ink); font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    main { max-width:1080px; margin:auto; }
+    h1,h2,p { margin:0; } h1 { font-size:28px; line-height:1.2; } h2 { font-size:18px; margin-bottom:14px; }
+    .eyebrow { color:var(--green); font-weight:700; letter-spacing:.04em; margin-bottom:8px; }
+    .muted { color:var(--muted); } .note { margin-top:10px; color:var(--muted); }
+    .summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:24px 0; }
+    .stat { background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:16px; }
+    .stat-label { color:var(--muted); font-size:13px; } .stat-value { font-size:26px; font-weight:700; margin-top:3px; }
+    section { background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:20px; margin-top:16px; }
+    .chart-wrap { overflow-x:auto; } svg { display:block; width:100%; min-width:680px; height:auto; }
+    .legend { display:flex; flex-wrap:wrap; gap:16px; margin-top:8px; color:var(--muted); font-size:13px; }
+    .legend span::before { content:""; display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; background:var(--green); }
+    .legend .max::before { background:var(--blue); } .legend .threshold::before { background:var(--orange); }
+    .callout { border-left:4px solid var(--orange); padding:10px 12px; background:#fff7e8; margin-top:16px; }
+    table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; } th,td { text-align:right; padding:9px 8px; border-bottom:1px solid var(--line); } th:first-child,td:first-child { text-align:left; } th { color:var(--muted); font-weight:600; }
+    .ok { color:var(--green); font-weight:700; } .footer { margin-top:18px; font-size:13px; color:var(--muted); }
+    @media (max-width:700px) { body { padding:22px 12px 36px; } h1 { font-size:23px; } .summary { grid-template-columns:repeat(2,minmax(0,1fr)); } section { padding:14px; } }
+  </style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">NUTRILENS / BASELINE-2026-11-11</p>
+  <h1>v1.0.0 壓力測試基線報告</h1>
+  <p class="note">目標：<code>https://node.taile9a8dc.ts.net/</code> · 唯讀端點 · 2026-11-11</p>
+
+  <div class="summary" aria-label="測試摘要">
+    <div class="stat"><div class="stat-label">總請求數</div><div class="stat-value">39</div></div>
+    <div class="stat"><div class="stat-label">成功率</div><div class="stat-value ok">100%</div></div>
+    <div class="stat"><div class="stat-label">最高觀測延遲</div><div class="stat-value">2.03 s</div></div>
+    <div class="stat"><div class="stat-label">最大併發樣本</div><div class="stat-value">5</div></div>
+  </div>
+
+  <section>
+    <h2>併發增加時，/health 延遲如何變化</h2>
+    <div class="chart-wrap">
+      <svg viewBox="0 0 900 330" role="img" aria-labelledby="concurrency-title concurrency-desc">
+        <title id="concurrency-title">併發與健康檢查延遲</title>
+        <desc id="concurrency-desc">1、2、5 個同時請求的 p50 與最大延遲；橘色虛線為 2 秒參考線。</desc>
+        <line x1="70" y1="260" x2="860" y2="260" stroke="#dbe6e0"/><line x1="70" y1="180" x2="860" y2="180" stroke="#dbe6e0"/><line x1="70" y1="100" x2="860" y2="100" stroke="#dbe6e0"/><line x1="70" y1="20" x2="860" y2="20" stroke="#dbe6e0"/>
+        <text x="58" y="265" text-anchor="end" fill="#63736c">0</text><text x="58" y="185" text-anchor="end" fill="#63736c">1s</text><text x="58" y="105" text-anchor="end" fill="#63736c">2s</text><text x="58" y="25" text-anchor="end" fill="#63736c">3s</text>
+        <line x1="70" y1="100" x2="860" y2="100" stroke="#ed8a19" stroke-width="2" stroke-dasharray="7 6"/>
+        <text x="855" y="93" text-anchor="end" fill="#ed8a19">2 秒參考線</text>
+        <polyline points="190,137.2 465,110.4 740,98.6" fill="none" stroke="#1f9d72" stroke-width="4"/>
+        <polyline points="190,127.5 465,106.2 740,97.3" fill="none" stroke="#2f80ed" stroke-width="4"/>
+        <circle cx="190" cy="137.2" r="6" fill="#1f9d72"/><circle cx="465" cy="110.4" r="6" fill="#1f9d72"/><circle cx="740" cy="98.6" r="6" fill="#1f9d72"/>
+        <circle cx="190" cy="127.5" r="6" fill="#2f80ed"/><circle cx="465" cy="106.2" r="6" fill="#2f80ed"/><circle cx="740" cy="97.3" r="6" fill="#2f80ed"/>
+        <text x="190" y="286" text-anchor="middle" fill="#14201b">1</text><text x="465" y="286" text-anchor="middle" fill="#14201b">2</text><text x="740" y="286" text-anchor="middle" fill="#14201b">5</text>
+        <text x="465" y="315" text-anchor="middle" fill="#63736c">同時請求數</text>
+        <text x="180" y="128" text-anchor="end" fill="#1f9d72">1.54s</text><text x="455" y="101" text-anchor="end" fill="#1f9d72">1.87s</text><text x="730" y="89" text-anchor="end" fill="#1f9d72">2.02s</text>
+        <text x="200" y="117" fill="#2f80ed">1.66s</text><text x="475" y="96" fill="#2f80ed">1.92s</text><text x="750" y="88" fill="#2f80ed">2.03s</text>
+      </svg>
+    </div>
+    <div class="legend"><span>p50 延遲</span><span class="max">最大延遲</span><span class="threshold">2 秒參考線</span></div>
+    <div class="callout">少量唯讀併發都成功，但從 1 增加到 5 個同時請求時，p50 已由 1.54 秒升到 2.02 秒。這是容量測試的警訊，不是「最多 5 人」的結論。</div>
+  </section>
+
+  <section>
+    <h2>各公開端點的單人基線延遲</h2>
+    <div class="chart-wrap">
+      <svg viewBox="0 0 900 300" role="img" aria-labelledby="endpoint-title endpoint-desc">
+        <title id="endpoint-title">公開端點單人延遲比較</title>
+        <desc id="endpoint-desc">四個公開端點各執行五次，顯示 p50 與最大延遲。</desc>
+        <line x1="180" y1="245" x2="850" y2="245" stroke="#dbe6e0"/><line x1="180" y1="175" x2="850" y2="175" stroke="#dbe6e0"/><line x1="180" y1="105" x2="850" y2="105" stroke="#dbe6e0"/><line x1="180" y1="35" x2="850" y2="35" stroke="#dbe6e0"/>
+        <text x="170" y="250" text-anchor="end" fill="#63736c">0</text><text x="170" y="180" text-anchor="end" fill="#63736c">0.25s</text><text x="170" y="110" text-anchor="end" fill="#63736c">0.5s</text><text x="170" y="40" text-anchor="end" fill="#63736c">0.75s</text>
+        <text x="170" y="79" text-anchor="end" fill="#63736c">延遲</text>
+        <text x="180" y="275" fill="#14201b">/health</text><text x="350" y="275" fill="#14201b">/auth/config</text><text x="520" y="275" fill="#14201b">/disease-rules</text><text x="690" y="275" fill="#14201b">/medical-metadata</text>
+        <rect x="210" y="93.5" width="70" height="151.5" rx="3" fill="#1f9d72"/><rect x="380" y="92.7" width="70" height="152.3" rx="3" fill="#1f9d72"/><rect x="550" y="93.9" width="70" height="151.1" rx="3" fill="#1f9d72"/><rect x="720" y="66.1" width="70" height="178.9" rx="3" fill="#1f9d72"/>
+        <text x="245" y="84" text-anchor="middle" fill="#14201b">541ms</text><text x="415" y="83" text-anchor="middle" fill="#14201b">544ms</text><text x="585" y="84" text-anchor="middle" fill="#14201b">543ms</text><text x="755" y="56" text-anchor="middle" fill="#14201b">639ms</text>
+      </svg>
+    </div>
+    <div class="legend"><span>p50 延遲（每個端點 5 次）</span></div>
+    <table>
+      <thead><tr><th>端點</th><th>樣本</th><th>成功率</th><th>最小</th><th>p50</th><th>最大</th></tr></thead>
+      <tbody>
+        <tr><td>/health</td><td>5</td><td class="ok">100%</td><td>535ms</td><td>541ms</td><td>973ms</td></tr>
+        <tr><td>/auth/config</td><td>5</td><td class="ok">100%</td><td>530ms</td><td>544ms</td><td>564ms</td></tr>
+        <tr><td>/disease-rules</td><td>5</td><td class="ok">100%</td><td>537ms</td><td>543ms</td><td>553ms</td></tr>
+        <tr><td>/medical-metadata</td><td>5</td><td class="ok">100%</td><td>622ms</td><td>639ms</td><td>682ms</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>如何解讀</h2>
+    <p class="muted">這次只測試 GET/公開端點，沒有登入、註冊、寫入資料、付費 API、影像辨識或長時間 soak test，因此只能證明「基線時服務可回應」，不能回答「最多幾個人」。正式容量測試仍須在同學同意的時段，逐級測試 1 → 5 → 10 → 20 → 30 → 50 位真實測試帳號，並同步記錄 CPU、記憶體、磁碟、網路、5xx、逾時與斷線重連。</p>
+    <p class="footer">逐筆端點資料：<code>baseline_requests.csv</code> · 併發摘要：<code>baseline_concurrency.csv</code> · 完整彙總：<code>baseline_summary.json</code></p>
+  </section>
+</main>
+</body>
+</html>

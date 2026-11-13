@@ -1,0 +1,211 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "一筆飲食紀錄的去向",
+    "subtitle": "從記錄到三個畫面各自看到什麼",
+    "output": "docs/architecture/meal-record.html",
+    "visual_preset": "blueprint",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "capture",
+        "label": "怎麼進來",
+        "focus": [
+          "scan",
+          "manual",
+          "records"
+        ],
+        "note": "兩條路徑寫進同一張表；手動那條目前不送餐別，後端會補成午餐。"
+      },
+      {
+        "id": "derive",
+        "label": "後端算什麼",
+        "focus": [
+          "records",
+          "targets",
+          "limits",
+          "stats"
+        ],
+        "note": "每日目標依疾病指引算，單餐上限取規則檔與公式中較嚴的一組。"
+      },
+      {
+        "id": "surface",
+        "label": "畫面看到什麼",
+        "focus": [
+          "home",
+          "trends",
+          "profile"
+        ],
+        "note": "三個畫面吃同一份數字，不各自重算。"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "label": "記錄"
+    },
+    {
+      "label": "儲存"
+    },
+    {
+      "label": "後端計算"
+    },
+    {
+      "label": "畫面"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "scan",
+      "type": "frontend",
+      "label": "掃描辨識",
+      "sublabel": "Gemini 估算營養",
+      "stage": 0,
+      "row": 0,
+      "tag": "計費"
+    },
+    {
+      "id": "manual",
+      "type": "frontend",
+      "label": "手動新增",
+      "sublabel": "自行填九項營養素",
+      "stage": 0,
+      "row": 2
+    },
+    {
+      "id": "records",
+      "type": "database",
+      "label": "records",
+      "sublabel": "SQLite（nutrilens.db）",
+      "stage": 1,
+      "row": 1
+    },
+    {
+      "id": "targets",
+      "type": "backend",
+      "label": "每日目標",
+      "sublabel": "依疾病指引計算",
+      "stage": 2,
+      "row": 1
+    },
+    {
+      "id": "limits",
+      "type": "security",
+      "label": "單餐上限",
+      "sublabel": "取較嚴的一組",
+      "stage": 2,
+      "row": 0
+    },
+    {
+      "id": "stats",
+      "type": "backend",
+      "label": "連續天數 / 累積餐數",
+      "sublabel": "由實際紀錄推算",
+      "stage": 2,
+      "row": 2
+    },
+    {
+      "id": "home",
+      "type": "frontend",
+      "label": "首頁",
+      "sublabel": "今日進度與警示",
+      "stage": 3,
+      "row": 0
+    },
+    {
+      "id": "trends",
+      "type": "frontend",
+      "label": "趨勢",
+      "sublabel": "七日均值與鈉風險",
+      "stage": 3,
+      "row": 1
+    },
+    {
+      "id": "profile",
+      "type": "frontend",
+      "label": "我的",
+      "sublabel": "檔案與目標對照",
+      "stage": 3,
+      "row": 2
+    }
+  ],
+  "flows": [
+    {
+      "from": "scan",
+      "to": "records",
+      "label": "POST /record",
+      "variant": "emphasis"
+    },
+    {
+      "from": "manual",
+      "to": "records",
+      "label": "手填"
+    },
+    {
+      "from": "records",
+      "to": "targets",
+      "label": "當日",
+      "variant": "emphasis",
+      "labelDx": 28
+    },
+    {
+      "from": "records",
+      "to": "limits",
+      "label": "疾病條件",
+      "labelDy": 16
+    },
+    {
+      "from": "records",
+      "to": "stats",
+      "label": "歷史"
+    },
+    {
+      "from": "targets",
+      "to": "home",
+      "label": "剩餘熱量",
+      "variant": "emphasis",
+      "labelDy": -16
+    },
+    {
+      "from": "limits",
+      "to": "home",
+      "label": "單餐超標警示",
+      "variant": "security",
+      "route": "straight"
+    },
+    {
+      "from": "targets",
+      "to": "trends",
+      "label": "達標",
+      "route": "straight",
+      "labelDx": 22
+    },
+    {
+      "from": "stats",
+      "to": "profile",
+      "label": "連續"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "同一份數字",
+      "items": [
+        "每日目標與單餐上限都由後端算好再下發",
+        "三個畫面不各自重算門檻",
+        "前端只負責比大小與呈現"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "還沒修的缺口",
+      "items": [
+        "手動新增不送餐別，後端一律補成午餐",
+        "TFDA 是食材樣本庫，查不到便當這類菜色",
+        "手動路徑要使用者自己填九項營養素"
+      ]
+    }
+  ]
+}

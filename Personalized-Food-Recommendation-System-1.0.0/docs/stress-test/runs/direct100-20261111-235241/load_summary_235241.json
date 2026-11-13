@@ -1,0 +1,790 @@
+{
+  "target": "https://node.taile9a8dc.ts.net",
+  "started_at": "2026-11-11T23:52:41.252+08:00",
+  "load_id": "235241",
+  "accounts": 100,
+  "retained_records_per_account": 3,
+  "stage_seconds_requested": 20,
+  "soak_seconds_requested": 60,
+  "stages": [
+    {
+      "phase": "burst",
+      "concurrency": 100,
+      "started": true,
+      "completed": true,
+      "reference_pass": false,
+      "cycle_count": 100,
+      "users_with_failed_cycles": 61,
+      "users_with_successful_cycles": 39,
+      "requests": 373,
+      "success": 312,
+      "failed": 61,
+      "success_pct": 83.646,
+      "p50_ms": 200.56,
+      "p95_ms": 18153.89,
+      "p99_ms": 19435.1,
+      "max_ms": 19927.53,
+      "duration_s": 19.989,
+      "rps": 18.661,
+      "first_request": {
+        "requests": 100,
+        "success": 39,
+        "failed": 61,
+        "success_pct": 39.0,
+        "p50_ms": 16082.38,
+        "p95_ms": 19422.74,
+        "p99_ms": 19597.92,
+        "max_ms": 19927.53,
+        "duration_s": null,
+        "rps": null
+      },
+      "later_api": {
+        "requests": 273,
+        "success": 273,
+        "failed": 0,
+        "success_pct": 100.0,
+        "p50_ms": 176.73,
+        "p95_ms": 332.43,
+        "p99_ms": 383.28,
+        "max_ms": 441.85,
+        "duration_s": null,
+        "rps": null
+      },
+      "attempt": 1,
+      "purpose": "direct_100_simultaneous_users",
+      "row_start": 101,
+      "row_end": 478,
+      "finished_at": "2026-11-11T23:54:53.032+08:00"
+    }
+  ],
+  "generator_resources": [
+    {
+      "timestamp": "2026-11-11T23:54:35.664+08:00",
+      "phase": "burst",
+      "concurrency": 100,
+      "local_process_cpu_percent": 777.4,
+      "local_host_cpu_percent": 82.1,
+      "local_process_rss_mb": 60.44,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T23:54:40.824+08:00",
+      "phase": "burst",
+      "concurrency": 100,
+      "local_process_cpu_percent": 602.6,
+      "local_host_cpu_percent": 71.7,
+      "local_process_rss_mb": 74.41,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T23:54:46.008+08:00",
+      "phase": "burst",
+      "concurrency": 100,
+      "local_process_cpu_percent": 963.2,
+      "local_host_cpu_percent": 99.9,
+      "local_process_rss_mb": 93.55,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    },
+    {
+      "timestamp": "2026-11-11T23:54:51.186+08:00",
+      "phase": "burst",
+      "concurrency": 100,
+      "local_process_cpu_percent": 1129.0,
+      "local_host_cpu_percent": 99.9,
+      "local_process_rss_mb": 117.06,
+      "server_started_at": "2026-11-11T21:47:11.356665+08:00"
+    }
+  ],
+  "stop_reason": null,
+  "maximum_supported_users": null,
+  "remote_resource_monitoring": false,
+  "method": "100 simultaneous fresh HTTP sessions; no all-user warmup gate; one 8-request authenticated CRUD flow per user",
+  "source_population": "D:\\SH\\web\\Personalized-Food-Recommendation-System-0.0.9-new\\Personalized-Food-Recommendation-System-0.0.9\\docs\\stress-test\\runs\\population-20261111-2230",
+  "max_accounts": 100,
+  "confirmation_seconds": 60,
+  "reference": {
+    "p95_ms_below": 2000,
+    "request_failure_ratio_below": 0.01,
+    "users_with_failed_cycles_ratio_below": 0.01
+  },
+  "note": "Connection failures count as failed users. Partial completion does not establish sustained capacity for 100 users.",
+  "requested_users": 100,
+  "conditional_confirmation_seconds": 60,
+  "initial_health": {
+    "app_version": "v1.0.0",
+    "auth_provider": "local-sqlite",
+    "auth_required": true,
+    "cached_restaurant_menus": 36,
+    "custom_foods": 0,
+    "database": "sqlite",
+    "database_path": null,
+    "deployed_branch": "local",
+    "deployed_commit": "local",
+    "disease_rule_review_status": {
+      "guideline_screening": 3,
+      "requires_clinical_personalization": 1,
+      "screening_rule": 1
+    },
+    "disease_rules": 5,
+    "foods_in_db": 12,
+    "foods_in_tfda": 2181,
+    "mongo": false,
+    "openai_enabled": true,
+    "places_enabled": true,
+    "recognition_engine": "gemini-vision-db-lookup",
+    "restaurants": 20,
+    "started_at": "2026-11-11T21:47:11.356665+08:00",
+    "status": "ok"
+  },
+  "updated_at": "2026-11-11T23:55:28.286+08:00",
+  "health": {
+    "requests": 4,
+    "success": 4,
+    "failed": 0,
+    "success_pct": 100.0,
+    "p50_ms": 163.38,
+    "p95_ms": 2347.58,
+    "p99_ms": 2655.6,
+    "max_ms": 2732.6,
+    "duration_s": null,
+    "rps": null
+  },
+  "outstanding_tokens": 0,
+  "pending_temporary_records": 0,
+  "search_end": "Direct 100-user attempt finished",
+  "final_health": {
+    "app_version": "v1.0.0",
+    "auth_provider": "local-sqlite",
+    "auth_required": true,
+    "cached_restaurant_menus": 36,
+    "custom_foods": 0,
+    "database": "sqlite",
+    "database_path": null,
+    "deployed_branch": "local",
+    "deployed_commit": "local",
+    "disease_rule_review_status": {
+      "guideline_screening": 3,
+      "requires_clinical_personalization": 1,
+      "screening_rule": 1
+    },
+    "disease_rules": 5,
+    "foods_in_db": 12,
+    "foods_in_tfda": 2181,
+    "mongo": false,
+    "openai_enabled": true,
+    "places_enabled": true,
+    "recognition_engine": "gemini-vision-db-lookup",
+    "restaurants": 20,
+    "started_at": "2026-11-11T21:47:11.356665+08:00",
+    "status": "ok"
+  },
+  "verification": {
+    "accounts_checked": 100,
+    "accounts_valid": 100,
+    "checks": [
+      {
+        "account": "stress_test_20261111_051",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_052",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_053",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_054",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_055",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_056",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_057",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_058",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_059",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_060",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_061",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_062",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_063",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_064",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_065",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_066",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_067",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_068",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_069",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_070",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_071",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_072",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_073",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_074",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_075",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_076",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_077",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_078",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_079",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_080",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_081",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_082",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_083",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_084",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_085",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_086",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_087",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_088",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_089",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_090",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_091",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_092",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_093",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_094",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_095",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_096",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_097",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_098",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_099",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_100",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_101",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_102",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_103",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_104",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_105",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_106",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_107",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_108",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_109",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_110",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_111",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_112",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_113",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_114",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_115",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_116",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_117",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_118",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_119",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_120",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_121",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_122",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_123",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_124",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_125",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_126",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_127",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_128",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_129",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_130",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_131",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_132",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_133",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_134",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_135",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_136",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_137",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_138",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_139",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_140",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_141",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_142",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_143",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_144",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_145",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_146",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_147",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_148",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_149",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      },
+      {
+        "account": "stress_test_20261111_150",
+        "seed_records_valid": true,
+        "temporary_records_remaining": 0,
+        "record_count": 3
+      }
+    ],
+    "pending_temporary_records": 0,
+    "outstanding_tokens": 0
+  },
+  "finished_at": "2026-11-11T23:55:28.286+08:00"
+}

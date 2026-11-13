@@ -1,0 +1,224 @@
+{
+  "run_id": "persistent-20261111-215732",
+  "target": "https://node.taile9a8dc.ts.net",
+  "started_at": "2026-11-11T21:57:32.954120+08:00",
+  "method": "persistent HTTP sessions; 7 operations per cycle; 4-6 s think time after each cycle",
+  "server_resource_monitoring": false,
+  "stages": [
+    {
+      "phase": "load",
+      "concurrency": 1,
+      "requests": 14,
+      "success": 14,
+      "failed": 0,
+      "success_pct": 100.0,
+      "p50_ms": 171.04,
+      "p95_ms": 185.25,
+      "p99_ms": 187.44,
+      "max_ms": 187.99,
+      "duration_s": 12.16,
+      "rps": 1.151
+    }
+  ],
+  "initial_health": {
+    "app_version": "v1.0.0",
+    "auth_provider": "local-sqlite",
+    "auth_required": true,
+    "cached_restaurant_menus": 36,
+    "custom_foods": 0,
+    "database": "sqlite",
+    "database_path": null,
+    "deployed_branch": "local",
+    "deployed_commit": "local",
+    "disease_rule_review_status": {
+      "guideline_screening": 3,
+      "requires_clinical_personalization": 1,
+      "screening_rule": 1
+    },
+    "disease_rules": 5,
+    "foods_in_db": 12,
+    "foods_in_tfda": 2181,
+    "mongo": false,
+    "openai_enabled": true,
+    "places_enabled": true,
+    "recognition_engine": "gemini-vision-db-lookup",
+    "restaurants": 20,
+    "started_at": "2026-11-11T21:47:11.356665+08:00",
+    "status": "ok"
+  },
+  "requested_levels": [
+    1,
+    5,
+    10,
+    15,
+    18
+  ],
+  "active_account_count": 18,
+  "finished_at": "2026-11-11T21:58:21.695551+08:00",
+  "stop_reason": "three consecutive failed health probes",
+  "monitor": {
+    "requests": 3,
+    "success": 0,
+    "failed": 3,
+    "success_pct": 0.0,
+    "p50_ms": 728.29,
+    "p95_ms": 864.19,
+    "p99_ms": 876.27,
+    "max_ms": 879.29,
+    "duration_s": null,
+    "rps": null
+  },
+  "generator_resources": [
+    {
+      "timestamp": "2026-11-11T21:58:03+08:00",
+      "elapsed_s": 30.891,
+      "phase": "load",
+      "concurrency": 1,
+      "generator_cpu_percent": 79.3,
+      "generator_host_cpu_percent": 24.5,
+      "generator_rss_mb": 57.5,
+      "server_started_at": null
+    },
+    {
+      "timestamp": "2026-11-11T21:58:09+08:00",
+      "elapsed_s": 36.78,
+      "phase": "load",
+      "concurrency": 1,
+      "generator_cpu_percent": 11.9,
+      "generator_host_cpu_percent": 24.7,
+      "generator_rss_mb": 58.43,
+      "server_started_at": null
+    },
+    {
+      "timestamp": "2026-11-11T21:58:15+08:00",
+      "elapsed_s": 42.49,
+      "phase": "load",
+      "concurrency": 1,
+      "generator_cpu_percent": 10.9,
+      "generator_host_cpu_percent": 21.9,
+      "generator_rss_mb": 59.15,
+      "server_started_at": null
+    }
+  ],
+  "request_count_by_phase": {
+    "preparation": 36,
+    "warmup": 1,
+    "load": 14,
+    "monitor": 3,
+    "cleanup": 36
+  },
+  "cleanup": {
+    "pending": 0,
+    "checks": [
+      {
+        "user_index": 0,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 1,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 2,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 3,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 4,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 5,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 6,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 7,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 8,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 9,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 10,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 11,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 12,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 13,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 14,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 15,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 16,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      },
+      {
+        "user_index": 17,
+        "baseline_match": true,
+        "before_count": 0,
+        "after_count": 0
+      }
+    ],
+    "all_baselines_match": true
+  }
+}

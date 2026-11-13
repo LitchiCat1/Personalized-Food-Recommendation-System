@@ -1,0 +1,307 @@
+# Changelog
+
+## v1.0.1 - 2026-11-13（AI 中轉站金鑰池與照片營養配對修正）
+
+### Added
+
+- 所有 AI 功能共用中轉站 Base URL、模型與金鑰池；同一程序以空閒金鑰輪替，包含限流冷卻及等待機制。
+- 公開 `key.txt.example` 與私下交付完整 `key.txt` 的部署步驟，避免將真實金鑰上傳公開儲存庫。
+- 更新官方 TFDA 2,213 筆食品，加入 USDA FNDDS 5,431 筆備援資料，保留來源、食品編號、缺值及下載雜湊。
+- 收錄 13 張食物照片的修改前後測試、離線重播工具及照片辨識／資料匯入回歸測試。
+
+### Fixed
+
+- 營養配對改為 TFDA 優先，只有缺乏合適食品與食用狀態時才使用 USDA；避免雞腿配成雞腿菇、高麗菜配成水餃、水餃配成水餃皮等錯配。
+- 改善便當逐格辨識與配菜拆分，保留滷肉飯中的滷肉；熟食不再套用乾麵、濃縮湯或不相符生肉的數值。
+- 保留照片辨識名稱與未配對項目；所有照片結果模式都能看到待確認清單，部分營養合計與缺少數值均有提示。
+- GitHub Pages 建置使用獨立的瀏覽器地圖金鑰變數，與伺服器 Places 金鑰分開。
+
+### Changed
+
+- 前端、Expo、後端健康檢查及部署分支版本統一為 `v1.0.1`。
+- 營養資料隨專案離線提供，不需要額外的 USDA API key。照片份量、未知菜種、配方差異與尚缺官方資料的食品仍須人工確認。
+
+## v1.0.0 - 2026-11-10 (完整餐盤原生拍照與自動對焦)
+
+### Fixed
+
+- **完整餐盤拍照無法自動對焦**：改用與「拍攝菜單」相同的原生相機拍攝流程，拍照後仍直接送出 AI 食物辨識。
+
+### Changed
+
+- 將前端、Expo app、後端健康檢查版本號及 Render／GitHub Pages 部署分支更新為 `v1.0.0`。
+
+## Unreleased - 2026-11-04 (菜單分析先問 ChatGPT)
+
+### Added
+
+- **菜單分析可以用 ChatGPT（OpenAI API）**：在 `backend/.env.local` 設 `OPENAI_API_KEY` 後，依店名估菜單（店家建檔）與菜單照片辨識都會先問 ChatGPT；它出錯、逾時、額度用完、餘額不足或說看不出這家店賣什麼時，才照原本的方式輪替 Gemini 金鑰與模型。沒設就跟原本一樣只用 Gemini。模型預設 `gpt-4.1-mini`，帳號沒有時換 `gpt-4o-mini`，可用 `OPENAI_MODELS` 覆寫。建檔的失敗分類（`no_items`／`rate_limited`／`inconclusive`／`unavailable`）把 ChatGPT 當成多一個模型計算：兩邊都說看不出來才算問不出菜單。照片兩邊都失敗時，兩邊的原因都顯示給使用者。`/health` 新增 `openai_enabled`。
+
+## Unreleased - 2026-10-29 (目標體重決定每日熱量)
+
+### Changed
+
+- **目標體重先前沒有任何計算用到**：後端只是存進去再讀出來，想減 5 公斤的人拿到的每日目標還是 TDEE，只能自己去改「每日熱量基準」。新增 `resolve_weight_goal_energy()`（`profile_service.py`）：沒有疾病條件、又設了目標體重時，每日目標改為 TDEE − 500 kcal（減重，約每週 0.5 kg）／TDEE + 300 kcal（增重）／TDEE（與目前體重差不到 1 kg），並以 BMR 為下限。疾病指引的目標仍然優先；「每日熱量基準」只在沒設目標體重時採用。每日目標（`nutrition_progress_service`）與單餐上限、店家推薦（`medical_risk_service`）共用同一個函式，兩邊是同一個數字。`nutrition_target_basis.source` 新增 `weight_goal`，並附 `weight_goal`（方向、TDEE、實際加減量、是否被 BMR 抬升）讓「我的 → 飲食目標」說明數字怎麼來的。
+- **不幫過輕的人開熱量赤字**：目前 BMI 已低於 18.5，或目標體重換算的 BMI 低於 18.5（線上有 50 kg 的帳號填目標 20 kg，範圍檢查 20~400 kg 擋不住）時，每日目標維持在 TDEE，畫面上說明原因。
+
+## v0.0.9 - 2026-09-10 (每日熱量目標統一、深色模式、無障礙與前端體積)
+
+依線上版（`personalized-food-recommendation-frontend-rt1v`）的一輪實機測試逐項修正。
+測試當下線上跑的前後端都比 repo 舊，其中數項（餐別、英文警告、休息中店家排序、
+手動搜尋加入後的狀態）在 repo 裡本來就已修好，只是還沒部署。
+
+### Fixed
+
+- **每日熱量目標同時存在三個互相矛盾的數字**：`tdee`（2,570，顯示在「我的 → 個人資料」）、使用者自填的 `daily_calorie_target`（存進後端但畫面上完全不顯示）、以及疾病指引算出的臨床目標（1,589.5，顯示在首頁／趨勢／「我的 → 飲食目標」）。同一個 App 裡三個「每日熱量」互相打架，而且沒有任何一處說明差在哪。`/records/<user_id>` 新增 `nutrition_target_basis`，回報現在生效的是哪一個、依據什麼（理想體重、kcal/kg、活動量、BMR、是否被 BMR 抬升、使用者自填值）。「我的」頁的 TDEE 卡改為顯示實際生效的**每日目標**，下方以一句話說明來源；TDEE 移到基本資料列並標注「未計入疾病調整」。
+- **「編輯資料」的「每日熱量」欄位形同虛設**：改成 3000 後 App 回報「已同步到後端」，後端也確實存了 3000，但畫面上沒有任何一處會變——有疾病條件時 `E = min(e_candidates)` 一律覆蓋使用者填的值。欄位改名為「每日熱量**基準** kcal」並加上說明：沒有勾選疾病時才採用這個數字。
+- **疾病調整後的目標低於使用者的基礎代謝率，而且完全不看活動量**：先前不分活動量一律 25 或 30 kcal/kg，等於把每個人都當輕度活動。一位 22 歲男性、170cm/70kg、選了「中等活動」的糖尿病使用者，BMR 是 1,658 kcal，卻拿到 1,589.5 kcal 的每日目標。改為依活動量分級（久坐 25／輕度 30／中等 35／高度以上 40 kcal/kg 理想體重），糖尿病與高血脂在 BMI ≥ 24 時再往下調一級（痛風／高血壓／腎病維持不調，與原行為一致），並以 BMR 作為疾病目標的絕對下限。同一位使用者的目標改為 1,907 kcal。
+- **「連續 14 天」是寫死的假資料**：`constants/mock-data.ts` 的 `streak: 14` 從來沒有被真實資料覆蓋過，今天才註冊、只有一筆紀錄的帳號一樣顯示「連續 14 天」。新增 `calculateActivityStats()` 依實際紀錄算連續天數與累積餐數（今天還沒記錄不算中斷，從昨天起算），mock 常數移除。
+- **掃描頁把疾病與過敏原的英文代碼直接顯示給使用者**：「安全條件已套用」寫的是「疾病：diabetes、hypertension · 過敏原：milk」，其他地方都是中文。新增 `lib/medical-labels.ts` 做代碼→中文對照，對不上的原樣顯示。
+- **店家標籤是 Google Places 的英文類型代碼**：`restaurant`、`food`、`meal_takeaway`、`store`、`meal_delivery` 直接塞進 `tags` 顯示。新增 `readable_place_types()` 轉成中文並丟掉 `point_of_interest`／`establishment`／`food`／`store` 這類每家店都有、講了等於沒講的類型；對不上表的類型直接不顯示，不退回英文。附帶效果是這些 tag 會參與 `_places_risk_candidate` 的過敏原／疾病關鍵字比對，英文代碼在中文關鍵字表裡永遠比不中，換成中文之後「海鮮」「燒烤」這類類型才真的擋得掉衝突的店。
+- **「手動搜尋」分頁點進去沒有任何可操作的元件**：說明卡沒有按鈕（其他模式那裡是「啟動相機」之類的動作），而真正的搜尋框排在「辨識結果」與「安全條件」之後，要捲兩段才看得到，使用者會以為分頁壞了。手動模式時把搜尋工具移到說明卡正下方。
+- **菜單解析等了 38 秒才回「線上查無此店菜單」，全程只有一個轉圈**：加上已等待秒數與預期時間（第一次分析一家店約 20~40 秒）。
+- **推薦分數沒有鑑別度而且名不副實**：`match_score` 是距離、評分與價位算出來的，跟健康完全無關，卻掛著「推薦」兩個字顯示在一個健康管理 App 裡；實測 12 家店有 6 家都是 99。改為顯示 Google 評分（★4.3），沒有評分就不顯示。
+- **菜單彈窗有兩顆功能相同的上傳按鈕**：標題下一顆、空狀態卡片裡一顆，而空狀態的文案還寫著「請直接點擊下方按鈕」。查無菜單時只保留卡片裡那顆。
+- **`document.title` 是空字串**：分頁只顯示網址，加書籤沒有名稱，分享連結也沒有標題。根因是 expo-router 靜態輸出時一定會插一個 `<title data-rh="true">`，而且排在 `+html.tsx` 的內容之前——HTML 規範取第一個 title，那個空的會贏。改用 `expo-router/head` 的 `<Head>` 去填它，輸出現在只有一個非空的 title。
+- **`<html lang="en">` 但內容全是繁體中文**：讀屏軟體會用英文語音朗讀中文。改為 `zh-Hant-TW`，並補上 meta description 與 og 標籤。
+- **`role="radio"` 用 `aria-selected` 而非 `aria-checked`**：初次設定的生理性別、飲食型態、活動量三組。`aria-selected` 在 radio 上不是有效屬性，讀屏軟體讀不到選取狀態。店家類型 chip 掛在 `role="button"` 上的 `aria-selected` 一併改為 `aria-pressed`。
+- **表單驗證只有視覺提示**：身高填 0 只有橘色外框與變灰的儲存鍵，沒有 `aria-invalid`，讀屏或色覺障礙的使用者只會遇到一個按不下去的按鈕。所有欄位補上 `aria-invalid` 與 `aria-label`。
+- **多個輸入框只靠 placeholder 當標籤**：「本餐預算」填值後就完全沒有可見標籤。補上可見標籤與 `aria-label`。
+- **同一個數字兩種寫法**：首頁同時出現「今天還能吃 1,590 kcal」與「目標 1,589.5 kcal」。熱量統一用 `formatCalories()` 取整。
+- **時間格式不一致**：餐卡顯示「下午09:47」（`zh-TW` 的 `toLocaleTimeString` 預設 12 小時制），紀錄編輯顯示「21:47」。統一為 24 小時制。
+- **手動搜尋建立的紀錄被標成 📸**：圖示先前取自食物的 `source`（`TFDA`，那是「營養數據哪裡來的」），改用紀錄的 `source`（「怎麼記錄的」）。
+- **滑鼠停在地圖上時整頁捲不動，手機上像卡住**：`gestureHandling` 從 `greedy` 改為 `cooperative`——滾輪捲頁面（按住 Ctrl 才縮放），單指捲頁面、雙指操作地圖。
+- **地圖徽章在淺色模式下幾乎看不見**：固定深色底卻用會跟著主題走的 `text.primary`，改用固定白色的 `text.inverse`。
+- **輸入框聚焦時單位文字被邊框蓋住**：焦點框先前是瀏覽器預設的 outline，只框住 `flex:1` 的輸入框本身並畫在同一列的「kcal」上面。改為把焦點狀態畫在外殼上。
+- **一餐點兩道菜時單餐鈉上限不會觸發**：`evaluate_medical_risk` 逐道菜比對「每日 ÷ 3」的額度，兩道各 490mg 會全部通過。新增 `evaluate_meal_medical_risk` 檢查一餐合計，`/predict/vision-food` 回傳 `meal_warnings`；因為使用者已經把這些菜放在一起了，這是提醒而不是封鎖。訊息用詞也改成說清楚比的是「單道 vs 一餐額度」。
+- **安全條件勾選會同時留下兩種格式**：舊紀錄存中文標籤（`高血壓`）、新的存 id（`hypertension`），畫面判定「已勾選」時兩種都認，但 store 的 toggle 只比對 id，於是點一下會變成兩個都留著、顯示成已勾選，送去後端的卻是空陣列——少一個病症等於那整組禁忌規則沒有套用。抽出 `lib/safety-selection.ts` 讓兩邊用同一套比對，並加上測試。
+- **每筆紀錄的餐別被寫死成「點心」**：POST `/record` 的 payload 硬寫 `meal_type: '點心'`，畫面卻先用時間判定顯示「晚餐」，同步後跳回「點心」。抽出 `lib/meal.ts`，`saveRecord` 的 `mealType` 改為必填，由呼叫端提供該筆紀錄實際發生的時間（離線佇列補送時要用當初入列的時間，不是送出的時間）。
+
+### Added
+
+- **深色模式（web）**：`constants/theme.ts` 拆成 `lightPalette` / `darkPalette`，web 端的 `Palette.*` 產出 CSS 變數參照（`var(--nl-text-primary)`），由 `app/+html.tsx` 注入的樣式依 `prefers-color-scheme` 決定實際值。這個做法讓既有的 600 多處 `Palette.*` 引用一行都不用改——畫面用的是 `StyleSheet.create`，那是模組載入時就算好的，改成執行期解析會動到整個 codebase。深色盤是重新配的而不是把淺色反轉：強調綠從 #1F9D72 提亮到 #35C08D，對卡片底的對比從約 3.1:1 提到約 7.4:1。原生端沒有 CSS 變數，維持淺色盤，行為不變。`app.json` 的 `userInterfaceStyle` 從 `dark` 改為 `automatic`。
+- **`app/+html.tsx`**：web 靜態輸出的 HTML 外殼，負責 `lang`、meta、theme-color 與主題 CSS 的注入。
+
+### Changed
+
+- **前端 bundle 從 3.01 MB 降到 2.58 MB（brotli 777 KB → 504 KB）**：`import { Ionicons } from '@expo/vector-icons'` 這個 barrel 會把其他圖示家族的 glyphmap 一起打包（bundle 裡找得到 FontAwesome5 的 `accusoft`、Foundation 的 `burst-sale`），全 repo 只用 Ionicons。15 個檔案改為 `import Ionicons from '@expo/vector-icons/Ionicons'`。註：Metro 在 `output: "static"` 下只會產出單一 bundle，`asyncRoutes` 兩種寫法都試過都不會分割，真正的 code splitting 需要改變 export 模式，會影響現有的靜態託管，因此沒有採用。
+- **靜態資源加上長期快取**：`render.yaml` 對 `/_expo/static/*` 與 `/assets/*` 設定 `Cache-Control: public, max-age=31536000, immutable`，`index.html` 維持 `must-revalidate`。檔名本來就帶 content hash，先前卻用預設的 `max-age=0`，每次造訪都要重新驗證並下載整包 bundle。（GitHub Pages 不支援自訂 header，此設定只對 Render 生效。）
+- **Google Maps 標記**：設定 `EXPO_PUBLIC_GOOGLE_MAPS_MAP_ID` 時改用 `AdvancedMarker`（`google.maps.Marker` 自 2024-02-21 起 deprecated），沒設定時沿用舊的 `Marker`——AdvancedMarker 少了 Map ID 會整個不顯示標記，無條件切換等於把地圖弄壞。
+
+## v0.0.8f - 2026-09-03 (營養指標精簡、時區／單位修正、一鍵測試資料、店家推薦飲食限制與費用)
+
+### Changed
+
+- **移除鈣與鐵兩項營養指標**：追蹤欄位從 11 項縮減為 9 項（熱量、蛋白質、碳水、精緻糖、脂肪、飽和脂肪、反式脂肪、纖維、鈉）。餐廳目錄的鈣鐵值本來全為 0，AI 菜單爬蟲也只是依菜名關鍵字給 4 級常數（豆製品 150 mg／蔬菜 60 mg 之類），無法反映實際餐點；與其顯示猜測值不如拿掉。異動範圍涵蓋 `NUTRITION_FIELDS`、每日目標計算、記錄 schema、掃描與營養標示 OCR、餐廳目錄、前端進度條與趨勢頁。
+- **慢性腎臟病單餐鈣上限規則一併移除**：`medical_risk_service` 原有「單餐鈣 > 266 mg 阻擋」的 CKD 規則隨鈣欄位移除；該規則因目錄鈣值全為 0，實際上從未觸發過。
+- **Postgres `records` 資料表**：`total_calcium` / `total_iron` 不再寫入或讀取，但既有欄位保留不刪，舊資料不受影響；新建資料庫不會再建立這兩欄。
+
+### Fixed
+
+- **看不出 Render 線上跑的是哪一版**：`/health` 新增 `app_version`、`deployed_branch`、`deployed_commit`（後兩者取自 Render 自動注入的 `RENDER_GIT_BRANCH` / `RENDER_GIT_COMMIT`）與 `started_at`。先前只能靠「某個新路由回 404 還是 401」反推部署狀態，改 Branch 但沒按 Manual Deploy 這種情況完全看不出來。
+- **店家推薦沒有依「不能吃的食物」過濾**：`/map-food-recommend`（Render 上實際使用的 Google Places 路徑）從頭到尾沒有呼叫 `evaluate_medical_risk`，疾病禁忌與過敏原完全沒有生效——只有 Places 失敗退回本地目錄時才會過濾。現在會用店名與店家類型比對：命中疾病 `blocked_keywords`（例如高血脂遇到「炸雞」）直接擋掉並列入 `filtered_out`；過敏原則新增店家層級關鍵字（`allergen_taxonomy.json` 的 `venue_keywords`，例如甲殼類對到「海鮮」「生猛」），因為同一家店通常仍有可吃的品項，改為顯示警告而非隱藏。逐道菜的過濾維持在「完整菜單」執行。
+- **店家搜尋費用過高**：`fetch_google_places_restaurants` 每次都先打舊版 Nearby Search，成功時還要對每一家店各送一次 Place Details（較貴的 SKU），一次搜尋最多 13 次計費請求。改為優先使用 Places API (New)——單一請求就會依 field mask 一併回傳 `websiteUri` 與 `googleMapsUri`，完全不需要 Details；舊版只在新版沒有結果時才當備援。另外加上 10 分鐘的搜尋快取（座標取到小數第 3 位，約 100 公尺），連按「更新地圖」5 次只會送出 1 次計費請求。
+- **七天灌入的菜單好幾天一模一樣**：原本用 `slot_index % 菜色數` 輪流發牌，菜色少於一週的量時會嚴重重複——只找到 3 道菜時七天有 6 天完全相同，14 道菜還會出現同一天吃兩次同一道。改為 `plan_daily_dishes`：菜色足夠就洗牌切段，不足則列舉「可重複的三道組合」並優先取三道都不同的組合，3 道菜以上就能保證七天互不相同、5 道以上連同一天內也不重複。seed 取自 user_id + source + 日期，同一天重按結果一致。
+- **沒有菜單的店家會被略過**：原本為了避開逾時，把 Gemini 菜單分析寫死上限 3 家。改用 45 秒時間預算：附近店家只要沒有現成菜單就送去分析，湊滿七天所需的 21 道或用完預算才停，最多 6 家。
+- **一餐只能放一道菜，蛋白質與纖維的每日下限幾乎不可能達成**：真人一餐也會配青菜、配湯，先前的規劃把三餐各鎖定一道單品，纖維卡在 8~9 g（目標 25~30 g）。改為一餐最多三道、一天最多七道，並改用「從一道菜開始，每次加最有幫助且不撐破任何上限的一道」的貪婪法——先固定三道主餐再補配菜的話，熱量與鈉會先被主餐吃光，之後任何青菜都會破表。同時修正 `_split_into_meals` 在菜色不足三餐時複製菜色填滿的問題：那些多出來的份量沒有被計分，導致實測出現「鈉 2900 mg」這種本該被排除的一天。
+- **一鍵灌入的餐點沒有依疾病條件湊出達標的一天**：先前只用 `evaluate_medical_risk` 擋掉「單道違規」的餐點，但鈉、纖維、精緻糖這些是以「一天」為單位判定的——三道各自合格的菜加起來仍可能超標。改為列舉三道菜的組合，用 `calculate_pdf_daily_targets` 的疾病別目標與 `build_nutrition_goal_types` 的方向（上限／下限）逐組評分，優先挑符合項數最多、違規幅度最小的組合，再取彼此不重複的七天。回傳與畫面訊息新增 `fully_compliant_days` 與 `conditions`，直接顯示「N/7 天完全符合（高血壓）」。
+- **一鍵灌入不再使用本地模擬餐廳目錄**：`restaurant_catalog.json` 內建那 20 家測試店的纖維是 0.5~3.5 的佔位值，糖與飽和脂肪整欄為 0，灌進去會讓達標判定失真（實測七天纖維只有 4 g，而目標是 25 g）。移除 `curated` 來源與三處退回本地目錄的 fallback，改為丟出 `SeedDataUnavailable`（HTTP 409）並說明是搜尋不到店家、菜單分析失敗還是全被預算／健康條件擋掉。目錄仍當作快取使用，但只認 `/restaurant/menu` 分析過真實店家後寫回的項目，用 `restaurant_id` 前綴與 `AI標記` 標籤排除內建測試店。前端移除「灌入 7 天（本地測試店家）」按鈕。
+- **店家菜單快取可以放另一個 Supabase**：菜單是全體共用、不屬於任何使用者的資料，沒必要跟飲食紀錄擠同一個資料庫的免費額度。新增可選的 `MENU_DATABASE_URL`，設定後 `restaurant_menus` 會建在該連線上，其餘資料維持在 `DATABASE_URL`；未設定或連不上時自動退回主資料庫。`/health` 新增 `menu_cache_database`（separate／shared／memory）與 `cached_restaurant_menus`。
+- **附近店家建檔改成獨立動作**：把「分析菜單」從灌入七天的請求裡拆出來。新增 `POST /restaurants/index/<user_id>` 與「我的」頁的「① 建立附近店家菜單檔案」按鈕，一次在時間預算內處理幾家還沒建過的店，把店名、地址、座標、place_id 與菜單一起寫進 `restaurant_menus`，可以重複按累積。回傳會說明本次建檔幾家、已建過幾家、還剩幾家、資料庫累積幾家。灌入七天（②）因此只需要讀快取，不必再等 Gemini。
+- **分析過的店家菜單存進資料庫快取**：Gemini 分析一家店要 20~30 秒，先前只會寫回 `restaurant_catalog.json`，但 Render 的檔案系統是暫存的，重啟就沒了，等於每次都重新分析。新增 `restaurant_menus` 資料表（Postgres／Mongo／記憶體三種儲存都支援），一鍵灌入時先查快取再決定要不要打 Gemini，分析成功後寫回。回傳訊息會標明「其中 N 家直接用之前分析過的菜單快取」。
+- **菜單分析每個模型都跑滿 30 秒還生不完**：prompt 要求 3~4 道餐點、每道 15 個欄位的 JSON，輸出太長，實測 `gemini-2.5-flash`、`gemini-flash-latest`、`gemini-3.5-flash` 全部逾時，只有最快的 `gemini-2.5-flash-lite` 有機會回來（但那把金鑰配額已滿回 429）。prompt 精簡成 3 道餐點、9 個欄位（其餘由 `validate_and_balance_nutrition` 補），並加上 `maxOutputTokens: 900` 讓模型不會慢慢寫到逾時。另外把「逾時」與「404 沒權限」的診斷訊息分開——先前逾時會被印成「所有模型都回 404」，指向錯誤的排查方向。
+- **一鍵灌入會掛住好幾分鐘不回應**：`enrich_restaurant_with_gemini` 只把 HTTP 404 記進 `unavailable_models`，read timeout 走的是 except 分支，所以同一個慢模型會被每一把金鑰各重試一次——6 把金鑰 × 5 個模型 × 30 秒逾時，單一家店最壞要跑 900 秒，而 `MENU_ANALYSIS_BUDGET_SECONDS` 只在「換下一家店」時檢查，擋不住這個內層迴圈。逾時現在同樣視為該模型不可用（實測嘗試次數 30 → 5），並把時間預算的 deadline 傳進去，每次嘗試前先檢查。
+- **菜單分析在 Render 上逾時**：模型名稱修正後不再 404，但 `gemini-2.5-flash` 生成一份 4~6 道、每道 11 項營養的菜單超過 20 秒的逾時上限，兩次逾時就把分析預算用完，結果仍然退回本地目錄。改為輕量模型優先（`lite` → `flash` → `pro`）、單次逾時 20s 拉到 30s、prompt 從 4~6 道降為 3~4 道，並把 `MENU_ANALYSIS_BUDGET_SECONDS` 從 45s 拉到 75s。
+- **菜單分析寫死模型名稱導致店家推薦拿不到真實菜單**：`enrich_restaurant_with_gemini` 是全 repo 唯一沒有使用 `get_gemini_models()` 的 Gemini 呼叫點，寫死 `gemini-2.5-flash` 與 `gemini-2.5-pro`。金鑰沒有這兩個模型權限時每一把都回 404，最後退回 `generate_fallback_menu()`，而真實店名不在樣板清單裡只會得到空陣列，於是「灌入 7 天（店家搜尋餐點）」永遠退回本地測試目錄。改用 `get_gemini_models()`（可由 `GEMINI_MODELS` 覆寫），並在模型回 404 後不再對其他金鑰重試同一個模型——6 把金鑰的情況下請求數從 30 次降到 5 次，也不會再把 45 秒的分析預算燒光。
+- **一鍵灌入在 Render 上按了會失敗**：`source=recommend` 原本會對 Google Places 找到的每一家店都呼叫 `enrich_restaurant_with_gemini`，而該函式最壞情況會跑「金鑰數 × 模型數」次 20 秒的請求，八家店就足以讓整個 request 在 Render 逾時。改成兩輪：先用本地已知菜單湊菜色（零外部呼叫），不夠才向 Gemini 估算，且上限 3 家、湊滿 12 道就停；單一店家估算失敗改為記錄後略過，不再讓整批失敗。
+- **API 錯誤訊息會被 JSON 解析錯誤蓋掉**：`parseJson` 先呼叫 `resp.json()` 再檢查 `resp.ok`，後端逾時、502 或路由不存在時回的是 HTML 或空 body，使用者只會看到 `Unexpected token '<'`，真正的狀態碼完全看不到。改成先讀 text 再嘗試解析，並針對 404／401／403／5xx 給出可行動的說明。
+- **反式脂肪數值放大 1000 倍**：TFDA 原始資料的反式脂肪含量單位是 mg/100g（其他脂肪是 g/100g），`convert_tfda.py` 直接沿用未換算，導致 `nutrition_db_tw.json` 有 405 筆食品的反式脂肪被當成公克數，一顆蛋算成 29.94 g、葡萄籽油算成 2122 g。因為每日反式脂肪目標是 0 g（上限），只要記錄到蛋或乳製品就必然判定超標，首頁進度條會顯示「165 / 0 g」這種數字。轉檔時改為 mg→g 換算，並一併修正既有的 `nutrition_db_tw.json`；修正後同一份菜單的一週達標天數從 2/7 變成 7/7。
+- **慢性腎臟病的蛋白質判定方向相反**：`calculate_pdf_daily_targets` 對 CKD 把蛋白質目標壓到 `W x 0.6`（嚴格限量），但 `NUTRITION_GOAL_TYPES` 固定把蛋白質視為 `minimum_target`，導致 CKD 使用者吃到 114 g 蛋白質會被判成「達標」而不是「超標」，等於給出相反的建議。新增 `build_nutrition_goal_types(user)`，CKD 的蛋白質改為 `upper_limit`。
+- **「今天」用 UTC 判斷**：伺服器跑在 UTC，但飲食紀錄的 timestamp 與店家 `open_hours` 都是本地時間。本地 00:00–08:00 這段時間，店家推薦的「今日剩餘營養」會拿到昨天的攝取量；店家營業狀態也用 UTC 時鐘比對本地營業時間（本地凌晨 00:31 會有 16/20 家被判成營業中）。新增 `services/app_time_service.py` 以固定偏移量（預設 +8，可用 `APP_UTC_OFFSET_HOURS` 調整）統一換算，`build_daily_nutrition_progress`、`storage.get_history` / `get_today_records`、店家營業判斷、以及未帶 timestamp 的紀錄預設時間全部改用本地時間。
+
+### Added
+
+- **「我的」頁一鍵灌入 7 天測試資料**：新增 `POST /seed/week-records/<user_id>` 與 `DELETE`（皆需 Supabase Auth，且 `require_user_access` 只允許操作自己的資料），前端在「我的」頁底部新增「測試資料」區塊，本機與 Render 都能用。`source=recommend` 會走 Google Places 找出附近真實店家，逐家取得菜單（本地已知菜單，或由 Gemini 即時估算）後再依預算與疾病禁忌過濾，把餐點輪流分攤到七天三餐；沒有 `GOOGLE_PLACES_API_KEY` 或附近查無店家時會退回本地測試餐廳目錄，並在 `data_source` 與畫面訊息明確標示資料不是真實店家。因為直接讀菜單品項而不是推薦 API 的 response，膳食纖維、糖、飽和脂肪、反式脂肪都留得住。`client_record_id` 為 `seed_<source>_<日期>_<餐別>`，重跑只會補上新的一天，「清除測試資料」也只會刪掉這些 id。
+- **7 天飲食測試資料產生器** (`backend/scripts/seed_week_test_data.py`)：一次灌入 7 天飲食紀錄並依疾病別條件逐日檢查達標情形，營養值取自 TFDA 資料庫依克數換算。支援 `--scenario` / `--profile` / `--dry-run` / `--clear` / `--report`，詳見 Operations Runbook 2.5 節。
+
+## v0.0.8b - 2026-08-30 (菜單照片辨識修正版)
+
+### Fixed
+
+- **菜單照片辨識失敗**：修正 Web 相簿只回傳 blob/data URI 時未送出圖片的問題；後端現在依實際圖片位元組辨識 MIME，並支援 Gemini 目前可用模型輪替，避免舊模型停用或 429 配額讓密集中文菜單直接變成空結果。
+- **菜單 OCR 結果遺失**：支援 Gemini 多段回應、欄位別名與截斷 JSON 的可用前綴；過濾沒有價格的分類標題，並保留同名小／大份品項。
+- **菜單上傳診斷**：辨識失敗會回傳可理解的 API key、配額、服務忙碌或圖片格式訊息；失敗時不會清空店家既有菜單資料。
+
+## v0.0.8 - 2026-08-29
+
+### Added
+
+- **菜單拍照上傳**：「上傳實體菜單照片」按鈕現在會詢問「📷 拍照」或「📁 從相簿選擇」，並在拍照前請求相機權限，不再只能從相簿挑選既有圖片。
+
+### Fixed
+
+- **AI 摘要營養素缺漏**：「智慧推薦」AI 摘要的個人化推薦餐點（`recommended_foods`）先前只由 Gemini 提供品名與理由，膳食纖維、鈣、鐵三項在缺乏估算邏輯下永遠為 0；補上依食物關鍵字的保守估算，比照既有膳食纖維規則。
+- **營養素進度不隨疾病更新**：後端早已依 PDF 臨床準則計算疾病專屬的每日營養目標（`calculate_pdf_daily_targets`），但只用於 AI 摘要提示詞，首頁「營養素進度」進度條的目標值從未套用，一律使用固定預設值。`/records/<user_id>` 現在會回傳 `nutrition_targets`，首頁全部 11 項營養素目標會依使用者當前疾病動態更新。
+- **推薦卡片過早顯示「+ 加入今日紀錄」**：「智慧推薦」店家卡片在使用者查看完整菜單或 AI 摘要前，其推薦品項本屬粗略猜測資料，卻已顯示「+ 加入今日紀錄」按鈕，容易把不準確的營養數值寫入飲食紀錄；改為僅在完整菜單與 AI 摘要中提供加入按鈕。
+- **拍照上傳按鈕在網頁版完全無反應**：react-native-web 的 `Alert.alert`在網頁平台是空函式，導致「拍照 / 相簿」選擇對話框點擊後沒有任何反應。改為使用自訂 Modal（比照既有刪除確認對話框樣式），網頁與原生平台皆可正常運作。
+- **營養素目標顯示未四捨五入**：`nutrition_targets` 先前直接回傳未經處理的浮點數（如 `38.147999999999996`），造成首頁進度條顯示雜訊數字；改用既有的 `_display_number` 邏輯統一四捨五入至小數點下一位。
+- **AI 摘要「加入今日紀錄」數據異常**：`handleQuickAddRecord` 先前用 `item.calories || 350` 這類 `||` 寫法帶入預設值，導致 AI 摘要中合法為 0 的數值（例如「無糖茶」「黑咖啡」等真實熱量／蛋白質／碳水／脂肪／鈉為 0 的推薦品項）被誤判為「未提供」，被硬套上 350 kcal／15g 蛋白質／45g 碳水／10g 脂肪／500mg 鈉的樣板數字，造成每次加入這類低熱量推薦餐點時數據明顯失真。改用 `??`，只在數值真的缺漏（`null`/`undefined`）時才套用預設值。
+- **拍照上傳菜單「選擇完照片就沒反應」**：上傳實體菜單照片後，成功／失敗／「AI 沒辨識到餐點」都只呼叫了在網頁版是空函式的 `Alert.alert`（或原生平台不支援的 `alert()`），使用者選完照片後除了讀取中動畫消失外完全沒有任何提示，容易誤以為功能故障。改為在畫面上顯示可關閉的 `FeedbackBanner`：辨識成功、辨識失敗（含錯誤訊息）、以及辨識結果為空（例如未設定 Gemini API key 或照片內容無法解析）都會有明確文字說明；「+ 加入今日紀錄」的成功／失敗提示與 AI 摘要載入失敗提示也一併改用同一機制。
+- **AI 食物辨識頁同一批網頁版無回應問題**：「拍照 / 相簿 / 營養標示 / 手動搜尋」頁的相機錯誤、辨識結果、OCR 結果、搜尋結果、自訂食品儲存等 15 處提示同樣都用了網頁版空函式的 `Alert.alert`；沿用該頁已有的 `FeedbackBanner` 機制統一顯示，並在每個動作開始時清除前一次的提示，避免舊訊息殘留誤導。
+- **個人檔案頁「登出」在 Demo 模式下網頁版按了沒反應**：未設定 Supabase Auth 時點擊「登出」、以及儲存個人資料成功、登出失敗都只呼叫了 `Alert.alert`；改用畫面上的 `FeedbackBanner`，讓使用者知道「目前未啟用 Supabase Auth，無法登出」而不是誤以為按鈕失效。原生平台的登出確認對話框（`Platform.OS !== 'web'` 分支）維持使用 `Alert.alert`，網頁版原本就已改用 `window.confirm` 不受影響。
+- **拍照上傳實體菜單「AI 沒辨識到餐點」（Gemini 已設定金鑰時）**：`parse_menu_image_with_gemini` 先前不論實際上傳的圖片格式為何，一律把 `inlineData.mimeType` 寫死為 `image/jpeg`；若使用者上傳的是 PNG（許多手機截圖、部分相機皆為 PNG），Gemini 會收到型別標示錯誤的圖片資料，可能因此完全讀不到內容卻仍回傳 HTTP 200，導致「辨識成功但零品項」且無任何錯誤訊息。改為比照現有 `nutrition-label` OCR 端點，透過 `decode_image_base64` 依實際位元組偵測正確的 PNG/JPEG/GIF/WebP mimeType。同時強化辨識 prompt，明確要求「即使品項很多也要逐一列出、不可只挑幾項」並放寬「需精算物理熱量一致性」的措辭（下游 `validate_and_balance_nutrition` 本來就會校正），並將 `maxOutputTokens` 提高到 8192，降低密集菜單（十幾到數十項）因輸出過長或模型過度謹慎而回傳空陣列的機率；同時在「HTTP 200 但零品項」時記錄 `finishReason`，方便日後從 Render logs 診斷。
+
+## v0.0.7e - 2026-08-26 (拍照菜單測試版)
+
+### Added
+
+- 新增「📷 拍照 / 📁 上傳實體菜單」功能：在「完整菜單」對話框內常駐提供上傳按鈕，支援使用者隨時拍照或選取照片，並透過 Gemini Vision AI 自動讀取菜單品項、價格與營養估算。
+- 新增 Gemini API 多金鑰動態輪替機制 (Key Rotation)：解決 API 每分鐘 15 RPM 限流與 429 錯誤，確保多組 API Key 自動切換不中斷。
+
+### Fixed
+
+- **熱量物理校正 (Calorie Balance Algorithm)**：引入 $P \times 4 + C \times 4 + F \times 9 \approx \text{Calories}$ 驗算機制，修正牛肉麵等餐點高脂肪與標示總熱量不符合物理邏輯的問題。
+- **全套 11 項營養指標補全**：補齊精緻糖、飽和脂肪、反式脂肪、膳食纖維、鈣與鐵欄位，防止記錄產生全為 0 的缺漏。
+- **移除硬編碼樣板值**：徹底移除前端 `fiber || 3` 寫死 3g 纖維及「AI 摘要」餐點 `400 kcal` 樣板，改為讀取真實分析數值。
+- **過濾 0 kcal 佔位符按鈕**：過濾 Google Places 店家的 `到店後選擇符合預算的餐點` 0 kcal 提示項目，隱藏該項目的「+ 加入今日紀錄」按鈕。
+
+## v0.0.7d - 2026-08-18
+
+### Added
+
+- 在所有推薦餐點（店家卡片、AI 摘要提醒、完整菜單 Modal）旁新增「+ 加入今日紀錄」按鈕，點擊可直接將詳細營養素寫入當日飲食紀錄並動態累計進度條。
+- 為所有店家（包含 Google Places 店家）提供通用的「完整菜單」解析與 3~5 項安全餐點推薦。
+- 新增根據使用者疾病禁忌、過敏原、剩餘熱量/營養素目標與預算自動排序截取 Top 3~5 項最佳餐點的推薦機制。
+
+### Changed
+
+- 更新菜單評分排序，優先隔離反式脂肪、高油炸、過敏原等不符條件餐點至「不符合/需注意餐點」區塊。
+- 更新 Blueprint 與部署腳本版本標籤至 `v0.0.7d`。
+
+## v0.0.7c - 2026-08-17
+
+### Added
+
+- Added Google Places official website and Google Maps links to nearby restaurant results.
+- Added a conditional external "店家網站／菜單" entry when Google Places provides an official restaurant website.
+- Added a Google Maps store-information entry for traditional shops without a public website, so users can inspect the store's current photos and details without invented menu data.
+
+### Changed
+
+- Google Places restaurants no longer invoke the Gemini/template-generated detailed-menu flow; local catalog restaurants retain their existing menu analysis.
+- Updated Render services and the desktop sidebar version label to `v0.0.7c`.
+
+### Fixed
+
+- Fixed Blueprint deployments sending API requests to the original project's backend instead of the backend created in the same deployment.
+- Made Render deployments require Supabase Auth by default and fail closed with a configuration error instead of silently loading the `demo_user` / 王小明 profile.
+- Render now prompts for Supabase and Google Places settings once on the backend, then exposes the required public build values to the frontend through Blueprint service references.
+
+### Validation
+
+- Added focused Google Places link tests covering successful website discovery and non-blocking detail lookup failure.
+
+## v0.0.7b - 2026-08-14
+
+### Added
+
+- Added complete record, scanner, OCR, TFDA search, history, and PostgreSQL support for refined sugar, saturated fat, trans fat, calcium, iron, and fried-food status.
+- Added disease-aware daily nutrition targets and food-risk handling for diabetes, gout, hyperlipidemia, hypertension, and stage 3-5 chronic kidney disease.
+- Added backward-compatible normalization from `refined_sugar` to the canonical `sugar` field.
+
+### Changed
+
+- Updated nutrition labels to total carbohydrates, refined sugar, total fat, dietary fiber, sodium, calcium, and iron terminology.
+- Made Supabase authentication explicit through `EXPO_PUBLIC_SUPABASE_AUTH_REQUIRED`, matching the backend deployment mode.
+- Updated Render services to deploy from `v0.0.7b`.
+
+### Removed
+
+- Removed the standalone meal recommendation list, recommendation feedback controls, `/recommend/<user_id>` API, feedback APIs, recommendation service, and dedicated feedback storage initialization.
+- Kept nearby restaurant search, Google Places map, navigation, menu inspection, and restaurant summaries available on the `recommend` route.
+
+### Validation
+
+- Backend unit/API tests and frontend TypeScript checks cover the retained record, scanner, history, disease-rule, and nearby restaurant flows.
+
+## v0.0.7 - 2026-08-07
+
+### Added
+
+- Added Google Places API (New) v1 fallback to handle projects with disabled Legacy Places API.
+- Added multi-version Gemini model selection (trying `gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-1.5-flash` in sequence) to resolve model deprecations on newer keys.
+- Added local location fallback flat coordinate shifting for mock restaurants in dev catalog, guaranteeing markers show up during off-grid offline local testing.
+- Added detailed offline empty-state helper guides inside the menu Modal to direct users to camera scanning and AI summaries.
+
+### Changed
+
+- Refactored nearby restaurant search recommendations to dynamically feed dish details into the top-level food recommendation panel with restaurant names as source labels.
+- Replaced general healthy bento dummy items in scraper default fallback with an empty list for unknown restaurant names.
+
+### Validation
+
+- Backend model list fallback tests and Google Places v1 integration verified via HTTP API.
+- Typecheck and Metro bundle compilation completed successfully.
+
+### Deployment Notes
+
+- Clear database cache of old placeholder menus if testing new keys.
+- Keep standard environment variables for production.
+
+## v0.0.6 - 2026-08-03
+
+
+### Added
+
+- Added editable nutrition-label food names with whitespace validation and persisted final values.
+- Added idempotent dietary record saves, visible success/error feedback, and a retryable local synchronization queue.
+- Added authenticated record-backed dietary trends with same-day aggregation and latest continuous seven-day selection.
+- Added a dashboard dietary record manager with inclusive date ranges, responsive record lists, editing, deletion confirmation, and error recovery.
+- Added a shared calendar date picker and manual creation of validated today or historical dietary records.
+- Added backward-compatible record pagination plus authenticated `PATCH` and `DELETE` endpoints keyed by `client_record_id`.
+- Added focused scanner, date-range, trend, record mutation, and API route tests.
+
+### Changed
+
+- Dashboard and trend data now refetch through the shared Zustand record revision after record creation, synchronization, editing, or deletion.
+- Updated Expo, package, desktop UI, Render Blueprint, and deployment documentation versions to `v0.0.6`.
+
+### Validation
+
+- Backend unit and API suites, frontend scanner/date/trend tests, typecheck, lint, and Expo web export passed.
+- Responsive QA covered 375, 390, 430, 768, and 1280px widths with no horizontal overflow.
+- Browser QA covered inclusive same-day, cross-month, cross-year, empty, loading, API error/recovery, edit retry, delete cancel, and delete failure states.
+
+### Deployment Notes
+
+- No database schema migration is required; existing record fields and API response schemas remain unchanged.
+- Render services now track the `v0.0.6` release branch and retain the existing environment variables.
+
+## v0.0.4 - 2026-07-18
+
+### Added
+
+- Added disease-sensitive nutrient markers to the dashboard, backed by the existing disease-rule metadata with local fallbacks.
+- Added a shared daily nutrition progress context covering targets, consumed amounts, remaining amounts, progress percentages, goal types, and over-target amounts.
+- Added personalized Google Places restaurant AI summaries that use the authenticated user's current diseases and daily nutrition progress.
+- Added explicit handling for nutrients that are near or over their upper limit, with disease restrictions taking priority over filling other nutrition gaps.
+- Added personalized food recommendations and reasons to the restaurant AI summary UI.
+- Added service and authenticated API route tests for disease context, nutrition overages, prompt construction, and restaurant summary responses.
+
+### Changed
+
+- Simplified the recommendation page so meal and nearby restaurant sections remain visible in one responsive flow.
+- Updated the frontend version, CI release branch, Render Blueprint branch, and deployment documentation to `v0.0.4`.
+- Replaced the stale backend CI file list with a full `compileall` syntax check so new and renamed Python modules are covered automatically.
+- Updated frontend contribution guidance to use the implemented Expo design system as the baseline for incremental UI work.
+
+### Validation
+
+- Backend: 35 unit and API tests passed.
+- Frontend: typecheck, lint, and Expo web export passed.
+- Responsive QA: verified at 390x844 and 1440x1000 with no horizontal overflow and 44px AI summary touch targets.
+
+### Deployment Notes
+
+- No database schema migration is required.
+- Render must retain the existing Supabase, Gemini, Google Places, and database environment variables.

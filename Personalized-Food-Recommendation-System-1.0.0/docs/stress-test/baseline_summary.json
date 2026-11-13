@@ -1,0 +1,58 @@
+{
+  "run_id": "baseline-2026-11-11",
+  "measured_on": "2026-11-11",
+  "target": "https://node.taile9a8dc.ts.net/",
+  "app_version": "v1.0.0",
+  "server": "waitress",
+  "database": "local-sqlite",
+  "test_type": "read-only baseline",
+  "request_count": 39,
+  "raw_request_rows": 20,
+  "aggregate_concurrency_rows": 3,
+  "successful_requests": 39,
+  "failed_requests": 0,
+  "success_rate_pct": 100.0,
+  "scope_note": "No login, signup, writes, paid APIs, OCR, Vision, Places, or high-load test was run. The 20 raw endpoint rows and 19 concurrent health requests are represented separately; concurrency values are aggregate summaries.",
+  "concurrency_health_summary": [
+    {
+      "concurrency": 1,
+      "samples": 5,
+      "successful": 5,
+      "failed": 0,
+      "min_ms": 1324.4,
+      "p50_ms": 1535.2,
+      "max_ms": 1656.5
+    },
+    {
+      "concurrency": 2,
+      "samples": 4,
+      "successful": 4,
+      "failed": 0,
+      "min_ms": 1508.2,
+      "p50_ms": 1869.5,
+      "max_ms": 1922.8
+    },
+    {
+      "concurrency": 5,
+      "samples": 10,
+      "successful": 10,
+      "failed": 0,
+      "min_ms": 1897.8,
+      "p50_ms": 2017.2,
+      "max_ms": 2033.7
+    }
+  ],
+  "endpoint_serial_summary": [
+    {"endpoint": "/health", "samples": 5, "successful": 5, "failed": 0, "min_ms": 535.0, "p50_ms": 541.2, "max_ms": 973.1},
+    {"endpoint": "/auth/config", "samples": 5, "successful": 5, "failed": 0, "min_ms": 529.5, "p50_ms": 543.8, "max_ms": 564.0},
+    {"endpoint": "/disease-rules", "samples": 5, "successful": 5, "failed": 0, "min_ms": 537.0, "p50_ms": 543.2, "max_ms": 552.9},
+    {"endpoint": "/medical-metadata", "samples": 5, "successful": 5, "failed": 0, "min_ms": 622.2, "p50_ms": 639.0, "max_ms": 682.0}
+  ],
+  "reference_latency_threshold_ms": 2000,
+  "interpretation": [
+    "這是基線資料，不代表最大可用人數。",
+    "少量併發時所有請求均回應 200，未觀察到斷線。",
+    "health 的 p50 從 1 併發的 1535.2 ms 上升到 5 併發的 2017.2 ms，已接近或略過目前暫定的 2 秒參考線。",
+    "測試數量太少，尚不能判定 Waitress、SQLite、主機資源或 Tailscale 哪一層是容量瓶頸。"
+  ]
+}

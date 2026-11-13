@@ -1,0 +1,680 @@
+"""醫療風險判定的測試。
+
+這個模組決定「腎臟病患者能不能吃這道菜」，卻一直沒有直接的測試。今天才在
+裡面找到腎臟病蛋白質判定方向相反的 bug——那種錯誤只有靠測試才擋得住，
+所以每一條會擋人的規則都要有一個會失敗的理由。
+"""
+
+import os
+import unittest
+
+from services.disease_rule_service import load_allergen_taxonomy, load_disease_rules
+from services.medical_risk_service import evaluate_medical_risk
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# 身高 170cm → 理想體重 W = 22 * 1.7^2 = 63.58 kg。
+# 每公斤要給幾大卡依活動量分級（profile_service.resolve_energy_factor），
+# 這裡固定用「輕度活動」= 30 kcal/kg，讓 E = W * 30 = 1907 kcal，
+# 下面每一條門檻的數字才有一個講得出來的來源。活動量本身的影響另外測
+# （EnergyFactorTests）。
+PROFILE = {"height": 170, "weight": 65, "age": 30, "gender": "male", "activity_multiplier": 1.375}
+W = 22.0 * 1.7 ** 2
+E = W * 30
+
+
+def dish(**overrides) -> dict:
+    """一道各項都寬鬆的餐點，測哪一條規則就只把那一項推高。"""
+    base = {
+        "label": "test_dish",
+        "name_zh": "清蒸雞胸飯",
+        "calories": 300,
+        "protein": 10,
+        "carbs": 35,
+        "sugar": 2,
+        "fat": 6,
+        "saturated_fat": 1.0,
+        "trans_fat": 0,
+        "fiber": 4,
+        "sodium": 200,
+        "allergens": [],
+        "is_fried": False,
+        "gi": "low",
+    }
+    base.update(overrides)
+    return base
+
+
+class MedicalRiskTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.rules = load_disease_rules(BASE_DIR)
+        cls.taxonomy = load_allergen_taxonomy(BASE_DIR)
+
+    def evaluate(self, candidate, conditions=(), allergens=()):
+        return evaluate_medical_risk(
+            candidate, list(conditions), list(allergens),
+            self.rules, self.taxonomy, user_profile=PROFILE,
+        )
+
+    def blocked_nutrients(self, result) -> set:
+        return {
+            risk.get("nutrient")
+            for risk in result["risks"]
+            if risk.get("severity") == "block"
+        }
+
+
+class NoConditionsTests(MedicalRiskTestCase):
+    def test_a_plain_dish_is_safe_when_nothing_is_configured(self):
+        result = self.evaluate(dish())
+        self.assertTrue(result["is_safe"])
+        self.assertEqual(result["block_reasons"], [])
+
+    def test_even_an_extreme_dish_passes_with_no_conditions(self):
+        """沒有疾病條件時不該憑空擋人——那些門檻是疾病專屬的。"""
+        result = self.evaluate(dish(calories=1500, sodium=3000, fat=90))
+        self.assertTrue(result["is_safe"])
+
+
+class AllergenTests(MedicalRiskTestCase):
+    def test_a_declared_allergen_blocks_the_dish(self):
+        result = self.evaluate(dish(name_zh="鮮蝦炒飯"), allergens=["shellfish"])
+        self.assertFalse(result["is_safe"])
+
+    def test_someone_elses_allergen_does_not_block_it(self):
+        result = self.evaluate(dish(name_zh="鮮蝦炒飯"), allergens=["peanut"])
+        self.assertTrue(result["is_safe"])
+
+
+class TransFatTests(MedicalRiskTestCase):
+    def test_trans_fat_is_blocked_for_every_condition(self):
+        for condition in ("diabetes", "gout", "hyperlipidemia", "hypertension", "kidney_disease"):
+            with self.subTest(condition=condition):
+                result = self.evaluate(dish(trans_fat=0.5), conditions=[condition])
+                self.assertIn("trans_fat", self.blocked_nutrients(result))
+
+    def test_a_trace_amount_is_tolerated(self):
+        """門檻是 0.1g；標示為 0 的食品實務上仍可能有微量。"""
+        result = self.evaluate(dish(trans_fat=0.05), conditions=["hypertension"])
+        self.assertNotIn("trans_fat", self.blocked_nutrients(result))
+
+
+class HypertensionTests(MedicalRiskTestCase):
+    def test_sodium_over_a_third_of_the_daily_limit_is_blocked(self):
+        result = self.evaluate(dish(sodium=800), conditions=["hypertension"])
+        self.assertIn("sodium", self.blocked_nutrients(result))
+
+    def test_sodium_under_the_limit_passes(self):
+        result = self.evaluate(dish(sodium=600), conditions=["hypertension"])
+        self.assertNotIn("sodium", self.blocked_nutrients(result))
+
+    def test_the_message_names_the_number_and_the_limit(self):
+        result = self.evaluate(dish(sodium=900), conditions=["hypertension"])
+        message = next(m for m in result["block_reasons"] if "鈉" in m)
+        self.assertIn("900", message)
+        # 生效的是 disease_rules.json 的 600mg（有 AHA／國健署引用），
+        # 不是程式裡另外硬編碼的 2000/3。見 EffectiveLimitTests。
+        self.assertIn("600", message)
+
+    def test_calories_over_a_third_of_the_daily_energy_are_blocked(self):
+        result = self.evaluate(dish(calories=int(E / 3) + 100), conditions=["hypertension"])
+        self.assertIn("calories", self.blocked_nutrients(result))
+
+
+class KidneyDiseaseTests(MedicalRiskTestCase):
+    """腎臟病的蛋白質是「限量上限」，方向跟一般人的「至少吃到」相反。"""
+
+    def test_high_protein_is_blocked_not_rewarded(self):
+        result = self.evaluate(dish(protein=40), conditions=["kidney_disease"])
+        self.assertIn("protein", self.blocked_nutrients(result))
+
+    def test_low_protein_passes(self):
+        result = self.evaluate(dish(protein=8), conditions=["kidney_disease"])
+        self.assertNotIn("protein", self.blocked_nutrients(result))
+
+    def test_the_protein_ceiling_follows_ideal_body_weight(self):
+        limit = (W * 0.8) / 3.0
+        self.assertNotIn(
+            "protein",
+            self.blocked_nutrients(self.evaluate(dish(protein=limit - 1), conditions=["kidney_disease"])),
+        )
+        self.assertIn(
+            "protein",
+            self.blocked_nutrients(self.evaluate(dish(protein=limit + 1), conditions=["kidney_disease"])),
+        )
+
+    def test_the_sodium_ceiling_is_stricter_than_for_hypertension(self):
+        """腎臟病是 1500mg/日，高血壓是 2000mg/日。"""
+        salty = dish(sodium=520)  # 介於 1500/3 與 2000/3 之間
+        self.assertIn("sodium", self.blocked_nutrients(self.evaluate(salty, conditions=["kidney_disease"])))
+        self.assertNotIn("sodium", self.blocked_nutrients(self.evaluate(salty, conditions=["hypertension"])))
+
+
+class FriedFoodTests(MedicalRiskTestCase):
+    def test_frying_is_forbidden_for_gout_and_hyperlipidemia(self):
+        for condition in ("gout", "hyperlipidemia"):
+            with self.subTest(condition=condition):
+                result = self.evaluate(dish(name_zh="鹽酥雞", is_fried=True), conditions=[condition])
+                self.assertTrue(
+                    any(risk["type"] == "fried_food" and risk["severity"] == "block" for risk in result["risks"])
+                )
+
+    def test_frying_is_only_a_caution_for_the_other_conditions(self):
+        for condition in ("diabetes", "hypertension", "kidney_disease"):
+            with self.subTest(condition=condition):
+                result = self.evaluate(dish(name_zh="炸雞排", is_fried=True), conditions=[condition])
+                fried = [risk for risk in result["risks"] if risk["type"] == "fried_food"]
+                self.assertTrue(fried)
+                self.assertEqual({risk["severity"] for risk in fried}, {"caution"})
+
+
+class HyperlipidemiaTests(MedicalRiskTestCase):
+    def test_a_high_fat_meal_is_blocked(self):
+        result = self.evaluate(dish(fat=60), conditions=["hyperlipidemia"])
+        self.assertIn("fat", self.blocked_nutrients(result))
+
+    def test_saturated_fat_has_its_own_stricter_ceiling(self):
+        limit = (E * 0.07) / 9.0 / 3.0
+        result = self.evaluate(dish(fat=10, saturated_fat=limit + 2), conditions=["hyperlipidemia"])
+        self.assertIn("saturated_fat", self.blocked_nutrients(result))
+
+
+class MultipleConditionsTests(MedicalRiskTestCase):
+    def test_the_strictest_condition_wins(self):
+        """同時有高血壓與腎臟病時，該用 1500mg 的那條。"""
+        salty = dish(sodium=520)
+        result = self.evaluate(salty, conditions=["hypertension", "kidney_disease"])
+        self.assertIn("sodium", self.blocked_nutrients(result))
+
+    def test_each_condition_reports_its_own_reason(self):
+        result = self.evaluate(dish(sodium=900, protein=40), conditions=["hypertension", "kidney_disease"])
+        conditions_named = {risk.get("condition_id") for risk in result["risks"] if risk["severity"] == "block"}
+        self.assertEqual(conditions_named, {"hypertension", "kidney_disease"})
+
+
+class EffectiveLimitTests(MedicalRiskTestCase):
+    """同一個營養素有兩套門檻時，實際生效的是嚴的那個。
+
+    `disease_rules.json` 是有引用、有審閱紀錄的治理檔案，`medical_risk_service`
+    裡另外有一套依理想體重推算的公式。兩邊數字不一致時，較寬的那條等於死碼——
+    審閱者看檔案簽核的數字，跟系統實際執行的可能不同。這裡把「較嚴者生效」
+    釘住，讓任何一邊變動時測試會說話。
+    """
+
+    def test_hypertension_sodium_uses_the_configured_600_not_the_derived_667(self):
+        self.assertNotIn("sodium", self.blocked_nutrients(
+            self.evaluate(dish(sodium=590), conditions=["hypertension"])))
+        self.assertIn("sodium", self.blocked_nutrients(
+            self.evaluate(dish(sodium=610), conditions=["hypertension"])))
+
+    def test_kidney_sodium_uses_the_derived_500_not_the_configured_600(self):
+        self.assertIn("sodium", self.blocked_nutrients(
+            self.evaluate(dish(sodium=520), conditions=["kidney_disease"])))
+
+    def test_kidney_protein_uses_the_derived_ceiling_not_the_configured_40(self):
+        self.assertIn("protein", self.blocked_nutrients(
+            self.evaluate(dish(protein=25), conditions=["kidney_disease"])))
+
+    def test_hyperlipidemia_fat_uses_the_derived_ceiling_not_the_configured_25(self):
+        self.assertIn("fat", self.blocked_nutrients(
+            self.evaluate(dish(fat=20), conditions=["hyperlipidemia"])))
+
+
+class EnergyFactorTests(MedicalRiskTestCase):
+    """單餐額度要跟著活動量走，而且不能低到基礎代謝以下。
+
+    先前每公斤一律 25／30 大卡、完全不看活動量：一位選「中等活動」的使用者
+    拿到的每日目標會比他的 BMR 還低，單餐額度也跟著被壓到不合理的低點，
+    而「我的」頁面顯示的目標卻是另一個數字。
+    """
+
+    def _ceiling(self, profile, condition="hypertension"):
+        from services.medical_risk_service import resolve_user_energy_and_weight
+        return resolve_user_energy_and_weight([condition], profile)[0]
+
+    def test_a_more_active_person_gets_a_higher_daily_energy(self):
+        sedentary = self._ceiling({**PROFILE, "activity_multiplier": 1.2})
+        light = self._ceiling({**PROFILE, "activity_multiplier": 1.375})
+        moderate = self._ceiling({**PROFILE, "activity_multiplier": 1.55})
+        active = self._ceiling({**PROFILE, "activity_multiplier": 1.9})
+        self.assertLess(sedentary, light)
+        self.assertLess(light, moderate)
+        self.assertLess(moderate, active)
+
+    def test_the_target_never_drops_below_basal_metabolic_rate(self):
+        # 久坐 + 矮小：W * 25 會低於 BMR，這時要被 BMR 接住。
+        profile = {"height": 150, "weight": 46, "age": 25, "gender": "male",
+                   "activity_multiplier": 1.2}
+        bmr = 10 * 46 + 6.25 * 150 - 5 * 25 + 5
+        self.assertGreaterEqual(self._ceiling(profile), bmr)
+
+    def test_overweight_reduction_applies_only_to_weight_managed_conditions(self):
+        overweight = {"height": 170, "weight": 90, "age": 40, "gender": "male",
+                      "activity_multiplier": 1.375}
+        # 糖尿病與高血脂的指引含減重目標，過重時往下調一級；痛風／高血壓不調。
+        self.assertLess(self._ceiling(overweight, "diabetes"),
+                        self._ceiling(overweight, "gout"))
+        self.assertEqual(self._ceiling(overweight, "hyperlipidemia"),
+                         self._ceiling(overweight, "diabetes"))
+        self.assertEqual(self._ceiling(overweight, "hypertension"),
+                         self._ceiling(overweight, "gout"))
+
+    def test_a_normal_bmi_person_gets_no_weight_loss_reduction(self):
+        lean = {**PROFILE, "weight": 60}
+        self.assertEqual(self._ceiling(lean, "diabetes"), self._ceiling(lean, "gout"))
+
+
+class ProfileSensitivityTests(MedicalRiskTestCase):
+    def test_a_shorter_person_gets_a_lower_ceiling(self):
+        """門檻依理想體重換算，不是固定值。"""
+        # 兩邊都固定同一個活動量，差異才單純來自身高換算的理想體重。
+        meal = dish(calories=560)
+        tall = evaluate_medical_risk(
+            meal, ["hypertension"], [], self.rules, self.taxonomy,
+            user_profile={"height": 180, "weight": 75, "age": 30, "gender": "male",
+                          "activity_multiplier": 1.375},
+        )
+        short = evaluate_medical_risk(
+            meal, ["hypertension"], [], self.rules, self.taxonomy,
+            user_profile={"height": 155, "weight": 48, "age": 30, "gender": "male",
+                          "activity_multiplier": 1.375},
+        )
+        self.assertTrue(tall["is_safe"])
+        self.assertFalse(short["is_safe"])
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class ThresholdConflictReportTests(MedicalRiskTestCase):
+    """兩套門檻不一致時要報出來，而不是靜靜地讓一邊失效。"""
+
+    def test_the_known_disagreements_are_reported(self):
+        from services.medical_risk_service import rule_threshold_conflicts
+
+        conflicts = rule_threshold_conflicts(self.rules, PROFILE)
+        pairs = {(c["condition_id"], c["nutrient"]) for c in conflicts}
+        self.assertIn(("hypertension", "sodium"), pairs)
+        self.assertIn(("kidney_disease", "protein"), pairs)
+
+    def test_each_entry_says_which_side_is_ignored(self):
+        from services.medical_risk_service import rule_threshold_conflicts
+
+        for conflict in rule_threshold_conflicts(self.rules, PROFILE):
+            self.assertIn(conflict["ignored_source"], {"configured", "derived"})
+            self.assertEqual(
+                conflict["effective_block"],
+                min(conflict["configured_block"], conflict["derived_block"]),
+            )
+
+    def test_matching_thresholds_are_not_reported_as_conflicts(self):
+        from services.medical_risk_service import derived_meal_limits, rule_threshold_conflicts
+
+        # 兩邊都從同一份宣告算出來，數字對齊時就不該報成衝突
+        aligned = {
+            "hypertension": {
+                "personalized_limits": {
+                    "sodium": {"basis": "absolute", "daily_amount": 1800.0, "meals_per_day": 3}
+                },
+                "risk_nutrients": {"sodium": {"block": 600.0}},
+            }
+        }
+        self.assertEqual(derived_meal_limits(aligned, PROFILE)["hypertension"]["sodium"], 600.0)
+        self.assertEqual(rule_threshold_conflicts(aligned, PROFILE), [])
+
+    def test_the_diabetes_disagreements_are_reported_too(self):
+        """先前的比對清單是手抄的，整組糖尿病都沒被檢查到。"""
+        from services.medical_risk_service import rule_threshold_conflicts
+
+        pairs = {
+            (c["condition_id"], c["nutrient"])
+            for c in rule_threshold_conflicts(self.rules, PROFILE)
+        }
+        self.assertIn(("diabetes", "sugar"), pairs)
+        self.assertIn(("diabetes", "carbs"), pairs)
+
+
+class DeclaredLimitTests(MedicalRiskTestCase):
+    """單餐上限的公式宣告在規則檔，程式只負責求值。"""
+
+    def test_every_condition_declares_its_personalized_limits(self):
+        for condition_id in ("diabetes", "gout", "hyperlipidemia", "hypertension", "kidney_disease"):
+            with self.subTest(condition=condition_id):
+                self.assertTrue(self.rules[condition_id].get("personalized_limits"))
+
+    def test_an_energy_share_converts_to_grams(self):
+        from services.medical_risk_service import resolve_personalized_limit
+
+        # 每日 1800 kcal 的 25% 當脂肪，1g 脂肪 9 kcal，分三餐
+        limit = resolve_personalized_limit(
+            {"basis": "daily_energy", "share": 0.25, "kcal_per_gram": 9.0, "meals_per_day": 3},
+            1800, 60,
+        )
+        self.assertAlmostEqual(limit, (1800 * 0.25) / 9 / 3, places=6)
+
+    def test_a_cap_is_applied_before_dividing_by_meals(self):
+        from services.medical_risk_service import resolve_personalized_limit
+
+        # 5% of 4000 kcal = 50g 糖，但每日上限 25g，所以單餐是 25/3
+        limit = resolve_personalized_limit(
+            {"basis": "daily_energy", "share": 0.05, "kcal_per_gram": 4.0,
+             "cap": 25.0, "meals_per_day": 3},
+            4000, 60,
+        )
+        self.assertAlmostEqual(limit, 25.0 / 3, places=6)
+
+    def test_ideal_body_weight_basis(self):
+        from services.medical_risk_service import resolve_personalized_limit
+
+        limit = resolve_personalized_limit(
+            {"basis": "ideal_body_weight", "per_kg": 0.8, "meals_per_day": 3}, 1800, 60
+        )
+        self.assertAlmostEqual(limit, (60 * 0.8) / 3, places=6)
+
+    def test_an_unknown_basis_is_ignored_rather_than_guessed(self):
+        from services.medical_risk_service import resolve_personalized_limit
+
+        self.assertIsNone(resolve_personalized_limit({"basis": "vibes"}, 1800, 60))
+
+    def test_the_rules_file_is_data_not_code(self):
+        """不支援字串運算式：規則檔不該能執行任意運算。"""
+        from services.medical_risk_service import resolve_personalized_limit
+
+        self.assertIsNone(resolve_personalized_limit({"formula": "E / 3"}, 1800, 60))
+
+    def test_changing_the_declaration_changes_what_gets_blocked(self):
+        """證明程式真的讀了宣告，而不是還在用內建數字。"""
+        import copy
+
+        rules = copy.deepcopy(self.rules)
+        rules["hypertension"]["personalized_limits"]["sodium"] = {
+            "basis": "absolute", "daily_amount": 300.0, "meals_per_day": 3,
+        }
+        result = evaluate_medical_risk(
+            dish(sodium=150), ["hypertension"], [], rules, self.taxonomy, user_profile=PROFILE
+        )
+        self.assertIn("sodium", {r.get("nutrient") for r in result["risks"] if r["severity"] == "block"})
+
+
+class MealLevelLimitTests(MedicalRiskTestCase):
+    """單餐上限要對「一餐」生效，不能只對「一道菜」生效。
+
+    personalized_limits 是每日總量 ÷ 3，也就是一餐的額度，但
+    evaluate_medical_risk 是逐道菜呼叫的。結果是一餐點兩道各 490mg 的菜全部
+    通過（合計 980mg），單獨一道 510mg 的反而被擋——同一個上限，兩種結論。
+    """
+
+    def test_two_dishes_each_under_the_limit_still_pass_individually(self):
+        for _ in range(2):
+            result = evaluate_medical_risk(
+                dish(sodium=490), ["hypertension"], [], self.rules, self.taxonomy, user_profile=PROFILE
+            )
+            self.assertTrue(result["is_safe"])
+
+    def test_the_meal_total_of_those_same_dishes_is_flagged(self):
+        from services.medical_risk_service import evaluate_meal_medical_risk
+
+        result = evaluate_meal_medical_risk(
+            [{"nutrients": dish(sodium=490)}, {"nutrients": dish(sodium=490)}],
+            ["hypertension"], [], self.rules, self.taxonomy, user_profile=PROFILE,
+        )
+        self.assertTrue(result["has_caution"])
+        sodium_risks = [r for r in result["risks"] if r["nutrient"] == "sodium"]
+        self.assertEqual(len(sodium_risks), 1)
+        self.assertEqual(sodium_risks[0]["value"], 980.0)
+        self.assertEqual(sodium_risks[0]["scope"], "meal")
+
+    def test_a_meal_within_the_limit_is_not_flagged(self):
+        from services.medical_risk_service import evaluate_meal_medical_risk
+
+        result = evaluate_meal_medical_risk(
+            [{"nutrients": dish(sodium=300)}, {"nutrients": dish(sodium=300)}],
+            ["hypertension"], [], self.rules, self.taxonomy, user_profile=PROFILE,
+        )
+        self.assertFalse(result["has_caution"])
+
+    def test_a_user_without_conditions_gets_no_meal_warnings(self):
+        from services.medical_risk_service import evaluate_meal_medical_risk
+
+        result = evaluate_meal_medical_risk(
+            [{"nutrients": dish(sodium=5000)}], [], [], self.rules, self.taxonomy, user_profile=PROFILE,
+        )
+        self.assertEqual(result["caution_reasons"], [])
+
+    def test_the_meal_check_scales_by_portion_like_the_per_dish_check(self):
+        from services.medical_risk_service import evaluate_meal_medical_risk
+
+        # 每 100g 400mg 的菜，吃 200g 就是 800mg，已超過 666.7mg 的單餐上限
+        result = evaluate_meal_medical_risk(
+            [{"nutrients": dish(sodium=400), "portion_g": 200}],
+            ["hypertension"], [], self.rules, self.taxonomy, user_profile=PROFILE,
+        )
+        self.assertTrue(result["has_caution"])
+
+    def test_the_per_dish_message_says_it_is_one_dish_not_the_meal(self):
+        """訊息寫「單餐」會讓人以為整餐都算過了。"""
+        result = evaluate_medical_risk(
+            dish(sodium=900), ["hypertension"], [], self.rules, self.taxonomy, user_profile=PROFILE
+        )
+        message = " ".join(result["block_reasons"])
+        self.assertIn("這一道", message)
+        self.assertNotIn("單餐鈉", message)
+
+
+class ThresholdResolutionTests(MedicalRiskTestCase):
+    """規則檔門檻與公式門檻不一致時，誰說了算。
+
+    先前「較嚴的那一組生效」不是有人決定的——它是兩段檢查各跑一次的副作用。
+    審閱者在 disease_rules.json 上簽核的數字，可能不是系統實際執行的，而且
+    檔案裡沒有任何地方能記下「我們決定用哪一邊」。
+    """
+
+    def _rules_with_conflict(self, resolution=None):
+        import copy
+
+        rules = copy.deepcopy(self.rules)
+        rule = rules["hypertension"]
+        # 規則檔 600 mg vs 公式 2000/3 = 666.7 mg，本來就不一致。
+        if resolution is not None:
+            rule["threshold_resolutions"] = {"sodium": resolution}
+        return rules
+
+    def test_without_a_decision_the_stricter_limit_still_wins(self):
+        """沒人裁決時要維持安全預設，不能因為加了裁決機制就放寬。"""
+        from services.medical_risk_service import rule_threshold_conflicts
+
+        conflicts = rule_threshold_conflicts(self._rules_with_conflict(), PROFILE)
+        sodium = next(c for c in conflicts if c["condition_id"] == "hypertension" and c["nutrient"] == "sodium")
+        self.assertFalse(sodium["resolved"])
+        self.assertEqual(sodium["effective_block"], min(sodium["configured_block"], sodium["derived_block"]))
+
+    def test_a_recorded_decision_is_honoured_even_when_it_is_looser(self):
+        """裁決的意義就是它會改變執行結果，包括採用比較寬的那一邊。"""
+        from services.medical_risk_service import rule_threshold_conflicts
+
+        rules = self._rules_with_conflict({
+            "use": "derived",
+            "decided_by": "test-clinician",
+            "decided_on": "2026-07-01",
+            "note": "以每日 2000 mg ÷ 3 餐為準",
+        })
+        conflicts = rule_threshold_conflicts(rules, PROFILE)
+        sodium = next(c for c in conflicts if c["condition_id"] == "hypertension" and c["nutrient"] == "sodium")
+        self.assertTrue(sodium["resolved"])
+        self.assertEqual(sodium["effective_block"], sodium["derived_block"])
+        self.assertEqual(sodium["ignored_source"], "configured")
+
+    def test_the_decision_changes_what_actually_blocks_a_dish(self):
+        """報表寫了什麼不重要，重要的是篩選真的照著做。"""
+        rules_default = self._rules_with_conflict()
+        rules_derived = self._rules_with_conflict({
+            "use": "derived", "decided_by": "test-clinician", "decided_on": "2026-07-01",
+        })
+        # 630 mg：超過規則檔的 600，但沒超過公式的 666.7。
+        item = dish(sodium=630)
+
+        blocked = evaluate_medical_risk(item, ["hypertension"], [], rules_default, self.taxonomy, user_profile=PROFILE)
+        allowed = evaluate_medical_risk(item, ["hypertension"], [], rules_derived, self.taxonomy, user_profile=PROFILE)
+
+        self.assertFalse(blocked["is_safe"], "沒有裁決時應該照較嚴的 600 mg 擋下來")
+        self.assertTrue(allowed["is_safe"], "裁決採用公式（666.7 mg）後這一道應該通過")
+
+
+class EffectiveMealLimitTests(MedicalRiskTestCase):
+    """單餐上限要能被拿出來，前端才有數字可以比對已經記下的餐點。
+
+    先前這組門檻只在推薦與掃描時擋得住「還沒吃的」候選餐點；使用者自己記下
+    的餐點只跟整日總量比，所以高血壓使用者記一筆 620 mg 的三明治（單餐上限
+    600 mg），首頁照樣寫「目前沒有需要優先處理的飲食警示」。
+    """
+
+    def test_it_reports_the_same_number_the_screening_enforces(self):
+        """報出來的數字必須跟實際擋人的那個一致，否則又是兩套會漂移的門檻。"""
+        from services.medical_risk_service import effective_meal_limits
+
+        limits = effective_meal_limits(self.rules, ["hypertension"], PROFILE)
+        self.assertIn("sodium", limits)
+        sodium_limit = limits["sodium"]["limit"]
+
+        just_over = evaluate_medical_risk(
+            dish(sodium=sodium_limit + 20), ["hypertension"], [],
+            self.rules, self.taxonomy, user_profile=PROFILE,
+        )
+        just_under = evaluate_medical_risk(
+            dish(sodium=sodium_limit - 20), ["hypertension"], [],
+            self.rules, self.taxonomy, user_profile=PROFILE,
+        )
+        self.assertIn("sodium", self.blocked_nutrients(just_over))
+        self.assertNotIn("sodium", self.blocked_nutrients(just_under))
+
+    def test_it_names_the_condition_that_asked_for_the_limit(self):
+        """訊息要說得出「為什麼」，不然使用者只看到一個沒有來歷的數字。"""
+        from services.medical_risk_service import effective_meal_limits
+
+        limits = effective_meal_limits(self.rules, ["hypertension"], PROFILE)
+        self.assertTrue(limits["sodium"]["conditions"])
+        self.assertIn("高血壓", limits["sodium"]["conditions"][0])
+        self.assertEqual(limits["sodium"]["unit"], "mg")
+
+    def test_several_conditions_take_the_strictest(self):
+        from services.medical_risk_service import effective_meal_limits
+
+        hypertension = effective_meal_limits(self.rules, ["hypertension"], PROFILE)["sodium"]["limit"]
+        kidney = effective_meal_limits(self.rules, ["kidney_disease"], PROFILE)["sodium"]["limit"]
+        both = effective_meal_limits(self.rules, ["hypertension", "kidney_disease"], PROFILE)["sodium"]["limit"]
+        self.assertEqual(both, min(hypertension, kidney))
+
+    def test_no_conditions_means_no_meal_limits(self):
+        """沒有勾疾病的人不該被單餐上限攔——那些數字是疾病指引來的。"""
+        from services.medical_risk_service import effective_meal_limits
+
+        self.assertEqual(effective_meal_limits(self.rules, [], PROFILE), {})
+
+
+class GoutKeywordTests(MedicalRiskTestCase):
+    """痛風要靠菜名擋掉內臟類餐點。
+
+    建檔菜單送進 evaluate_medical_risk 的只有中文菜名，label 是 menu_001 這種
+    編號。規則先前只寫了「內臟」這個統稱，台灣菜單卻是直接寫部位：線上實測
+    只勾痛風，台南國華街的「腰子冬粉」「豬心冬粉」被當成可以吃的推薦出來，
+    「薑絲炒大腸」也沒擋。這是關鍵字篩選，不是普林含量資料。
+    """
+
+    @staticmethod
+    def menu_item(name):
+        # 跟 healthy_food_service._items_from_indexed_menu 送進來的形狀一樣
+        return dish(label="menu_001", name_zh=name)
+
+    @staticmethod
+    def gout_keyword_hits(result):
+        return [
+            risk for risk in result["risks"]
+            if risk["type"] == "condition_keyword" and risk["condition_id"] == "gout"
+        ]
+
+    def test_organ_meat_dishes_are_blocked(self):
+        for name in ("腰子冬粉", "豬心冬粉", "薑絲炒大腸", "下水湯"):
+            with self.subTest(dish=name):
+                result = self.evaluate(self.menu_item(name), conditions=["gout"])
+                self.assertFalse(result["is_safe"])
+                self.assertTrue(self.gout_keyword_hits(result))
+
+    def test_the_reason_names_the_word_that_matched(self):
+        result = self.evaluate(self.menu_item("腰子冬粉"), conditions=["gout"])
+        self.assertIn("腰子", " ".join(result["block_reasons"]))
+
+    def test_ordinary_meat_dishes_pass(self):
+        for name in ("豬肉冬粉", "雞肉飯"):
+            with self.subTest(dish=name):
+                result = self.evaluate(self.menu_item(name), conditions=["gout"])
+                self.assertTrue(result["is_safe"], result["block_reasons"])
+
+    def test_names_that_only_look_like_organ_meat_are_not_matched(self):
+        """刻意不列的字，理由寫在 disease_rules.json 的 blocked_keywords_note。"""
+        for name in ("肝連湯", "豬血湯", "香腸炒飯", "玉米濃湯", "百頁豆腐", "牛肝菌燉飯"):
+            with self.subTest(dish=name):
+                result = self.evaluate(self.menu_item(name), conditions=["gout"])
+                self.assertEqual(self.gout_keyword_hits(result), [])
+
+    def test_the_organ_keywords_belong_to_gout_only(self):
+        result = self.evaluate(self.menu_item("腰子冬粉"), conditions=["hypertension"])
+        self.assertTrue(result["is_safe"], result["block_reasons"])
+
+
+class GoutIndexedMenuTests(unittest.TestCase):
+    """走真正的建檔菜單路徑重現線上那一次：只勾痛風，店是阿明豬心冬粉。
+
+    店名本身含「豬心」，但擋的依據必須是菜名——不然整家店連豬肉冬粉都會
+    被擋掉。
+    """
+
+    VENUE_NAME = "阿明豬心冬粉"
+    PLACE_ID = "p_aming"
+
+    @staticmethod
+    def _dish(name):
+        return {
+            "name": name, "price": 70, "calories": 380, "protein": 18, "carbs": 50,
+            "fat": 10, "sugar": 2, "saturated_fat": 3, "trans_fat": 0, "fiber": 2, "sodium": 900,
+        }
+
+    def _build(self):
+        from unittest.mock import patch
+
+        import services.healthy_food_service as healthy_food_service_module
+        from repositories.storage import StorageRepository
+
+        storage = StorageRepository(None, False, {}, [], [])
+        storage.upsert_user({
+            "user_id": "u1", "name": "U", "height": 170, "weight": 65, "age": 30,
+            "health_conditions": ["痛風"], "allergens": [],
+        })
+        storage.save_restaurant_menu(
+            self.VENUE_NAME,
+            [self._dish("腰子冬粉"), self._dish("豬心冬粉"), self._dish("豬肉冬粉")],
+            venue={"google_place_id": self.PLACE_ID},
+        )
+        venue = {
+            "restaurant_id": f"google_{self.PLACE_ID}", "name": self.VENUE_NAME,
+            "lat": 22.9950, "lng": 120.1990, "address": "台南市中西區國華街",
+            "distance_km": 0.1, "tags": ["Google Places"], "google_place_id": self.PLACE_ID,
+            "price_level": 1, "is_open": True, "rating": 4.2, "user_ratings_total": 800,
+            "match_score": 70, "data_source": "google_places", "nutrition_available": False,
+            "recommended_items": [],
+        }
+        with patch.object(healthy_food_service_module, "fetch_google_places_restaurants",
+                          return_value=[venue]):
+            return healthy_food_service_module.build_google_places_food_recommendations(
+                storage, "u1", {"budget": 150, "lat": 22.9950, "lng": 120.1990},
+            )
+
+    def test_organ_dishes_are_filtered_out_and_the_plain_one_is_kept(self):
+        result = self._build()
+        self.assertEqual(result["venues_with_menu"], 1)
+        recommended = [item["item_name"] for item in result["recommended"]]
+        filtered = {entry["item_name"]: entry["reasons"] for entry in result["filtered_out"]}
+        self.assertEqual(recommended, ["豬肉冬粉"])
+        self.assertEqual(set(filtered), {"腰子冬粉", "豬心冬粉"})
+        self.assertTrue(any("腰子" in reason for reason in filtered["腰子冬粉"]))

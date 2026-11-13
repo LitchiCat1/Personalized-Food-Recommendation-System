@@ -1,0 +1,272 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "疾病門檻怎麼決定",
+    "subtitle": "規則檔與臨床公式不一致時，誰說了算",
+    "output": "docs/architecture/threshold-decision.html",
+    "visual_preset": "blueprint",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "two-sources",
+        "label": "兩套門檻",
+        "focus": [
+          "rulefile",
+          "formula",
+          "compare"
+        ],
+        "note": "規則檔有簽核紀錄與引用；公式依理想體重推算。兩邊對同一個營養素會給不同數字。"
+      },
+      {
+        "id": "decision",
+        "label": "裁決點",
+        "focus": [
+          "compare",
+          "decided",
+          "use_cfg",
+          "use_drv",
+          "stricter"
+        ],
+        "note": "threshold_resolutions 是臨床人員寫下決定的地方；沒寫就走安全預設。"
+      },
+      {
+        "id": "effect",
+        "label": "實際生效",
+        "focus": [
+          "stricter",
+          "apply",
+          "limits",
+          "report"
+        ],
+        "note": "裁決不是文件，它會改變哪一道菜被擋下來。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "cfg",
+      "label": "規則檔門檻"
+    },
+    {
+      "id": "drv",
+      "label": "臨床公式門檻"
+    },
+    {
+      "id": "gov",
+      "label": "治理裁決"
+    },
+    {
+      "id": "run",
+      "label": "實際執行"
+    },
+    {
+      "id": "open",
+      "label": "尚未裁決",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "collect",
+      "label": "取得兩套數字",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "decide",
+      "label": "裁決",
+      "fromCol": 1,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "enforce",
+      "label": "生效",
+      "fromCol": 4,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "rulefile",
+      "lane": "cfg",
+      "col": 0,
+      "type": "database",
+      "label": "規則檔門檻",
+      "sublabel": "risk_nutrients.block",
+      "tag": "已簽核"
+    },
+    {
+      "id": "formula",
+      "lane": "drv",
+      "col": 0,
+      "type": "backend",
+      "label": "臨床公式門檻",
+      "sublabel": "personalized_limits"
+    },
+    {
+      "id": "compare",
+      "lane": "gov",
+      "col": 1,
+      "type": "security",
+      "label": "兩邊數字不一致",
+      "sublabel": "差距超過 0.5"
+    },
+    {
+      "id": "decided",
+      "lane": "gov",
+      "col": 2,
+      "type": "security",
+      "label": "有臨床裁決嗎",
+      "sublabel": "threshold_resolutions"
+    },
+    {
+      "id": "use_cfg",
+      "lane": "cfg",
+      "col": 3,
+      "type": "database",
+      "label": "採用規則檔",
+      "sublabel": "use: configured"
+    },
+    {
+      "id": "use_drv",
+      "lane": "drv",
+      "col": 3,
+      "type": "backend",
+      "label": "採用公式",
+      "sublabel": "use: derived"
+    },
+    {
+      "id": "stricter",
+      "lane": "open",
+      "col": 3,
+      "type": "security",
+      "label": "取較嚴的一組",
+      "sublabel": "安全預設，不是裁決"
+    },
+    {
+      "id": "apply",
+      "lane": "run",
+      "col": 4,
+      "type": "backend",
+      "label": "擋不擋這一道",
+      "sublabel": "evaluate_medical_risk"
+    },
+    {
+      "id": "limits",
+      "lane": "run",
+      "col": 5,
+      "type": "frontend",
+      "label": "單餐上限下發",
+      "sublabel": "meal_nutrient_limits"
+    },
+    {
+      "id": "report",
+      "lane": "open",
+      "col": 5,
+      "type": "external",
+      "label": "標成未裁決",
+      "sublabel": "/medical-metadata"
+    }
+  ],
+  "mainPath": [
+    "rulefile",
+    "compare",
+    "decided",
+    "stricter",
+    "apply",
+    "limits"
+  ],
+  "edges": [
+    {
+      "from": "rulefile",
+      "to": "compare",
+      "variant": "emphasis"
+    },
+    {
+      "from": "formula",
+      "to": "compare"
+    },
+    {
+      "from": "compare",
+      "to": "decided",
+      "label": "需要決定",
+      "variant": "emphasis"
+    },
+    {
+      "from": "decided",
+      "to": "use_cfg",
+      "label": "裁決：規則檔",
+      "role": "branch"
+    },
+    {
+      "from": "decided",
+      "to": "use_drv",
+      "label": "裁決：公式",
+      "role": "branch"
+    },
+    {
+      "from": "decided",
+      "to": "stricter",
+      "label": "沒有裁決",
+      "role": "branch",
+      "variant": "dashed"
+    },
+    {
+      "from": "use_cfg",
+      "to": "apply"
+    },
+    {
+      "from": "use_drv",
+      "to": "apply"
+    },
+    {
+      "from": "stricter",
+      "to": "apply",
+      "variant": "dashed"
+    },
+    {
+      "from": "apply",
+      "to": "limits",
+      "variant": "emphasis"
+    },
+    {
+      "from": "stricter",
+      "to": "report",
+      "role": "async",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "為什麼需要一個裁決欄位",
+      "items": [
+        "「取較嚴的一組」原本是兩段檢查各跑一次的副作用",
+        "審閱者在規則檔上簽核的數字，可能不是系統執行的",
+        "檔案裡先前沒有任何地方能寫下決定"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "裁決怎麼寫",
+      "items": [
+        "在該疾病加上 threshold_resolutions",
+        "use 只接受 configured 或 derived",
+        "一併記下 decided_by、decided_on 與理由"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "目前狀態",
+      "items": [
+        "6 項營養素仍在等臨床人員裁決",
+        "痛風規則已到 2026.09.1，其餘仍是 2026.06.1",
+        "慢性腎臟病標著需依分期與抽血數值個人化"
+      ]
+    }
+  ]
+}

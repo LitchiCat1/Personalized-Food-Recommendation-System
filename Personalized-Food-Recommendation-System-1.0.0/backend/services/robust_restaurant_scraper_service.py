@@ -1,0 +1,763 @@
+import json
+import os
+import random
+import re
+import time
+import requests
+from bs4 import BeautifulSoup
+from services.ai_relay_service import get_relay_config, relay_chat
+
+from services.nutrition_label_service import (
+    decode_image_base64,
+    extract_json_block,
+    extract_json_items,
+    extract_number,
+    gemini_generate_url,
+    gemini_headers,
+    gemini_key_model_pairs,
+    get_gemini_api_keys,
+    get_gemini_models,
+    is_forbidden_gemini_model,
+    remember_forbidden_gemini_model,
+)
+from services.openai_service import (
+    OPENAI_CHAT_URL,
+    OPENAI_NO_CREDIT_CODES,
+    get_openai_api_key,
+    get_openai_models,
+    openai_chat_payload,
+    openai_error,
+    openai_headers,
+    openai_response_text,
+)
+
+# Modern User-Agents to prevent anti-bot blocking
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+]
+
+def build_robust_session() -> requests.Session:
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": random.choice(USER_AGENTS),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive"
+    })
+    return session
+
+def fetch_public_menu_text(url: str) -> str:
+    if not url or not url.startswith("http"):
+        return ""
+    session = build_robust_session()
+    try:
+        response = session.get(url, timeout=12)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, "html.parser")
+            for s in soup(["script", "style", "nav", "footer"]):
+                s.decompose()
+            text = soup.get_text(separator="\n")
+            cleaned_lines = [line.strip() for line in text.splitlines() if line.strip()]
+            return "\n".join(cleaned_lines[:200])
+    except Exception as e:
+        print(f"[!] Scraper fetch warning for {url}: {e}")
+    return ""
+
+def generate_fallback_menu(restaurant_name: str) -> list[dict]:
+    """Generates a highly realistic mock menu based on the restaurant name keyword."""
+    name = restaurant_name.lower()
+    
+    # 1. McDonald's / KFC / Burgers / Fast Food
+    if any(k in name for k in ["麥當勞", "肯德基", "漢堡", "美式", "kfc", "mcdonald", "漢堡王", "摩斯"]):
+        return [
+            {"item_id": "f_burger_1", "name": "經典牛肉起司堡", "price": 95, "calories": 530, "protein": 28.0, "carbs": 40.0, "fat": 26.0, "sodium": 890, "gi": "high", "tags": ["高鈉注意"]},
+            {"item_id": "f_burger_2", "name": "麥香魚堡", "price": 49, "calories": 330, "protein": 15.0, "carbs": 38.0, "fat": 13.0, "sodium": 560, "gi": "medium", "tags": ["海鮮類"]},
+            {"item_id": "f_burger_3", "name": "去皮烤雞沙拉 (醬料另計)", "price": 99, "calories": 180, "protein": 22.0, "carbs": 8.0, "fat": 6.0, "sodium": 340, "gi": "low", "tags": ["低GI", "高蛋白", "低熱量"]},
+            {"item_id": "f_burger_4", "name": "黃金脆薯 (大份)", "price": 60, "calories": 480, "protein": 5.0, "carbs": 62.0, "fat": 24.0, "sodium": 620, "gi": "high", "tags": ["高脂肪", "油炸品"]}
+        ]
+    
+    # 2. Convenience Stores (7-11, FamilyMart)
+    if any(k in name for k in ["7-11", "7-eleven", "全家", "便利商店", "超商", "萊爾富", "ok超商"]):
+        return [
+            {"item_id": "f_store_1", "name": "紐奧良烤雞三明治", "price": 49, "calories": 310, "protein": 14.0, "carbs": 36.0, "fat": 12.0, "sodium": 650, "gi": "medium", "tags": ["蛋白質補給"]},
+            {"item_id": "f_store_2", "name": "石安牧場溫泉蛋", "price": 46, "calories": 75, "protein": 7.0, "carbs": 1.0, "fat": 5.0, "sodium": 180, "gi": "low", "tags": ["低GI", "高蛋白", "低熱量"]},
+            {"item_id": "f_store_3", "name": "健身G肉餐盒", "price": 95, "calories": 480, "protein": 32.0, "carbs": 58.0, "fat": 11.0, "sodium": 780, "gi": "low", "tags": ["高蛋白", "低GI"]},
+            {"item_id": "f_store_4", "name": "無糖高纖豆漿", "price": 25, "calories": 146, "protein": 13.0, "carbs": 8.0, "fat": 7.0, "sodium": 55, "gi": "low", "tags": ["低GI", "高纖", "低鈉"]}
+        ]
+        
+    # 3. Japanese Restaurants / Yoshinoya / Sushi / Ramen
+    if any(k in name for k in ["吉野家", "日式", "壽司", "拉麵", "丼", "定食", "爭鮮", "烏龍麵"]):
+        return [
+            {"item_id": "f_jap_1", "name": "經典牛丼 (中份)", "price": 125, "calories": 680, "protein": 24.0, "carbs": 85.0, "fat": 25.0, "sodium": 920, "gi": "high", "tags": ["高飽足"]},
+            {"item_id": "f_jap_2", "name": "鹽烤鯖魚定食", "price": 180, "calories": 540, "protein": 28.0, "carbs": 55.0, "fat": 22.0, "sodium": 880, "gi": "low", "tags": ["優質脂肪", "低GI"]},
+            {"item_id": "f_jap_3", "name": "綜合握壽司 (6貫)", "price": 120, "calories": 360, "protein": 18.0, "carbs": 54.0, "fat": 6.0, "sodium": 450, "gi": "medium", "tags": ["海產"]},
+            {"item_id": "f_jap_4", "name": "和風海帶芽沙拉", "price": 40, "calories": 45, "protein": 1.0, "carbs": 8.0, "fat": 0.5, "sodium": 320, "gi": "low", "tags": ["高纖", "低脂"]}
+        ]
+
+    # 4. Coffee Shops / Starbucks / Louisa
+    if any(k in name for k in ["星巴克", "咖啡", "cafe", "路易莎", "louisa", "cama", "甜點", "下午茶"]):
+        return [
+            {"item_id": "f_cafe_1", "name": "美式咖啡 (無糖去冰/大杯)", "price": 95, "calories": 15, "protein": 0.5, "carbs": 3.0, "fat": 0.0, "sodium": 15, "gi": "low", "tags": ["零卡", "低鈉", "低GI"]},
+            {"item_id": "f_cafe_2", "name": "經典拿鐵 (無糖/燕麥奶)", "price": 120, "calories": 170, "protein": 5.0, "carbs": 22.0, "fat": 6.0, "sodium": 90, "gi": "medium", "tags": ["植物奶"]},
+            {"item_id": "f_cafe_3", "name": "凱薩雞肉起司烤捲餅", "price": 85, "calories": 380, "protein": 18.0, "carbs": 35.0, "fat": 16.0, "sodium": 740, "gi": "medium", "tags": ["蛋白質"]},
+            {"item_id": "f_cafe_4", "name": "黑森林巧克力蛋糕", "price": 90, "calories": 350, "protein": 4.5, "carbs": 48.0, "fat": 15.0, "sodium": 180, "gi": "high", "tags": ["高糖高熱量"]}
+        ]
+
+    # 5. Hotpot (火鍋)
+    if any(k in name for k in ["鍋", "火鍋", "涮涮鍋", "麻辣", "石二鍋"]):
+        return [
+            {"item_id": "f_pot_1", "name": "精選板腱牛肉鍋盤", "price": 268, "calories": 420, "protein": 38.0, "carbs": 5.0, "fat": 26.0, "sodium": 380, "gi": "low", "tags": ["優質高蛋白"]},
+            {"item_id": "f_pot_2", "name": "健康低卡時蔬盤 (無火鍋料)", "price": 120, "calories": 150, "protein": 6.0, "carbs": 24.0, "fat": 2.0, "sodium": 190, "gi": "low", "tags": ["高纖", "低鈉", "低GI"]},
+            {"item_id": "f_pot_3", "name": "川味麻辣湯底", "price": 80, "calories": 350, "protein": 4.0, "carbs": 12.0, "fat": 32.0, "sodium": 2800, "gi": "medium", "tags": ["超高鈉警示", "高脂肪"]}
+        ]
+
+    # 6. Italian Restaurants / Pasta / Pizza / Saizeriya
+    if any(k in name for k in ["薩莉亞", "義大利", "麵店", "pasta", "pizza", "比薩", "焗烤"]):
+        return [
+            {"item_id": "f_ital_1", "name": "經典蕃茄肉醬義大利麵", "price": 110, "calories": 580, "protein": 22.0, "carbs": 80.0, "fat": 18.0, "sodium": 950, "gi": "medium", "tags": ["碳水補給"]},
+            {"item_id": "f_ital_2", "name": "地中海嫩煎雞肉沙拉", "price": 99, "calories": 240, "protein": 20.0, "carbs": 12.0, "fat": 12.0, "sodium": 480, "gi": "low", "tags": ["高纖", "低GI"]},
+            {"item_id": "f_ital_3", "name": "瑪格麗特比薩 (個人份)", "price": 120, "calories": 620, "protein": 24.0, "carbs": 78.0, "fat": 22.0, "sodium": 1120, "gi": "high", "tags": ["高脂肪", "高鈉"]}
+        ]
+
+    # 7. Dumplings / Bafang
+    if "餃" in name or "八方" in name or "鍋貼" in name:
+        return [
+            {"item_id": "f_1", "name": "招牌鍋貼 (10顆)", "price": 65, "calories": 640, "protein": 22.0, "carbs": 70.0, "fat": 30.0, "sodium": 580, "gi": "medium", "tags": ["經典熱銷"]},
+            {"item_id": "f_2", "name": "高麗菜水餃 (10顆)", "price": 65, "calories": 520, "protein": 20.0, "carbs": 64.0, "fat": 20.0, "sodium": 480, "gi": "medium", "tags": ["均衡高飽足"]},
+            {"item_id": "f_3", "name": "酸辣湯", "price": 35, "calories": 140, "protein": 6.0, "carbs": 18.0, "fat": 5.0, "sodium": 820, "gi": "medium", "tags": ["高鈉注意"]},
+            {"item_id": "f_4", "name": "寒天真規豆漿 (無糖)", "price": 20, "calories": 115, "protein": 11.0, "carbs": 5.0, "fat": 6.0, "sodium": 35, "gi": "low", "tags": ["高蛋白", "低GI", "低鈉"]}
+        ]
+    
+    # 8. Bento / Porkchop (梁社漢等)
+    if "便當" in name or "排骨" in name or "梁社漢" in name or "雞腿" in name or "燒肉" in name or "自助餐" in name:
+        return [
+            {"item_id": "f_1", "name": "炸排骨飯便當", "price": 115, "calories": 920, "protein": 34.0, "carbs": 110.0, "fat": 38.0, "sodium": 1240, "gi": "high", "tags": ["高熱量"]},
+            {"item_id": "f_2", "name": "滷雞腿飯便當", "price": 120, "calories": 780, "protein": 42.0, "carbs": 105.0, "fat": 24.0, "sodium": 980, "gi": "medium", "tags": ["高蛋白"]},
+            {"item_id": "f_3", "name": "清蒸時蔬豆腐盤", "price": 75, "calories": 190, "protein": 14.0, "carbs": 12.0, "fat": 8.0, "sodium": 320, "gi": "low", "tags": ["高纖", "低GI", "低鈉"]},
+            {"item_id": "f_4", "name": "單點滷排骨", "price": 80, "calories": 280, "protein": 24.0, "carbs": 12.0, "fat": 15.0, "sodium": 680, "gi": "medium", "tags": ["高蛋白"]}
+        ]
+
+    # 9. Beef Noodles
+    if "牛肉麵" in name or "麵館" in name or "老張" in name or "小吃" in name:
+        return [
+            {"item_id": "f_1", "name": "紅燒牛肉麵 (大份)", "price": 180, "calories": 850, "protein": 48.0, "carbs": 95.0, "fat": 30.0, "sodium": 2100, "gi": "medium", "tags": ["高高鈉", "高蛋白"]},
+            {"item_id": "f_2", "name": "清燉腱子肉麵", "price": 170, "calories": 620, "protein": 45.0, "carbs": 88.0, "fat": 10.0, "sodium": 1450, "gi": "medium", "tags": ["高蛋白", "低脂"]},
+            {"item_id": "f_3", "name": "涼拌小黃瓜", "price": 40, "calories": 65, "protein": 1.5, "carbs": 6.0, "fat": 4.0, "sodium": 290, "gi": "low", "tags": ["低鈉", "低GI", "高纖"]},
+            {"item_id": "f_4", "name": "皮蛋豆腐", "price": 50, "calories": 220, "protein": 16.0, "carbs": 8.0, "fat": 14.0, "sodium": 420, "gi": "low", "tags": ["高蛋白", "低GI"]}
+        ]
+
+    # 10. Tea / Drinks
+    if "茶" in name or "飲" in name or "舖" in name or "飲料" in name or "50嵐" in name or "coCo" in name:
+        return [
+            {"item_id": "f_1", "name": "四季春茶 (無糖去冰)", "price": 30, "calories": 0, "protein": 0.0, "carbs": 0.0, "fat": 0.0, "sodium": 10, "gi": "low", "tags": ["零卡", "低鈉", "低GI"]},
+            {"item_id": "f_2", "name": "珍珠鮮奶茶 (半糖)", "price": 65, "calories": 420, "protein": 6.0, "carbs": 68.0, "fat": 14.0, "sodium": 110, "gi": "high", "tags": ["高糖警告"]},
+            {"item_id": "f_3", "name": "燕麥拿鐵 (無糖)", "price": 75, "calories": 180, "protein": 4.5, "carbs": 24.0, "fat": 7.0, "sodium": 95, "gi": "medium", "tags": ["植物奶"]}
+        ]
+
+    # Default fallback (return empty list if completely unknown)
+    return []
+
+
+
+# TypeError / AttributeError / NameError 不是「這個模型不行，換下一個」的理由，
+# 那是我們自己的程式壞了。今天的 'list' object has no attribute 'get' 就是被
+# 當成模型失敗重試掉，一路重試到預算用完，看起來像 Gemini 掛了。
+OUR_BUG_TYPES = (TypeError, AttributeError, NameError, IndexError)
+
+
+def _describe_failure(error: Exception, context: str) -> str:
+    kind = "BUG" if isinstance(error, OUR_BUG_TYPES) else "!"
+    if isinstance(error, OUR_BUG_TYPES):
+        import traceback
+
+        traceback.print_exc()
+    return f"[{kind}] {context}: {type(error).__name__}: {error}"
+
+
+def validate_and_balance_nutrition(item: dict) -> dict:
+    """
+    Validates and balances nutrient numbers so that:
+    Calories roughly equals (Protein*4 + Carbs*4 + Fat*9).
+    Also ensures sugar <= carbs, saturated_fat <= fat, etc.
+    """
+    calories = float(item.get("calories", 0) or 0)
+    protein = float(item.get("protein", 0) or 0)
+    carbs = float(item.get("carbs", 0) or 0)
+    fat = float(item.get("fat", 0) or 0)
+    
+    # Check physical calorie consistency (1g P=4, 1g C=4, 1g F=9)
+    calculated_calories = protein * 4.0 + carbs * 4.0 + fat * 9.0
+    if calories > 0 and abs(calculated_calories - calories) > 80:
+        if fat * 9.0 > calories:
+            fat = max(0.0, round((calories - protein * 4.0 - carbs * 4.0) / 9.0, 1))
+        else:
+            calories = round(calculated_calories)
+    elif calories <= 0 and calculated_calories > 0:
+        calories = round(calculated_calories)
+            
+    sugar = float(item.get("sugar", 0) or 0)
+    if sugar > carbs and carbs > 0:
+        sugar = round(carbs * 0.4, 1)
+        
+    saturated_fat = float(item.get("saturated_fat", 0) or 0)
+    if saturated_fat > fat and fat > 0:
+        saturated_fat = round(fat * 0.35, 1)
+        
+    trans_fat = float(item.get("trans_fat", 0) or 0)
+    if trans_fat > fat:
+        trans_fat = 0.0
+        
+    name = item.get("name", "")
+
+    # 哪幾項是推估出來的，要能往上傳到畫面：這些是「上限」類目標，
+    # 使用者有權知道擋他或放行他的那個數字不是量出來的。
+    estimated: list[str] = []
+
+    fiber = float(item.get("fiber", 0) or 0)
+    if fiber == 0:
+        estimated.append("fiber")
+        if any(k in name for k in ["蔬菜", "青菜", "沙拉", "菇", "海帶"]):
+            fiber = 3.5
+        elif any(k in name for k in ["飯", "麵", "吐司", "漢堡", "燕麥", "水果"]):
+            fiber = 2.0
+        elif any(k in name for k in ["豆漿", "豆腐", "豆乾"]):
+            fiber = 1.5
+        else:
+            fiber = 0.5
+
+    # 模型常把飽和脂肪與糖留白或填 0。纖維早就有這層推估，這兩項更需要：
+    # 它們是「上限」類目標，假的 0 會直接變成假的達標，比缺值還危險。
+    if saturated_fat == 0 and fat > 0:
+        is_fried_name = any(k in name for k in ["炸", "脆", "酥", "排骨", "雞腿", "培根", "香腸"])
+        saturated_fat = round(fat * (0.35 if is_fried_name else 0.25), 1)
+        estimated.append("saturated_fat")
+
+    if sugar == 0 and carbs > 0:
+        if any(k in name for k in ["奶茶", "紅茶", "綠茶", "可樂", "汽水", "果汁", "冰沙", "蛋糕", "甜", "布丁", "拿鐵"]):
+            sugar = round(carbs * 0.6, 1)
+        elif any(k in name for k in ["糖醋", "照燒", "蜜汁", "滷", "醬燒", "三杯"]):
+            sugar = round(carbs * 0.15, 1)
+        else:
+            sugar = round(carbs * 0.05, 1)
+        estimated.append("sugar")
+
+    item["calories"] = round(calories)
+    item["protein"] = round(protein, 1)
+    item["carbs"] = round(carbs, 1)
+    item["fat"] = round(fat, 1)
+    item["sugar"] = round(sugar, 1)
+    item["saturated_fat"] = round(saturated_fat, 1)
+    item["trans_fat"] = round(trans_fat, 1)
+    item["fiber"] = round(fiber, 1)
+    item["sodium"] = round(float(item.get("sodium", 0) or 0))
+    item["is_fried"] = item.get("is_fried", False) or any(k in item.get("name", "") for k in ["炸", "脆", "酥"])
+    if estimated:
+        item["estimated_nutrients"] = sorted(set(estimated) | set(item.get("estimated_nutrients") or []))
+    return item
+
+
+MENU_GENERATION_TIMEOUT_SECONDS = 30
+# 照片要辨識的品項多、輸出長，給 ChatGPT 比文字菜單多一點時間
+MENU_PHOTO_OPENAI_TIMEOUT_SECONDS = 45
+
+
+def _ask_openai_for_menu(prompt: str, api_key: str, restaurant_name: str, deadline: float | None) -> dict:
+    """Gemini 沒問到菜單時改問 ChatGPT。
+
+    回 {"items": [...]}，或 {"outcome": ...}：
+    - empty：模型說看不出這家店賣什麼
+    - rate_limited：429，限流或帳戶餘額用完（OPENAI_NO_CREDIT_CODES）
+    - unavailable：金鑰無效，或沒有任何模型能用（全部 404）
+    - inconclusive：逾時或出錯，沒問完
+    - out_of_budget：呼叫端給的時間用完了
+    """
+    outcome = "unavailable"
+    for model_name in get_openai_models():
+        if deadline is not None and time.monotonic() >= deadline:
+            return {"outcome": "out_of_budget"}
+        try:
+            res = requests.post(
+                OPENAI_CHAT_URL,
+                headers=openai_headers(api_key),
+                json=openai_chat_payload(model_name, prompt, 1500),
+                timeout=MENU_GENERATION_TIMEOUT_SECONDS,
+            )
+            if res.status_code == 200:
+                text, _finish_reason = openai_response_text(res.json())
+                items = extract_json_items(text) if text else []
+                if items:
+                    print(f"[Scraper] Successfully generated menu using ChatGPT model: {model_name}")
+                    return {"items": items}
+                print(f"[!] {restaurant_name}: ChatGPT {model_name} 回了空菜單")
+                return {"outcome": "empty"}
+            code, message = openai_error(res)
+            if res.status_code == 429:
+                print(f"[!] ChatGPT 429（{code or 'rate_limited'}）：{message[:160]}")
+                return {"outcome": "rate_limited"}
+            if res.status_code in (401, 403):
+                print(f"[!] ChatGPT 金鑰無效或沒有權限（HTTP {res.status_code}）：{message[:160]}")
+                return {"outcome": "unavailable"}
+            # 404 = 帳號沒有這個模型，換下一個
+            print(f"[!] ChatGPT {model_name} status {res.status_code}: {message[:160]}")
+            if res.status_code != 404:
+                outcome = "inconclusive"
+        except requests.Timeout:
+            print(f"[!] ChatGPT {model_name} 逾時 {MENU_GENERATION_TIMEOUT_SECONDS}s，換下一個模型")
+            outcome = "inconclusive"
+        except Exception as e:
+            print(_describe_failure(e, f"ChatGPT {model_name}"))
+            outcome = "inconclusive"
+    return {"outcome": outcome}
+
+
+def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_text: str = "", deadline: float | None = None) -> dict:
+    """請 ChatGPT／Gemini 估這家店的幾道菜。
+
+    回傳 {"items": [...]}；拿不到菜單時多帶 "failure"，讓建檔端決定要不要把
+    這家店記下來、多久內別再問：
+    - no_items：每個能用的模型都明確回了空清單，這家店就是問不出來
+    - inconclusive：有模型逾時或出錯，沒問完
+    - rate_limited：金鑰額度用完（429），還有模型沒問到
+    - out_of_budget：呼叫端給的時間用完了
+    - unavailable：沒有任何模型能用（沒設金鑰，或全部 404）
+
+    有設 OPENAI_API_KEY 時先問 ChatGPT，它沒給出菜單才換 Gemini 的金鑰與模型。
+    """
+    keys = get_gemini_api_keys()
+    openai_key = get_openai_api_key()
+    if not keys and not openai_key:
+        print("[!] No Gemini API key found for scraper - using realistic templates")
+        fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
+        return {"items": fallback_items} if fallback_items else {"items": [], "failure": "unavailable"}
+
+    prompt = f"""
+    台灣餐廳「{restaurant_name}」（{address}）最常見的 3 道餐點，估算營養。
+    只輸出 JSON，不要 markdown、不要說明。數值概略即可，後端會校正熱量一致性。
+    餐點必須是這家店真的會賣的；店名看不出賣什麼就回 {{"items":[]}}，不要填通用菜單。
+    sugar 指添加糖，saturated_fat 指飽和脂肪——糖尿病與高血脂的判斷靠這兩項，
+    留白的話後端只能用品名猜，所以請一併估。
+    只需要這幾個欄位，其餘不要輸出：
+    {{"items":[{{"name":"餐點名稱","price":120,"calories":480,"protein":32,"carbs":45,"fat":14,"sugar":6,"saturated_fat":4,"fiber":3,"sodium":420,"is_fried":false}}]}}
+    """
+    if get_relay_config():
+        try:
+            text, _finish = relay_chat(prompt, max_tokens=1500, timeout=MENU_GENERATION_TIMEOUT_SECONDS, deadline=deadline)
+            items = extract_json_items(text)
+            return {"items": [validate_and_balance_nutrition(item) for item in items]} if items else {"items": [], "failure": "no_items"}
+        except requests.HTTPError as error:
+            status = error.response.status_code if error.response is not None else None
+            failure = "rate_limited" if status == 429 else "unavailable" if status in {401, 403, 404} else "inconclusive"
+        except requests.Timeout:
+            failure = "out_of_budget" if deadline is not None and time.monotonic() >= deadline else "inconclusive"
+        except (requests.RequestException, ValueError):
+            failure = "inconclusive"
+        return {"items": [], "failure": failure}
+
+    # 全 repo 其他 Gemini 呼叫都用 get_gemini_models()（可由 GEMINI_MODELS 覆寫）。
+    # 這裡原本寫死 2.5-flash / 2.5-pro，金鑰沒有這兩個模型權限時整串 404，
+    # 最後退回 generate_fallback_menu()，而真實店名不在樣板清單裡會回空陣列。
+    # 這裡只需要幾道菜，追求的是「快」而不是「準」：把輕量模型排到前面，
+    # 免得先卡在較慢的模型上把整個分析預算耗光。
+    def _speed_rank(model: str) -> int:
+        if "lite" in model:
+            return 0
+        if "flash" in model:
+            return 1
+        return 2
+
+    candidate_models = sorted(get_gemini_models(), key=_speed_rank)
+    # 404 是「這把金鑰沒有這個模型的權限」，是金鑰層級的，記憶由各功能共用；
+    # 最近回過 404 的組合不在這份清單裡。
+    usable_pairs = set(gemini_key_model_pairs(keys, candidate_models))
+    our_bugs = 0
+    # 逾時是模型層級的（這個模型就是生不完），換金鑰重試同一個只是再等一次。
+    timed_out_models = set()
+    # 模型明確回了空清單（店名看不出賣什麼），換金鑰問同一個模型答案也一樣。
+    answered_empty_models = set()
+    out_of_budget = False
+    rate_limited = False
+
+    # 有設 ChatGPT 就先問它；它沒給出菜單（出錯、額度用完或說看不出來）才輪到 Gemini
+    openai_outcome = None
+    if openai_key:
+        asked = _ask_openai_for_menu(prompt, openai_key, restaurant_name, deadline)
+        if asked.get("items"):
+            return {"items": [validate_and_balance_nutrition(item) for item in asked["items"]]}
+        openai_outcome = asked["outcome"]
+        out_of_budget = openai_outcome == "out_of_budget"
+
+    for gemini_key in keys:
+        if out_of_budget:
+            break
+        for model_name in candidate_models:
+            if model_name in timed_out_models or model_name in answered_empty_models:
+                continue
+            if (gemini_key, model_name) not in usable_pairs:
+                continue
+            if deadline is not None and time.monotonic() >= deadline:
+                print("[!] 菜單分析已超出呼叫端給的時間預算，停止重試")
+                out_of_budget = True
+                break
+            try:
+                payload = {
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    # 輸出封頂，模型才不會慢慢寫到逾時
+                    "generationConfig": {"response_mime_type": "application/json", "maxOutputTokens": 1500},
+                }
+                res = requests.post(
+                    gemini_generate_url(model_name),
+                    headers=gemini_headers(gemini_key),
+                    json=payload,
+                    timeout=MENU_GENERATION_TIMEOUT_SECONDS,
+                )
+                if res.status_code == 200:
+                    parsed_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    items = extract_json_items(parsed_text)
+                    if items:
+                        print(f"[Scraper] Successfully generated menu using key {gemini_key[:8]}... model: {model_name}")
+                        balanced_items = [validate_and_balance_nutrition(item) for item in items]
+                        return {"items": balanced_items}
+                    answered_empty_models.add(model_name)
+                    print(f"[!] {restaurant_name}: model {model_name} 回了空菜單，換下一個模型")
+                elif res.status_code == 429:
+                    # 額度是綁在金鑰上的，這把已經用完，試它的其他模型只是浪費預算
+                    rate_limited = True
+                    print(f"[!] Key {gemini_key[:8]}... 已達額度上限（429），直接換下一把金鑰")
+                    break
+                else:
+                    if res.status_code == 404:
+                        remember_forbidden_gemini_model(gemini_key, model_name)
+                    print(f"[!] Key {gemini_key[:8]}... model {model_name} status {res.status_code}, trying next key/model...")
+            except requests.Timeout:
+                # 逾時代表這個模型在預算內生不完，別再拿其他金鑰重試同一個
+                timed_out_models.add(model_name)
+                print(f"[!] Gemini Model {model_name} 逾時 {MENU_GENERATION_TIMEOUT_SECONDS}s，跳過這個模型")
+            except Exception as e:
+                print(_describe_failure(e, f"Gemini Model {model_name}"))
+                if isinstance(e, OUR_BUG_TYPES):
+                    our_bugs += 1
+
+    if our_bugs:
+        print(f"[BUG] 有 {our_bugs} 次失敗是我們自己的程式錯誤，不是模型問題——先看上面的 traceback")
+    if timed_out_models:
+        print(f"[!] 這些模型在 {MENU_GENERATION_TIMEOUT_SECONDS}s 內生不完：{sorted(timed_out_models)}")
+    never_allowed = {
+        model for model in candidate_models
+        if all(is_forbidden_gemini_model(key, model) for key in keys)
+    }
+    if keys and never_allowed:
+        print(f"[!] 沒有任何一把金鑰有權限的模型（404）：{sorted(never_allowed)}。可用 GEMINI_MODELS 指定其他模型。")
+
+    fallback_items = [validate_and_balance_nutrition(item) for item in generate_fallback_menu(restaurant_name)]
+    if fallback_items:
+        return {"items": fallback_items}
+
+    # 只有「每個能用的模型都說看不出來」才算這家店問不出菜單；
+    # 有模型因為時間、額度或錯誤沒回答到，就不能怪到店家頭上。
+    judgeable_models = set(candidate_models) - never_allowed
+    # ChatGPT 也算一個能回答的模型；金鑰無效或沒有模型能用時，跟 404 一樣不算
+    if openai_outcome in {"empty", "rate_limited", "inconclusive"}:
+        judgeable_models.add("chatgpt")
+        if openai_outcome == "empty":
+            answered_empty_models.add("chatgpt")
+        elif openai_outcome == "rate_limited":
+            rate_limited = True
+    if out_of_budget:
+        failure = "out_of_budget"
+    elif answered_empty_models and judgeable_models <= answered_empty_models:
+        failure = "no_items"
+    elif rate_limited:
+        failure = "rate_limited"
+    elif not judgeable_models:
+        failure = "unavailable"
+    else:
+        failure = "inconclusive"
+    return {"items": [], "failure": failure}
+
+
+def _normalize_menu_items(raw_items) -> list[dict]:
+    """Normalize the few fields needed to safely display an OCR menu result."""
+    if isinstance(raw_items, dict):
+        raw_items = [raw_items]
+    if not isinstance(raw_items, list):
+        return []
+
+    normalized = []
+    ignored_names = {"品名", "品項", "價格", "金額", "數量", "合計", "總計", "外帶", "內用"}
+    for index, raw_item in enumerate(raw_items):
+        if not isinstance(raw_item, dict):
+            continue
+        name = raw_item.get("name") or raw_item.get("item_name") or raw_item.get("dish_name")
+        if not isinstance(name, str):
+            continue
+        name = re.sub(r"\s+", " ", name).strip()
+        if not name or name in ignored_names:
+            continue
+
+        price = extract_number(
+            raw_item.get("price") or raw_item.get("price_twd") or raw_item.get("價格"),
+            as_int=True,
+        )
+        if price is None or price <= 0:
+            continue
+
+        item = dict(raw_item)
+        item["name"] = name
+        item["item_id"] = str(item.get("item_id") or f"menu_{index + 1:03d}")
+        item["price"] = price
+        normalized.append(item)
+
+    items_by_name = {}
+    for item in normalized:
+        items_by_name.setdefault(item["name"], []).append(item)
+    for same_name_items in items_by_name.values():
+        prices = {item["price"] for item in same_name_items}
+        if len(same_name_items) == 2 and len(prices) == 2:
+            small, large = sorted(same_name_items, key=lambda item: item["price"])
+            small["name"] += " (小)"
+            large["name"] += " (大)"
+    return normalized
+
+
+def _extract_menu_items_from_response(body: dict) -> tuple[list[dict], str | None]:
+    """Read Gemini text from all response parts and recover partial OCR when needed."""
+    candidate = (body.get("candidates") or [{}])[0]
+    finish_reason = candidate.get("finishReason")
+    parts = (candidate.get("content") or {}).get("parts") or []
+    response_text = "\n".join(
+        part.get("text", "") for part in parts if isinstance(part, dict) and isinstance(part.get("text"), str)
+    ).strip()
+    return _menu_items_from_text(response_text), finish_reason
+
+
+def _menu_items_from_text(response_text: str) -> list[dict]:
+    """把模型回的菜單文字轉成品項；Gemini 與 ChatGPT 共用。"""
+    if not response_text:
+        return []
+
+    try:
+        items = extract_json_items(response_text)
+        return _normalize_menu_items(items)
+    except (AttributeError, TypeError, ValueError, KeyError):
+        # A dense menu can hit the output limit after several complete rows.
+        # Recover those rows instead of throwing away the usable prefix.
+        recovered = []
+        for object_text in re.findall(r"\{[^{}]+\}", response_text):
+            try:
+                parsed_object = json.loads(object_text)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(parsed_object, dict) and any(
+                key in parsed_object for key in ("name", "item_name", "dish_name")
+            ):
+                recovered.append(parsed_object)
+        if recovered:
+            return _normalize_menu_items(recovered)
+
+        pattern = re.compile(
+            r"[\"'](?:name|item_name|dish_name)[\"']\s*:\s*[\"']([^\"']+)[\"']"
+            r"[\s\S]{0,180}?[\"'](?:price|price_twd|價格)[\"']\s*:\s*[\"']?([0-9]+)"
+        )
+        for index, match in enumerate(pattern.finditer(response_text)):
+            recovered.append({"item_id": f"menu_{index + 1:03d}", "name": match.group(1), "price": int(match.group(2))})
+        return _normalize_menu_items(recovered)
+
+
+def _read_menu_photo_with_openai(prompt: str, image_base64: str, image_mime_type: str, api_key: str) -> dict:
+    """用 ChatGPT 辨識菜單照片。回 {"items", "model"}，失敗時回 {"error": 給使用者看的原因}。"""
+    error = "ChatGPT 未回傳可用的菜單品項"
+    for model_name in get_openai_models():
+        try:
+            res = requests.post(
+                OPENAI_CHAT_URL,
+                headers=openai_headers(api_key),
+                json=openai_chat_payload(model_name, prompt, 8192, image_base64, image_mime_type),
+                timeout=MENU_PHOTO_OPENAI_TIMEOUT_SECONDS,
+            )
+            if res.status_code == 200:
+                text, finish_reason = openai_response_text(res.json())
+                items = _menu_items_from_text(text)
+                if items:
+                    print(f"[Scraper] Successfully parsed menu photo using ChatGPT model: {model_name}, {len(items)} items")
+                    return {"items": items, "model": model_name}
+                error = f"ChatGPT 回傳 0 個品項（finish_reason={finish_reason or 'unknown'}）"
+                print(f"[!] ChatGPT Vision {model_name} returned zero items (finish_reason={finish_reason}), trying next model...")
+                continue
+            code, message = openai_error(res)
+            print(f"[!] ChatGPT Vision {model_name} status {res.status_code}: {message[:180]}")
+            # 額度與金鑰是帳號層級的，換模型也一樣
+            if res.status_code == 429:
+                if code in OPENAI_NO_CREDIT_CODES:
+                    return {"error": "ChatGPT 帳戶餘額不足，請到 OpenAI 儲值。"}
+                return {"error": "ChatGPT 使用額度已達上限，請稍後再試。"}
+            if res.status_code in (401, 403):
+                return {"error": "ChatGPT API key 無效或沒有權限，請檢查 OPENAI_API_KEY。"}
+            if res.status_code == 404:
+                error = f"ChatGPT 模型 {model_name} 無法使用，可用 OPENAI_MODELS 指定其他模型。"
+            else:
+                error = f"ChatGPT 暫時無法辨識菜單（HTTP {res.status_code}）。"
+        except Exception as e:
+            error = "ChatGPT 連線失敗，請稍後再試。"
+            print(_describe_failure(e, f"ChatGPT Vision model {model_name}"))
+    return {"error": error}
+
+
+def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐廳") -> dict:
+    """辨識菜單照片，回傳品項與給畫面用的狀態。
+
+    有設 OPENAI_API_KEY 時先問 ChatGPT，它沒辨識出品項才換 Gemini Vision。
+    """
+    if not image_base64:
+        return {"items": [], "recognition_status": "error", "recognition_error": "缺少菜單圖片"}
+
+    try:
+        _img_bytes, image_base64, image_mime_type = decode_image_base64(image_base64)
+    except ValueError as e:
+        print(f"[!] Menu photo decode failed: {e}")
+        return {"items": [], "recognition_status": "error", "recognition_error": str(e)}
+
+    keys = get_gemini_api_keys()
+    openai_key = get_openai_api_key()
+    if not keys and not openai_key:
+        print("[!] No Gemini API key found for menu image parsing")
+        return {
+            "items": [],
+            "recognition_status": "error",
+            "recognition_error": "後端未設定 Gemini API key，請在 Render 設定 GEMINI_API_KEYS 後重新部署。",
+        }
+    
+    prompt = f"""
+    你是一位台灣經驗豐富的臨床膳食評估師與營養師。
+    請識別這張「{restaurant_name}」實體菜單照片中的餐點名稱與價格。這張照片可能是密集的價目表或菜單看板，
+    上面可能有非常多品項（十幾到數十項都有可能）；請務必逐一列出照片中「每一項」看得到的餐點，不要只挑幾項
+    或只列出範例，也不要因為品項太多而省略。即使照片邊緣模糊、部分文字不清楚，仍請根據可辨識的部分盡量列出
+    合理的品項名稱與價格，不要整個放棄辨識。沒有標示價格的分類標題（例如飲料、啤酒）不要當作品項；同一道餐點
+    若有小碗／大碗兩個價格，請分成兩筆，並在名稱中明確加上「(小)」與「(大)」。
+
+    為每道餐點估算 11 項營養指標即可，數值不需要非常精確，合理概略估計即可（後端會另外做物理一致性校正，
+    1g蛋白質=4kcal, 1g碳水=4kcal, 1g脂肪=9kcal，你不需要自己保證完全吻合）：
+
+    請輸出合法 JSON 格式（不要包含任何 markdown codeblock 或文字說明）：
+    {{
+      "items": [
+        {{
+          "item_id": "m_001",
+          "name": "餐點名稱",
+          "price": 120,
+          "calories": 480,
+          "protein": 32.0,
+          "carbs": 45.0,
+          "fat": 14.0,
+          "sugar": 2.0,
+          "saturated_fat": 3.5,
+          "trans_fat": 0.0,
+          "fiber": 3.0,
+          "sodium": 420,
+          "is_fried": false,
+          "gi": "low",
+          "allergens": [],
+          "tags": ["高蛋白", "低GI"]
+        }}
+      ]
+    }}
+    """
+    relay = get_relay_config()
+    if relay:
+        try:
+            text, _finish = relay_chat(
+                prompt, max_tokens=8192, image_base64=image_base64,
+                image_mime_type=image_mime_type, timeout=MENU_PHOTO_OPENAI_TIMEOUT_SECONDS,
+            )
+            items = _menu_items_from_text(text)
+            if items:
+                return {
+                    "items": [validate_and_balance_nutrition(item) for item in items],
+                    "recognition_status": "recognized", "recognition_model": relay.model,
+                }
+            error_message = "AI \u672a\u8fa8\u8b58\u51fa\u83dc\u55ae\u54c1\u9805\uff0c\u8acb\u63db\u4e00\u5f35\u6e05\u6670\u7684\u7167\u7247\u3002"
+        except (requests.RequestException, ValueError):
+            error_message = "AI \u83dc\u55ae\u8fa8\u8b58\u670d\u52d9\u66ab\u6642\u7121\u6cd5\u4f7f\u7528\uff0c\u8acb\u7a0d\u5f8c\u518d\u8a66\u3002"
+        return {"items": [], "recognition_status": "error", "recognition_error": error_message}
+
+    # 有設 ChatGPT 就先問它；沒辨識出品項才輪到 Gemini
+    openai_failure = None
+    if openai_key:
+        asked = _read_menu_photo_with_openai(prompt, image_base64, image_mime_type, openai_key)
+        if asked.get("items"):
+            return {
+                "items": [validate_and_balance_nutrition(item) for item in asked["items"]],
+                "recognition_status": "recognized",
+                "recognition_model": asked["model"],
+            }
+        openai_failure = asked["error"]
+
+    candidate_models = get_gemini_models()
+    # 最近回過 404 的（金鑰, 模型）直接跳過，記憶由各功能共用
+    usable_pairs = set(gemini_key_model_pairs(keys, candidate_models))
+    last_error = "Gemini 未回傳可用的菜單品項"
+    for gemini_key in keys:
+        for model_name in candidate_models:
+            if (gemini_key, model_name) not in usable_pairs:
+                continue
+            try:
+                payload = {
+                    "contents": [
+                        {
+                            "parts": [
+                                {"text": prompt},
+                                {
+                                    "inline_data": {
+                                        "mime_type": image_mime_type,
+                                        "data": image_base64
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    "generationConfig": {"responseMimeType": "application/json", "maxOutputTokens": 8192}
+                }
+                res = requests.post(gemini_generate_url(model_name), headers=gemini_headers(gemini_key), json=payload, timeout=25)
+                if res.status_code == 200:
+                    body = res.json()
+                    items, finish_reason = _extract_menu_items_from_response(body)
+                    if items:
+                        print(f"[Scraper] Successfully parsed menu photo using key {gemini_key[:8]}... model: {model_name}, {len(items)} items")
+                        balanced_items = [validate_and_balance_nutrition(item) for item in items]
+                        return {
+                            "items": balanced_items,
+                            "recognition_status": "recognized",
+                            "recognition_model": model_name,
+                        }
+                    last_error = f"Gemini 回傳 0 個品項（finishReason={finish_reason or 'unknown'}）"
+                    print(f"[!] Key {gemini_key[:8]}... Vision model {model_name} returned zero items (finishReason={finish_reason}), trying next key/model...")
+                else:
+                    try:
+                        api_message = (res.json().get("error") or {}).get("message", "")
+                    except (TypeError, ValueError):
+                        api_message = ""
+                    if res.status_code == 404:
+                        remember_forbidden_gemini_model(gemini_key, model_name)
+                    if res.status_code == 429:
+                        last_error = "Gemini 使用額度已達上限，請稍後再試，或在 Render 更新 GEMINI_API_KEYS。"
+                    elif res.status_code in (401, 403):
+                        last_error = "Gemini API key 無效或沒有模型存取權限，請檢查 Render 的 GEMINI_API_KEYS。"
+                    elif res.status_code == 503:
+                        last_error = "Gemini 目前服務繁忙，請稍後再試。"
+                    else:
+                        last_error = f"Gemini 暫時無法辨識菜單（HTTP {res.status_code}）。"
+                    print(f"[!] Key {gemini_key[:8]}... Vision model {model_name} status {res.status_code}: {api_message[:180]}")
+            except Exception as e:
+                last_error = "Gemini Vision 連線失敗，請稍後再試。"
+                print(_describe_failure(e, f"Gemini Vision model {model_name}"))
+
+    if not keys:
+        last_error = openai_failure
+    elif openai_failure:
+        # 兩邊都問過了，兩邊失敗的原因都讓使用者看到
+        last_error = f"{openai_failure}；{last_error}"
+    return {"items": [], "recognition_status": "error", "recognition_error": last_error}
+

@@ -1,0 +1,801 @@
+{
+  "generated_at": "2026-11-11T22:16:58.840094+08:00",
+  "target": "https://node.taile9a8dc.ts.net",
+  "app_version": "v1.0.0",
+  "conclusion": "尚未測得最大可用人數。已完成 1–50 人短時間突發測試；持續操作補測因連線與健康檢查錯誤提前停止。約 19 個保留 Session 後的新連線失敗，是本次路徑的觀測，尚未定位原因。",
+  "maximum_supported_users": null,
+  "completed_sustained_stages": 0,
+  "completed_soak": false,
+  "owner_reported_environment": {
+    "tailscale_version": "1.104.5",
+    "funnel_enabled": true,
+    "upstream": "http://127.0.0.1:5000",
+    "source": "User relayed classmate's diagnostic output; not directly inspected",
+    "reported_cached_menus": 36
+  },
+  "server_started_at_after_restart": "2026-11-11T21:47:11.356665+08:00",
+  "deployment_comparability": "Burst tests preceded the 21:47 backend restart; persistent tests and connection probe followed it. Do not treat them as a single unchanged deployment.",
+  "burst_runs": [
+    {
+      "run_id": "20261111-213539",
+      "started_at": "2026-11-11T21:35:39+08:00",
+      "finished_at": "2026-11-11T21:38:23+08:00",
+      "total_requests": 1404,
+      "successful_requests": 1401,
+      "cleanup": {
+        "removed": 0,
+        "remaining": [],
+        "errors": [],
+        "clean": true
+      }
+    },
+    {
+      "run_id": "20261111-214021",
+      "started_at": "2026-11-11T21:40:21+08:00",
+      "finished_at": "2026-11-11T21:42:01+08:00",
+      "total_requests": 270,
+      "successful_requests": 270,
+      "cleanup": {
+        "removed": 0,
+        "remaining": [],
+        "errors": [],
+        "clean": true
+      }
+    }
+  ],
+  "burst_stages": [
+    {
+      "run_id": "20261111-213539",
+      "concurrency": 1,
+      "all_measured_requests": 9,
+      "all_measured_failures": 0,
+      "duration_s": 2.659,
+      "all_measured_rps": 3.385,
+      "business_requests": 8,
+      "business_failures": 0,
+      "business_success_pct": 100.0,
+      "initial_attempts": 1,
+      "initial_failures": 0,
+      "initial_request_p95_ms": 1117.84,
+      "later_api_requests": 7,
+      "later_api_failures": 0,
+      "later_api_p95_ms": 321.58,
+      "redundant_cleanup_requests": 1,
+      "expected_cleanup_404": 1
+    },
+    {
+      "run_id": "20261111-213539",
+      "concurrency": 5,
+      "all_measured_requests": 45,
+      "all_measured_failures": 0,
+      "duration_s": 3.09,
+      "all_measured_rps": 14.563,
+      "business_requests": 40,
+      "business_failures": 0,
+      "business_success_pct": 100.0,
+      "initial_attempts": 5,
+      "initial_failures": 0,
+      "initial_request_p95_ms": 1804.47,
+      "later_api_requests": 35,
+      "later_api_failures": 0,
+      "later_api_p95_ms": 181.0,
+      "redundant_cleanup_requests": 5,
+      "expected_cleanup_404": 5
+    },
+    {
+      "run_id": "20261111-213539",
+      "concurrency": 10,
+      "all_measured_requests": 90,
+      "all_measured_failures": 0,
+      "duration_s": 3.742,
+      "all_measured_rps": 24.051,
+      "business_requests": 80,
+      "business_failures": 0,
+      "business_success_pct": 100.0,
+      "initial_attempts": 10,
+      "initial_failures": 0,
+      "initial_request_p95_ms": 2323.98,
+      "later_api_requests": 70,
+      "later_api_failures": 0,
+      "later_api_p95_ms": 206.94,
+      "redundant_cleanup_requests": 10,
+      "expected_cleanup_404": 10
+    },
+    {
+      "run_id": "20261111-213539",
+      "concurrency": 20,
+      "all_measured_requests": 180,
+      "all_measured_failures": 0,
+      "duration_s": 6.042,
+      "all_measured_rps": 29.791,
+      "business_requests": 160,
+      "business_failures": 0,
+      "business_success_pct": 100.0,
+      "initial_attempts": 20,
+      "initial_failures": 0,
+      "initial_request_p95_ms": 4651.77,
+      "later_api_requests": 140,
+      "later_api_failures": 0,
+      "later_api_p95_ms": 467.63,
+      "redundant_cleanup_requests": 20,
+      "expected_cleanup_404": 20
+    },
+    {
+      "run_id": "20261111-213539",
+      "concurrency": 30,
+      "all_measured_requests": 270,
+      "all_measured_failures": 3,
+      "duration_s": 8.514,
+      "all_measured_rps": 31.712,
+      "business_requests": 240,
+      "business_failures": 3,
+      "business_success_pct": 98.75,
+      "initial_attempts": 30,
+      "initial_failures": 3,
+      "initial_request_p95_ms": 6309.7,
+      "later_api_requests": 210,
+      "later_api_failures": 0,
+      "later_api_p95_ms": 355.2,
+      "redundant_cleanup_requests": 30,
+      "expected_cleanup_404": 30
+    },
+    {
+      "run_id": "20261111-213539",
+      "concurrency": 40,
+      "all_measured_requests": 360,
+      "all_measured_failures": 0,
+      "duration_s": 10.762,
+      "all_measured_rps": 33.451,
+      "business_requests": 320,
+      "business_failures": 0,
+      "business_success_pct": 100.0,
+      "initial_attempts": 40,
+      "initial_failures": 0,
+      "initial_request_p95_ms": 9463.36,
+      "later_api_requests": 280,
+      "later_api_failures": 0,
+      "later_api_p95_ms": 198.91,
+      "redundant_cleanup_requests": 40,
+      "expected_cleanup_404": 40
+    },
+    {
+      "run_id": "20261111-213539",
+      "concurrency": 50,
+      "all_measured_requests": 450,
+      "all_measured_failures": 0,
+      "duration_s": 23.811,
+      "all_measured_rps": 18.899,
+      "business_requests": 400,
+      "business_failures": 0,
+      "business_success_pct": 100.0,
+      "initial_attempts": 50,
+      "initial_failures": 0,
+      "initial_request_p95_ms": 17537.92,
+      "later_api_requests": 350,
+      "later_api_failures": 0,
+      "later_api_p95_ms": 426.44,
+      "redundant_cleanup_requests": 50,
+      "expected_cleanup_404": 50
+    },
+    {
+      "run_id": "20261111-214021",
+      "concurrency": 30,
+      "all_measured_requests": 270,
+      "all_measured_failures": 0,
+      "duration_s": 10.38,
+      "all_measured_rps": 26.012,
+      "business_requests": 240,
+      "business_failures": 0,
+      "business_success_pct": 100.0,
+      "initial_attempts": 30,
+      "initial_failures": 0,
+      "initial_request_p95_ms": 8947.76,
+      "later_api_requests": 210,
+      "later_api_failures": 0,
+      "later_api_p95_ms": 211.48,
+      "redundant_cleanup_requests": 30,
+      "expected_cleanup_404": 30
+    }
+  ],
+  "persistent_attempts": [
+    {
+      "run_id": "persistent-20261111-215033",
+      "started_at": "2026-11-11T21:50:33.725943+08:00",
+      "finished_at": "2026-11-11T21:50:57.121409+08:00",
+      "login_attempts": 50,
+      "login_success": 19,
+      "login_failed": 31,
+      "business_requests": 0,
+      "business_failures": 0,
+      "monitor_requests": 0,
+      "monitor_failures": 0,
+      "stop_reason": "RuntimeError: One or more accounts failed preparation; no load test started",
+      "error_types": {
+        "SSLError": 31
+      },
+      "cleanup": {
+        "pending": 0,
+        "checks": [
+          {
+            "user_index": 0,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 1,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 2,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 3,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 4,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 5,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 6,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 7,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 8,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 9,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 10,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 11,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 12,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 13,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 14,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 15,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 16,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 17,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 19,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          }
+        ],
+        "all_baselines_match": true
+      }
+    },
+    {
+      "run_id": "persistent-20261111-215245",
+      "started_at": "2026-11-11T21:52:45.228040+08:00",
+      "finished_at": "2026-11-11T21:53:45.468471+08:00",
+      "login_attempts": 50,
+      "login_success": 19,
+      "login_failed": 31,
+      "business_requests": 0,
+      "business_failures": 0,
+      "monitor_requests": 0,
+      "monitor_failures": 0,
+      "stop_reason": "RuntimeError: One or more accounts failed preparation; no load test started",
+      "error_types": {
+        "SSLError": 31
+      },
+      "cleanup": {
+        "pending": 0,
+        "checks": [
+          {
+            "user_index": 0,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 1,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 2,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 3,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 4,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 5,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 6,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 7,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 8,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 9,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 10,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 11,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 12,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 13,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 14,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 15,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 16,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 17,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 18,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          }
+        ],
+        "all_baselines_match": true
+      }
+    },
+    {
+      "run_id": "persistent-20261111-215732",
+      "started_at": "2026-11-11T21:57:32.954120+08:00",
+      "finished_at": "2026-11-11T21:58:21.695551+08:00",
+      "login_attempts": 18,
+      "login_success": 18,
+      "login_failed": 0,
+      "business_requests": 14,
+      "business_failures": 0,
+      "monitor_requests": 3,
+      "monitor_failures": 3,
+      "stop_reason": "three consecutive failed health probes",
+      "error_types": {
+        "SSLError": 3
+      },
+      "cleanup": {
+        "pending": 0,
+        "checks": [
+          {
+            "user_index": 0,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 1,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 2,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 3,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 4,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 5,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 6,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 7,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 8,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 9,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 10,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 11,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 12,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 13,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 14,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 15,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 16,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          },
+          {
+            "user_index": 17,
+            "baseline_match": true,
+            "before_count": 0,
+            "after_count": 0
+          }
+        ],
+        "all_baselines_match": true
+      }
+    }
+  ],
+  "partial_stages": [
+    {
+      "run_id": "persistent-20261111-215732",
+      "phase": "load",
+      "concurrency": 1,
+      "requests": 14,
+      "success": 14,
+      "failed": 0,
+      "success_pct": 100.0,
+      "p50_ms": 171.04,
+      "p95_ms": 185.25,
+      "p99_ms": 187.44,
+      "max_ms": 187.99,
+      "duration_s": 12.16,
+      "rps": 1.151,
+      "run_stopped_early": true,
+      "stop_reason": "three consecutive failed health probes"
+    }
+  ],
+  "connection_probe": [
+    {
+      "phase": "hold",
+      "held_before": 0,
+      "status": 200,
+      "latency_ms": 1221.42,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 1,
+      "status": 200,
+      "latency_ms": 1165.66,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 2,
+      "status": 200,
+      "latency_ms": 1165.16,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 3,
+      "status": 200,
+      "latency_ms": 1188.66,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 4,
+      "status": 200,
+      "latency_ms": 1159.55,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 5,
+      "status": 200,
+      "latency_ms": 1499.44,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 6,
+      "status": 200,
+      "latency_ms": 1200.9,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 7,
+      "status": 200,
+      "latency_ms": 1149.81,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 8,
+      "status": 200,
+      "latency_ms": 1149.39,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 9,
+      "status": 200,
+      "latency_ms": 1119.24,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 10,
+      "status": 200,
+      "latency_ms": 1126.6,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 11,
+      "status": 200,
+      "latency_ms": 1323.34,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 12,
+      "status": 200,
+      "latency_ms": 1170.13,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 13,
+      "status": 200,
+      "latency_ms": 1180.07,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 14,
+      "status": 200,
+      "latency_ms": 1179.42,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 15,
+      "status": 200,
+      "latency_ms": 1140.31,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 16,
+      "status": 200,
+      "latency_ms": 1319.85,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 17,
+      "status": 200,
+      "latency_ms": 1149.24,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 18,
+      "status": 200,
+      "latency_ms": 1200.56,
+      "error": ""
+    },
+    {
+      "phase": "hold",
+      "held_before": 19,
+      "status": 0,
+      "latency_ms": 719.63,
+      "error": "HTTPSConnectionPool(host='node.taile9a8dc.ts.net', port=443): Max retries exceeded with url: /health (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1081)')))"
+    },
+    {
+      "phase": "after_releasing_one",
+      "held_before": 18,
+      "status": 200,
+      "latency_ms": 1328.27,
+      "error": ""
+    }
+  ],
+  "tailscale_research": {
+    "url": "https://tailscale.com/docs/features/tailscale-funnel#requirements-and-limitations",
+    "consulted_on": "2026-11-11",
+    "finding": "Official Funnel limitations list non-configurable bandwidth limits, but no published 18/19 concurrent-connection cap. Absence of documentation does not establish unlimited capacity."
+  },
+  "measurement_notes": [
+    "P95 uses linear interpolation over all recorded attempts, including failed attempts. Failure duration is not a successful response latency.",
+    "First request includes client scheduling, DNS/TCP/TLS, network, ingress and backend time; no phase-level timing was captured.",
+    "Later API requests follow the first request in the same requests.Session; retries/reconnections may still occur. Warm physical sockets were not independently verified.",
+    "Burst all_measured_rps includes one redundant cleanup DELETE per user, normally returning expected 404. Business metrics exclude that request.",
+    "The 18 prepared users were not all actively operating: only the one-user stage ran for 12.16 seconds, while all three independent health checks failed.",
+    "The probe retained client Session objects; simultaneous live TCP socket count and any per-IP versus global cap were not independently verified.",
+    "No server CPU/RAM/disk/network/DB monitoring; cause cannot be assigned to Tailscale, Waitress or SQLite.",
+    "No browser rendering/assets, photo uploads, paid/external AI or Places requests were tested. No hours-long reliability result exists.",
+    "Persistent test records returned to baseline and those logins were logged out. Earlier burst login tokens were not retained; owner cleanup or expiry is needed."
+  ],
+  "source_sha256": {
+    "docs\\stress-test\\runs\\remote_requests_20261111-213539.csv": "680869d74903aadaccb8eceb90f85d78dbe182b9ff7f5077c96cedf4839765fe",
+    "docs\\stress-test\\runs\\remote_summary_20261111-213539.json": "1771dc6c217a81cc43f44879b6ea319bac046470a679ceb625bf457061669eda",
+    "docs\\stress-test\\runs\\remote_requests_20261111-214021.csv": "bb637e030fe9b331d6795d16e3bf28454f1db730da47b294ea4832e79fbbc049",
+    "docs\\stress-test\\runs\\remote_summary_20261111-214021.json": "f8447cf01ff2e99800b67d657459f84ff5825ef49c8bc90f1a5eefb353cd4798",
+    "docs\\stress-test\\runs\\persistent-20261111-215033\\requests.csv": "6f019b31f48580ed8ba0653485b85a0e776b3eaa9e141290f3836b63eec7713b",
+    "docs\\stress-test\\runs\\persistent-20261111-215033\\summary.json": "7bab110353f5ff0e3f4b91a22e33c995d1490967ee3b465d21b54b465d539fe6",
+    "docs\\stress-test\\runs\\persistent-20261111-215245\\requests.csv": "37a2565651b345d6333eb4013e1a8c2b5bafd18de64ba920604c4a76cae91952",
+    "docs\\stress-test\\runs\\persistent-20261111-215245\\summary.json": "85f670ea0a69d3a6c11ca7bc201b223773edb97e1cfc4867b3a2b3fd2fea6f97",
+    "docs\\stress-test\\runs\\persistent-20261111-215732\\requests.csv": "d67249c9b1b051778799c22bffc03b8d78e26eaacff95e4d5521798c88deb353",
+    "docs\\stress-test\\runs\\persistent-20261111-215732\\summary.json": "082020ffe2b548fb4a88e1a6e65c36d899d50655b72905f1cac895424882099f",
+    "docs\\stress-test\\runs\\connection_probe_20261111-215700.csv": "47d6d69ccb144283187ab5a60c2ec38dc53ef078eaff9a6fc139de9a599ff827"
+  }
+}

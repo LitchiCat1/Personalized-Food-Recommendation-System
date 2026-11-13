@@ -1,0 +1,17 @@
+﻿run,stage_index,purpose,phase,users,attempt,started,passed,warmup_requests,warmup_success,warmup_failed,duration_s,requests,failed,p95_ms,p99_ms,max_ms
+boundary-20261111-233120,0,baseline_recheck,steady,18,1,True,True,18,18,0,20.607,497,0,188.08,369.89,394.03
+boundary-20261111-233120,1,search,steady,19,1,True,True,19,19,0,20.641,532,0,196.44,216.73,660.59
+boundary-20261111-233120,2,search,steady,20,1,False,False,20,19,1,,0,0,,,
+boundary-20261111-233120,3,repeat_first_failure,steady,20,2,False,False,20,19,1,,0,0,,,
+boundary-20261111-233120,4,confirm_highest_passing_level,soak,19,2,True,True,19,19,0,60.613,1372,0,175.57,200.6,628.27
+boundary-20261111-233120,5,final_boundary_recheck,steady,20,3,False,False,20,19,1,,0,0,,,
+boundary-20261111-233553,0,ten_user_step,steady,20,1,True,True,20,20,0,20.999,560,0,202.54,237.14,273.49
+boundary-20261111-233553,1,ten_user_step,steady,30,1,False,False,30,20,10,,0,0,,,
+boundary-20261111-233553,2,ten_user_step,steady,40,1,False,False,40,20,20,,0,0,,,
+boundary-20261111-233553,3,ten_user_step,steady,50,1,False,False,50,20,30,,0,0,,,
+boundary-20261111-233553,4,ten_user_step,steady,60,1,False,False,60,20,40,,0,0,,,
+boundary-20261111-233553,5,ten_user_step,steady,70,1,False,False,70,20,50,,0,0,,,
+boundary-20261111-233553,6,ten_user_step,steady,80,1,False,False,80,20,60,,0,0,,,
+boundary-20261111-233553,7,ten_user_step,steady,90,1,False,False,90,20,70,,0,0,,,
+boundary-20261111-233553,8,ten_user_step,steady,100,1,False,False,100,20,80,,0,0,,,
+boundary-20261111-233553,9,confirm_highest_ten_user_step,soak,20,2,True,True,20,20,0,60.485,1421,0,229.66,362.95,668.44

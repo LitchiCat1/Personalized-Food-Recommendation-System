@@ -1,0 +1,6 @@
+Base URL "https://cdn.sta1n.cn/v1"
+API格式 "OpenAI Compatible"
+指定模型ID "[AN]gemini-4-hydrogen-high"
+
+# Copy this template to key.txt in the same directory.
+# Paste one API key per line below. Do not commit the filled key.txt.

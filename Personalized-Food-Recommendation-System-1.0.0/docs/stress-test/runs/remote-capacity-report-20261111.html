@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NutriLens v1.0.0 遠端容量測試報告</title>
+  <style>
+    :root { color-scheme: light; --bg:#f6f8f7; --surface:#fff; --ink:#14201b; --muted:#63736c; --line:#dbe6e0; --green:#1f9d72; --blue:#2f80ed; --orange:#ed8a19; --red:#d94b4b; }
+    * { box-sizing:border-box; } body { margin:0; padding:32px 20px 48px; background:var(--bg); color:var(--ink); font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    main { max-width:1080px; margin:auto; } h1,h2,p { margin:0; } h1 { font-size:28px; line-height:1.2; } h2 { font-size:18px; margin-bottom:14px; }
+    .eyebrow { color:var(--green); font-weight:700; letter-spacing:.04em; margin-bottom:8px; } .muted { color:var(--muted); }
+    .summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:24px 0; }
+    .stat, section { background:var(--surface); border:1px solid var(--line); border-radius:8px; } .stat { padding:16px; }
+    .stat-label { color:var(--muted); font-size:13px; } .stat-value { font-size:26px; font-weight:700; margin-top:3px; } .ok { color:var(--green); font-weight:700; }
+    section { padding:20px; margin-top:16px; } .chart-wrap { overflow-x:auto; } svg { display:block; width:100%; min-width:680px; height:auto; }
+    .legend { display:flex; flex-wrap:wrap; gap:16px; margin-top:8px; color:var(--muted); font-size:13px; } .legend span::before { content:""; display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; background:var(--blue); } .legend .threshold::before { background:var(--orange); } .legend .repeat::before { background:var(--red); }
+    .callout { border-left:4px solid var(--orange); padding:10px 12px; background:#fff7e8; margin-top:16px; } table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; } th,td { text-align:right; padding:9px 8px; border-bottom:1px solid var(--line); } th:first-child,td:first-child { text-align:left; } th { color:var(--muted); font-weight:600; }
+    .footer { margin-top:18px; font-size:13px; color:var(--muted); } @media (max-width:700px) { body { padding:22px 12px 36px; } h1 { font-size:23px; } .summary { grid-template-columns:repeat(2,minmax(0,1fr)); } section { padding:14px; } }
+  </style>
+</head>
+<body><main>
+  <p class="eyebrow">NUTRILENS / REMOTE CAPACITY TEST</p>
+  <h1>v1.0.0 歷史短時間突發測試</h1>
+  <div class="callout"><strong>容量判讀已修正：</strong>此頁保留首兩輪混合統計，含新連線首請求與預期 404 清理，不能解讀為 5 人上限。持續測試未完成，最大可用人數未知。請閱讀<a href="../report-20261111/index.html">更新報告：分開呈現首請求、後續 API 與連線失敗</a>。</div>
+  <p class="muted">目標：<code>https://node.taile9a8dc.ts.net/</code> · 50 組專用帳號 · 混合讀寫流程 · 不含付費 API</p>
+  <div class="summary" aria-label="容量測試摘要">
+    <div class="stat"><div class="stat-label">最大可用人數</div><div class="stat-value">尚未確認</div></div>
+    <div class="stat"><div class="stat-label">持續操作補測</div><div class="stat-value">提前中止</div></div>
+    <div class="stat"><div class="stat-label">最高短時間突發級別</div><div class="stat-value">50 人</div></div>
+    <div class="stat"><div class="stat-label">50 人 P95 / 最大</div><div class="stat-value">10.0 / 22.5s</div></div>
+  </div>
+  <section>
+    <h2>歷史混合 P95：包含新 Session 首請求與清理</h2>
+    <div class="chart-wrap">
+      <svg viewBox="0 0 900 350" role="img" aria-labelledby="capacity-title capacity-desc">
+        <title id="capacity-title">併發人數與 P95 延遲</title>
+        <desc id="capacity-desc">藍線為第一輪測試的 P95，紅點為 30 人重測，橘色虛線為 2 秒參考線。</desc>
+        <line x1="70" y1="280" x2="860" y2="280" stroke="#dbe6e0"/><line x1="70" y1="230" x2="860" y2="230" stroke="#dbe6e0"/><line x1="70" y1="180" x2="860" y2="180" stroke="#dbe6e0"/><line x1="70" y1="130" x2="860" y2="130" stroke="#dbe6e0"/><line x1="70" y1="80" x2="860" y2="80" stroke="#dbe6e0"/><line x1="70" y1="30" x2="860" y2="30" stroke="#dbe6e0"/>
+        <text x="58" y="285" text-anchor="end" fill="#63736c">0</text><text x="58" y="235" text-anchor="end" fill="#63736c">2s</text><text x="58" y="185" text-anchor="end" fill="#63736c">4s</text><text x="58" y="135" text-anchor="end" fill="#63736c">6s</text><text x="58" y="85" text-anchor="end" fill="#63736c">8s</text><text x="58" y="35" text-anchor="end" fill="#63736c">10s</text>
+        <line x1="70" y1="230" x2="860" y2="230" stroke="#ed8a19" stroke-width="2" stroke-dasharray="7 6"/><text x="855" y="222" text-anchor="end" fill="#ed8a19">2 秒參考線</text>
+        <polyline points="110,259.5 235,235.4 360,223.6 485,189.9 610,148.6 735,125.5 860,30" fill="none" stroke="#2f80ed" stroke-width="4"/>
+        <circle cx="110" cy="259.5" r="5" fill="#2f80ed"/><circle cx="235" cy="235.4" r="5" fill="#2f80ed"/><circle cx="360" cy="223.6" r="5" fill="#2f80ed"/><circle cx="485" cy="189.9" r="5" fill="#2f80ed"/><circle cx="610" cy="148.6" r="5" fill="#2f80ed"/><circle cx="735" cy="125.5" r="5" fill="#2f80ed"/><circle cx="860" cy="30" r="5" fill="#2f80ed"/>
+        <circle cx="610" cy="130.1" r="8" fill="#d94b4b"/><text x="620" y="121" fill="#d94b4b">30 人重測 6.0s</text>
+        <text x="110" y="305" text-anchor="middle" fill="#14201b">1</text><text x="235" y="305" text-anchor="middle" fill="#14201b">5</text><text x="360" y="305" text-anchor="middle" fill="#14201b">10</text><text x="485" y="305" text-anchor="middle" fill="#14201b">20</text><text x="610" y="305" text-anchor="middle" fill="#14201b">30</text><text x="735" y="305" text-anchor="middle" fill="#14201b">40</text><text x="860" y="305" text-anchor="middle" fill="#14201b">50</text><text x="465" y="338" text-anchor="middle" fill="#63736c">同時使用者數</text>
+      </svg>
+    </div>
+    <div class="legend"><span>P95（第一輪）</span><span class="repeat">30 人重測</span><span class="threshold">2 秒參考線</span></div>
+    <div class="callout">30 人首輪出現 3 次 TLS EOF，重測無錯誤。新 Session 首請求與後續 API 的耗時差異很大，應分開分析；此處混合 P95 不能決定穩定使用人數上限。後端於 21:47 重啟，此頁數據在重啟前量得。</div>
+  </section>
+  <section>
+    <h2>各級別數據</h2>
+    <div class="chart-wrap"><table><thead><tr><th>併發</th><th>請求</th><th>請求成功率</th><th>使用者成功率</th><th>RPS</th><th>P50</th><th>P95</th><th>最大</th><th>傳輸錯誤</th></tr></thead><tbody>
+      <tr><td>1</td><td>9</td><td class="ok">100%</td><td class="ok">100%</td><td>3.4</td><td>169ms</td><td>818ms</td><td>1.12s</td><td>0</td></tr>
+      <tr><td>5</td><td>45</td><td class="ok">100%</td><td class="ok">100%</td><td>14.6</td><td>159ms</td><td>1.78s</td><td>1.81s</td><td>0</td></tr>
+      <tr><td>10</td><td>90</td><td class="ok">100%</td><td class="ok">100%</td><td>24.1</td><td>171ms</td><td>2.25s</td><td>2.32s</td><td>0</td></tr>
+      <tr><td>20</td><td>180</td><td class="ok">100%</td><td class="ok">100%</td><td>29.8</td><td>172ms</td><td>3.60s</td><td>4.65s</td><td>0</td></tr>
+      <tr><td>30</td><td>270</td><td>98.9%</td><td>90.0%</td><td>31.7</td><td>170ms</td><td>5.25s</td><td>6.44s</td><td>3 TLS EOF</td></tr>
+      <tr><td>40</td><td>360</td><td class="ok">100%</td><td class="ok">100%</td><td>33.5</td><td>168ms</td><td>6.18s</td><td>9.51s</td><td>0</td></tr>
+      <tr><td>50</td><td>450</td><td class="ok">100%</td><td class="ok">100%</td><td>18.9</td><td>163ms</td><td>10.00s</td><td>22.48s</td><td>0</td></tr>
+      <tr><td>30 重測</td><td>270</td><td class="ok">100%</td><td class="ok">100%</td><td>26.0</td><td>157ms</td><td>6.00s</td><td>8.95s</td><td>0</td></tr>
+    </tbody></table></div>
+  </section>
+  <section><h2>清理與限制</h2><p class="muted">兩輪測試產生的飲食紀錄均已透過 API 清理，殘留紀錄為 0。404 狀態是「立即刪除後的清理重試」預期結果，不列為錯誤。登入 50 組帳號的 P95 約 1.86 秒。此測試沒有同步取得同學電腦的 CPU、記憶體、磁碟與 Tailscale 監控，因此只能判斷端到端 HTTP 表現，不能單獨歸因到 SQLite 或 Waitress。</p><p class="footer">第一輪原始資料：remote_summary_20261111-213539.json · 第二輪：remote_summary_20261111-214021.json · 彙總：remote_capacity_summary_20261111.json</p></section>
+</main></body></html>

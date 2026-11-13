@@ -1,0 +1,2 @@
+﻿run_id,phase,concurrency,requests,success,failed,success_pct,p50_ms,p95_ms,p99_ms,max_ms,duration_s,rps,run_stopped_early,stop_reason
+persistent-20261111-215732,load,1,14,14,0,100.0,171.04,185.25,187.44,187.99,12.16,1.151,True,three consecutive failed health probes

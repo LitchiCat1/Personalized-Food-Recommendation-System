@@ -1,0 +1,49 @@
+# Python
+**/.venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# IDE
+.vscode/
+.idea/
+
+# Codex internal
+.planning/
+.agents/
+.opencode/
+tmp/
+task_plan.md
+findings.md
+progress.md
+skills-lock.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env*.local
+key.txt
+
+# Local load-test accounts contain login credentials.
+docs/stress-test/test_accounts_*.csv
+
+# TFDA
+backend/tfda_data/20_5.json
+
+# 本機 SQLite（DATABASE_PATH 指到專案裡時）
+*.db
+*.db-wal
+*.db-shm
+
+# graphify 產生的知識圖譜與快取（本機用，不進版控）
+graphify-out/

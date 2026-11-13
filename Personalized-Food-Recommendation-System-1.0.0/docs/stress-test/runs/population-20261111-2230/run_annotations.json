@@ -1,0 +1,9 @@
+{
+  "223424": {
+    "burst_valid": true,
+    "steady_valid_for_capacity": false,
+    "reason": "The monitoring window incorrectly included errors from the preceding burst phase. The one-user steady stage stopped after 1.832 seconds despite 7/7 successful business requests. Fixed to select only the current phase and concurrency; rerun only the affected sustained scenario.",
+    "raw_evidence_preserved": true,
+    "final_verification": "100/100 accounts retained exactly three valid seed records, temporary records 0, outstanding tokens 0."
+  }
+}

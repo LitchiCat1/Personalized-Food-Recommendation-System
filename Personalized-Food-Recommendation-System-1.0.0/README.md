@@ -1,0 +1,257 @@
+# 個人化飲食推薦與影像辨識 App
+
+目前版本：**v1.0.1**（2026-11-13）。
+
+> 健康飲食管理工具，結合 Gemini Vision 食物辨識、資料庫營養對應、個人化營養分析與附近店家搜尋。
+
+## 📁 專案結構
+
+```
+Personalized-Food-Recommendation-System/
+├── backend/                  # Flask 後端 API
+│   ├── app.py                # 主伺服器入口與 API routes
+│   ├── data/                 # 本地靜態與快取資料
+│   │   └── restaurant_catalog.json # 測試餐廳與快取菜單資料庫
+│   ├── services/             # 辨識、推薦、網頁爬蟲與 AI 解析邏輯
+│   │   ├── robust_restaurant_scraper_service.py # AI 菜單爬蟲與估算服務
+│   │   ├── google_places_service.py # Google Places API 串接與新版 v1 相容
+│   │   ├── healthy_food_service.py # 健康餐點與店家推薦整合服務
+│   │   └── ...
+│   ├── repositories/         # 資料庫/記憶體資料訪問層
+│   │   └── storage.py        # 使用者與飲食紀錄存取 (含自動註冊 Fallback)
+│   ├── nutrition_db.json     # 手工食物營養素資料庫
+│   ├── nutrition_db_tw.json  # TFDA 台灣食品營養資料庫（主要）
+│   ├── nutrition_db_usda.json # USDA FNDDS 官方資料（備援）
+│   ├── requirements.txt      # Python 依賴 (含 beautifulsoup4)
+│   └── ...
+├── frontend/                 # Expo React Native 前端
+│   ├── app/                  # Expo Router 頁面
+│   │   ├── (tabs)/           # Tab 導覽頁面
+│   │   │   ├── index.tsx     # 首頁 Dashboard
+│   │   │   ├── scanner.tsx   # AI 食物與營養標示辨識
+│   │   │   ├── recommend.tsx # 附近店家搜尋與地圖
+│   │   │   ├── history.tsx   # 飲食趨勢與 AI 洞察
+│   │   │   └── profile.tsx   # 個人檔案設定
+│   │   └── _layout.tsx       # Root layout 與驗證閘道
+│   ├── components/           # 可複用 UI 元件
+│   │   ├── AuthGate.tsx      # 登入與註冊 Gate（帳號存在本機資料庫）
+│   │   ├── AppContainer.tsx  # 響應式佈局容器
+│   │   ├── maps/             # 地圖整合元件
+│   │   └── ui/               # 設計系統通用按鈕、對話框與導覽
+│   ├── lib/                  # API 調用與型別定義
+│   │   ├── api.ts            # 前後端 API 串接 (含 Google Places v1)
+│   │   └── ...
+│   ├── store/                # Zustand 狀態管理
+│   │   └── useStore.ts       # 全域核心狀態
+│   └── package.json          # 前端依賴與腳本 (v1.0.1)
+└── docs/                     # 專案文件
+    ├── PRD.md                # 產品需求文件
+    ├── Project_Architecture_and_Status.md # 架構與 Roadmap 稽核表
+    └── Operations_Runbook.md # 部署與維護指令手冊
+```
+
+## 🔑 核心功能狀態
+
+- **AI 食物辨識** — 食物名稱/份量初判 + 後端 TFDA 優先、USDA 備援與自訂食品營養對應
+- **份量校正** — 掃描結果可人工調整重量並即時重算營養素
+- **個人化營養追蹤** — BMR/TDEE 計算、三大營養素 + 鈉/纖維進度
+- **安全過濾引擎** — 5 種疾病禁忌規則 + 過敏原比對
+- **Google Places 店家推薦** — 預算 + 定位 + 半徑 + 店家類型搜尋，支援 Google Maps 導航與個人化 AI 店家摘要
+- **飲食趨勢分析** — 週熱量柱狀圖 + 營養素均值 + AI 洞察
+- **飲食紀錄管理** — 日曆區間查詢 + 手動新增今日或歷史紀錄 + 編輯與刪除
+- **未知食品備援** — TFDA 搜尋 + 自訂食品 + 營養標示 OCR
+- **本機登入** — 暱稱 + 密碼登入/註冊，帳號存在本機 SQLite，Bearer token 傳遞、後端 user_id 權限檢查
+- **本機資料庫** — 帳號、飲食紀錄、店家菜單快取都存在一個 SQLite 檔，不需要雲端服務
+- **跨平台響應式** — 手機/平板/桌面自適應
+
+目前 Google Places 店家搜尋、Web Google Maps、個人化 AI 店家摘要、個人檔案編輯、登出、本機登入與後端強制 user-scoped 權限檢查均已完成驗證，GitHub Actions 已有基礎 CI。詳細狀態請以 `docs/Project_Architecture_and_Status.md` 的 roadmap 稽核表為準。
+
+## 在本機執行
+
+網站與資料庫都在自己的電腦上，不需要任何雲端服務，也不用安裝資料庫：
+資料存在一個 SQLite 檔（預設 `%LOCALAPPDATA%\NutriLens\nutrilens.db`）。
+
+> 如果後端有時從 Claude 桌面版啟動、有時從工作排程器或一般終端機啟動，請在 `backend/.env.local`
+> 把 `DATABASE_PATH` 設到 AppData 以外（例如 `C:\Users\<你的帳號>\NutriLensData\nutrilens.db`）。
+> Claude 桌面版是 MSIX 套件，從它啟動的程式寫進 AppData 的檔案會被 Windows 導到它自己的資料夾，
+> 兩邊會各用一個資料庫。後端與備份、重設密碼的腳本偵測到這種情況會停下來說明，不會繼續執行。
+
+第一次：
+
+```bash
+pip install -r backend/requirements.txt
+cp backend/.env.local.example backend/.env.local   # 填入 GOOGLE_PLACES_API_KEY 等非 AI 設定
+cp key.txt.example key.txt                        # 填入私下取得的 AI 中轉站金鑰
+npm --prefix frontend install
+```
+
+### AI 中轉站設定與伺服器交接
+
+所有 AI 功能（食物照片辨識、營養標示 OCR、店家摘要、店家菜單建檔與菜單照片辨識）
+共用 OpenAI Compatible 中轉站與金鑰池。後端會自動讀取本 README 同目錄下的 `key.txt`，
+使用檔案中的 Base URL、指定模型 ID 與所有金鑰，不需要修改程式碼或前端設定。
+
+公開儲存庫只提供不含金鑰的 `key.txt.example`；已填入金鑰的 `key.txt` 由 `.gitignore` 排除。
+架設同學下載後，將專案持有人私下提供的完整 `key.txt` 放到 `key.txt.example` 同目錄，
+覆蓋自己建立的空白 `key.txt`，重新啟動後端即可。只更新後端即可套用，不需要重建前端。
+`key.txt` 每行放一把 `sk-` 開頭的金鑰；Base URL 與模型 ID 請保留範例的標示格式。
+
+同一個後端程序會依序分配空閒金鑰，一把金鑰同時只處理一個 AI 呼叫；全部忙碌時等待空位。
+遇到 429 會依 `Retry-After`（預設 60 秒，最多 300 秒）暫停該金鑰，權限錯誤暫停 300 秒，
+並在請求的時間預算內換下一把。輪替無法增加中轉站帳戶共用的總額度。
+請以單一後端程序部署來維持這項互斥保證；多程序或多台伺服器需各自分配不同金鑰組。
+
+設定的優先順序：同時設定的 `AI_BASE_URL`、`AI_MODEL`、`AI_API_KEYS` >
+`AI_RELAY_KEYS_FILE` 指向的檔案 > 專案根目錄的 `key.txt`。
+三個環境變數若有設定就必須全部填齊；`AI_API_KEYS` 以逗號分隔。
+沒有任何中轉站設定時才沿用舊版 Gemini／OpenAI 設定；中轉站呼叫失敗時不會回退舊金鑰。
+
+Render 等只從 GitHub 建置的服務不會取得本機金鑰檔，請在服務的環境變數介面填入上面三個值；
+`render.yaml` 已列出所需欄位。Docker 若以 `backend` 為建置目錄，請把完整金鑰檔唯讀掛載到
+`/run/secrets/nutrilens-ai`，並設定 `AI_RELAY_KEYS_FILE=/run/secrets/nutrilens-ai`。
+
+`/health` 的 `ai_relay_enabled=true` 表示已載入中轉站設定，不代表已驗證遠端連線。
+管理者可透過原有的 `/health/gemini?generate=1` 診斷路由驗證實際呼叫，回傳不包含金鑰內容。
+本機單元測試會設定 `NUTRILENS_SKIP_LOCAL_ENV=1`，避免讀取真實金鑰並產生 API 費用。
+
+### 照片辨識與營養資料來源
+
+照片辨識只讓 AI 判斷可見食物與估計可食重量，營養數值由官方資料庫換算。
+**優先使用 TFDA；找不到相符食品與食用狀態時才使用 USDA FNDDS。**
+不以名稱包含相同字詞就自動套用，也不將熟食重量乘上乾麵、濃縮湯或不相符生肉的數值。
+原態蔬菜、USDA 一般配方與未知內餡的熟水餃等參考資料會明確提醒差異，仍須確認油鹽與重量。
+
+專案已內附 2,213 筆 TFDA、5,431 筆 USDA FNDDS 2021–2023 資料及各自的 `.source.json` 來源紀錄。
+伺服器啟動直接讀取這些 JSON，**不需要另申請 USDA API key，也不會在啟動時下載資料**。
+請將兩份資料與來源紀錄一併交付，不要只複製程式檔。
+
+找不到合適資料的食品會顯示在辨識結果的待確認清單；「已配對項目合計」不代表整餐營養。
+資料來源沒有提供的營養素會在照片結果顯示「未提供」，不是實測為 0。
+份量、配方與照片辨識仍有不確定性；有包裝時優先使用實際營養標示，無法確認時可補充自訂食品。
+13 張 `food_picture` 照片的前後測試、官方來源及重現指令見 [測試紀錄](docs/food-image-evaluation/README.md)。
+
+### 平常使用（推薦）
+
+先把網站打包一次（改過前端程式才需要重跑）：
+
+```bash
+npm --prefix frontend run build:local
+```
+
+之後只要開後端，網站和 API 都在同一個網址：
+
+```bash
+python backend/app.py
+```
+
+打開 http://localhost:5000 註冊帳號就能用。後端的 `/health` 會顯示資料庫檔案的位置。
+
+### 讓其他裝置連進來
+
+預設只有這台電腦連得到。要給別人用：
+
+1. 在 `backend/.env.local` 設一組邀請碼，例如 `SIGNUP_CODE=nutri-2026`。其他裝置註冊時要輸入它；
+   沒設的話其他裝置只能登入已經有的帳號、不能註冊（在這台電腦上永遠可以註冊）。
+   要讓所有人不用邀請碼就能註冊，改設 `OPEN_SIGNUP=true`。
+   放在 Render 上時沒設就是開放註冊，要關掉請在 Render 後台設 `OPEN_SIGNUP=false`。
+2. 依對方在哪裡選一種：
+   - **同一個 Wi-Fi 或 VPN（例如 Radmin）**：用 `python backend/app.py --lan` 啟動，
+     後端會印出「同一個網路的手機或電腦：http://192.168.x.x:5000」，在對方的瀏覽器打開即可。
+   - **從外面的網路連（組員在家、老師評審）**：照常 `python backend/app.py`，另開一個終端機執行下面這行，
+     把印出來的 `https://….trycloudflare.com` 網址傳給對方；關掉視窗網址就失效，每次執行網址都不同。
+
+     ```bash
+     cloudflared tunnel --url http://localhost:5000
+     ```
+
+注意：
+
+- 手機的瀏覽器只有在 **https** 網址下才允許用相機拍照和定位。用 `http://192.168.x.x` 連時，請改用「相簿」上傳照片、
+  店家頁會改用預設位置；要用相機或定位，請用 cloudflared 網址。
+- 不同網址（`localhost:5000`、`192.168.x.x:5000`、cloudflared 網址、`localhost:8081`）在瀏覽器看來是不同網站，
+  各自要登入一次。同一個網址開好幾個分頁時，登入、登出會自動同步。
+- 只有在這台電腦上才能做的事：清除店家菜單檔案、查看金鑰診斷。
+- 展示完就把 cloudflared 關掉。在咖啡店、學校這類公用 Wi-Fi 上不要加 `--lan`。
+
+### 固定網址（Tailscale Funnel）
+
+cloudflared 的網址每次都不同。要一個不會變的網址，用 Tailscale Funnel（免費）：
+網址是 `https://電腦名稱.你的-tailnet.ts.net`，轉到這台電腦的 5000 埠。
+
+1. 安裝 Tailscale 並登入，在 Tailscale 後台（登入的那個 tailnet）開啟 HTTPS 憑證與 Funnel 權限。
+2. 開啟 Funnel（加 `--bg` 會在背景執行，重開機後設定還在）：
+
+   ```bash
+   tailscale funnel --bg 5000
+   ```
+
+   關掉：`tailscale funnel --https=443 off`。
+3. 後端要開著，網址才連得到。可以設成登入 Windows 時在背景自動啟動：
+   排程工作執行 `pythonw backend/scripts/run_in_background.py`（沒有視窗），
+   輸出寫到 `%LOCALAPPDATA%\NutriLens\logs\backend.log`。手動停止或重新啟動：
+
+   ```powershell
+   Stop-ScheduledTask -TaskName "NutriLens Backend"
+   ```
+
+   ```powershell
+   Start-ScheduledTask -TaskName "NutriLens Backend"
+   ```
+
+   背景的後端開著時，不要再另外執行 `python backend/app.py`（5000 埠已經被占用）。
+
+電腦關機或睡眠時網站就連不上。從 Funnel 進來的人一律算「其他裝置」，
+不能清除菜單檔案或看金鑰診斷；登入／註冊的次數限制依 Tailscale 回報的訪客 IP 各自計算。
+
+### 開發時（改前端程式）
+
+開兩個終端機，前端改了會即時更新：
+
+```bash
+python backend/app.py                 # 後端 http://localhost:5000
+npm --prefix frontend run web         # 網站 http://localhost:8081
+```
+
+其他工具：
+
+- 忘記密碼：`python backend/scripts/reset_password.py 小明`（不帶暱稱會列出所有帳號）。
+- 備份：`python backend/scripts/backup_db.py`（後端開著也可以），備份存在資料庫旁邊的 `backups` 資料夾；
+  `--list` 列出備份，`--restore 檔名` 還原（要先關掉後端，原本的檔案會改名留著）。
+  不要在後端開著時直接複製 `.db` 檔：剛寫的資料可能還在旁邊的 `-wal` 檔裡。
+- 自動備份：後端開著時每 24 小時自己備份一次（檔名有 `-auto-`），只留最近 30 份，備份時順便檢查整份資料庫有沒有損毀；
+  間隔、份數、另外複製一份到別的硬碟，見 `backend/.env.local.example` 的 `AUTO_BACKUP_*`。
+- 資料庫結構有版本號：之後改了資料表，後端啟動時會先備份（檔名有 `before-v`）再自動升級；
+  用舊版程式開到新版改過的資料庫會停下來，請先 `git pull`。
+- 資料庫檔案損毀或打不開時，後端會停下來並印出檔案位置，不會改用記憶體繼續跑（那樣資料重開就不見了）。
+
+## Expo Go 測試注意事項
+
+如果使用 `npx expo start --tunnel` 在手機上測試，請注意：
+
+1. Expo tunnel 只處理前端，不會自動幫 Flask backend 建 tunnel
+2. 後端必須另外啟動：`python backend/app.py`
+3. 前端 API 位址目前支援：
+   - `.env.local` 手動指定
+   - Expo 執行環境自動推導 host
+4. 若手機出現 `Network request failed`，優先檢查：
+   - backend 是否啟動
+   - 電腦防火牆是否開放 `5000`
+   - 手機與電腦是否在可互通網路上
+
+## 🛠 技術棧
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Expo (React Native) + TypeScript |
+| State | Zustand |
+| Navigation | Expo Router (file-based) |
+| Backend | Flask + SQLite（本機檔案）+ MongoDB fallback |
+| AI Model | Gemini Vision API + TFDA/custom food DB lookup |
+| Camera | expo-camera + expo-image-picker |
+
+## 📝 最近更新紀錄 (v0.0.7e - 拍照菜單測試版)
+
+- **📷 實體菜單拍照上傳與 Gemini Vision AI 個人化推薦**：在「完整菜單」對話框頂部常駐上傳按鈕，支援隨時拍照上傳實體菜單，Gemini Vision 自動讀取品項價格與營養，並自動生成 3~5 項安全推薦。
+- **⚖️ 卡路里與三大營養素物理公式驗算**：新增 $P \times 4 + C \times 4 + F \times 9 \approx \text{Calories}$ 校正平衡演算法，解決營養數值計算不合物理邏輯的問題。
+- **🛡️ 補齊全套 11 項營養指標與移除樣板預設值**：補齊精緻糖、飽和脂肪、反式脂肪、纖維、鈣與鐵；移除前端 `fiber || 3` 及「AI 摘要」`400 kcal` 硬編碼預設值。
+- **🔄 Gemini API 多金鑰動態輪替 (Key Rotation)**：解決每分鐘 15 RPM 限流與 429 錯誤，多組 API Key 自動切換不中斷。

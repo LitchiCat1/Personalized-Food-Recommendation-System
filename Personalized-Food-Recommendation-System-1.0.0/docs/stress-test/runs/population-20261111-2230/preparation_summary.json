@@ -1,0 +1,38 @@
+{
+  "started_at": "2026-11-11T22:29:31.351+08:00",
+  "target": "https://node.taile9a8dc.ts.net",
+  "accounts_requested": 100,
+  "records_per_account": 3,
+  "completed": true,
+  "health": {
+    "app_version": "v1.0.0",
+    "auth_provider": "local-sqlite",
+    "auth_required": true,
+    "cached_restaurant_menus": 36,
+    "custom_foods": 0,
+    "database": "sqlite",
+    "database_path": null,
+    "deployed_branch": "local",
+    "deployed_commit": "local",
+    "disease_rule_review_status": {
+      "guideline_screening": 3,
+      "requires_clinical_personalization": 1,
+      "screening_rule": 1
+    },
+    "disease_rules": 5,
+    "foods_in_db": 12,
+    "foods_in_tfda": 2181,
+    "mongo": false,
+    "openai_enabled": true,
+    "places_enabled": true,
+    "recognition_engine": "gemini-vision-db-lookup",
+    "restaurants": 20,
+    "started_at": "2026-11-11T21:47:11.356665+08:00",
+    "status": "ok"
+  },
+  "finished_at": "2026-11-11T22:31:39.909+08:00",
+  "accounts_created_or_recovered": 100,
+  "accounts_verified": 100,
+  "retained_records_verified": 300,
+  "outstanding_tokens": 0
+}

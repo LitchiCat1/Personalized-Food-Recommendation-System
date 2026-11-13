@@ -1,0 +1,242 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
+  buildOCRDetectedFood,
+  FOOD_NAME_REQUIRED_MESSAGE,
+  manualSearchFood,
+  normalizeFoodName,
+  runNutritionLabelOCR,
+  runPrediction,
+  saveRecord,
+} from '../lib/scanner.ts';
+import { getAutoMealType, normalizeMealType, perMealBudget } from '../lib/meal.ts';
+
+function detectedFood(name = '原始名稱') {
+  return {
+    id: 'ocr-test',
+    foodName: name,
+    confidence: 100,
+    source: 'nutrition-label-ocr',
+    needsConfirmation: false,
+    boundingBox: { x: 0, y: 0, w: 0, h: 0 },
+    estimatedWeight: 100,
+    nutrition: {
+      calories: 180,
+      protein: 8.5,
+      carbs: 22,
+      sugar: 4.5,
+      fat: 6,
+      saturated_fat: 1.2,
+      trans_fat: 0,
+      sodium: 210,
+      fiber: 3,
+      is_fried: true,
+    },
+    gi: 'medium',
+    allergens: [],
+    warnings: [],
+  };
+}
+
+test('vision mapping preserves missing nutrient flags for honest display', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({ detections: [{
+      name_zh: '滷肉', confidence: 0.95, estimated_weight_g: 80,
+      nutrition: detectedFood().nutrition, source: 'USDA FNDDS',
+      missing_nutrition_fields: ['trans_fat'],
+    }] }),
+  });
+  try {
+    const result = await runPrediction({
+      apiBaseUrl: 'http://localhost:5000', imageBase64: 'dGVzdA==', healthConditions: [], allergens: [],
+    });
+    assert.deepEqual(result.detections[0].missingNutritionFields, ['trans_fat']);
+    assert.equal(result.detections[0].foodName, '滷肉');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('normalizes the final OCR food name and carries it into detected food', () => {
+  assert.equal(normalizeFoodName('  修改後豆漿  '), '修改後豆漿');
+  assert.equal(normalizeFoodName('   '), '');
+  assert.equal(buildOCRDetectedFood({
+    product_name: '  修改後豆漿  ',
+    serving_size_g: 250,
+    nutrition_per_serving: { calories: 180, protein: 8.5, carbs: 22, fat: 6, sodium: 210, fiber: 3 },
+  }).foodName, '修改後豆漿');
+  assert.throws(() => buildOCRDetectedFood({ product_name: '   ' }), new RegExp(FOOD_NAME_REQUIRED_MESSAGE));
+});
+
+test('saves the user final trimmed name in the existing foods schema', async () => {
+  const originalFetch = globalThis.fetch;
+  let requestBody;
+  globalThis.fetch = async (_url, init) => {
+    requestBody = JSON.parse(init.body);
+    return { ok: true, json: async () => ({}) };
+  };
+  try {
+    await saveRecord({
+      apiBaseUrl: 'https://api.example.test',
+      userId: 'user-a',
+      clientRecordId: 'edited-name-record',
+      foods: [detectedFood('  使用者最後輸入名稱  ')],
+      source: 'nutrition-label',
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(requestBody.foods[0].name, '使用者最後輸入名稱');
+  assert.equal(requestBody.foods[0].calories, 180);
+  assert.equal(requestBody.foods[0].sugar, 4.5);
+  assert.equal(requestBody.foods[0].is_fried, true);
+  assert.equal(requestBody.total_saturated_fat, 1.2);
+  assert.equal(requestBody.source, 'nutrition-label');
+  assert.equal(requestBody.client_record_id, 'edited-name-record');
+});
+
+test('deduplicates rapid matching saves and releases the lock after failure for retry', async () => {
+  const originalFetch = globalThis.fetch;
+  let requestCount = 0;
+  let releaseFirstRequest;
+  globalThis.fetch = () => {
+    requestCount += 1;
+    return new Promise((resolve) => {
+      releaseFirstRequest = () => resolve({ ok: true, json: async () => ({}) });
+    });
+  };
+  const params = {
+    apiBaseUrl: 'https://api.example.test',
+    userId: 'user-a',
+    clientRecordId: 'rapid-record',
+    foods: [detectedFood('快速點擊測試')],
+    source: 'nutrition-label',
+  };
+  try {
+    const first = saveRecord(params);
+    const second = saveRecord(params);
+    assert.equal(requestCount, 1);
+    releaseFirstRequest();
+    await Promise.all([first, second]);
+
+    globalThis.fetch = async () => {
+      requestCount += 1;
+      return requestCount === 2
+        ? { ok: false, json: async () => ({ error: 'temporary failure' }) }
+        : { ok: true, json: async () => ({}) };
+    };
+    await assert.rejects(() => saveRecord({ ...params, clientRecordId: 'retry-record' }), /temporary failure/);
+    await saveRecord({ ...params, clientRecordId: 'retry-record' });
+    assert.equal(requestCount, 3);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('sends the meal type the record actually belongs to, not a fixed 點心', async () => {
+  const originalFetch = globalThis.fetch;
+  const captured = [];
+  globalThis.fetch = async (_url, init) => {
+    captured.push(JSON.parse(init.body));
+    return { ok: true, json: async () => ({}) };
+  };
+  try {
+    // 早餐時段掃描 → 早餐，而不是寫死的「點心」
+    await saveRecord({
+      apiBaseUrl: 'https://api.example.test',
+      userId: 'user-a',
+      clientRecordId: 'breakfast-record',
+      foods: [detectedFood('燕麥粥')],
+      source: 'camera',
+      mealType: getAutoMealType(new Date('2026-09-10T08:30:00')),
+    });
+    assert.equal(captured[0].meal_type, '早餐');
+
+    // 離線佇列晚上才補送早上那筆，餐別仍要跟著「當初入列的時間」
+    await saveRecord({
+      apiBaseUrl: 'https://api.example.test',
+      userId: 'user-a',
+      clientRecordId: 'replayed-breakfast',
+      foods: [detectedFood('燕麥粥')],
+      source: 'camera',
+      mealType: getAutoMealType(new Date('2026-09-10T08:30:00')),
+    });
+    assert.equal(captured[1].meal_type, '早餐');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('a replayed record carries the time it was queued; a live save lets the backend stamp it', async () => {
+  const originalFetch = globalThis.fetch;
+  const captured = [];
+  globalThis.fetch = async (_url, init) => {
+    captured.push(JSON.parse(init.body));
+    return { ok: true, json: async () => ({}) };
+  };
+  const base = {
+    apiBaseUrl: 'https://api.example.test',
+    userId: 'user-a',
+    foods: [detectedFood('滷肉飯')],
+    source: 'camera',
+    mealType: '晚餐',
+  };
+  try {
+    await saveRecord({ ...base, clientRecordId: 'live-record' });
+    assert.equal('timestamp' in captured[0], false);
+
+    // 23:50 排隊的晚餐隔天早上才補送，要存成當晚，不是隔天早上
+    await saveRecord({ ...base, clientRecordId: 'queued-record', timestamp: '2026-10-25T23:50:00.000+08:00' });
+    assert.equal(captured[1].timestamp, '2026-10-25T23:50:00.000+08:00');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('a non-JSON error page becomes a readable message instead of a parse error', async () => {
+  // 後端逾時或 502 時回的是 HTML，直接 resp.json() 會丟出 "Unexpected token '<'"
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 502,
+    json: async () => { throw new SyntaxError("Unexpected token '<', \"<!doctype \"... is not valid JSON"); },
+  });
+  const image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  try {
+    await assert.rejects(
+      () => runPrediction({ apiBaseUrl: 'https://api.example.test', imageBase64: image, healthConditions: [], allergens: [] }),
+      (error) => !/Unexpected token/.test(error.message) && /HTTP 502/.test(error.message),
+    );
+    await assert.rejects(
+      () => manualSearchFood({ apiBaseUrl: 'https://api.example.test', keyword: '白飯' }),
+      (error) => !/Unexpected token/.test(error.message) && /HTTP 502/.test(error.message),
+    );
+    await assert.rejects(
+      () => runNutritionLabelOCR({ apiBaseUrl: 'https://api.example.test', imageBase64: image }),
+      (error) => !/Unexpected token/.test(error.message),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('splits the day into meals the same way the dashboard does', () => {
+  assert.equal(getAutoMealType(new Date('2026-09-10T08:30:00')), '早餐');
+  assert.equal(getAutoMealType(new Date('2026-09-10T12:15:00')), '午餐');
+  assert.equal(getAutoMealType(new Date('2026-09-10T15:40:00')), '點心');
+  assert.equal(getAutoMealType(new Date('2026-09-10T19:05:00')), '晚餐');
+  assert.equal(normalizeMealType('午餐'), '午餐');
+  assert.equal(normalizeMealType('brunch'), '點心');
+});
+
+test('per-meal budget follows the users disease-adjusted daily sodium limit', () => {
+  // 一般人每日 2000mg → 單餐 ~667mg；腎臟病每日 1500mg → 單餐 500mg。
+  // 寫死 800mg 會讓腎臟病患者的 700mg 餐點顯示成正常。
+  assert.equal(Math.round(perMealBudget(2000, 2000)), 667);
+  assert.equal(perMealBudget(1500, 2000), 500);
+  assert.equal(Math.round(perMealBudget(undefined, 2000)), 667);
+  assert.equal(Math.round(perMealBudget(0, 2000)), 667);
+});

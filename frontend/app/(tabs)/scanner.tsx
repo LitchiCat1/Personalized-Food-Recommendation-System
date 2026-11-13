@@ -16,7 +16,7 @@ import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
 import FeedbackBanner from '@/components/ui/feedback-banner';
-import ScannerManualTools from '@/components/scanner/ScannerManualTools';
+import ScannerManualTools, { ScannerPendingFoods } from '@/components/scanner/ScannerManualTools';
 import ScannerResults from '@/components/scanner/ScannerResults';
 import MenuCheckResults from '@/components/scanner/MenuCheckResults';
 import { checkMenuPhoto, type MenuPhotoCheckResponse } from '@/lib/api';
@@ -306,7 +306,7 @@ export default function ScannerScreen() {
       const ok = await handlePrediction(imageBase64);
       if (!ok) {
         clearScan();
-        setRecordFeedback({ tone: 'error', title: '未辨識到可記錄的食物', message: '請拍攝完整餐盤、保持光線充足，或改用相簿與手動搜尋。' });
+        setRecordFeedback({ tone: 'error', title: '尚無可記錄的營養結果', message: '請查看下方待確認食物與缺少資料的原因，可用營養標示或手動搜尋補充。若未列出任何食物，請重新拍攝完整餐盤。' });
       }
       return ok;
     } catch (error: any) {
@@ -712,7 +712,7 @@ export default function ScannerScreen() {
         <Text style={styles.scanTitle}>
           {menuChecking ? '正在用 AI 分析菜單' : scanResult.isScanning ? '正在分析照片' : results.length > 0 && scanMode !== 'menu' ? `已辨識 ${results.length} 項食物` : modeConfig.title}
         </Text>
-        <Text style={styles.scanHint}>{results.length > 0 && scanMode !== 'menu' ? `合計 ${totalCal} kcal，鈉 ${totalSodium}mg。請確認份量後加入。` : modeConfig.hint}</Text>
+        <Text style={styles.scanHint}>{results.length > 0 && scanMode !== 'menu' ? `${rejectedDetections.length > 0 ? '已配對項目合計' : '估計合計'} ${totalCal} kcal，鈉 ${totalSodium}mg。${rejectedDetections.length > 0 ? `另有 ${rejectedDetections.length} 項待確認，尚未計入。` : '請確認份量後加入。'}` : modeConfig.hint}</Text>
         {scanMode !== 'manual' ? (
           <PrimaryButton label={modeConfig.action} onPress={modeConfig.onPress} disabled={scanResult.isScanning || ocrQuerying || menuChecking} icon={<Ionicons name={modeConfig.icon} size={18} color={Palette.text.inverse} />} />
         ) : null}
@@ -739,7 +739,9 @@ export default function ScannerScreen() {
         <Text style={styles.sectionTitle}>辨識結果</Text>
         {results.length > 0 ? <DataPill tone="success">{results.length} 項</DataPill> : null}
       </View>
+      <ScannerPendingFoods rs={rs} items={rejectedDetections} />
       <ScannerResults
+        hasUnmatchedFoods={rejectedDetections.length > 0}
         rs={rs}
         wp={wp}
         results={results}
@@ -787,7 +789,7 @@ export default function ScannerScreen() {
    * 使用者會以為這個分頁壞了。改成緊接在說明卡下面。
    */
   const manualTools = scanMode === 'manual' ? (
-    <ScannerManualTools rs={rs} manualQuery={manualQuery} onManualQueryChange={setManualQuery} manualSearching={manualSearching} onManualSearch={handleManualSearch} ocrQuerying={ocrQuerying} onOCRSearch={handleLabelOCRFromGallery} rejectedDetections={rejectedDetections} />
+    <ScannerManualTools rs={rs} manualQuery={manualQuery} onManualQueryChange={setManualQuery} manualSearching={manualSearching} onManualSearch={handleManualSearch} ocrQuerying={ocrQuerying} onOCRSearch={handleLabelOCRFromGallery} />
   ) : null;
 
   return (

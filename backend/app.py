@@ -38,6 +38,7 @@ from services.disease_rule_service import (
     normalize_condition_ids,
 )
 from services.env_service import load_local_env
+from services.ai_relay_service import get_relay_config
 from services.history_service import build_history_response
 from services.google_places_service import GooglePlacesAPIError, GooglePlacesConfigError
 from services.healthy_food_service import build_google_places_food_recommendations, build_healthy_food_recommendations, load_restaurant_catalog
@@ -69,6 +70,7 @@ from services.vision_food_service import (
     build_vision_food_response,
     call_gemini_food_recognition_with_rotation,
 )
+from services.nutrition_database_service import load_usda_foods
 from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini, parse_menu_image_with_gemini
 from services.medical_risk_service import (
     MEALS_PER_DAY,
@@ -541,6 +543,9 @@ except FileNotFoundError:
     TFDA_DB = {}
     print("[WARN] TFDA nutrition_db_tw.json not found - using fallback only")
 
+USDA_DB = load_usda_foods(BASE_DIR)
+TFDA_DB.update(USDA_DB)
+
 # ─── Disease filter rules (PRD: 硬性排除規則) ────────────────
 DISEASE_RULES = load_disease_rules(BASE_DIR)
 print(f"[OK] Disease rules loaded: {len(DISEASE_RULES)} conditions")
@@ -556,7 +561,7 @@ print(f"[OK] Restaurant catalog loaded: {len(RESTAURANT_CATALOG)} restaurants")
 # ═══════════════════════════════════════════════════════════════
 
 
-APP_VERSION = "v1.0.0"
+APP_VERSION = "v1.0.1"
 STARTED_AT = app_now().isoformat()
 
 
@@ -586,15 +591,17 @@ def health():
         "database_path": database_path if database_path and is_local_request() else None,
         "cached_restaurant_menus": storage.count_restaurant_menus(),
         "mongo": USE_MONGO,
-        "recognition_engine": "gemini-vision-db-lookup",
+        "recognition_engine": "ai-relay-vision-db-lookup" if get_relay_config() else "gemini-vision-db-lookup",
         "foods_in_db": len(NUTRITION_DB),
-        "foods_in_tfda": len(TFDA_DB),
+        "foods_in_tfda": len(TFDA_DB) - len(USDA_DB),
+        "foods_in_usda": len(USDA_DB),
         "disease_rules": len(DISEASE_RULES),
         "disease_rule_review_status": build_disease_rules_response(DISEASE_RULES)["review_status_counts"],
         "restaurants": len(RESTAURANT_CATALOG),
         "places_enabled": bool(os.environ.get("GOOGLE_PLACES_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY")),
         # 菜單分析先問 ChatGPT、失敗才換 Gemini；沒設就只用 Gemini
-        "openai_enabled": bool((os.environ.get("OPENAI_API_KEY") or "").strip()),
+        "openai_enabled": bool(get_relay_config() or (os.environ.get("OPENAI_API_KEY") or "").strip()),
+        "ai_relay_enabled": bool(get_relay_config()),
         "auth_required": is_auth_required(),
         "auth_provider": f"local-{sql_db.dialect}" if auth_repo.use_sql else "local-memory",
         "custom_foods": storage.count_custom_foods(),

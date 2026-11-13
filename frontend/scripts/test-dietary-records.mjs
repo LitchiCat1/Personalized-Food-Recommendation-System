@@ -173,6 +173,7 @@ test('formats internal food source codes and meal emojis into Chinese labels', (
   assert.equal(formatFoodSourceLabel('manual'), '手動紀錄');
   assert.equal(formatFoodSourceLabel('camera'), '拍照辨識');
   assert.equal(formatFoodSourceLabel('TFDA-search'), 'TFDA 資料庫');
+  assert.equal(formatFoodSourceLabel('USDA FNDDS'), 'USDA 參考資料');
   assert.equal(formatFoodSourceLabel('nutrition-label-ocr'), '營養標示');
   assert.equal(formatFoodSourceLabel('custom-food'), '自訂食品');
   assert.equal(formatMealEmojiSource('📸'), '拍照辨識');

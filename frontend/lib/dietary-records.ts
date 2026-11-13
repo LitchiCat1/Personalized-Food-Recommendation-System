@@ -291,6 +291,7 @@ export function formatFoodSourceLabel(source?: string): string {
   if (key === 'manual') return '手動紀錄';
   if (key === 'camera' || key === 'gemini_vision_db' || key === 'gemini-vision-db-lookup') return '拍照辨識';
   if (key === 'tfda' || key === 'tfda-search') return 'TFDA 資料庫';
+  if (key === 'usda fndds') return 'USDA 參考資料';
   if (key === 'custom' || key === 'custom-food') return '自訂食品';
   if (key === 'nutrition-label' || key === 'nutrition-label-ocr' || key === 'gemini ocr') return '營養標示';
   return raw;

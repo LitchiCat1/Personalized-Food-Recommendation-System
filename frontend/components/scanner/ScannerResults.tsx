@@ -24,9 +24,10 @@ type Props = {
   sodiumDailyTarget?: number;
   /** 這一餐合計超過單餐上限的提醒（每道單獨看都在範圍內）。 */
   mealWarnings?: string[];
+  hasUnmatchedFoods?: boolean;
 };
 
-export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightChange, submitting = false, disabled = false, sodiumDailyTarget, mealWarnings = [] }: Props) {
+export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightChange, submitting = false, disabled = false, sodiumDailyTarget, mealWarnings = [], hasUnmatchedFoods = false }: Props) {
   const controlsDisabled = submitting || disabled;
   const sodiumMealBudget = perMealBudget(sodiumDailyTarget, 2000);
   const [weightDrafts, setWeightDrafts] = useState<Record<string, string>>({});
@@ -161,21 +162,23 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
 
             <View style={styles.nutritionGrid}>
               {[
-                { label: '熱量', value: food.nutrition.calories, unit: 'kcal', color: Palette.accent.green },
-                { label: '蛋白質', value: food.nutrition.protein, unit: 'g', color: Palette.accent.blue },
-                { label: '總碳水化合物', value: food.nutrition.carbs, unit: 'g', color: Palette.accent.orange },
-                { label: '精緻糖', value: food.nutrition.sugar ?? 0, unit: 'g', color: Palette.accent.orange },
-                { label: '總脂肪', value: food.nutrition.fat, unit: 'g', color: Palette.accent.purple },
-                { label: '飽和脂肪', value: food.nutrition.saturated_fat ?? 0, unit: 'g', color: Palette.accent.purple },
-                { label: '反式脂肪', value: food.nutrition.trans_fat ?? 0, unit: 'g', color: Palette.status.error },
-                { label: '膳食纖維', value: food.nutrition.fiber, unit: 'g', color: Palette.accent.cyan },
-                { label: '鈉 (Sodium)', value: food.nutrition.sodium, unit: 'mg', color: food.nutrition.sodium > sodiumMealBudget ? Palette.status.warning : Palette.accent.pink },
+                { key: 'calories', label: '熱量', value: food.nutrition.calories, unit: 'kcal', color: Palette.accent.green },
+                { key: 'protein', label: '蛋白質', value: food.nutrition.protein, unit: 'g', color: Palette.accent.blue },
+                { key: 'carbs', label: '總碳水化合物', value: food.nutrition.carbs, unit: 'g', color: Palette.accent.orange },
+                { key: 'sugar', label: '總糖', value: food.nutrition.sugar ?? 0, unit: 'g', color: Palette.accent.orange },
+                { key: 'fat', label: '總脂肪', value: food.nutrition.fat, unit: 'g', color: Palette.accent.purple },
+                { key: 'saturated_fat', label: '飽和脂肪', value: food.nutrition.saturated_fat ?? 0, unit: 'g', color: Palette.accent.purple },
+                { key: 'trans_fat', label: '反式脂肪', value: food.nutrition.trans_fat ?? 0, unit: 'g', color: Palette.status.error },
+                { key: 'fiber', label: '膳食纖維', value: food.nutrition.fiber, unit: 'g', color: Palette.accent.cyan },
+                { key: 'sodium', label: '鈉 (Sodium)', value: food.nutrition.sodium, unit: 'mg', color: food.nutrition.sodium > sodiumMealBudget ? Palette.status.warning : Palette.accent.pink },
               ].map((item) => (
                 <View key={item.label} style={[styles.nutritionItem, { minWidth: wp(26) }]}>
                   <Text style={styles.nutritionLabel}>{item.label}</Text>
                   <Text style={[styles.nutritionValue, { color: item.color }]}>
-                    {item.value}
-                    <Text style={styles.nutritionUnit}> {item.unit}</Text>
+                    {food.missingNutritionFields?.includes(item.key) ? '未提供' : <>
+                      {item.value}
+                      <Text style={styles.nutritionUnit}> {item.unit}</Text>
+                    </>}
                   </Text>
                 </View>
               ))}
@@ -198,7 +201,7 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
 
       <View style={styles.totalCard}>
         <View style={styles.totalHeader}>
-          <Text style={styles.totalTitle}>合計攝取</Text>
+          <Text style={styles.totalTitle}>{hasUnmatchedFoods ? '已配對項目合計' : '估計攝取合計'}</Text>
           <DataPill tone={totalSodium > sodiumMealBudget ? 'warning' : 'success'}>鈉 {totalSodium}mg</DataPill>
         </View>
         <View style={styles.totalRow}>

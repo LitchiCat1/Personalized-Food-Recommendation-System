@@ -9,6 +9,7 @@ import time
 import requests
 
 from services.nutrient_service import get_nutrient_value
+from services.ai_relay_service import get_relay_config, relay_chat, relay_diagnostics
 
 
 RETRYABLE_GEMINI_STATUS_CODES = {401, 403, 404, 429, 500, 502, 503, 504}
@@ -198,6 +199,9 @@ def decode_image_base64(value, max_bytes: int = MAX_IMAGE_BYTES) -> tuple[bytes,
 
 
 def get_gemini_api_keys(explicit_key: str | None = None) -> list[str]:
+    relay = get_relay_config()
+    if relay:
+        return list(relay.keys)
     raw_keys = [
         explicit_key,
         os.environ.get("GEMINI_API_KEYS"),
@@ -262,6 +266,10 @@ def gemini_key_model_pairs(keys: list[str], models: list[str]) -> list[tuple[str
 
 def call_gemini_with_rotation(api_keys: list[str], call, label: str):
     """依序換金鑰與模型呼叫 call(api_key, model)，直到成功或遇到不該重試的錯誤。"""
+    relay = get_relay_config()
+    if relay:
+        # Relay transport owns retries and key leases across all features.
+        return call(relay.keys[0], relay.model)
     if not api_keys:
         raise ValueError("缺少 Gemini API key，請設定 GEMINI_API_KEYS 或 GEMINI_API_KEY 環境變數")
 
@@ -314,6 +322,8 @@ def probe_gemini_models(timeout: float = 10.0, generate: bool = False) -> dict:
     分不出是模型名寫錯還是金鑰沒開通。這裡直接查，不用猜。
     金鑰只回前 8 碼，不會把完整值吐出來。
     """
+    if get_relay_config():
+        return relay_diagnostics(timeout, generate)
     configured = get_gemini_models()
     report = []
     usable_everywhere = None
@@ -371,6 +381,9 @@ def probe_gemini_models(timeout: float = 10.0, generate: bool = False) -> dict:
 
 
 def get_gemini_models() -> list[str]:
+    relay = get_relay_config()
+    if relay:
+        return [relay.model]
     raw_models = [os.environ.get("GEMINI_MODELS"), os.environ.get("GEMINI_MODEL")]
     models: list[str] = []
     seen = set()
@@ -410,6 +423,9 @@ def call_gemini_nutrition_ocr(image_b64: str, mime_type: str, api_key: str, gemi
         '"sodium":null,"fiber":null},'
         '"ocr_text":"","confidence_note":""}'
     )
+    if get_relay_config():
+        text, _finish = relay_chat(prompt, image_base64=image_b64, image_mime_type=mime_type)
+        return extract_json_block(text)
     payload = {
         "contents": [
             {

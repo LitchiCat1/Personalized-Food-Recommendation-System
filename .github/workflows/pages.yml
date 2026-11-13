@@ -7,7 +7,7 @@ name: Deploy web app to GitHub Pages
 on:
   push:
     branches:
-      - v1.0.0
+      - v1.0.1
       - v0.0.8f
       - main
   workflow_dispatch:
@@ -59,7 +59,7 @@ jobs:
           # 這幾個值最後都會出現在公開的 JS bundle 裡，所以用 vars 而不是 secrets——
           # 標成 secret 只會讓人誤以為它們是機密的。
           EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL }}
-          GOOGLE_PLACES_API_KEY: ${{ vars.GOOGLE_MAPS_BROWSER_KEY }}
+          GOOGLE_MAPS_BROWSER_KEY: ${{ vars.GOOGLE_MAPS_BROWSER_KEY }}
         run: npm run build:web
 
       - name: Add 404 fallback for client-side routes

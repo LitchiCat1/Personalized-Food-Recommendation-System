@@ -24,16 +24,22 @@ def search_foods(storage, tfda_db: dict, query: str, limit: int, user_id: str | 
 
     tfda_candidates = []
     for key, food in tfda_db.items():
-        if q in key or q in (food.get("name_zh") or "") or q_lower in (food.get("name_en") or "").lower():
+        if q in key or q in (food.get("name_zh") or "") or q_lower in (food.get("name_en") or "").lower() or q in food.get("aliases", []):
             tfda_candidates.append((_score_tfda_match(q, q_lower, key, food), key, food))
 
-    for _, key, food in sorted(tfda_candidates, key=lambda item: item[0])[:limit - len(results)]:
+    for _, key, food in sorted(tfda_candidates, key=lambda item: (item[2].get("source") == "USDA FNDDS", item[0]))[:limit - len(results)]:
         results.append(
             {
                 "key": key,
                 "name_zh": food.get("name_zh", key),
                 "name_en": food.get("name_en", ""),
                 "category": food.get("category", ""),
+                "code": food.get("code"),
+                "aliases": food.get("aliases", []),
+                "description": food.get("description", ""),
+                "source_url": food.get("source_url"),
+                "water": food.get("water"),
+                "reference_only": food.get("reference_only", False),
                 "calories": food.get("calories", 0),
                 "protein": food.get("protein", 0),
                 "fat": food.get("fat", 0),
@@ -46,7 +52,7 @@ def search_foods(storage, tfda_db: dict, query: str, limit: int, user_id: str | 
                 "is_fried": food.get("is_fried") is True
                 or is_fried_food_name(food.get("name_zh", key), food.get("name_en")),
                 "unit": food.get("unit", "per 100g"),
-                "source": "TFDA",
+                "source": food.get("source", "TFDA"),
                 "allergens": food.get("allergens", []) or [],
             }
         )
@@ -59,7 +65,7 @@ def _score_tfda_match(q: str, q_lower: str, key: str, food: dict) -> tuple:
     name_en = (food.get("name_en") or "").lower()
     category = food.get("category", "") or ""
 
-    if name_zh == q or key == q:
+    if name_zh == q or key == q or q in food.get("aliases", []):
         match_rank = 0
     elif name_zh.startswith(q) or key.startswith(q):
         match_rank = 1

@@ -1,0 +1,12 @@
+{
+  "provider": "衛生福利部食品藥物管理署",
+  "dataset_url": "https://data.gov.tw/dataset/8543",
+  "download_url": "https://data.fda.gov.tw/data/opendata/export/20/json",
+  "license": "政府資料開放授權條款-第1版",
+  "converted_at": "2026-11-13T11:25:24.431640+00:00",
+  "input_sha256": "755d2f0e4a7c1fe80ac0636863117e376773c9342cfd68e7b05e67d81e3c6064",
+  "raw_rows": 230152,
+  "unique_codes": 2213,
+  "output_foods": 2213,
+  "nutrition_values": "Official per-100g values; no AI-generated nutrition or recipe estimates."
+}

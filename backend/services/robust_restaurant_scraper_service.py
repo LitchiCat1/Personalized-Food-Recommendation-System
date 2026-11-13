@@ -5,6 +5,7 @@ import re
 import time
 import requests
 from bs4 import BeautifulSoup
+from services.ai_relay_service import get_relay_config, relay_chat
 
 from services.nutrition_label_service import (
     decode_image_base64,
@@ -342,6 +343,20 @@ def enrich_restaurant_with_gemini(restaurant_name: str, address: str, scraped_te
     只需要這幾個欄位，其餘不要輸出：
     {{"items":[{{"name":"餐點名稱","price":120,"calories":480,"protein":32,"carbs":45,"fat":14,"sugar":6,"saturated_fat":4,"fiber":3,"sodium":420,"is_fried":false}}]}}
     """
+    if get_relay_config():
+        try:
+            text, _finish = relay_chat(prompt, max_tokens=1500, timeout=MENU_GENERATION_TIMEOUT_SECONDS, deadline=deadline)
+            items = extract_json_items(text)
+            return {"items": [validate_and_balance_nutrition(item) for item in items]} if items else {"items": [], "failure": "no_items"}
+        except requests.HTTPError as error:
+            status = error.response.status_code if error.response is not None else None
+            failure = "rate_limited" if status == 429 else "unavailable" if status in {401, 403, 404} else "inconclusive"
+        except requests.Timeout:
+            failure = "out_of_budget" if deadline is not None and time.monotonic() >= deadline else "inconclusive"
+        except (requests.RequestException, ValueError):
+            failure = "inconclusive"
+        return {"items": [], "failure": failure}
+
     # 全 repo 其他 Gemini 呼叫都用 get_gemini_models()（可由 GEMINI_MODELS 覆寫）。
     # 這裡原本寫死 2.5-flash / 2.5-pro，金鑰沒有這兩個模型權限時整串 404，
     # 最後退回 generate_fallback_menu()，而真實店名不在樣板清單裡會回空陣列。
@@ -650,6 +665,24 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
       ]
     }}
     """
+    relay = get_relay_config()
+    if relay:
+        try:
+            text, _finish = relay_chat(
+                prompt, max_tokens=8192, image_base64=image_base64,
+                image_mime_type=image_mime_type, timeout=MENU_PHOTO_OPENAI_TIMEOUT_SECONDS,
+            )
+            items = _menu_items_from_text(text)
+            if items:
+                return {
+                    "items": [validate_and_balance_nutrition(item) for item in items],
+                    "recognition_status": "recognized", "recognition_model": relay.model,
+                }
+            error_message = "AI \u672a\u8fa8\u8b58\u51fa\u83dc\u55ae\u54c1\u9805\uff0c\u8acb\u63db\u4e00\u5f35\u6e05\u6670\u7684\u7167\u7247\u3002"
+        except (requests.RequestException, ValueError):
+            error_message = "AI \u83dc\u55ae\u8fa8\u8b58\u670d\u52d9\u66ab\u6642\u7121\u6cd5\u4f7f\u7528\uff0c\u8acb\u7a0d\u5f8c\u518d\u8a66\u3002"
+        return {"items": [], "recognition_status": "error", "recognition_error": error_message}
+
     # 有設 ChatGPT 就先問它；沒辨識出品項才輪到 Gemini
     openai_failure = None
     if openai_key:

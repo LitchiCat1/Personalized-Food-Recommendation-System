@@ -140,6 +140,7 @@ export type DetectedFood = {
   confidence: number;
   source?: string;
   needsConfirmation?: boolean;
+  missingNutritionFields?: string[];
   boundingBox: { x: number; y: number; w: number; h: number };
   estimatedWeight: number; // grams
   originalEstimatedWeight?: number;

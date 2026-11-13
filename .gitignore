@@ -16,6 +16,7 @@ web-build/
 .idea/
 
 # Codex internal
+.planning/
 .agents/
 .opencode/
 tmp/
@@ -31,6 +32,10 @@ Thumbs.db
 # Env
 .env
 .env*.local
+key.txt
+
+# Local load-test accounts contain login credentials.
+docs/stress-test/test_accounts_*.csv
 
 # TFDA
 backend/tfda_data/20_5.json

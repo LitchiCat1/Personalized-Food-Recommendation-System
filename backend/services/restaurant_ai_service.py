@@ -1,6 +1,7 @@
 import json
 
 import requests
+from services.ai_relay_service import get_relay_config, relay_chat
 
 from services.nutrition_label_service import (
     call_gemini_with_rotation,
@@ -138,6 +139,9 @@ def call_gemini_restaurant_summary(
         nutrition_progress,
         disease_rules,
     )
+    if get_relay_config():
+        text, _finish = relay_chat(prompt, timeout=30)
+        return extract_json_block(text)
     resp = requests.post(
         gemini_generate_url(model),
         headers=gemini_headers(api_key),

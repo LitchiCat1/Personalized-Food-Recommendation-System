@@ -1,5 +1,7 @@
 # 個人化飲食推薦與影像辨識 App
 
+目前版本：**v1.0.1**（2026-11-13）。
+
 > 健康飲食管理工具，結合 Gemini Vision 食物辨識、資料庫營養對應、個人化營養分析與附近店家搜尋。
 
 ## 📁 專案結構
@@ -18,7 +20,8 @@ Personalized-Food-Recommendation-System/
 │   ├── repositories/         # 資料庫/記憶體資料訪問層
 │   │   └── storage.py        # 使用者與飲食紀錄存取 (含自動註冊 Fallback)
 │   ├── nutrition_db.json     # 手工食物營養素資料庫
-│   ├── nutrition_db_tw.json  # TFDA 台灣食品營養資料庫
+│   ├── nutrition_db_tw.json  # TFDA 台灣食品營養資料庫（主要）
+│   ├── nutrition_db_usda.json # USDA FNDDS 官方資料（備援）
 │   ├── requirements.txt      # Python 依賴 (含 beautifulsoup4)
 │   └── ...
 ├── frontend/                 # Expo React Native 前端
@@ -40,7 +43,7 @@ Personalized-Food-Recommendation-System/
 │   │   └── ...
 │   ├── store/                # Zustand 狀態管理
 │   │   └── useStore.ts       # 全域核心狀態
-│   └── package.json          # 前端依賴與腳本 (v0.0.7)
+│   └── package.json          # 前端依賴與腳本 (v1.0.1)
 └── docs/                     # 專案文件
     ├── PRD.md                # 產品需求文件
     ├── Project_Architecture_and_Status.md # 架構與 Roadmap 稽核表
@@ -49,7 +52,7 @@ Personalized-Food-Recommendation-System/
 
 ## 🔑 核心功能狀態
 
-- **Gemini Vision 食物辨識** — 食物名稱/份量初判 + 後端 TFDA/自訂食品資料庫營養對應
+- **AI 食物辨識** — 食物名稱/份量初判 + 後端 TFDA 優先、USDA 備援與自訂食品營養對應
 - **份量校正** — 掃描結果可人工調整重量並即時重算營養素
 - **個人化營養追蹤** — BMR/TDEE 計算、三大營養素 + 鈉/纖維進度
 - **安全過濾引擎** — 5 種疾病禁忌規則 + 過敏原比對
@@ -77,9 +80,55 @@ Personalized-Food-Recommendation-System/
 
 ```bash
 pip install -r backend/requirements.txt
-cp backend/.env.local.example backend/.env.local   # 填入 GEMINI_API_KEYS、GOOGLE_PLACES_API_KEY
+cp backend/.env.local.example backend/.env.local   # 填入 GOOGLE_PLACES_API_KEY 等非 AI 設定
+cp key.txt.example key.txt                        # 填入私下取得的 AI 中轉站金鑰
 npm --prefix frontend install
 ```
+
+### AI 中轉站設定與伺服器交接
+
+所有 AI 功能（食物照片辨識、營養標示 OCR、店家摘要、店家菜單建檔與菜單照片辨識）
+共用 OpenAI Compatible 中轉站與金鑰池。後端會自動讀取本 README 同目錄下的 `key.txt`，
+使用檔案中的 Base URL、指定模型 ID 與所有金鑰，不需要修改程式碼或前端設定。
+
+公開儲存庫只提供不含金鑰的 `key.txt.example`；已填入金鑰的 `key.txt` 由 `.gitignore` 排除。
+架設同學下載後，將專案持有人私下提供的完整 `key.txt` 放到 `key.txt.example` 同目錄，
+覆蓋自己建立的空白 `key.txt`，重新啟動後端即可。只更新後端即可套用，不需要重建前端。
+`key.txt` 每行放一把 `sk-` 開頭的金鑰；Base URL 與模型 ID 請保留範例的標示格式。
+
+同一個後端程序會依序分配空閒金鑰，一把金鑰同時只處理一個 AI 呼叫；全部忙碌時等待空位。
+遇到 429 會依 `Retry-After`（預設 60 秒，最多 300 秒）暫停該金鑰，權限錯誤暫停 300 秒，
+並在請求的時間預算內換下一把。輪替無法增加中轉站帳戶共用的總額度。
+請以單一後端程序部署來維持這項互斥保證；多程序或多台伺服器需各自分配不同金鑰組。
+
+設定的優先順序：同時設定的 `AI_BASE_URL`、`AI_MODEL`、`AI_API_KEYS` >
+`AI_RELAY_KEYS_FILE` 指向的檔案 > 專案根目錄的 `key.txt`。
+三個環境變數若有設定就必須全部填齊；`AI_API_KEYS` 以逗號分隔。
+沒有任何中轉站設定時才沿用舊版 Gemini／OpenAI 設定；中轉站呼叫失敗時不會回退舊金鑰。
+
+Render 等只從 GitHub 建置的服務不會取得本機金鑰檔，請在服務的環境變數介面填入上面三個值；
+`render.yaml` 已列出所需欄位。Docker 若以 `backend` 為建置目錄，請把完整金鑰檔唯讀掛載到
+`/run/secrets/nutrilens-ai`，並設定 `AI_RELAY_KEYS_FILE=/run/secrets/nutrilens-ai`。
+
+`/health` 的 `ai_relay_enabled=true` 表示已載入中轉站設定，不代表已驗證遠端連線。
+管理者可透過原有的 `/health/gemini?generate=1` 診斷路由驗證實際呼叫，回傳不包含金鑰內容。
+本機單元測試會設定 `NUTRILENS_SKIP_LOCAL_ENV=1`，避免讀取真實金鑰並產生 API 費用。
+
+### 照片辨識與營養資料來源
+
+照片辨識只讓 AI 判斷可見食物與估計可食重量，營養數值由官方資料庫換算。
+**優先使用 TFDA；找不到相符食品與食用狀態時才使用 USDA FNDDS。**
+不以名稱包含相同字詞就自動套用，也不將熟食重量乘上乾麵、濃縮湯或不相符生肉的數值。
+原態蔬菜、USDA 一般配方與未知內餡的熟水餃等參考資料會明確提醒差異，仍須確認油鹽與重量。
+
+專案已內附 2,213 筆 TFDA、5,431 筆 USDA FNDDS 2021–2023 資料及各自的 `.source.json` 來源紀錄。
+伺服器啟動直接讀取這些 JSON，**不需要另申請 USDA API key，也不會在啟動時下載資料**。
+請將兩份資料與來源紀錄一併交付，不要只複製程式檔。
+
+找不到合適資料的食品會顯示在辨識結果的待確認清單；「已配對項目合計」不代表整餐營養。
+資料來源沒有提供的營養素會在照片結果顯示「未提供」，不是實測為 0。
+份量、配方與照片辨識仍有不確定性；有包裝時優先使用實際營養標示，無法確認時可補充自訂食品。
+13 張 `food_picture` 照片的前後測試、官方來源及重現指令見 [測試紀錄](docs/food-image-evaluation/README.md)。
 
 ### 平常使用（推薦）
 

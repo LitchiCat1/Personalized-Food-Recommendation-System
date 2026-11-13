@@ -91,6 +91,7 @@ function mapApiDetections(detections: any[]): DetectedFood[] {
     confidence: Math.round((d.confidence || 0) * 1000) / 10,
     source: d.source,
     needsConfirmation: d.needs_confirmation || false,
+    missingNutritionFields: d.missing_nutrition_fields || [],
     boundingBox: d.bounding_box,
     estimatedWeight: d.estimated_weight_g,
     originalEstimatedWeight: d.estimated_weight_g,

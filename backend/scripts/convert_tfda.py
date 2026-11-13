@@ -9,6 +9,12 @@
 import json
 import os
 import sys
+import argparse
+import hashlib
+import re
+import zipfile
+from datetime import datetime, timezone
+from pathlib import Path
 
 RAW_PATH = os.path.join(os.path.dirname(__file__), "..", "tfda_data", "20_5.json")
 OUT_PATH = os.path.join(os.path.dirname(__file__), "..", "nutrition_db_tw.json")
@@ -67,10 +73,17 @@ def safe_float(v):
 
 
 def main():
-    print(f"📂 Reading {RAW_PATH} ...")
-
-    with open(RAW_PATH, "r", encoding="utf-8") as f:
-        raw = json.load(f)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--raw", type=Path, default=Path(RAW_PATH))
+    parser.add_argument("--output", type=Path, default=Path(OUT_PATH))
+    args = parser.parse_args()
+    print(f"Reading {args.raw} ...")
+    content = args.raw.read_bytes()
+    if zipfile.is_zipfile(args.raw):
+        with zipfile.ZipFile(args.raw) as archive:
+            raw = json.loads(archive.read("20_5.json"))
+    else:
+        raw = json.loads(content.decode("utf-8-sig"))
 
     print(f"  Total rows: {len(raw):,}")
 
@@ -90,6 +103,7 @@ def main():
                 "name_en": str(row.get("樣品英文名稱", "") or "").strip(),
                 "category": str(row.get("食品分類", "")).strip(),
                 "description": str(row.get("內容物描述", "") or "").strip(),
+                "aliases": [part.strip() for part in re.split(r"[,，、;；]", str(row.get("俗名") or "")) if part.strip()],
                 "waste_rate": str(row.get("廢棄率", "") or "").strip(),
                 "nutrients": {},
             }
@@ -127,13 +141,16 @@ def main():
             "name_zh": name,
             "name_en": food["name_en"],
             "category": food["category"],
+            "aliases": food["aliases"],
+            "description": food["description"],
+            "source_url": "https://data.gov.tw/dataset/8543",
             # 核心六大營養素 (app.py 必用)
-            "calories": n.get("calories", 0),
-            "protein": n.get("protein", 0),
-            "fat": n.get("fat", 0),
-            "carbs": n.get("carbs", 0),
-            "sodium": n.get("sodium", 0),
-            "fiber": n.get("fiber", 0),
+            "calories": n.get("calories"),
+            "protein": n.get("protein"),
+            "fat": n.get("fat"),
+            "carbs": n.get("carbs"),
+            "sodium": n.get("sodium"),
+            "fiber": n.get("fiber"),
             # 額外營養素
             "sugar": n.get("sugar"),
             "saturated_fat": n.get("saturated_fat"),
@@ -165,11 +182,22 @@ def main():
     print(f"  Skipped (no name): {skipped}")
 
     # ── Save ──
-    with open(OUT_PATH, "w", encoding="utf-8") as f:
+    with open(args.output, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
 
-    size_kb = os.path.getsize(OUT_PATH) / 1024
-    print(f"\n✅ Saved to {OUT_PATH}")
+    args.output.with_suffix(".source.json").write_text(json.dumps({
+        "provider": "衛生福利部食品藥物管理署",
+        "dataset_url": "https://data.gov.tw/dataset/8543",
+        "download_url": "https://data.fda.gov.tw/data/opendata/export/20/json",
+        "license": "政府資料開放授權條款-第1版",
+        "converted_at": datetime.now(timezone.utc).isoformat(),
+        "input_sha256": hashlib.sha256(content).hexdigest(),
+        "raw_rows": len(raw), "unique_codes": len(foods), "output_foods": len(result),
+        "nutrition_values": "Official per-100g values; no AI-generated nutrition or recipe estimates.",
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    size_kb = os.path.getsize(args.output) / 1024
+    print(f"\n✅ Saved to {args.output}")
     print(f"   File size: {size_kb:.0f} KB ({size_kb/1024:.1f} MB)")
 
     # ── 統計各分類數量 ──

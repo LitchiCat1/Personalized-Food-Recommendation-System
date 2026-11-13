@@ -19,28 +19,17 @@ type Props = {
   onManualSearch: () => void;
   ocrQuerying: boolean;
   onOCRSearch: () => void;
-  rejectedDetections: RejectedDetection[];
 };
 
-export default function ScannerManualTools({
-  rs,
-  manualQuery,
-  onManualQueryChange,
-  manualSearching,
-  onManualSearch,
-  ocrQuerying,
-  onOCRSearch,
-  rejectedDetections,
-}: Props) {
+export function ScannerPendingFoods({ rs, items }: { rs: (value: number) => number; items: RejectedDetection[] }) {
+  if (items.length === 0) return null;
   return (
-    <>
-      {rejectedDetections.length > 0 && (
         <View style={styles.rejectedCard}>
           <View style={styles.rejectedHeader}>
             <Ionicons name="alert-circle-outline" size={rs(16)} color={Palette.status.warning} />
-            <Text style={styles.rejectedTitle}>已忽略不可靠辨識</Text>
+            <Text style={styles.rejectedTitle}>需確認或補充營養資料的食物</Text>
           </View>
-          {rejectedDetections.map((item, index) => (
+          {items.map((item, index) => (
             <View key={`${item.label}_${index}`} style={styles.rejectedItem}>
               <Text style={styles.rejectedText} selectable>
                 {item.label} ({Math.round(item.confidence * 100)}%)：{item.reason}
@@ -51,8 +40,19 @@ export default function ScannerManualTools({
             </View>
           ))}
         </View>
-      )}
+  );
+}
 
+export default function ScannerManualTools({
+  rs,
+  manualQuery,
+  onManualQueryChange,
+  manualSearching,
+  onManualSearch,
+  ocrQuerying,
+  onOCRSearch,
+}: Props) {
+  return (
       <View style={styles.manualCard}>
         <View style={styles.manualHeader}>
           <View style={styles.iconCircle}>
@@ -94,7 +94,6 @@ export default function ScannerManualTools({
           )}
         </Pressable>
       </View>
-    </>
   );
 }
 

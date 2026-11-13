@@ -38,6 +38,27 @@ function detectedFood(name = '原始名稱') {
   };
 }
 
+test('vision mapping preserves missing nutrient flags for honest display', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({ detections: [{
+      name_zh: '滷肉', confidence: 0.95, estimated_weight_g: 80,
+      nutrition: detectedFood().nutrition, source: 'USDA FNDDS',
+      missing_nutrition_fields: ['trans_fat'],
+    }] }),
+  });
+  try {
+    const result = await runPrediction({
+      apiBaseUrl: 'http://localhost:5000', imageBase64: 'dGVzdA==', healthConditions: [], allergens: [],
+    });
+    assert.deepEqual(result.detections[0].missingNutritionFields, ['trans_fat']);
+    assert.equal(result.detections[0].foodName, '滷肉');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('normalizes the final OCR food name and carries it into detected food', () => {
   assert.equal(normalizeFoodName('  修改後豆漿  '), '修改後豆漿');
   assert.equal(normalizeFoodName('   '), '');

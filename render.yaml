@@ -4,7 +4,7 @@ services:
     runtime: static
     repo: https://github.com/LitchiCat1/Personalized-Food-Recommendation-System
     rootDir: frontend
-    branch: v1.0.0
+    branch: v1.0.1
     buildCommand: npm ci && npm run build:web
     staticPublishPath: dist
     # 打包出來的檔名帶 content hash（entry-<hash>.js），內容變了檔名就會變，
@@ -45,7 +45,7 @@ services:
     repo: https://github.com/LitchiCat1/Personalized-Food-Recommendation-System
     plan: free
     rootDir: backend
-    branch: v1.0.0
+    branch: v1.0.1
     buildCommand: pip install -r requirements.txt
     startCommand: python -u app.py
     # 資料存在 Supabase 的 Postgres：DATABASE_URL 填 Supabase → Connect → Session pooler
@@ -53,6 +53,14 @@ services:
     # 沒設的話會用 Render 磁碟上的 SQLite，每次部署都會清空。
     envVars:
       - key: DATABASE_URL
+        sync: false
+      # All AI features use the relay. Set all three in the server dashboard;
+      # AI_API_KEYS is the comma-separated list privately supplied by the owner.
+      - key: AI_BASE_URL
+        value: "https://cdn.sta1n.cn/v1"
+      - key: AI_MODEL
+        value: "[AN]gemini-4-hydrogen-high"
+      - key: AI_API_KEYS
         sync: false
       - key: GEMINI_API_KEYS
         sync: false

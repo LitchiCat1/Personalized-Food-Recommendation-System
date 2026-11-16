@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "mode": "live_single_source_tavily_replay",
+  "source_url": "https://www.tahsda.org.tw/communitymedicine/files/20161126_RAOHEStreetMarketNight/QQ%E7%8E%8B%E5%AD%90%E5%9C%B0%E7%93%9C%E7%90%83.pdf",
+  "query": "QQ 王子地瓜球 每100公克 營養標示 熱量 蛋白質 鈉",
+  "started_at": 1794656488.984248,
+  "search": {
+    "request_id": "bd05a531-3da7-4b88-a108-559595fb3cc7",
+    "usage": {
+      "credits": 1
+    },
+    "urls": [],
+    "result_count": 0
+  },
+  "extract": {
+    "request_id": "225ebb4a-0dda-455f-9d9c-07dfbe725456",
+    "usage": {
+      "credits": 0
+    },
+    "document_count": 1,
+    "failed_urls": [],
+    "documents": [
+      {
+        "url": "https://www.tahsda.org.tw/communitymedicine/files/20161126_RAOHEStreetMarketNight/QQ%E7%8E%8B%E5%AD%90%E5%9C%B0%E7%93%9C%E7%90%83.pdf",
+        "bytes": 1805,
+        "content_hash": "2335a202763698da4b653f482e6cb3d435db82db7525ba5ba6e13d6de21da99e",
+        "retrieval_version": "tavily-extract-basic-markdown-v1"
+      }
+    ]
+  },
+  "side_effects": {
+    "production_route_enabled": false,
+    "database_written": false,
+    "user_records_written": false,
+    "raw_content_persisted": false
+  },
+  "status": "ok",
+  "elapsed_seconds": 2.957
+}

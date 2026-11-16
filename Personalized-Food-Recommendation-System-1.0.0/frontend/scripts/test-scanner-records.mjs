@@ -2,14 +2,31 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildOCRDetectedFood,
+  formatScannerResultTitle,
+  formatScannerSourceBadge,
   FOOD_NAME_REQUIRED_MESSAGE,
+  hasReviewableNutritionMiss,
   manualSearchFood,
   normalizeFoodName,
   runNutritionLabelOCR,
   runPrediction,
+  mergeNutritionEnrichmentResult,
   saveRecord,
 } from '../lib/scanner.ts';
 import { getAutoMealType, normalizeMealType, perMealBudget } from '../lib/meal.ts';
+
+test('scanner summary distinguishes matched nutrition from pending foods', () => {
+  assert.equal(formatScannerResultTitle(2, 5), '已配對 2 項營養資料');
+  assert.equal(formatScannerResultTitle(0, 5), '5 項食物待確認');
+  assert.equal(formatScannerResultTitle(0, 0), null);
+});
+
+test('scanner source badge reflects matched nutrient sources without guessing the model', () => {
+  assert.equal(formatScannerSourceBadge(['TFDA', 'USDA FNDDS', 'TFDA']), 'TFDA + USDA');
+  assert.equal(formatScannerSourceBadge(['custom-food']), '自訂');
+  assert.equal(formatScannerSourceBadge([], 5), '待營養配對');
+  assert.equal(formatScannerSourceBadge([]), '資料來源');
+});
 
 function detectedFood(name = '原始名稱') {
   return {
@@ -57,6 +74,148 @@ test('vision mapping preserves missing nutrient flags for honest display', async
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('vision mapping preserves server item IDs and persisted scan context', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      detections: [{
+        item_id: 'scan-42:0', name_zh: '糯米腸', confidence: 0.95, estimated_weight_g: 120,
+        nutrition: detectedFood().nutrition, source: 'TFDA',
+      }],
+      scan_context: {
+        status: 'persisted', scan_id: 'scan-42', scan_revision: 0,
+        authority_token: 'authority-token', items: [{
+          item_id: 'scan-42:0', item_revision: 0, name_zh: '糯米腸', confidence: 0.95,
+          weight_confidence: 0.8, estimated_weight_g: 120, food_state: 'prepared',
+          preparation_method: null, components_scope: 'food_only', brand: null, variant: null,
+          validation_issues: [],
+        }],
+      },
+    }),
+  });
+  try {
+    const result = await runPrediction({
+      apiBaseUrl: 'http://localhost:5000', imageBase64: 'dGVzdA==', healthConditions: [], allergens: [],
+    });
+    assert.equal(result.detections[0].id, 'scan-42:0');
+    assert.equal(result.scanContext.scan_id, 'scan-42');
+    assert.equal(result.scanContext.items[0].item_id, 'scan-42:0');
+    assert.equal(result.scanContext.authority_token, 'authority-token');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('a high-confidence local nutrition miss can continue to FDC candidate review', () => {
+  const context = {
+    status: 'persisted', scan_id: 'scan-miss', scan_revision: 0,
+    items: [{ item_id: 'scan-miss:0', validation_issues: [] }],
+  };
+  assert.equal(hasReviewableNutritionMiss([{
+    item_id: 'scan-miss:0', label: '蘋果', confidence: 0.95, reason: 'no local nutrition',
+    recognition_status: 'recognized', nutrition_status: 'unmatched',
+  }], context), true);
+});
+
+test('FDC candidate review stays closed for low-confidence or invalid recognition', () => {
+  const context = {
+    status: 'persisted', scan_id: 'scan-miss', scan_revision: 0,
+    items: [{ item_id: 'scan-miss:0', validation_issues: [] }],
+  };
+  assert.equal(hasReviewableNutritionMiss([{
+    item_id: 'scan-miss:0', label: '不明食物', confidence: 0.3, reason: 'low confidence',
+  }], context), false);
+  assert.equal(hasReviewableNutritionMiss([{
+    item_id: 'scan-miss:0', label: '蘋果', confidence: 0.95, reason: 'invalid recognition',
+    recognition_status: 'recognized', nutrition_status: 'unmatched',
+  }], { ...context, items: [{ item_id: 'scan-miss:0', validation_issues: ['missing_food_state'] }] }), false);
+  assert.equal(hasReviewableNutritionMiss([{
+    item_id: 'scan-miss:other', label: '蘋果', confidence: 0.95, reason: 'wrong scan item',
+    recognition_status: 'recognized', nutrition_status: 'unmatched',
+  }], context), false);
+});
+
+test('stale vision 401 does not dispatch logout for a newer session', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWindow = globalThis.window;
+  const events = [];
+  globalThis.window = { dispatchEvent: (event) => events.push(event.type) };
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 401,
+    json: async () => ({ error: 'expired token' }),
+  });
+  try {
+    const request = {
+      apiBaseUrl: 'https://example.test', imageBase64: 'dGVzdA==',
+      healthConditions: [], allergens: [], auth: { accessToken: 'old-token' },
+    };
+    await assert.rejects(runPrediction({ ...request, isCurrentSession: () => false }));
+    assert.deepEqual(events, []);
+    await assert.rejects(runPrediction({ ...request, isCurrentSession: () => true }));
+    assert.deepEqual(events, ['nutrilens:unauthorized']);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalWindow === undefined) delete globalThis.window;
+    else globalThis.window = originalWindow;
+  }
+});
+
+test('enrichment merge adds only complete point-value portions', () => {
+  const base = detectedFood('原始辨識');
+  const response = {
+    result: { items: [{
+      item_id: 'scan-1:0', item_revision: 0, original_visual_name: '糯米腸',
+      status: 'accepted', origin: 'web',
+      recognition_context: { name_zh: '糯米腸', confidence: 0.9, estimated_weight_g: 120 },
+      nutrition_profile: { source_details: { source_id: 'reviewed-source' } },
+      portion: {
+        weight_g: 120, values: { calories: 240, protein: 8, carbs: 32, fat: 9, sodium: 360, fiber: null,
+          sugar: null, saturated_fat: null, trans_fat: null },
+        missing_nutrition_fields: ['fiber', 'sugar', 'saturated_fat', 'trans_fat'],
+      },
+    }] },
+  };
+  const merged = mergeNutritionEnrichmentResult([{ ...base, id: 'scan-1:0' }], response);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].nutrition.calories, 240);
+  assert.equal(merged[0].source, 'web:reviewed-source');
+  assert.deepEqual(merged[0].missingNutritionFields, ['fiber', 'sugar', 'saturated_fat', 'trans_fat']);
+  const unresolved = mergeNutritionEnrichmentResult([base], {
+    result: { items: [{ item_id: 'ocr-test', portion: { values: { calories: null } } }] },
+  });
+  assert.equal(unresolved[0].nutrition.calories, 180);
+});
+
+test('enrichment with unknown weight stays unresolved and never assumes 100g', () => {
+  const item = {
+    item_id: 'scan-unknown:0', item_revision: 0, original_visual_name: '未知重量食品',
+    status: 'accepted', origin: 'web',
+    recognition_context: { name_zh: '未知重量食品', confidence: 0.9 },
+    nutrition_profile: { source_details: { source_id: 'reviewed-source' } },
+    portion: {
+      values: { calories: 240, protein: 8, carbs: 32, fat: 9, sodium: 360, fiber: 2,
+        sugar: 1, saturated_fat: 3, trans_fat: 0 },
+      missing_nutrition_fields: [],
+    },
+  };
+  const response = { result: { items: [item] } };
+  const added = mergeNutritionEnrichmentResult([], response);
+  assert.deepEqual(added, []);
+
+  const original = { ...detectedFood('原始辨識'), id: item.item_id };
+  const retained = mergeNutritionEnrichmentResult([original], response);
+  assert.deepEqual(retained, [original]);
+
+  const invalidPortion = mergeNutritionEnrichmentResult([], {
+    result: { items: [{ ...item, item_id: 'scan-invalid:0', recognition_context: {
+      name_zh: '無效重量食品', confidence: 0.9, estimated_weight_g: 120,
+    }, portion: { ...item.portion, weight_g: 0 } }] },
+  });
+  assert.deepEqual(invalidPortion, []);
 });
 
 test('normalizes the final OCR food name and carries it into detected food', () => {

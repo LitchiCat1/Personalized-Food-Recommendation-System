@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "mode": "live_single_source_tavily_model_replay",
+  "source_url": "https://www.tahsda.org.tw/communitymedicine/files/20161126_RAOHEStreetMarketNight/QQ%E7%8E%8B%E5%AD%90%E5%9C%B0%E7%93%9C%E7%90%83.pdf",
+  "item_id": "live-qq-balls-0",
+  "tavily": {
+    "status": "ok",
+    "request_id": "811e334a-1095-4391-8883-0bcad24a332c",
+    "usage": {
+      "credits": 1
+    },
+    "document_count": 1,
+    "failed_urls": [],
+    "documents": [
+      {
+        "url": "https://www.tahsda.org.tw/communitymedicine/files/20161126_RAOHEStreetMarketNight/QQ%E7%8E%8B%E5%AD%90%E5%9C%B0%E7%93%9C%E7%90%83.pdf",
+        "bytes": 1805,
+        "content_hash": "2335a202763698da4b653f482e6cb3d435db82db7525ba5ba6e13d6de21da99e",
+        "retrieval_version": "tavily-extract-basic-markdown-v1"
+      }
+    ]
+  },
+  "model": {
+    "status": "ok",
+    "response_sha256": "72c0c0594a1018fe3241e4832f429a9d4479a96c67cbee2f79419dba2ce5d765",
+    "response_bytes": 302,
+    "finish_checked": "stop",
+    "item_status": "no_evidence",
+    "selected_source_id": null,
+    "selected_table_id": null,
+    "selected_column_id": null,
+    "null_nutrient_count": 9
+  },
+  "adapter": {
+    "status": "rejected_expected",
+    "code": "ambiguous_identity",
+    "message": "Reviewed identity line must occur exactly once"
+  },
+  "side_effects": {
+    "production_registry_used": false,
+    "route_enabled": false,
+    "automatic_fallback_enabled": false,
+    "database_written": false,
+    "user_records_written": false,
+    "cache_written": false
+  }
+}

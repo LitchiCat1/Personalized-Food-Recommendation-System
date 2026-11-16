@@ -11,6 +11,7 @@ import { EMPTY_DAILY_NUTRITION } from '@/constants/nutrition-display';
 import { NEW_USER_PROFILE } from '@/constants/profile-defaults';
 import { resolveApiBaseUrl } from '@/lib/network';
 import type { DietaryRecord, MealNutrientLimits, NutritionGoalTypes, NutritionTargetBasis, NutritionTargets } from '@/lib/api';
+import type { NutritionFdcCandidateSnapshotResponse } from '@/lib/nutrition-fdc-candidate-api';
 
 // ─── Types ──────────────────────────────────────────────────
 export interface UserProfile {
@@ -47,7 +48,16 @@ export interface ScanResult {
   isScanning: boolean;
   detections: DetectedFood[];
   timestamp: string | null;
+  serverScanReference: ScannerServerScanReference | null;
+  fdcCandidateSnapshot: NutritionFdcCandidateSnapshotResponse | null;
 }
+
+export type ScannerServerScanReference = {
+  ownerUserId: string;
+  apiBaseUrl: string;
+  scan_id: string;
+  scan_revision: number;
+};
 
 export interface NutriLensState {
   // User
@@ -117,7 +127,16 @@ export interface NutriLensState {
 
   // Scanner
   scanResult: ScanResult;
-  setScanResult: (detections: DetectedFood[]) => void;
+  setScanResult: (detections: DetectedFood[], reference?: ScannerServerScanReference | null) => void;
+  setFdcCandidateSnapshot: (
+    reference: ScannerServerScanReference,
+    snapshot: NutritionFdcCandidateSnapshotResponse,
+  ) => void;
+  advanceFdcCandidateScanRevision: (
+    reference: ScannerServerScanReference,
+    issuedScanRevision: number,
+  ) => void;
+  invalidateFdcScanReference: (reference: ScannerServerScanReference) => void;
   updateScanFoodWeight: (foodId: string, nextWeight: number) => void;
   clearScan: () => void;
   setScanning: (v: boolean) => void;
@@ -192,7 +211,10 @@ function signedOutState() {
     nutritionTargetsReady: false,
     nutritionGoalTypes: {} as NutritionGoalTypes,
     nutritionTargetBasis: null as NutritionTargetBasis | null,
-    scanResult: { isScanning: false, detections: [], timestamp: null } as ScanResult,
+    scanResult: {
+      isScanning: false, detections: [], timestamp: null,
+      serverScanReference: null, fdcCandidateSnapshot: null,
+    } as ScanResult,
   };
 }
 
@@ -439,13 +461,55 @@ export const useStore = create<NutriLensState>((set, get) => ({
     }),
 
   // ── Scanner ──（初始值在 signedOutState）
-  setScanResult: (detections) =>
+  setScanResult: (detections, reference = null) =>
     set({
       scanResult: {
         isScanning: false,
         detections: detections.map(ensureOriginalPortion),
         timestamp: new Date().toISOString(),
+        serverScanReference: reference,
+        fdcCandidateSnapshot: null,
       },
+    }),
+
+  setFdcCandidateSnapshot: (reference, snapshot) =>
+    set((state) => {
+      const current = state.scanResult.serverScanReference;
+      if (current !== reference || current.ownerUserId !== state.user.userId ||
+          current.apiBaseUrl !== state.apiBaseUrl ||
+          snapshot.snapshot.scan_id !== current.scan_id ||
+          snapshot.snapshot.scan_revision !== current.scan_revision) {
+        return state;
+      }
+      return { scanResult: { ...state.scanResult, fdcCandidateSnapshot: snapshot } };
+    }),
+
+  advanceFdcCandidateScanRevision: (reference, issuedScanRevision) =>
+    set((state) => {
+      const current = state.scanResult.serverScanReference;
+      if (!current || current.ownerUserId !== reference.ownerUserId ||
+          current.apiBaseUrl !== reference.apiBaseUrl || current.scan_id !== reference.scan_id ||
+          current.scan_revision !== reference.scan_revision || issuedScanRevision !== current.scan_revision + 1 ||
+          current.ownerUserId !== state.user.userId || current.apiBaseUrl !== state.apiBaseUrl) {
+        return state;
+      }
+      return {
+        scanResult: {
+          ...state.scanResult,
+          serverScanReference: { ...current, scan_revision: issuedScanRevision },
+          fdcCandidateSnapshot: null,
+        },
+      };
+    }),
+
+  invalidateFdcScanReference: (reference) =>
+    set((state) => {
+      const current = state.scanResult.serverScanReference;
+      if (!current || current.ownerUserId !== reference.ownerUserId ||
+          current.apiBaseUrl !== reference.apiBaseUrl || current.scan_id !== reference.scan_id ||
+          current.scan_revision !== reference.scan_revision || current.ownerUserId !== state.user.userId ||
+          current.apiBaseUrl !== state.apiBaseUrl) return state;
+      return { scanResult: { ...state.scanResult, serverScanReference: null, fdcCandidateSnapshot: null } };
     }),
 
   updateScanFoodWeight: (foodId, nextWeight) =>
@@ -472,10 +536,17 @@ export const useStore = create<NutriLensState>((set, get) => ({
     })),
 
   clearScan: () =>
-    set({ scanResult: { isScanning: false, detections: [], timestamp: null } }),
+    set({ scanResult: {
+      isScanning: false, detections: [], timestamp: null,
+      serverScanReference: null, fdcCandidateSnapshot: null,
+    } }),
 
   setScanning: (v) =>
-    set((state) => ({ scanResult: { ...state.scanResult, isScanning: v } })),
+    set((state) => ({ scanResult: {
+      ...state.scanResult,
+      isScanning: v,
+      ...(v ? { serverScanReference: null, fdcCandidateSnapshot: null } : {}),
+    } })),
 
   // ── Camera active flag ──
   isCameraActive: false,
@@ -483,7 +554,15 @@ export const useStore = create<NutriLensState>((set, get) => ({
 
   // ── API ──
   apiBaseUrl: resolveApiBaseUrl(),
-  setApiBaseUrl: (url) => set({ apiBaseUrl: url }),
+  setApiBaseUrl: (url) => set((state) => ({
+    apiBaseUrl: url,
+    ...(state.apiBaseUrl !== url ? {
+      scanResult: {
+        isScanning: false, detections: [], timestamp: null,
+        serverScanReference: null, fdcCandidateSnapshot: null,
+      },
+    } : {}),
+  })),
 }));
 
 // ─── Helpers ────────────────────────────────────────────────

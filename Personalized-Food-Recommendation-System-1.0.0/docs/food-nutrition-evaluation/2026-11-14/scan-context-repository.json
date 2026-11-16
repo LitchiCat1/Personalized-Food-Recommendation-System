@@ -1,0 +1,34 @@
+{
+  "generated_at": "2026-11-14T00:00:00+08:00",
+  "scope": "durable signed scan-context and authority replay repository offline acceptance",
+  "branch": "v1.0.2",
+  "tests_run": 8,
+  "passed": 8,
+  "failed": 0,
+  "checks": [
+    "SQLite round trip and order-independent complete item-set hash",
+    "Missing, duplicate and changed item-set rejection",
+    "User binding, sequential scan revision enforcement and stale revision superseding",
+    "Expiry becomes a durable expired state",
+    "Atomic consumption and durable JTI replay rejection after restart",
+    "Concurrent SQLite consumers allow only one winner",
+    "Two SQLite connections replay the same revision without overwrite",
+    "Postgres JSONB/RLS/unique replay schema contract"
+  ],
+  "implementation": {
+    "module": "backend/repositories/scan_context_repository.py",
+    "durable_backends": ["sqlite", "postgres"],
+    "memory_mode": "explicit test-only fallback",
+    "mongo": "not implemented; enrichment must remain disabled for Mongo deployments",
+    "wired_to_app": false,
+    "automatic_web_fallback_enabled": false,
+    "production_source_registry": "empty"
+  },
+  "limitations": [
+    "No authenticated HTTP enrichment route yet",
+    "Enrichment request and quota repositories are separate follow-on boundaries; no cross-repository job coordinator yet",
+    "No live PostgreSQL database or Mongo server was used",
+    "No Tavily/model calls were made"
+  ],
+  "successful": true
+}

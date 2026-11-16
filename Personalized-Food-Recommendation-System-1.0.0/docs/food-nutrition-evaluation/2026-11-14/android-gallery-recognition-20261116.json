@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-16",
+  "batch": 65,
+  "branch": "v1.0.2",
+  "protected_branch": {
+    "ref": "refs/heads/v1.0.1",
+    "commit": "bb81e922ac9d2d69440d446bf7f02f4b822efba6",
+    "unchanged": true
+  },
+  "scope": "Review five user-provided Android screenshots of a gallery-photo recognition result; record visible evidence and fix misleading scan summary/source labels.",
+  "evidence_files": [
+    {"role": "scan_summary", "sha256": "b830fae60b3a202bf51e25cabab714256a4c75777c5252f10919f9f4728b93e5", "bytes": 748964},
+    {"role": "pending_foods", "sha256": "e4c7d40d6961eee9f8bc88932472e8975a751ece407091c195df6fb0da45e44e", "bytes": 1251569},
+    {"role": "white_rice_nutrition", "sha256": "afe6775e54e95254fc73e634240982debbed13c16789a906c57fe7202958c9d4", "bytes": 942278},
+    {"role": "braised_chicken_nutrition", "sha256": "78f0cceceb3746cee730fda2a9716ffc02817d238b31c32829462349b9396eb5", "bytes": 1045563},
+    {"role": "meal_photo", "sha256": "6b5f6efd5a8e8297f31fe8ec0b13768b26adab58b7a11ff316fbdb54e2fc770d", "bytes": 432119}
+  ],
+  "phone_flow": {
+    "device": "Android phone, based on screenshot status/navigation UI and user report context",
+    "entry_host_visible": "nutrilens-botto.tailcfc6d9.ts.net",
+    "capture_mode_visible": "gallery selected",
+    "recognition_result_visible": true,
+    "camera_shutter_flow_verified": false,
+    "browser_brand": "not independently verified",
+    "save_result_visible": false,
+    "record_write_status": "unknown_from_screenshots"
+  },
+  "recognition_summary": {
+    "candidate_count": 7,
+    "matched_nutrition_count": 2,
+    "pending_count": 5,
+    "visible_total_calories_kcal": 588,
+    "visible_total_sodium_mg": 420,
+    "visible_sum_check": {
+      "calories": "366 + 222 = 588",
+      "sodium_mg": "4 + 416 = 420",
+      "matches_displayed_total": true
+    },
+    "matched": [
+      {
+        "name": "白飯",
+        "confidence_percent": 97,
+        "estimated_weight_g": 200,
+        "source_label": "TFDA 資料庫",
+        "nutrients": {
+          "calories_kcal": 366,
+          "protein_g": 6.2,
+          "carbohydrate_g": 82,
+          "sugar_g": null,
+          "fat_g": 0.6,
+          "saturated_fat_g": 0.2,
+          "trans_fat_g": null,
+          "fiber_g": 1.2,
+          "sodium_mg": 4
+        },
+        "visible_warning": "總糖及反式脂肪未提供；份量與影像辨識為估計值；本餐還有五項未計入。"
+      },
+      {
+        "name": "滷雞腿",
+        "confidence_percent": 93,
+        "estimated_weight_g": 105,
+        "source_label": "USDA 參考資料",
+        "nutrients": {
+          "calories_kcal": 222,
+          "protein_g": 23.5,
+          "carbohydrate_g": 0,
+          "sugar_g": 0,
+          "fat_g": 14.1,
+          "saturated_fat_g": 3.9,
+          "trans_fat_g": null,
+          "fiber_g": 0,
+          "sodium_mg": 416
+        },
+        "visible_warning": "USDA一般食物參考值，實際配方、含水量、油鹽、品牌可能不同；估計可食重量不含骨頭但包含雞皮；反式脂肪未提供。"
+      }
+    ],
+    "pending": [
+      {"name": "菜葉", "confidence_percent": 82, "search_hints": ["葉菜", "青菜", "綠色葉菜"]},
+      {"name": "茄子", "confidence_percent": 88, "search_hints": ["茄子"]},
+      {"name": "豆干", "confidence_percent": 87, "search_hints": ["豆干", "豆乾"]},
+      {"name": "毛豆", "confidence_percent": 84, "search_hints": ["毛豆", "枝豆"]},
+      {"name": "菜葉", "confidence_percent": 83, "search_hints": ["葉菜", "青菜", "綠色葉菜"]}
+    ],
+    "pending_reason_visible": "缺少相同食品與食用狀態的可信營養資料，未計入營養合計。"
+  },
+  "interpretation_limits": [
+    "The generic label 菜葉 does not establish the botanical species or region-to-item binding.",
+    "Confidence scores are model output fields, not calibrated proof of food identity or nutrition accuracy.",
+    "The USDA reference badge is not evidence of a live USDA API request.",
+    "Displayed nutrients are database references scaled by vision-estimated weights, not measured ground truth.",
+    "The screenshots do not reveal raw request/response, model provider, model call count, retry count, token usage, or cost.",
+    "The screenshots do not reveal whether profile or meal-record writes occurred."
+  ],
+  "visible_ui_findings": [
+    {
+      "finding": "Header badge is hard-coded to Gemini + TFDA although the matched chicken card is labeled USDA reference; this neither describes all matched sources nor proves the model provider.",
+      "code_location": "frontend/app/(tabs)/scanner.tsx:1081"
+    },
+    {
+      "finding": "The heading says 2 recognized foods while five additional recognized-but-unmatched foods are listed below; it counted nutrition matches, not all detected candidates.",
+      "code_location": "frontend/app/(tabs)/scanner.tsx:967"
+    }
+  ],
+  "changes": {
+    "source_badge": "Now summarizes sources from matched detections and does not guess the model provider.",
+    "partial_scan_title": "Now says how many nutrition profiles were matched.",
+    "candidate_count": "The result count includes pending detections; partial states use a warning icon.",
+    "test_coverage": [
+      "TFDA + USDA source summary",
+      "custom source summary",
+      "no matched source fallback",
+      "partial match title",
+      "pending-only title"
+    ]
+  },
+  "verification_at_record_creation": {
+    "scanner_tests": "24 passed",
+    "typecheck": "passed",
+    "lint": "passed",
+    "frontend_build": "passed; local build bundle entry-a14ad6f15a5616c7c0db5aed6c916e85.js",
+    "rendered_mobile_qa": "passed at 390x844 and 1440x1000; no horizontal overflow; 0 app errors; existing pointerEvents deprecation warning",
+    "deployed_bundle_check": "passed; public HTTPS bundle SHA-256 65a1c6ad6ae466bdcfa76aaea307201e36e9b96cd15f00da2896d1b1bebd24d9 matched local build"
+  },
+  "deployment_after_ui_fix": {
+    "sqlite_backup_completed": true,
+    "service_stop_start_completed": true,
+    "local_health_http": 200,
+    "funnel_health_http": 200,
+    "app_version": "v1.0.2",
+    "database": "sqlite",
+    "automatic_web_fallback_enabled": false,
+    "nutrition_v2_scanner_enabled": false,
+    "external_database_path_value": null,
+    "task_state": "Running",
+    "listener_count": 1
+  },
+  "local_render_test_note": "One initial upload attempt against the real local endpoint received 401 because the temporary browser session had no Authorization Bearer token; no model call or database write occurred. The subsequent rendered check used a route-mocked response and validated the UI contract only.",
+  "provider_and_storage_observability": {
+    "agent_triggered_model_calls": 0,
+    "app_model_call_count": null,
+    "live_usda_api_call_count": null,
+    "live_tavily_call_count": null,
+    "profile_or_meal_record_write_count": null,
+    "automatic_fallback_preflight_before_this_scan": false,
+    "per_request_trace_available": false
+  }
+}

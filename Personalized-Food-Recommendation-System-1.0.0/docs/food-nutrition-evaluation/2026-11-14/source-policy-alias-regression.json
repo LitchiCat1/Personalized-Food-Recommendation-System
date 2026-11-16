@@ -1,0 +1,34 @@
+{
+  "generated_at": "2026-11-14",
+  "scope": "source policy id and source id alias normalization",
+  "branch": "v1.0.2",
+  "tests": {
+    "nutrition_profile_repository": {"tests_run": 12, "passed": 12, "failed": 0},
+    "nutrition_cache_repository": {"tests_run": 9, "passed": 9, "failed": 0},
+    "nutrition_enrichment_route": {"tests_run": 20, "passed": 20, "failed": 0},
+    "nutrition_enrichment_coordinator": {"tests_run": 12, "passed": 12, "failed": 0},
+    "targeted_total": 53
+  },
+  "verified": [
+    "policy_id resolves to the canonical source_id",
+    "duplicate policy ids fail closed instead of selecting an arbitrary source",
+    "cache read and write normalize aliases while preserving current revision and withdrawal checks",
+    "route cache lookup uses canonical source_id",
+    "coordinator fingerprints source-id and policy-id aliases as one durable request",
+    "profile references are bound to the resolved source_id"
+  ],
+  "not_verified": [
+    "live PostgreSQL policy-id lookup and concurrent source updates",
+    "Mongo atomic source-policy lookup",
+    "real Tavily or model provider HTTP"
+  ],
+  "safety": {
+    "tavily_called": false,
+    "usda_called": false,
+    "provider_called": false,
+    "private_key_files_read": false,
+    "production_source_registry_changed": false,
+    "automatic_web_fallback_enabled": false,
+    "nutrition_enrichment_route_enabled": false
+  }
+}

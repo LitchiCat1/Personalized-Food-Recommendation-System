@@ -24,8 +24,9 @@ sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "tools"))
 
 from services.ai_relay_service import get_relay_config
-from services.nutrition_label_service import decode_image_base64, extract_json_block
+from services.nutrition_label_service import decode_image_base64
 from services.openai_service import openai_chat_payload, openai_headers, openai_response_text
+from services.strict_json_service import parse_strict_model_json
 from services.vision_food_service import build_food_recognition_prompt, normalize_vision_result
 from evaluate_food_images import ground
 
@@ -39,13 +40,13 @@ def save(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
 
 
-def call(prompt, image=None, overrides=None, timeout=60):
+def call(prompt, image=None, overrides=None, timeout=60, *, image_mime_type=None):
     config = get_relay_config()
     if config is None:
         raise ValueError("No relay configured")
     payload = openai_chat_payload(config.model, prompt, 4096,
                                   base64.b64encode(image).decode("ascii") if image else None,
-                                  "image/jpeg" if image else None)
+                                  (image_mime_type or "image/jpeg") if image else None)
     payload.update(overrides or {})
     started = time.monotonic()
     result = {"requested_model": config.model, "prompt_sha256": digest(prompt.encode("utf-8")),
@@ -94,13 +95,17 @@ def vision_job(path, repeat, variant="original"):
         picture.save(buffer, format="JPEG", quality=70)
         content = buffer.getvalue()
     encoded = base64.b64encode(content).decode("ascii")
-    decode_image_base64(encoded)
+    _, _, mime_type = decode_image_base64(encoded)
     result = {"filename": path.name, "repeat": repeat, "variant": variant,
-              "image_sha256": digest(content), "image_bytes": len(content)}
-    result.update(call(build_food_recognition_prompt(), image=content))
-    if result.get("text") and result.get("finish_reason") not in {"length", "max_tokens"}:
+              "image_sha256": digest(content), "image_bytes": len(content),
+              "image_mime_type": mime_type}
+    result.update(call(build_food_recognition_prompt(), image=content, image_mime_type=mime_type))
+    if result.get("text"):
         try:
-            parsed = normalize_vision_result(extract_json_block(result["text"]))
+            if result.get("finish_reason") not in (None, "stop"):
+                raise ValueError("Food recognition output did not finish normally")
+            result["raw_parsed"] = parse_strict_model_json(result["text"], allow_array=True)
+            parsed = normalize_vision_result(result["raw_parsed"])
             result["parsed"] = parsed
             result["response"] = ground(parsed)
         except (ValueError, TypeError, KeyError, AttributeError) as exc:

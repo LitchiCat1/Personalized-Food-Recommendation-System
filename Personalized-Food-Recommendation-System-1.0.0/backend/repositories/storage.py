@@ -22,68 +22,6 @@ RECORD_COLUMNS = (
 RECORD_SELECT = ", ".join(RECORD_COLUMNS)
 
 
-# Render 用的 Supabase（Postgres）。型別跟 nutrilens 專案現有的表一致：
-# 表已經存在時 CREATE ... IF NOT EXISTS 什麼都不做，舊資料原封不動。
-# 每張表都開 RLS：後端是表的擁有者不受影響，但 Supabase 的公開 API（anon key）就讀不到。
-POSTGRES_TABLES = """
-CREATE TABLE IF NOT EXISTS users (
-    user_id TEXT PRIMARY KEY,
-    doc JSONB NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE TABLE IF NOT EXISTS records (
-    id BIGSERIAL PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    client_record_id TEXT NOT NULL,
-    timestamp TEXT NOT NULL,
-    meal_type TEXT,
-    foods JSONB,
-    total_calories DOUBLE PRECISION DEFAULT 0,
-    total_protein DOUBLE PRECISION DEFAULT 0,
-    total_carbs DOUBLE PRECISION DEFAULT 0,
-    total_fat DOUBLE PRECISION DEFAULT 0,
-    total_sodium DOUBLE PRECISION DEFAULT 0,
-    total_fiber DOUBLE PRECISION DEFAULT 0,
-    total_sugar DOUBLE PRECISION DEFAULT 0,
-    total_saturated_fat DOUBLE PRECISION DEFAULT 0,
-    total_trans_fat DOUBLE PRECISION DEFAULT 0,
-    source TEXT DEFAULT 'camera',
-    nutrition_contract_version INTEGER,
-    nutrition_context JSONB
-);
-CREATE INDEX IF NOT EXISTS idx_records_user_timestamp ON records (user_id, timestamp DESC);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_records_user_client_record ON records (user_id, client_record_id);
-ALTER TABLE records ADD COLUMN IF NOT EXISTS nutrition_contract_version INTEGER;
-ALTER TABLE records ADD COLUMN IF NOT EXISTS nutrition_context JSONB;
-CREATE TABLE IF NOT EXISTS custom_foods (
-    owner_key TEXT PRIMARY KEY,
-    food_id TEXT NOT NULL,
-    user_id TEXT NOT NULL,
-    doc JSONB NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_custom_foods_user_id ON custom_foods (user_id);
-CREATE TABLE IF NOT EXISTS restaurant_menus (
-    venue_key TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    name_key TEXT,
-    doc JSONB NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_restaurant_menus_name ON restaurant_menus (name_key);
-CREATE TABLE IF NOT EXISTS restaurant_menu_failures (
-    venue_key TEXT PRIMARY KEY,
-    reason TEXT NOT NULL,
-    failed_until TIMESTAMPTZ NOT NULL
-);
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE custom_foods ENABLE ROW LEVEL SECURITY;
-ALTER TABLE restaurant_menus ENABLE ROW LEVEL SECURITY;
-ALTER TABLE restaurant_menu_failures ENABLE ROW LEVEL SECURITY;
-"""
-
-
 class StorageRepository:
     def __init__(self, db, use_mongo: bool, mem_users: dict, mem_records: list, mem_custom_foods: list, sql: SqliteDatabase | None = None):
         self.db = db
@@ -100,10 +38,6 @@ class StorageRepository:
             self._init_tables()
 
     def _init_tables(self):
-        if self.sql.dialect == "postgres":
-            self.sql.executescript(POSTGRES_TABLES)
-            self._require_record_dedupe_index()
-            return
         # SQLite 沒有 JSON 與時間型別：doc / foods 存 JSON 字串，時間存 utc_iso() 的字串
         self.sql.executescript(
             """
@@ -166,25 +100,11 @@ class StorageRepository:
         它會直接跳過，之後每一次存紀錄都失敗。在啟動時就停下來說清楚。
         """
         wanted = {"user_id", "client_record_id"}
-        if self.sql.dialect == "postgres":
-            rows = self.sql.query_all(
-                """
-                SELECT array_agg(a.attname::text) AS columns
-                FROM pg_index i
-                JOIN pg_class t ON t.oid = i.indrelid
-                JOIN pg_namespace n ON n.oid = t.relnamespace
-                JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(i.indkey)
-                WHERE t.relname = 'records' AND n.nspname = current_schema() AND i.indisunique
-                GROUP BY i.indexrelid
-                """
-            )
-            found = any(set(row["columns"]) == wanted for row in rows)
-        else:
-            found = any(
-                {info["name"] for info in self.sql.query_all(f"PRAGMA index_info('{index['name']}')")} == wanted
-                for index in self.sql.query_all("PRAGMA index_list('records')")
-                if index["unique"]
-            )
+        found = any(
+            {info["name"] for info in self.sql.query_all(f"PRAGMA index_info('{index['name']}')")} == wanted
+            for index in self.sql.query_all("PRAGMA index_list('records')")
+            if index["unique"]
+        )
         if not found:
             raise RuntimeError(
                 "records 表缺少 (user_id, client_record_id) 的唯一索引，存紀錄會失敗。"
@@ -310,8 +230,8 @@ class StorageRepository:
         if self.use_sql:
             placeholders = ", ".join("?" for _ in RECORD_COLUMNS)
             # 同一筆同時送兩次（離線補傳加上手動重按）時，上面兩邊都查不到。唯一索引
-            # 擋得住重複，但後到的那個會撞 IntegrityError 變成 500；讓資料庫直接略過，
-            # 再查回先寫進去的那筆。SQLite 和 Postgres 都支援這個寫法。
+            # 擋得住重複，但後到的那個會撞 IntegrityError 變成 500；讓 SQLite 直接略過，
+            # 再查回先寫進去的那筆。
             inserted = self.sql.execute(
                 f"INSERT INTO records ({RECORD_SELECT}) VALUES ({placeholders}) "
                 "ON CONFLICT (user_id, client_record_id) DO NOTHING",
@@ -368,16 +288,10 @@ class StorageRepository:
             revision_filter = ""
             revision_params = ()
             if expected_revision is not None:
-                if self.sql.dialect == "postgres":
-                    revision_filter = (" AND nutrition_contract_version = 2"
-                                       " AND jsonb_typeof(nutrition_context -> 'revision') = 'number'"
-                                       " AND (nutrition_context ->> 'revision') = ?")
-                    revision_params = (str(expected_revision),)
-                else:
-                    revision_filter = (" AND nutrition_contract_version = 2"
-                                       " AND json_type(nutrition_context, '$.revision') = 'integer'"
-                                       " AND json_extract(nutrition_context, '$.revision') = ?")
-                    revision_params = (expected_revision,)
+                revision_filter = (" AND nutrition_contract_version = 2"
+                                   " AND json_type(nutrition_context, '$.revision') = 'integer'"
+                                   " AND json_extract(nutrition_context, '$.revision') = ?")
+                revision_params = (expected_revision,)
             if legacy_client:
                 revision_filter += " AND (nutrition_contract_version IS NULL OR nutrition_contract_version <> 2)"
             with self.sql.transaction():

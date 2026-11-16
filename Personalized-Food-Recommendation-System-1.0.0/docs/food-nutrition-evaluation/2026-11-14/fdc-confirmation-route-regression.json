@@ -1,0 +1,47 @@
+{
+  "generated_at": "2026-11-15T00:25:00+08:00",
+  "scope": "authenticated_fdc_confirmation_route_contract",
+  "branch": "v1.0.2",
+  "route": {
+    "method": "POST",
+    "path": "/nutrition/fdc/confirmation",
+    "feature_flag": "FDC_CONFIRMATION_ROUTE_ENABLED",
+    "default_enabled": false,
+    "client_snapshot_accepted": false,
+    "confirm_response_status": 202,
+    "confirm_result": "confirmed_pending_revision",
+    "requires_new_scan_revision": true,
+    "photo_confidence_changed": false
+  },
+  "targeted_regression": {
+    "command": "python -m pytest tests/test_fdc_confirmation_api.py tests/test_fdc_candidate_confirmation_repository.py -q",
+    "route_tests_passed": 5,
+    "repository_tests_passed": 5,
+    "total_passed": 10,
+    "failed": 0,
+    "errors": 0
+  },
+  "negative_cases": [
+    "missing authentication",
+    "feature flag disabled",
+    "authenticated user mismatch",
+    "unsupported client snapshot field",
+    "stable repository error mapping"
+  ],
+  "external_side_effects": {
+    "usda_requests": 0,
+    "tavily_requests": 0,
+    "model_requests": 0,
+    "api_key_read": false,
+    "new_scan_revision_created": false,
+    "nutrition_profiles_created": 0,
+    "photo_confidence_changed": false
+  },
+  "limitations": [
+    "No atomic confirm-to-new-revision transaction",
+    "No frontend confirmation UI",
+    "No live FDC Detail or production source policy",
+    "Route feature flag remains disabled by default"
+  ],
+  "successful": true
+}

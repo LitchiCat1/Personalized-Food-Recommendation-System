@@ -1,0 +1,104 @@
+{
+  "verified_at": "2026-11-15",
+  "branch": "v1.0.2",
+  "scope": "Current official source-rights evidence, cache scope, retention, withdrawal and admission decision",
+  "assessment_type": "evidence_summary_not_legal_opinion",
+  "sources": [
+    {
+      "source_id": "USDA-FDC",
+      "authoritative_urls": [
+        "https://fdc.nal.usda.gov/api-guide/",
+        "https://fdc.nal.usda.gov/download-datasets/"
+      ],
+      "verified_facts": {
+        "data_license": "CC0 1.0 Universal; public domain and not copyrighted",
+        "attribution": "USDA requests that FoodData Central be listed as the data source",
+        "api_key": "Required for API requests and must remain server-side",
+        "default_rate_limit": "1000 requests per hour per IP; excess returns HTTP 429"
+      },
+      "scope_limitations": [
+        "This applies to FoodData Central data, not arbitrary third-party pages, images, trademarks, or user-submitted content",
+        "CC0 does not validate food identity, preparation, brand equivalence, nutrient basis, or adapter compatibility",
+        "A reviewed item-specific FDC source policy and existing server-side authority checks remain required"
+      ],
+      "decision": "Data-rights evidence supports considering FDC records for reviewed use; no production policy or registry entry is approved by this audit",
+      "production_admitted": false
+    },
+    {
+      "source_id": "Tavily-output",
+      "authoritative_urls": [
+        "https://www.tavily.com/terms",
+        "https://help.tavily.com/articles/1612400809-storing-caching-retaining-output",
+        "https://help.tavily.com/articles/4025347510-displaying-publishing-output",
+        "https://help.tavily.com/articles/4716869118-attribution-third-party-content-rights",
+        "https://help.tavily.com/articles/3473422950-governing-terms-contracting-permissions"
+      ],
+      "verified_facts": {
+        "tavily_output_retention": "Official help states Search/Extract/Crawl output may be retained long-term without a maximum retention period or Tavily deletion requirement",
+        "end_user_display": "Official help permits displaying Tavily results and derived content in an application, subject to third-party rights",
+        "publisher_rights": "Tavily does not grant rights to third-party content in results; the customer remains responsible for each publisher's rights and terms",
+        "cross_customer_cache": "Official help directs customers to contact Tavily before sharing cached results across multiple customers",
+        "standard_terms_scope": "Current Platform Terms describe the API grant as use for the customer's internal business purposes; the customer's actual order form or separate agreement was not inspected",
+        "ai_output": "AI-generated output should be reviewed for accuracy and not represented as human-generated"
+      },
+      "scope_limitations": [
+        "Tavily's permission to retain its output does not authorize copying, displaying, or reusing the publisher's underlying nutrition table",
+        "No specific publisher page, website terms, content license, attribution rule, or automated-access permission was approved in this audit",
+        "The user's Tavily account plan, order form, and any written support confirmation were not inspected",
+        "Do not enable cross-user Tavily cache until the applicable plan and intended application scope are confirmed"
+      ],
+      "decision": "Keep Tavily-derived nutrition sources outside the production registry pending publisher-specific rights and account/application-scope confirmation",
+      "production_admitted": false
+    },
+    {
+      "source_id": "TFDA-open-data",
+      "authoritative_urls": [
+        "https://data.gov.tw/dataset/8543",
+        "https://www.fda.gov.tw/Tc/opendata.aspx"
+      ],
+      "verified_facts": {
+        "existing_review_status": "Review-only in source-rights-audit.json; this audit did not re-review the current dataset notice"
+      },
+      "scope_limitations": [
+        "Dataset license and TFDA website or individual-page terms must not be conflated",
+        "No new source-page or retention policy was approved"
+      ],
+      "decision": "Remain review-only",
+      "production_admitted": false
+    }
+  ],
+  "current_retention_implementation": {
+    "source_withdrawal_blocks_future_authority_and_cache_reads": true,
+    "source_withdrawal_physically_purges_source_artifacts": false,
+    "cache_ttl_purge_exists": true,
+    "purge_on_publisher_notice_exists": false,
+    "source_artifacts_without_withdrawal_purge": [
+      "nutrition_profiles and immutable source policy versions",
+      "nutrition_profile_cache rows beyond ordinary TTL cleanup",
+      "nutrition_fdc_profile_previews, including profile, portion and source block until physically removed",
+      "nutrition_scan_contexts, candidate snapshots and confirmation records after expiry/revocation",
+      "nutrition_enrichment_requests, including durable request and result payloads"
+    ],
+    "raw_extraction_storage": "Tavily raw Markdown is consumed by the retrieval/adapter/model path; no dedicated raw-page table was identified. Normalized profiles and selected source-row evidence can persist in request results, profiles, previews or cache, so downstream copies are not assumed exempt from publisher terms.",
+    "backup_scope": "A future purge contract must account for SQLite backups and WAL/journal copies, not only live table rows"
+  },
+  "admission_decision": {
+    "production_registry_policy_count": 0,
+    "automatic_web_fallback_enabled": false,
+    "nutrition_enrichment_route_enabled": false,
+    "fdc_candidate_confirmation_preview_accept_flags_enabled": false,
+    "decision": "Remain fail-closed. FDC data rights may support a separate reviewed policy for a specific FDC record, but no global or production registry admission is made. Tavily and TFDA remain blocked for web-derived nutrition reuse.",
+    "next_requirements": [
+      "Record a server-approved, item-specific FDC policy only after its identity and nutrient adapter review; keep user and cross-user cache scope explicit",
+      "Confirm the Tavily account/order-form and intended application scope; request written confirmation before shared multi-user caching",
+      "Review each publisher's applicable content license, attribution, automated access and derived-data rules before using its nutrition page",
+      "For any source requiring deletion, implement idempotent source-scoped purge across dependent tables and backups or exclude that source"
+    ]
+  },
+  "side_effects": {
+    "provider_calls": 0,
+    "api_keys_read": 0,
+    "production_database_writes": 0,
+    "production_flags_changed": false
+  }
+}

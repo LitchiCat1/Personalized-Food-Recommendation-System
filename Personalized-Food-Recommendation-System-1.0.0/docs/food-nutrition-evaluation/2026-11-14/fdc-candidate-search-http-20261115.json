@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "verified_local_date": "2026-11-15",
+  "branch": "v1.0.2",
+  "scope": "server_owned_fdc_candidate_search_reference_http_contract",
+  "result": "candidate_snapshot_http_ready_disabled_by_default",
+  "routes": {
+    "path": "/nutrition/fdc/candidates",
+    "methods": ["POST", "GET"],
+    "feature_flag": "FDC_CANDIDATE_ROUTE_ENABLED=false",
+    "sqlite_only": true,
+    "auth_before_feature_gate": true,
+    "post_fields": ["scan_id", "scan_revision"],
+    "get_query_fields": ["scan_id", "scan_revision"],
+    "client_candidate_or_fdc_id_accepted": false,
+    "response_contains_nutrition": false,
+    "response_contains_detail_payload": false
+  },
+  "server_search_gates": {
+    "official_datasets_must_be_healthy": ["TFDA", "USDA FNDDS"],
+    "local_status_required": "no_local_mapping",
+    "minimum_vision_confidence": "VISION_FOOD_MIN_CONFIDENCE (default 0.45)",
+    "validation_issues_must_be_empty": true,
+    "local_matched_source_conflict_incomplete_or_incompatible_search": false,
+    "max_unmatched_items_per_scan": 4,
+    "max_search_requests_per_scan": 12,
+    "page_size_per_request": 5,
+    "shared_deadline_seconds": 25,
+    "snapshot_persisted_and_replayed": true,
+    "owner_and_active_revision_checked_on_read": true,
+    "single_flight_scope": "one backend process only"
+  },
+  "tests": {
+    "command": "python -m pytest tests/test_fdc_candidates_api.py tests/test_fdc_candidates_http_integration.py tests/test_fdc_candidate_search_service.py tests/test_fdc_candidate_snapshot_repository.py tests/test_fooddata_central_selection.py tests/test_fooddata_central_client.py tests/test_vision_nutrition_routing.py tests/test_nutrition_enrichment_http_integration.py -q",
+    "passed": 66,
+    "subtests_passed": 68,
+    "failed": 0,
+    "http_contract_tests": 6,
+    "service_tests": 7,
+    "sqlite_http_integration_tests": 1
+  },
+  "full_backend_regression": {
+    "command": "python -m pytest -q",
+    "passed": 1032,
+    "subtests_passed": 721,
+    "failed": 0,
+    "skipped": 0,
+    "duration_seconds": 131.19
+  },
+  "side_effects": {
+    "live_usda_search": false,
+    "tavily": false,
+    "model": false,
+    "api_key_read": false,
+    "production_sqlite_write": false,
+    "profile_or_food_record_write": false,
+    "photo_confidence_changed": false
+  },
+  "production_flags": {
+    "fdc_candidate_route_enabled": false,
+    "fdc_confirmation_route_enabled": false,
+    "fdc_detail_route_enabled": false,
+    "fdc_profile_preview_route_enabled": false,
+    "fdc_profile_accept_route_enabled": false,
+    "nutrition_enrichment_route_enabled": false,
+    "automatic_web_fallback_enabled": false
+  },
+  "remaining_gates": [
+    "scanner retains scan references and displays only applicable candidates",
+    "item-by-item confirmation UI and confirmation-to-issued-revision handoff",
+    "mobile camera/gallery bounded end-to-end validation",
+    "source rights and production registry admission",
+    "cross-process candidate-search single-flight if deployment becomes multi-worker"
+  ]
+}

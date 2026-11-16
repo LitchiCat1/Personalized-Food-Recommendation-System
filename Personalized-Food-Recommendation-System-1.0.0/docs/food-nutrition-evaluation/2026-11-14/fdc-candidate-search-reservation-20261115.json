@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "verified_local_date": "2026-11-15",
+  "branch": "v1.0.2",
+  "scope": "sqlite_cross_process_fdc_candidate_search_reservation",
+  "result": "isolated_fake_provider_acceptance_passed_production_disabled",
+  "implementation": {
+    "repository": "backend/repositories/fdc_candidate_snapshot_repository.py",
+    "service": "backend/services/fdc_candidate_search_service.py",
+    "reservation_table": "nutrition_fdc_candidate_search_reservations",
+    "key": ["scan_id", "scan_revision"],
+    "authenticated_owner_bound": true,
+    "default_lease_seconds": 60,
+    "default_follower_wait_seconds": 30,
+    "default_follower_poll_seconds": 0.05,
+    "provider_deadline_seconds_unchanged": 25,
+    "provider_calls_inside_sqlite_write_transaction": false,
+    "follower_polling": "read_only_after_initial_claim",
+    "failure_behavior": "persist_sanitized_error_for_followers_new_request_can_retry",
+    "atomic_completion": [
+      "validate_current_lease_owner_and_expiry",
+      "recheck_active_scan_on_same_sqlite_connection",
+      "insert_immutable_candidate_snapshot",
+      "delete_current_reservation"
+    ],
+    "durable_snapshot_python_lock": false,
+    "transactional_scan_python_lock": false,
+    "expired_row_cleanup": "repository_startup_and_future_claims_after_scan_expiry",
+    "scheduled_retention_purge": false
+  },
+  "observed_cases": {
+    "two_spawn_workers_same_scan_revision": {
+      "separate_processes_and_sqlite_connections": true,
+      "follower_join_observed_before_provider_release": true,
+      "query_plan_executions": 1,
+      "fake_provider_search_calls": 3,
+      "identical_snapshot_digest": true,
+      "snapshot_rows": 1,
+      "reservation_rows_after_success": 0
+    },
+    "third_new_process_completed_replay": {
+      "same_digest": true,
+      "additional_provider_calls": 0
+    },
+    "failed_owner_with_concurrent_follower": {
+      "provider_calls_before_new_request": 1,
+      "both_error_codes": "upstream_error",
+      "automatic_follower_retry": false,
+      "new_process_retry_succeeds": true,
+      "total_provider_calls_after_retry": 4
+    },
+    "terminated_owner": {
+      "worker_terminated_while_provider_blocked": true,
+      "pending_reservation_survived": true,
+      "clock_before": 1000.0,
+      "lease_expires_at": 1005.0,
+      "successor_clock": 1006.0,
+      "expiry_method": "injected_repository_clock_not_real_time_sleep",
+      "successor_used_new_process_connection_and_synchronization_events": true,
+      "successor_succeeded": true,
+      "total_provider_calls_including_lost_attempt": 4
+    },
+    "repository_guards": [
+      "wrong_user_cannot_join_or_read_reservation",
+      "expired_lease_can_be_reclaimed",
+      "stale_owner_cannot_release_or_commit_successor_lease",
+      "completed_snapshot_race_does_not_create_another_lease",
+      "snapshot_and_reservation_completion_roll_back_together",
+      "durable_paths_never_acquire_snapshot_python_lock",
+      "transaction_paths_never_call_scan_repository_locking_reader",
+      "snapshot_read_supported_inside_outer_confirmation_transaction"
+    ],
+    "follower_poll_guard": {
+      "write_transactions_during_wait": 1,
+      "read_polls": "at_least_2",
+      "local_lookup_or_provider_called": false,
+      "terminal_code": "single_flight_timeout"
+    }
+  },
+  "tests": {
+    "focused_collection": {
+      "files": [
+        "backend/tests/test_fdc_candidate_search_service.py",
+        "backend/tests/test_fdc_candidate_search_multiprocess.py",
+        "backend/tests/test_fdc_candidate_snapshot_repository.py",
+        "backend/tests/test_fdc_candidate_confirmation_repository.py",
+        "backend/tests/test_fdc_candidates_api.py",
+        "backend/tests/test_fdc_candidates_http_integration.py"
+      ],
+      "collected": 40,
+      "executed_in_full_regression": true
+    },
+    "final_full_backend_regression": {
+      "command": "python -m pytest -q",
+      "environment": {"NUTRILENS_SKIP_LOCAL_ENV": "1", "DATABASE_PATH": ""},
+      "passed": 1044,
+      "subtests_passed": 721,
+      "failed": 0,
+      "skipped": 0,
+      "duration_seconds": 141.07,
+      "exit_code": 0,
+      "run_after_final_lock_order_fix": true
+    },
+    "independent_final_code_review": "no_remaining_blocker_in_reviewed_reservation_snapshot_paths"
+  },
+  "limitations": [
+    "Lease single-flight does not guarantee exactly-once upstream API spending.",
+    "A process lost after a provider response but before SQLite commit may require another search.",
+    "Crash recovery uses a real terminated worker plus an advanced injected clock; it does not wait the production 60-second lease.",
+    "Expired reservation metadata is cleaned on repository startup or a later valid claim, not by a background timer.",
+    "This is backend fake-provider testing, not a live provider, browser, real camera or external-device test."
+  ],
+  "side_effects": {
+    "live_usda_tavily_or_model_calls": 0,
+    "api_key_files_read": false,
+    "production_database_or_meal_record_writes": false,
+    "production_server_restarted": false,
+    "production_flags_changed": false,
+    "production_registry_entries": 0,
+    "sqlite_only": true,
+    "photo_confidence_changed": false,
+    "commit_or_stage_performed": false,
+    "protected_branch_ref": "refs/heads/v1.0.1",
+    "protected_branch_commit": "bb81e922ac9d2d69440d446bf7f02f4b822efba6"
+  },
+  "remaining_existing_gates": [
+    "item_specific_source_rights_and_production_registry_admission",
+    "bounded_expiry_restart_ui_behavior",
+    "real_camera_and_another_device_over_tailscale",
+    "final_production_flags_review"
+  ]
+}

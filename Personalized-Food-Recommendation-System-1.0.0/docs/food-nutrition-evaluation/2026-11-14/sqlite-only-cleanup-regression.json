@@ -1,0 +1,38 @@
+{
+  "generated_at": "2026-11-14",
+  "scope": "v1.0.2 sqlite-only sql runtime cleanup and backend regression",
+  "branch": "v1.0.2",
+  "decision": {
+    "only_sql_backend": "SQLite",
+    "postgresql_formal_deployment": false,
+    "database_url_behavior": "non-empty DATABASE_URL is rejected before database creation",
+    "legacy_mongodb_fallback": "non-SQL optional storage path; not supported by durable nutrition enrichment"
+  },
+  "changes_verified": {
+    "postgresql_runtime_adapter_removed": true,
+    "postgresql_driver_dependency_removed": true,
+    "postgresql_test_files_removed_from_current_tree": true,
+    "sqlite_existing_user_data_migrated_or_modified": false,
+    "v1_0_1_modified": false,
+    "local_postgresql_service_changed": false,
+    "legacy_render_yaml_changed": false,
+    "automatic_fallback_enabled": false
+  },
+  "tests": {
+    "targeted_scan_authority_and_route": {
+      "command": "python -m pytest tests/test_scan_context_repository.py tests/test_nutrition_enrichment_route.py tests/test_nutrition_enrichment_http_integration.py -q",
+      "passed": 32,
+      "failed": 0
+    },
+    "full_backend": {
+      "command": "python -m pytest tests -q",
+      "passed": 906,
+      "subtests_passed": 682,
+      "failed": 0,
+      "skipped": 0,
+      "duration_seconds": 120.98
+    }
+  },
+  "historical_postgresql_validation": "26/26 isolated live persistence tests from 2026-11-14 remain historical evidence only; no PostgreSQL test is a formal deployment gate",
+  "next_gate": "Offline USDA FDC candidate search and food identity contract; do not enable production registry or enrichment route"
+}

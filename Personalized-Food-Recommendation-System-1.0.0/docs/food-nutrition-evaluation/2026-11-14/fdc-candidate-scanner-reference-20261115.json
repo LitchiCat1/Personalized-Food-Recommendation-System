@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "verified_local_date": "2026-11-15",
+  "branch": "v1.0.2",
+  "scope": "offline scanner FDC candidate reference transport and state lifecycle",
+  "result": "passed_disabled_by_default_reference_transport",
+  "tests": [
+    {
+      "command": "cd frontend && npm run test:nutrition",
+      "tests_run": 131,
+      "passed": 131,
+      "failed": 0
+    },
+    {
+      "command": "cd frontend && npm run test:scanner",
+      "tests_run": 15,
+      "passed": 15,
+      "failed": 0
+    },
+    {
+      "command": "cd frontend && npm run typecheck",
+      "exit_code": 0
+    },
+    {
+      "command": "cd frontend && npm run lint -- --no-cache",
+      "exit_code": 0
+    },
+    {
+      "command": "cd backend && python -m pytest -q tests/test_fdc_candidate_search_service.py tests/test_fdc_candidates_http_integration.py",
+      "tests_run": 8,
+      "passed": 8,
+      "failed": 0,
+      "provider": "fake FDC client; isolated SQLite integration"
+    }
+  ],
+  "verified_boundaries": [
+    "candidate create POST sends only scan_id and scan_revision",
+    "candidate read GET sends only scan_id and scan_revision query parameters",
+    "response validation binds scan ID, revision, schema, item digest, snapshot digest and status to the request",
+    "unknown fields including nutrition values, malformed identities, invalid FDC IDs and inconsistent empty/available status are rejected",
+    "empty candidate snapshot is accepted as a valid no-candidate result",
+    "candidate request is disabled before network unless explicit frontend flag is true",
+    "expired snapshots are rejected and stale-session 401 responses do not notify the current account",
+    "scanner stores scan reference and candidate metadata without authority token",
+    "candidate response is ignored unless the exact scan reference, owner and API host remain current",
+    "new scan, scan start, clear, logout, account switch and API host change clear candidate references",
+    "stale vision 401 responses do not dispatch logout for a newer session",
+    "candidate retrieval is a background additive operation and does not modify vision detections, confidence, nutrients or recordability"
+  ],
+  "not_verified": [
+    "frontend candidate flag enabled against a running server",
+    "live USDA FDC Search for scanner-generated items",
+    "candidate confirmation UI and confirmation endpoint calls",
+    "fixed Detail/profile/portion flow from the mobile scanner",
+    "native camera/gallery or Tailscale authenticated end-to-end flow",
+    "cross-process candidate Search single-flight",
+    "source rights approval or production registry admission"
+  ],
+  "production_flags": {
+    "EXPO_PUBLIC_FDC_CANDIDATE_SEARCH_ENABLED": false,
+    "FDC_CANDIDATE_ROUTE_ENABLED": false,
+    "FDC_CONFIRMATION_ROUTE_ENABLED": false,
+    "FDC_DETAIL_ROUTE_ENABLED": false,
+    "FDC_PROFILE_PREVIEW_ROUTE_ENABLED": false,
+    "FDC_PROFILE_ACCEPT_ROUTE_ENABLED": false,
+    "NUTRITION_ENRICHMENT_ROUTE_ENABLED": false,
+    "automatic_web_fallback_enabled": false,
+    "production_source_registry_size": 0
+  },
+  "side_effects": {
+    "live_usda_calls": 0,
+    "tavily_calls": 0,
+    "model_calls": 0,
+    "api_keys_read": 0,
+    "production_sqlite_writes": 0,
+    "profile_writes": 0,
+    "dietary_record_writes": 0,
+    "photo_confidence_changes": 0
+  }
+}

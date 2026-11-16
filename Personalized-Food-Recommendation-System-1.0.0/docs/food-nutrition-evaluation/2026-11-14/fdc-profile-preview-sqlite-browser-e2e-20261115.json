@@ -1,0 +1,121 @@
+{
+  "date": "2026-11-15",
+  "branch": "v1.0.2",
+  "scope": "Scanner gallery to candidate confirmation and server-owned preview over real HTTP routes and an isolated SQLite database",
+  "environment": {
+    "app_url": "http://localhost:8082/scanner",
+    "api_origin": "http://127.0.0.1:8090",
+    "browser": "Playwright CLI 0.1.24 with Playwright 1.65.1 and preinstalled Chromium",
+    "browser_plugin": "Unavailable; used the documented Playwright CLI path",
+    "backend": "Real Flask routes in a dedicated test subprocess",
+    "database": "SQLite file in a unique system temp directory; removed after inspection",
+    "authentication": "AUTH_REQUIRED=true with a test-only token verifier and a seeded SQLite user",
+    "feature_flags": {
+      "candidate_route": true,
+      "confirmation_route": true,
+      "profile_preview_route": true,
+      "profile_accept_route": false,
+      "nutrition_enrichment_route": false,
+      "production_environment_changed": false
+    },
+    "provider_fakes": [
+      "Vision model function returned a fixed high-confidence apple fixture",
+      "Local lookup was forced to no_local_mapping to exercise the candidate path",
+      "FDC Search returned one fixed candidate",
+      "FDC Detail returned the existing validated apple fixture",
+      "A test-only reviewed source policy was seeded in the isolated database"
+    ],
+    "api_interception": "No Playwright route mocks for /predict/vision-food or /nutrition/fdc/*; requests reached the local Flask server"
+  },
+  "flow": {
+    "image_input": "Synthetic 1x1 PNG selected through the real browser gallery file chooser",
+    "vision_response": "One apple at confidence 0.95, server-estimated weight 150g; model call was replaced in the backend test process",
+    "candidate_search": {
+      "method": "POST",
+      "status": 200,
+      "request_fields": ["scan_id", "scan_revision"],
+      "result": "One FDC candidate returned and persisted in SQLite"
+    },
+    "confirmation": {
+      "method": "POST",
+      "status": 202,
+      "source_scan_revision": 0,
+      "issued_scan_revision": 1,
+      "selected_fdc_id": "171688",
+      "photo_confidence_changed": false
+    },
+    "preview": {
+      "method": "POST",
+      "status": 200,
+      "request_fields": ["confirmation_id", "scan_id", "issued_scan_revision", "item_id"],
+      "fdc_id": "171688",
+      "server_weight_g": 150,
+      "portion_weight_g": 150,
+      "calories_per_100g_kcal": 52,
+      "portion_calories_kcal": 78,
+      "profile_written": false,
+      "photo_confidence_changed": false
+    },
+    "forbidden_requests": {
+      "profile_accept": 0,
+      "meal_record_write": 0
+    }
+  },
+  "sqlite_post_run_counts": {
+    "scan_contexts": 2,
+    "candidate_snapshots": 1,
+    "confirmations": 1,
+    "issued_revisions": [1],
+    "active_previews": 1,
+    "nutrition_profiles": 0,
+    "meal_records": 0
+  },
+  "responsive": {
+    "mobile": {
+      "viewport": "390x844",
+      "document_width": 390,
+      "body_width": 390,
+      "preview_retained": true
+    },
+    "desktop": {
+      "viewport": "1440x1000",
+      "document_width": 1440,
+      "body_width": 1440,
+      "preview_retained_after_resize": true
+    }
+  },
+  "verification": {
+    "scanner_tests": {"passed": 18, "failed": 0},
+    "backend_profile_preview_http_integration_tests": {"passed": 3, "failed": 0},
+    "typecheck": "passed",
+    "eslint": "passed",
+    "expo_web_export": "passed",
+    "browser_page_errors": 0,
+    "browser_console_warnings": ["Existing React Native Web warning: props.pointerEvents is deprecated."],
+    "mobile_horizontal_overflow": false,
+    "desktop_horizontal_overflow": false
+  },
+  "side_effects": {
+    "live_usda_search_or_detail_calls": 0,
+    "live_tavily_calls": 0,
+    "live_model_calls": 0,
+    "production_database_writes": 0,
+    "profile_accept_calls": 0,
+    "meal_record_writes": 0,
+    "production_flags_changed": false
+  },
+  "issue_found_and_fixed": "When vision returned only a high-confidence recognized food with no local nutrition match, detections was empty and the scanner discarded its server scan reference before candidate search. The scanner now preserves the reference for clean server-owned unmatched items, continues to candidate review, and shows a pending-nutrition empty state. Low-confidence and validation-invalid detections remain ineligible.",
+  "screenshots": [
+    "C:\\Users\\botto\\AppData\\Local\\Temp\\nutrilens-scanner-sqlite-mobile-full.png",
+    "C:\\Users\\botto\\AppData\\Local\\Temp\\nutrilens-scanner-sqlite-desktop-final.png"
+  ],
+  "not_tested": [
+    "Physical camera capture and a real food photograph",
+    "Live Gemini, USDA FDC, Tavily, or other external providers",
+    "Production source-rights admission or automatic source registry",
+    "Profile acceptance and dietary-record writes",
+    "Cross-process provider reservation",
+    "Tailscale access from another device",
+    "Expiry recovery after scan/confirmation TTL; an earlier deliberately slow manual pass correctly expired and returned 409"
+  ]
+}

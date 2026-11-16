@@ -11,7 +11,7 @@
 見 repositories/sqlite_backup.py。
 
 還原前先檢查備份檔沒有損毀，再把目前的檔案改名留著（nutrilens.db.before-restore-日期時間），
-不會刪掉任何檔案。只處理本機的 SQLite；Render 上的 Supabase 請用 Supabase 後台的備份。
+不會刪掉任何檔案。只處理本機 SQLite 資料庫。
 """
 
 import argparse
@@ -70,7 +70,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if os.environ.get("DATABASE_URL", "").strip():
-        print("設了 DATABASE_URL（Supabase）：這個腳本只處理本機的 SQLite，請用 Supabase 後台的備份。")
+        print("此版本僅支援 SQLite；請移除不支援的 DATABASE_URL，再確認 DATABASE_PATH。")
         return 1
     database_path = resolve_database_path()
     if not database_path or database_path == ":memory:":

@@ -1,0 +1,111 @@
+{
+  "date": "2026-11-15",
+  "batch": 61,
+  "branch": "v1.0.2",
+  "evidence_types": ["user_report", "local_image_inspection", "static_code_review", "offline_helper_probe"],
+  "scope": "Record the owner's Android camera smoke report and review generic leafy-vegetable identity; no application change or live provider replay by the agent.",
+  "protected_branch": {
+    "ref": "refs/heads/v1.0.1",
+    "commit": "bb81e922ac9d2d69440d446bf7f02f4b822efba6",
+    "unchanged": true
+  },
+  "user_report": {
+    "device": "Android phone",
+    "camera_opened": true,
+    "recognition_completed": true,
+    "qualitative_result": "結果大致正確，但綠色菜葉型的蔬菜都被標示為菜葉。",
+    "initial_generic_label_description": "菜葉",
+    "reported_generic_label": "炒菜葉",
+    "actual_vegetable_identity": {
+      "basis": "User-provided annotations; not independently established species identification.",
+      "items": [
+        {"photo_region": "upper_left", "user_label": "大陸妹", "reported_display_label": "炒菜葉"},
+        {"photo_region": "lower_right", "user_label": "青江菜", "reported_display_label": "炒菜葉"}
+      ]
+    },
+    "sample_count": null,
+    "supplied_annotated_image_count": 1,
+    "used_previously_supplied_https_scanner_url": true,
+    "url": "Previously supplied HTTPS scanner URL, confirmed by user; no request trace inspected.",
+    "browser": null,
+    "source_or_result_section": "Both vegetable entries were in the upper pending-confirmation section of the recognition results, according to the user.",
+    "save_actions": "not reported",
+    "raw_response_or_service_logs_reviewed": false,
+    "claim_strength": "Qualitative user-reported smoke only; no measured recognition or nutrition accuracy."
+  },
+  "supplied_image": {
+    "path_relative_to_project": "food_picture/多種菜色的便當.jpg",
+    "sha256": "1ba15472326f83205c3d2b7f5279808491376021c25622205f3fa33c8d6170ea",
+    "agent_opened_local_image": true,
+    "observation": "Two visually distinct green vegetable regions are visible at upper left and lower right. Species labels are attributed to the user, not inferred as proven from the image.",
+    "original_model_response_or_result_screenshot": false
+  },
+  "code_review": {
+    "prompt": "backend/services/vision_food_service.py:build_food_recognition_prompt explicitly permits conservative leafy-vegetable names when species is uncertain.",
+    "normalization_and_display": "No blanket conversion from specific vegetable names to generic leafy names was found in normalize_vision_result or frontend/lib/scanner.ts mappings.",
+    "photo_specific_root_cause": "Photo and user-provided labels are now available; the original model response, scores and rejection reasons remain unavailable, so low confidence versus nutrition mismatch is not determined.",
+    "nutrition_search_boundary": "Downstream retrieval must not establish photographed species or raise visual confidence.",
+    "pending_item_contract": "ScannerPendingFoods renders rejectedDetections. Both the low-confidence and nutrition-miss backend branches skip nutrition totals; frontend totals reduce detections only. This agrees with the user's reported placement but is not a numerical audit of that phone request.",
+    "same_name_items": "Backend scan_id:index IDs and pending UI label_index keys allow separate same-name entries; actual phone item IDs and region-to-ID bindings were not obtained.",
+    "independent_read_only_audit": true
+  },
+  "offline_helper_probe": {
+    "working_directory": "backend",
+    "scope": "Direct calls to three eligibility helpers and the FDC query-plan builder; not a route, provider, cache, registry, or full-pipeline test.",
+    "functions": [
+      "services.fdc_candidate_search_service._eligible_for_search",
+      "services.nutrition_enrichment_route_service._web_enrichment_eligible",
+      "services.web_nutrition_service._identity_ready",
+      "services.food_query_normalization_service.build_fdc_search_query_plan"
+    ],
+    "confidence_threshold": 0.45,
+    "shared_input": {
+      "item_id": "offline-leaf-check:0",
+      "item_revision": 0,
+      "confidence": 0.95,
+      "validation_issues": [],
+      "food_state": "prepared",
+      "preparation_method": "stir_fried",
+      "components_scope": "food_only",
+      "scan_revision_argument": 0
+    },
+    "cases": [
+      {"name": "菜葉", "fdc_gate": true, "enrichment_gate": true, "web_gate": true, "fdc_queries": ["菜葉"]},
+      {"name": "葉菜", "fdc_gate": true, "enrichment_gate": true, "web_gate": true, "fdc_queries": ["葉菜"]},
+      {"name": "綠色葉菜", "fdc_gate": true, "enrichment_gate": true, "web_gate": true, "fdc_queries": ["綠色葉菜"]},
+      {"name": "小白菜", "fdc_gate": true, "enrichment_gate": true, "web_gate": true, "fdc_queries": ["小白菜"]}
+    ],
+    "supplemental_cases_after_user_clarification": [
+      {"name": "炒菜葉", "fdc_gate": true, "enrichment_gate": true, "web_gate": true, "fdc_queries": ["炒菜葉"]},
+      {"name": "大陸妹", "fdc_gate": true, "enrichment_gate": true, "web_gate": true, "fdc_queries": ["大陸妹"]},
+      {"name": "青江菜", "fdc_gate": true, "enrichment_gate": true, "web_gate": true, "fdc_queries": ["青江菜"]}
+    ],
+    "finding": "High self-rated confidence and structurally valid fields do not exclude an underspecified generic food identity, including the exact user-reported label 炒菜葉. Specific-name controls passing these helpers do not establish local database coverage or nutrient compatibility.",
+    "downstream_limits": "Web still checks local status, official database health, reviewed registry compatibility, source policy and other validators; helper eligibility is not evidence that nutrition was retrieved or accepted.",
+    "provider_calls": 0
+  },
+  "not_verified": [
+    "Phone request traces, exact browser, independently verified deployment identity, or private Tailscale peer access. Use of the prior public HTTPS scanner URL is user-confirmed.",
+    "Total test sample count, independently verified botanical labels, raw recognition fields, actual item IDs, scores, pending reasons or source metadata. One image and two user labels are available.",
+    "Portion weight, nutrient accuracy, or nutrition coverage.",
+    "FDC candidate/confirmation/Detail/preview/accept or Tavily completion on the phone.",
+    "User save actions, profile/meal-record writes, or the phone request's database effects.",
+    "Current service runtime flags, service logs, provider counts, or current deployment asset identity."
+  ],
+  "agent_side_effects": {
+    "live_model_usda_tavily_calls": 0,
+    "production_database_access": false,
+    "profile_or_meal_record_writes": 0,
+    "secret_values_inspected_or_reported": false,
+    "service_restarts": 0,
+    "application_code_changes": 0,
+    "feature_flag_or_registry_changes": 0,
+    "commit_or_push": false
+  },
+  "next_bounded_action": "Within the existing identity-confirmation workflow, add and regress a shared identity-specificity gate before FDC search, web-derived positive-cache reads and web completion. Include cooking-qualified generic labels such as 炒菜葉 and separate same-name scan items. Preserve original labels/confidence and require a new server-owned revision after any identity confirmation. Keep known specific foods and legitimate synonyms usable; do not force species guesses or enable production flags.",
+  "resolved_user_clarifications": [
+    "User confirmed using the previously supplied HTTPS scanner URL.",
+    "User supplied the photo and identified upper-left 大陸妹 and lower-right 青江菜; both were displayed as 炒菜葉 in the pending section."
+  ],
+  "pending_user_clarifications": []
+}

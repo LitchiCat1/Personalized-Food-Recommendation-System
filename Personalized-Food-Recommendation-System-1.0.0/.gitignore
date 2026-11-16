@@ -34,6 +34,7 @@ Thumbs.db
 .env*.local
 key.txt
 TavilyKey.txt
+USDA KEY.txt
 
 # Local load-test accounts contain login credentials.
 docs/stress-test/test_accounts_*.csv

@@ -1,0 +1,67 @@
+{
+  "generated_at": "2026-11-14T23:55:00+08:00",
+  "scope": "sqlite_server_owned_fdc_candidate_snapshot_persistence",
+  "branch": "v1.0.2",
+  "repository": {
+    "name": "FdcCandidateSnapshotRepository",
+    "database": "SQLite-only",
+    "production_input": "server-owned scan context plus server/provider candidates_by_item",
+    "client_snapshot_or_digest_accepted": false,
+    "bound_fields": [
+      "authenticated user_id",
+      "scan_id",
+      "scan_revision",
+      "item_set_digest",
+      "snapshot_digest",
+      "issued_at",
+      "expires_at",
+      "status"
+    ]
+  },
+  "targeted_regression": {
+    "command": "python -m pytest tests/test_fdc_candidate_snapshot_repository.py tests/test_scan_context_repository.py tests/test_fooddata_central_selection.py tests/test_fooddata_central_adapter.py -q",
+    "passed": 39,
+    "subtests_passed": 21,
+    "failed": 0,
+    "errors": 0,
+    "elapsed_seconds": 0.49
+  },
+  "full_backend_regression": {
+    "command": "python -m pytest tests -q",
+    "tests_run": 942,
+    "passed": 942,
+    "subtests_passed": 710,
+    "failed": 0,
+    "skipped": 0,
+    "errors": 0,
+    "elapsed_seconds": 115.29
+  },
+  "negative_cases": [
+    "candidate mapping drift on one scan revision",
+    "wrong authenticated user",
+    "scan revision mismatch",
+    "snapshot digest mismatch",
+    "expired scan context",
+    "restart read from SQLite file",
+    "new scan revision invalidates the old snapshot"
+  ],
+  "external_side_effects": {
+    "usda_search_requests": 0,
+    "usda_detail_requests": 0,
+    "tavily_requests": 0,
+    "model_requests": 0,
+    "api_key_read": false,
+    "confirmation_endpoint_calls": 0,
+    "nutrition_profiles_created": 0,
+    "user_food_records_written": 0,
+    "photo_confidence_changed": false
+  },
+  "limitations": [
+    "No HTTP confirmation endpoint or frontend confirmation UI",
+    "No durable confirmation actor/time/idempotency record",
+    "No automatic creation of a new scan revision after confirmation",
+    "No live FDC Detail, Tavily, model, or production source registry",
+    "Repository is a safe wiring primitive, not an enabled fallback route"
+  ],
+  "successful": true
+}

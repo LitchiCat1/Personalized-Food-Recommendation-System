@@ -10,7 +10,7 @@ storage.py 和 auth_repository.py 裡的 CREATE TABLE 一律寫「最新」的�
 2. SCHEMA_VERSION 加一
 3. 在 MIGRATIONS 加上把上一版改成這一版的函式
 後端啟動時會先自動備份一份（檔名有 before-v<版本>），再一版一版升上去；
-每一版在一個交易裡做完，中途出錯就整版退回。Render 的 Postgres 不走這裡。
+每一版在一個交易裡做完，中途出錯就整版退回。
 """
 
 from typing import Callable

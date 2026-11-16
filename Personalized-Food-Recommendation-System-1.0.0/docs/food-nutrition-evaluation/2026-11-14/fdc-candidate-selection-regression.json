@@ -1,0 +1,54 @@
+{
+  "generated_at": "2026-11-14T13:16:58.077245+00:00",
+  "scope": "offline_fdc_candidate_search_and_identity_contract",
+  "branch": "v1.0.2",
+  "candidate_selection": {
+    "schema_version": "FdcCandidateSelectionV1",
+    "search_client": "backend/services/fooddata_central_client.py",
+    "prompt_validator": "backend/services/fooddata_central_selection_service.py",
+    "suggestion_status": "confirmation_required",
+    "accepted_automatically": false,
+    "requires_known_state_preparation_and_components_scope": true,
+    "fdc_id_contract": "canonical positive decimal string, 1-18 digits",
+    "nutrition_values_in_prompt": false
+  },
+  "targeted_regression": {
+    "command": "python -m pytest tests/test_fooddata_central_client.py tests/test_fooddata_central_adapter.py tests/test_fooddata_central_selection.py -q",
+    "passed": 31,
+    "subtests_passed": 12,
+    "failed": 0
+  },
+  "tests_run": 922,
+  "passed": 922,
+  "skipped": 0,
+  "skip_reasons": {},
+  "failures": 0,
+  "errors": 0,
+  "failure_details": [],
+  "successful": true,
+  "elapsed_seconds": 117.876,
+  "isolation": {
+    "skip_local_env": true,
+    "database_path": "",
+    "external_db_and_relay_env_cleared": true,
+    "tavily_env_cleared": true
+  },
+  "external_side_effects": {
+    "usda_search_requests": 0,
+    "usda_detail_requests": 0,
+    "tavily_requests": 0,
+    "model_requests": 0,
+    "api_key_read": false,
+    "user_database_operations": 0,
+    "production_route_wired": false,
+    "production_source_registry_enabled": false
+  },
+  "limitations": [
+    "PostgreSQL is not supported by this project; SQLite is the only durable SQL backend",
+    "Mongo behavior uses offline test doubles; no live Mongo server",
+    "This offline contract run did not include live USDA Search; live query results are recorded separately in fdc-live-search-replay.json",
+    "No prompt-to-validator immutable candidate snapshot binding exists yet; required before route wiring",
+    "No user confirmation UI, fixed-ID detail flow, production source policy, mobile UI, or recognition accuracy evaluation",
+    "No new paid model or Tavily calls"
+  ]
+}

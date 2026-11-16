@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-16",
+  "batch": 67,
+  "branch": "v1.0.2",
+  "scope": "Review five newly supplied Android recognition screenshots and compare their visible UI with the currently served scanner bundle.",
+  "evidence_files": [
+    {"name": "辨識結果1.jpg", "role": "scan_summary_and_mode", "sha256": "a308b6f1c5440df6deda3d7c885940d3b352c6ce86be0b9898ce8f2472103b31", "bytes": 125240},
+    {"name": "辨識結果2.jpg", "role": "pending_foods", "sha256": "233b359c49b160acbeaa5123486f8807e94a4fb1f8496885dae91ecb18634b11", "bytes": 178390},
+    {"name": "辨識結果3.jpg", "role": "white_rice_nutrition", "sha256": "3c299ac2fe8cdde998ad876fd8a3b037174e4acdbcd4f90882826893b2519122", "bytes": 127696},
+    {"name": "辨識結果4.jpg", "role": "matched_total_and_record_action", "sha256": "504a47dfd5be20a02a417a105d5bead908550af14eec11cb3917a24c2a772b6e", "bytes": 121409},
+    {"name": "辨識結果5.jpg", "role": "braised_chicken_nutrition", "sha256": "decc9142ff9c5760a345610e8fa627fdc3fa413d83431455113ba03965fd46df", "bytes": 134811}
+  ],
+  "phone_flow": {
+    "device": "Android phone based on visible status/navigation UI",
+    "entry_host_visible": "nutrilens-botto.tailcfc6d9.ts.net",
+    "capture_mode_visible": "gallery selected",
+    "camera_shutter_flow_verified": false,
+    "recognition_result_visible": true,
+    "record_action_button_visible": true,
+    "record_write_status": "unknown_from_screenshots",
+    "login_status": "unknown_from_screenshots"
+  },
+  "recognition_summary": {
+    "candidate_count": 7,
+    "matched_nutrition_count": 2,
+    "pending_count": 5,
+    "visible_total_calories_kcal": 598,
+    "visible_total_sodium_mg": 440,
+    "visible_sum_check": {
+      "calories": "366 + 232 = 598",
+      "sodium_mg": "4 + 436 = 440",
+      "protein_g": "6.2 + 24.6 = 30.8",
+      "matches_visible_values": true
+    },
+    "matched": [
+      {
+        "name": "白飯",
+        "confidence_percent": 97,
+        "estimated_weight_g": 200,
+        "source_label": "TFDA 資料庫",
+        "nutrients": {
+          "calories_kcal": 366,
+          "protein_g": 6.2,
+          "carbohydrate_g": 82,
+          "sugar_g": null,
+          "fat_g": 0.6,
+          "saturated_fat_g": 0.2,
+          "trans_fat_g": null,
+          "fiber_g": 1.2,
+          "sodium_mg": 4
+        }
+      },
+      {
+        "name": "滷雞腿",
+        "confidence_percent": 96,
+        "estimated_weight_g": 110,
+        "source_label": "USDA 參考資料",
+        "nutrients": {
+          "calories_kcal": 232,
+          "protein_g": 24.6,
+          "carbohydrate_g": 0,
+          "sugar_g": 0,
+          "fat_g": 14.7,
+          "saturated_fat_g": 4.1,
+          "trans_fat_g": null,
+          "fiber_g": 0,
+          "sodium_mg": 436
+        }
+      }
+    ],
+    "pending": [
+      {"name": "綠色葉菜", "confidence_percent": 78},
+      {"name": "茄子", "confidence_percent": 92},
+      {"name": "豆干", "confidence_percent": 92},
+      {"name": "毛豆仁", "confidence_percent": 90},
+      {"name": "綠色葉菜", "confidence_percent": 80}
+    ],
+    "pending_reason_visible": "缺少相同食品與食用狀態的可信營養資料，尚未計入營養合計。"
+  },
+  "comparison_with_batch_65": {
+    "previous_chicken_weight_g": 105,
+    "current_chicken_weight_g": 110,
+    "previous_chicken_calories_kcal": 222,
+    "current_chicken_calories_kcal": 232,
+    "previous_chicken_sodium_mg": 416,
+    "current_chicken_sodium_mg": 436,
+    "interpretation": "The 5g estimated-weight difference accompanies the visible 10 kcal and 20mg sodium difference. Portion/model estimates varied; this is not an accuracy measurement."
+  },
+  "ui_findings": [
+    {
+      "finding": "Screenshot 1 shows the old 'Gemini + TFDA' badge and '已辨識 2 項食物' heading, despite five additional pending detections and the USDA-labeled chicken card.",
+      "current_live_bundle_check": {
+        "scanner_html_http_status": 200,
+        "bundle_path": "/_expo/static/js/web/entry-a14ad6f15a5616c7c0db5aed6c916e85.js",
+        "bundle_http_status": 200,
+        "bundle_sha256": "65a1c6ad6ae466bdcfa76aaea307201e36e9b96cd15f00da2896d1b1bebd24d9",
+        "matches_local_and_recorded_corrected_build": true,
+        "cache_control": "public, max-age=31536000, immutable"
+      },
+      "interpretation": "At review time the public bundle matched the previously verified corrected build, while these screenshots show older wording. The screenshot capture may predate that deployment or have used a stale browser asset; the available evidence cannot distinguish these causes or identify the exact asset used by the phone."
+    }
+  ],
+  "interpretation_limits": [
+    "The selected mode is gallery, so these images do not satisfy the pending Android camera shutter gate.",
+    "Confidence values are model output fields, not calibrated proof of food identity or nutrition accuracy.",
+    "TFDA and USDA reference labels do not prove live provider API calls.",
+    "Nutrition values are database references scaled by vision-estimated weights, not measured ground truth.",
+    "The visible add-record button does not prove whether it was pressed or whether a write succeeded.",
+    "Screenshots do not reveal runtime model provider, app request/retry counts, token usage, cost, Tavily/USDA live calls, or database writes."
+  ],
+  "agent_side_effects": {
+    "model_usda_tavily_requests": 0,
+    "production_application_api_calls": 0,
+    "profile_or_meal_record_writes": 0,
+    "database_access": false,
+    "application_code_changes": 0,
+    "feature_flag_or_source_registry_changes": 0
+  },
+  "next_bounded_action": "Use the currently served scanner in Android camera mode, capture the same meal with the shutter, stop on the recognition result, and do not confirm pending candidates, accept a profile, or save a meal record. Reload the current page before the test; verify the corrected summary/source wording, and keep the screen capture distinct from gallery evidence."
+}

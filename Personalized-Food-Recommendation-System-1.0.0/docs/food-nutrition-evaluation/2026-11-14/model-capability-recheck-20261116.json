@@ -1,0 +1,156 @@
+{
+  "created_at": "2026-11-16T09:46:21.354222+00:00",
+  "results": [
+    {
+      "requested_model": "[AN]gemini-4-hydrogen-high",
+      "prompt_sha256": "1e6e652a9ce54417677f0133f7586c37eafaf5937bb7f7683102aa32808d45f8",
+      "retry_count": 0,
+      "http_status": 200,
+      "text": "{\"status\":\"no_evidence\",\"food_name\":null,\"preparation\":null,\"serving_g\":null,\"calories\":null,\"source_url\":null,\"evidence\":\"本環境不具備連網搜尋或讀取外部網頁的工具，無法取得該網址之實際網頁內容。\"}",
+      "finish_reason": "stop",
+      "returned_model": "gemini-4-hydrogen",
+      "usage": {
+        "prompt_tokens": 135,
+        "completion_tokens": 62,
+        "total_tokens": 841,
+        "completion_tokens_details": {
+          "reasoning_tokens": 644
+        }
+      },
+      "annotations": null,
+      "tool_calls": null,
+      "grounding_metadata": null,
+      "response_keys": [
+        "choices",
+        "created",
+        "id",
+        "model",
+        "object",
+        "usage"
+      ],
+      "json": {
+        "status": "no_evidence",
+        "food_name": null,
+        "preparation": null,
+        "serving_g": null,
+        "calories": null,
+        "source_url": null,
+        "evidence": "本環境不具備連網搜尋或讀取外部網頁的工具，無法取得該網址之實際網頁內容。"
+      },
+      "elapsed_seconds": 6.799,
+      "case": "current_payload_search_request"
+    },
+    {
+      "requested_model": "[AN]gemini-4-hydrogen-high",
+      "prompt_sha256": "1e6e652a9ce54417677f0133f7586c37eafaf5937bb7f7683102aa32808d45f8",
+      "retry_count": 0,
+      "http_status": 200,
+      "text": "{\"status\":\"no_evidence\",\"food_name\":null,\"preparation\":null,\"serving_g\":null,\"calories\":null,\"source_url\":null,\"evidence\":\"目前環境不具備即時聯網搜尋或讀取網頁的工具，無法實際擷取 https://www.gqfood.com.tw/product_d.php?id=256&lang=tw&tb=1 的內容，因此無法提供食品名稱、處理方式與營養標示。\"}",
+      "finish_reason": "stop",
+      "returned_model": "gemini-4-hydrogen",
+      "usage": {
+        "prompt_tokens": 135,
+        "completion_tokens": 103,
+        "total_tokens": 1092,
+        "completion_tokens_details": {
+          "reasoning_tokens": 854
+        }
+      },
+      "annotations": null,
+      "tool_calls": null,
+      "grounding_metadata": null,
+      "response_keys": [
+        "choices",
+        "created",
+        "id",
+        "model",
+        "object",
+        "usage"
+      ],
+      "json": {
+        "status": "no_evidence",
+        "food_name": null,
+        "preparation": null,
+        "serving_g": null,
+        "calories": null,
+        "source_url": null,
+        "evidence": "目前環境不具備即時聯網搜尋或讀取網頁的工具，無法實際擷取 https://www.gqfood.com.tw/product_d.php?id=256&lang=tw&tb=1 的內容，因此無法提供食品名稱、處理方式與營養標示。"
+      },
+      "elapsed_seconds": 7.293,
+      "case": "web_search_options"
+    },
+    {
+      "requested_model": "[AN]gemini-4-hydrogen-high",
+      "prompt_sha256": "9687a6c47f037ae47e48a7f991ef28ee0385ffd549bd880febe6b1510d80f243",
+      "retry_count": 0,
+      "http_status": 200,
+      "text": "{\"probe_marker\":\"SCHEMA_20261113\"}",
+      "finish_reason": "stop",
+      "returned_model": "gemini-4-hydrogen",
+      "usage": {
+        "prompt_tokens": 213,
+        "completion_tokens": 34,
+        "total_tokens": 908,
+        "completion_tokens_details": {
+          "reasoning_tokens": 661
+        }
+      },
+      "annotations": null,
+      "tool_calls": null,
+      "grounding_metadata": null,
+      "response_keys": [
+        "choices",
+        "created",
+        "id",
+        "model",
+        "object",
+        "usage"
+      ],
+      "json": {
+        "probe_marker": "SCHEMA_20261113"
+      },
+      "elapsed_seconds": 6.343,
+      "case": "strict_schema_adherence_control"
+    },
+    {
+      "requested_model": "[AN]gemini-4-hydrogen-high",
+      "prompt_sha256": "71fbd75f5d0f7f084c052c632753a2b85997aff45320e73c677f6eda4b49a057",
+      "retry_count": 0,
+      "http_status": 200,
+      "text": "",
+      "finish_reason": "tool_calls",
+      "returned_model": "gemini-4-hydrogen",
+      "usage": {
+        "prompt_tokens": 79,
+        "completion_tokens": 16,
+        "total_tokens": 107,
+        "completion_tokens_details": {
+          "reasoning_tokens": 12
+        }
+      },
+      "annotations": null,
+      "tool_calls": [
+        {
+          "id": "call_9443288681346633195",
+          "type": "function",
+          "function": {
+            "name": "capability_probe",
+            "arguments": "{}"
+          }
+        }
+      ],
+      "grounding_metadata": null,
+      "response_keys": [
+        "choices",
+        "created",
+        "id",
+        "model",
+        "object",
+        "usage"
+      ],
+      "json_error": true,
+      "elapsed_seconds": 4.785,
+      "case": "function_tool_required_control"
+    }
+  ]
+}

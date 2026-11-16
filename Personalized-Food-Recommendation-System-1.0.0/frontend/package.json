@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "main": "expo-router/entry",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -12,8 +12,8 @@
     "test:trends": "node --test scripts/test-dietary-trends.mjs",
     "test:insights": "node --test scripts/test-trend-insights.mjs",
     "test:records": "node --test scripts/test-dietary-records.mjs",
-    "test:scanner": "node --test scripts/test-scanner-records.mjs",
-    "test:nutrition": "node --test scripts/test-nutrition-calculation.mjs scripts/test-nutrition-record-api.mjs scripts/test-record-sync-contract.mjs scripts/test-record-sync-locks.mjs scripts/test-record-submission.mjs",
+    "test:scanner": "node --test scripts/test-scanner-records.mjs scripts/test-scanner-reference-state.mjs scripts/test-nutrition-fdc-recovery.mjs",
+    "test:nutrition": "node --test scripts/test-nutrition-calculation.mjs scripts/test-nutrition-record-api.mjs scripts/test-nutrition-enrichment-api.mjs scripts/test-nutrition-fdc-candidate-api.mjs scripts/test-nutrition-fdc-confirmation-api.mjs scripts/test-nutrition-fdc-preview-api.mjs scripts/test-nutrition-read-model.mjs scripts/test-nutrition-read-aggregation.mjs scripts/test-nutrition-read-history.mjs scripts/test-record-sync-contract.mjs scripts/test-record-sync-locks.mjs scripts/test-record-submission.mjs",
     "test:config": "node --test scripts/test-build-env.mjs",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",

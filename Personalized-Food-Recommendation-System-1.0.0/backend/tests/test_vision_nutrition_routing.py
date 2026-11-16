@@ -110,6 +110,25 @@ class VisionNutritionRoutingTests(unittest.TestCase):
         self.assertEqual(self.match("白飯", food_state="unknown")[0]["key"], "白飯")
         self.assertTrue(self.match("荷包蛋", food_state="prepared", preparation_method="pan_fried"))
 
+    def test_reviewed_tfda_cooked_rice_method_matches_only_steamed(self):
+        for method in (None, "unknown", "steamed"):
+            with self.subTest(method=method):
+                matches = self.match("白飯", food_state="prepared", preparation_method=method)
+                self.assertEqual([match["key"] for match in matches], ["白飯"])
+
+        for method in ("boiled", "stir_fried", "pan_fried", "deep_fried", "roasted", "braised"):
+            with self.subTest(method=method):
+                self.assertEqual(self.match("白飯", food_state="prepared", preparation_method=method), [])
+
+        # Similar-looking synthetic or renamed profiles cannot inherit the
+        # reviewed TFDA mapping without the exact source record key and metadata.
+        record = dict(self.tfda["白飯"])
+        self.assertEqual(self.match("白飯", database={"renamed": record}, food_state="prepared",
+                                    preparation_method="steamed"), [])
+        altered = dict(record, code="OTHER")
+        self.assertEqual(self.match("白飯", database={"白飯": altered}, food_state="prepared",
+                                    preparation_method="steamed"), [])
+
     def test_lookup_reasons_distinguish_missing_mapping_from_invalid_profiles(self):
         for name, database, expected in (
             ("地瓜球", {}, "no_local_mapping"),

@@ -22,8 +22,8 @@ def main():
     backend = root / "backend"
     os.environ["NUTRILENS_SKIP_LOCAL_ENV"] = "1"
     os.environ["DATABASE_PATH"] = ""
-    for key in ("DATABASE_URL", "MONGO_URI", "MONGODB_URI", "NUTRILENS_TEST_DATABASE_URL",
-                "AI_BASE_URL", "AI_MODEL", "AI_API_KEYS", "AI_RELAY_KEYS_FILE"):
+    for key in ("DATABASE_URL", "MONGO_URI", "MONGODB_URI",
+                "AI_BASE_URL", "AI_MODEL", "AI_API_KEYS", "AI_RELAY_KEYS_FILE", "TAVILY_API_KEY"):
         os.environ.pop(key, None)
     os.chdir(backend)
     sys.path.insert(0, str(backend))
@@ -44,8 +44,9 @@ def main():
         "failure_details": failures,
         "successful": result.wasSuccessful(),
         "elapsed_seconds": round(time.monotonic() - started, 3),
-        "isolation": {"skip_local_env": True, "database_path": "", "external_db_and_relay_env_cleared": True},
-        "limitations": ["Real PostgreSQL integration tests require a separate configured test database",
+        "isolation": {"skip_local_env": True, "database_path": "", "external_db_and_relay_env_cleared": True,
+                      "tavily_env_cleared": True},
+        "limitations": ["PostgreSQL is not supported by this project; SQLite is the only durable SQL backend",
                         "Mongo behavior uses offline test doubles; no live Mongo server",
                         "No new paid model or Tavily calls; no mobile UI or recognition accuracy evaluation"],
     }

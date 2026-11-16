@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "verified_local_date": "2026-11-14",
+  "branch": "v1.0.2",
+  "protected_branch": "refs/heads/v1.0.1",
+  "protected_commit": "bb81e922ac9d2d69440d446bf7f02f4b822efba6",
+  "sqlite_backup_completed": true,
+  "same_origin_frontend_export_passed": true,
+  "existing_scheduled_task_reused": true,
+  "existing_tailscale_configuration_reused": true,
+  "config_or_key_changes": false,
+  "health": {
+    "status": "ok",
+    "app_version": "v1.0.2",
+    "database": "sqlite",
+    "auth_required": true,
+    "nutrition_contract_versions": [1, 2],
+    "nutrition_v2_scanner_enabled": false
+  },
+  "loopback_listener_only": true,
+  "local_homepage_status": 200,
+  "local_javascript_status": 200,
+  "funnel_homepage_status": 200,
+  "funnel_health_status": 200,
+  "funnel_homepage_matches_local": true,
+  "external_database_path_hidden": true,
+  "service_left_running": true,
+  "record_api_or_login_requests": 0,
+  "paid_calls": 0,
+  "limitations": [
+    "Startup uses existing real SQLite backup/migration/maintenance; this is separate from isolated frontend tests",
+    "No authenticated food-record, native-device or photo-accuracy validation",
+    "Nullable rendered consumers and automatic web nutrition fallback remain unconnected",
+    "No Git commit, branch switch or v1.0.1 branch update performed in this stage"
+  ]
+}

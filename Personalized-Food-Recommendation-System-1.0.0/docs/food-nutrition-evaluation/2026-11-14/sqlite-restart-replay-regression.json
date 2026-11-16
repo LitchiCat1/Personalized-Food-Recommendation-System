@@ -1,0 +1,52 @@
+{
+  "generated_at": "2026-11-14T18:31:00-06:00",
+  "scope": "sqlite_restart_replay_lease_regression",
+  "branch": "v1.0.2",
+  "targeted_tests": {
+    "commands": [
+      "python -m unittest discover -s tests -p test_nutrition_enrichment_repository.py -v",
+      "python -m unittest discover -s tests -p test_scan_context_repository.py -v"
+    ],
+    "tests_run": 18,
+    "passed": 18,
+    "skipped": 0,
+    "failures": 0,
+    "errors": 0
+  },
+  "new_cases": [
+    "SQLite file restart reclaims an expired pending enrichment lease and increments attempts",
+    "SQLite file restart retries a terminal retryable enrichment result without changing request identity",
+    "A consumed authority JTI cannot be reused for another scan after SQLite restart"
+  ],
+  "full_backend_regression": {
+    "command": "NUTRILENS_SKIP_LOCAL_ENV=1 python -m unittest discover -s tests -p test_*.py -q",
+    "tests_run": 968,
+    "passed": 942,
+    "skipped": 26,
+    "failures": 0,
+    "errors": 0,
+    "skip_reason": "live PostgreSQL integration requires NUTRILENS_TEST_DATABASE_URL"
+  },
+  "verified": [
+    "pending lease recovery after process/file restart",
+    "old request identity and retry attempt accounting",
+    "retryable result reset and new lease ownership",
+    "cross-restart JTI replay conflict isolation",
+    "scan context remains active when a conflicting JTI is rejected"
+  ],
+  "not_verified": [
+    "live PostgreSQL row locks and cross-process lease races",
+    "live Mongo atomic repository behavior",
+    "provider, Tavily, USDA or model HTTP calls"
+  ],
+  "safety": {
+    "tavily_called": false,
+    "usda_called": false,
+    "provider_called": false,
+    "private_key_files_read": false,
+    "production_source_registry_changed": false,
+    "automatic_web_fallback_enabled": false,
+    "nutrition_enrichment_route_enabled": false
+  },
+  "status": "sqlite_restart_replay_verified_live_postgresql_still_required"
+}

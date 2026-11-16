@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-16",
+  "batch": 64,
+  "branch": "v1.0.2",
+  "protected_branch": {
+    "ref": "refs/heads/v1.0.1",
+    "commit": "bb81e922ac9d2d69440d446bf7f02f4b822efba6",
+    "unchanged": true
+  },
+  "scope": "Deploy the current local v1.0.2 working tree and verify the public HTTPS scanner assets before a user-run Android unsaved camera scan.",
+  "deployment": {
+    "sqlite_backup_completed": true,
+    "frontend_build_command": "npm --prefix frontend run build:local",
+    "frontend_build_succeeded": true,
+    "existing_scheduled_task_reused": true,
+    "stop_confirmed_before_start": true,
+    "task_state_after_start": "Running",
+    "loopback_listener": "127.0.0.1:5000",
+    "listener_count": 1,
+    "local_health_http": 200,
+    "funnel_health_http": 200,
+    "app_version": "v1.0.2",
+    "database": "sqlite",
+    "auth_required": true,
+    "ai_relay_enabled": true,
+    "automatic_web_fallback_enabled": false,
+    "nutrition_v2_scanner_enabled": false,
+    "unexposed_fdc_and_enrichment_flags": "not independently verified in this batch; no flag changes were made"
+  },
+  "tailscale": {
+    "funnel_enabled": true,
+    "scanner_page_http": 200,
+    "scanner_asset_http": 200,
+    "asset": "/_expo/static/js/web/entry-348aeccb919537013547959488cd7c13.js",
+    "local_asset_sha256": "15c433c5bba7bcf8b478c240c51425246e7c858dc8b05fd954d49b667728e462",
+    "remote_asset_sha256": "15c433c5bba7bcf8b478c240c51425246e7c858dc8b05fd954d49b667728e462",
+    "asset_matches_local_build": true,
+    "external_database_path_value": null,
+    "local_database_path_present": true
+  },
+  "side_effects": {
+    "sqlite_backup_created": true,
+    "normal_sqlite_startup_schema_or_maintenance_access": true,
+    "login_or_scanner_requests": 0,
+    "profile_or_meal_record_writes": 0,
+    "live_model_calls": 0,
+    "live_usda_calls": 0,
+    "live_tavily_calls": 0,
+    "secret_values_inspected_or_reported": false,
+    "config_key_or_feature_flag_changes": false,
+    "commit_or_push": false
+  },
+  "explicit_http_requests": [
+    "local health",
+    "funnel health",
+    "local scanner page",
+    "funnel scanner page",
+    "funnel scanner JavaScript bundle"
+  ],
+  "phone_validation": {
+    "status": "pending_user_run",
+    "required_action": "On Android Chrome, use the existing HTTPS scanner, sign in, capture the same bento photo, run recognition, and stop on results without confirmation, profile acceptance, or meal-record save.",
+    "expected_interpretation": "This identity gate does not force a specific leafy-vegetable guess; a generic label remaining generic is not evidence of a regression or an accuracy improvement.",
+    "result_reported": false
+  }
+}

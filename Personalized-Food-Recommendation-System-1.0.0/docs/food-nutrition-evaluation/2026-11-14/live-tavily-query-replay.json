@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "mode": "live_tavily_production_query_replay",
+  "source_url": "https://www.tahsda.org.tw/communitymedicine/files/20161126_RAOHEStreetMarketNight/QQ%E7%8E%8B%E5%AD%90%E5%9C%B0%E7%93%9C%E7%90%83.pdf",
+  "queries": [
+    {
+      "query": "地瓜球 油炸 營養標示 每100公克 熱量 蛋白質 鈉",
+      "status": "ok",
+      "request_id": "9470bda5-69b5-4957-a0a6-7dadbe59f489",
+      "usage": {
+        "credits": 1
+      },
+      "urls": []
+    },
+    {
+      "query": "地瓜球 營養標示",
+      "status": "ok",
+      "request_id": "d49f3235-8cf2-40a8-b71a-21c88131ed4d",
+      "usage": {
+        "credits": 1
+      },
+      "urls": [
+        "https://www.tahsda.org.tw/communitymedicine/files/20161126_RAOHEStreetMarketNight/QQ%E7%8E%8B%E5%AD%90%E5%9C%B0%E7%93%9C%E7%90%83.pdf"
+      ]
+    }
+  ],
+  "side_effects": {
+    "database_written": false,
+    "production_enabled": false
+  }
+}

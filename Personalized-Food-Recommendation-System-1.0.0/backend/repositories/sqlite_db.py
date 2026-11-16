@@ -119,7 +119,7 @@ def to_json(value) -> str:
 
 
 def from_json(text):
-    """SQLite 存的是 JSON 字串；Postgres 的 jsonb 讀回來已經是 dict / list，原樣回傳。"""
+    """Decode SQLite JSON text while allowing already-decoded values in tests."""
     if text is None or text == "":
         return None
     if not isinstance(text, (str, bytes, bytearray)):

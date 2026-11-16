@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "verified_local_date": "2026-11-14",
+  "branch": "v1.0.2",
+  "service": {
+    "windows_service": "postgresql-x64-17",
+    "status": "Running",
+    "start_type": "Automatic",
+    "version": "17.12",
+    "listener": "127.0.0.1:5432",
+    "readiness": "accepting connections",
+    "hba_authentication": "scram-sha-256"
+  },
+  "test_database": {
+    "database": "postgres",
+    "role": "nutrilens_test_runner",
+    "url_secret_persisted": false,
+    "process_environment_only": true,
+    "create_schema_privilege_scoped_to_test_database": true,
+    "random_schema_per_test": true,
+    "schema_cleanup_verified": true,
+    "remaining_nutrilens_test_schemas": 0
+  },
+  "test_suites": [
+    {
+      "command_pattern": "python -m unittest discover -s tests -p test_postgres_integration.py -q",
+      "scope": "existing PostgreSQL storage/auth/transaction/concurrency/reconnect",
+      "tests_run": 23,
+      "passed": 23,
+      "failed": 0,
+      "errors": 0
+    },
+    {
+      "command_pattern": "python -m unittest discover -s tests -p test_nutrition_postgres_integration.py -q",
+      "scope": "nutrition scan authority JTI replay, request replay, quota contention",
+      "tests_run": 3,
+      "passed": 3,
+      "failed": 0,
+      "errors": 0
+    }
+  ],
+  "totals": {
+    "tests_run": 26,
+    "passed": 26,
+    "failed": 0,
+    "errors": 0,
+    "successful": true
+  },
+  "side_effects": {
+    "production_database_used": false,
+    "sqlite_database_modified": false,
+    "tavily_called": false,
+    "usda_called": false,
+    "model_called": false,
+    "user_records_written": false,
+    "automatic_fallback_enabled": false,
+    "enrichment_route_enabled": false
+  },
+  "historical_record": "postgres-validation-blocked.json remains unchanged as the earlier pre-installation result; this file records the later local-service validation."
+}

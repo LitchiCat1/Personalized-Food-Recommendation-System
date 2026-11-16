@@ -1,0 +1,61 @@
+{
+  "generated_at": "2026-11-14T23:08:00-06:00",
+  "scope": "offline_fdc_candidate_snapshot_binding",
+  "branch": "v1.0.2",
+  "snapshot": {
+    "schema_version": "FdcCandidateSnapshotV1",
+    "selection_schema_version": "FdcCandidateSelectionV2",
+    "bound_fields": ["scan_revision", "item_set_digest", "identity_digest", "snapshot_digest"],
+    "normalized_candidate_fields": ["fdcId", "description", "dataType", "brandOwner", "foodCategory"],
+    "nutrition_values_in_snapshot_or_prompt": false,
+    "input_mutation_isolated": true,
+    "model_suggestion_status": "confirmation_required",
+    "accepted_automatically": false
+  },
+  "targeted_regression": {
+    "command": "python -m pytest tests/test_food_query_normalization.py tests/test_fooddata_central_client.py tests/test_fooddata_central_adapter.py tests/test_fooddata_central_selection.py -q",
+    "passed": 38,
+    "subtests_passed": 18,
+    "failed": 0,
+    "errors": 0,
+    "elapsed_seconds": 0.25
+  },
+  "full_isolated_backend_regression": {
+    "command": "PYTHONPATH=backend python -m unittest discover -s backend/tests -p 'test_*.py'",
+    "tests_run": 929,
+    "passed": 929,
+    "skipped": 0,
+    "failed": 0,
+    "errors": 0,
+    "elapsed_seconds": 111.586
+  },
+  "negative_cases": [
+    "snapshot digest tampering",
+    "item-set digest tampering",
+    "scan revision drift",
+    "current item identity drift",
+    "model digest or revision mismatch",
+    "model-selected FDC ID outside snapshot",
+    "duplicate or missing model item",
+    "unknown candidate field",
+    "unknown food state cannot be suggested"
+  ],
+  "external_side_effects": {
+    "usda_search_requests": 0,
+    "usda_detail_requests": 0,
+    "tavily_requests": 0,
+    "model_requests": 0,
+    "api_key_read": false,
+    "user_database_operations": 0,
+    "nutrition_profiles_created": 0,
+    "photo_confidence_changed": false,
+    "production_route_or_source_registry_enabled": false
+  },
+  "limitations": [
+    "Snapshot binding is selection-only and is not wired to scan routes",
+    "No user confirmation UI or fixed-ID FDC detail adapter flow",
+    "No automatic web fallback, Tavily source admission, or nutrition profile creation",
+    "SQLite-only remains the formal deployment SQL backend; PostgreSQL is not production"
+  ],
+  "successful": true
+}

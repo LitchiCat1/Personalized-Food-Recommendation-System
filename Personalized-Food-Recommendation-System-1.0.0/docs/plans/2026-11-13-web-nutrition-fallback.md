@@ -1,11 +1,60 @@
 # 食物影像辨識與第三層營養補全：內部流程計畫書
 
-建立日期：2026-11-13；最近更新：2026-11-14。工作分支：`v1.0.2`；保護基準分支：`v1.0.1`，基準提交：`bb81e92`。使用者確認v1.0.1只保留AI模型更換，其餘本企劃的功能修改僅在v1.0.2建立本機提交；不移動／合併回v1.0.1。模型與金鑰設定檔不納入提交。本文章節中的「未提交」是各批驗收當時狀態；版本隔離以本段為準。
+建立日期：2026-11-13；最近更新：2026-11-16（第六十八批）。工作分支：`v1.0.2`；保護基準分支：`v1.0.1`，基準提交：`bb81e92`。使用者確認v1.0.1只保留AI模型更換，其餘本企劃的功能修改僅在v1.0.2建立本機提交；不移動／合併回v1.0.1。模型與金鑰設定檔不納入提交。本文章節中的「未提交」是各批驗收當時狀態；版本隔離以本段為準。
 狀態：使用者已授權依序修復；第一批本機相容性、基準、辨識合約及資料集健康修復完成。本文供後續 Codex 實作、驗證與交接使用。
-目前階段：Phase 1 本機修復與限定 adapter 的 profile／coverage 離線服務、Phase 2a 後端 opt-in 保存／風險、Phase 2b1 前端基礎，以及 Phase 2b2a 舊掃描送出完整性／跨日重試／新版分頁佇列鎖已完成限定驗收。Phase 2b2 的nullable掃描／OCR、今日／編輯／趨勢／推薦與新版重送全鏈仍待接線；不能宣稱整個Phase 2通過。第三層尚未串接、未啟用；各門檻見第 15、23–27 節。每階段依第 22 節更新本文。
+目前階段：Phase 1 本機修復、Phase 2 保存／前端基礎及 Phase 3 durable route／SQLite persistence 已完成限定驗收；正式部署維持 SQLite-only，PostgreSQL 只留歷史測試證據。今日／歷史／趨勢／洞察完整畫面仍延後。FDC 已接 bounded Search、immutable snapshot、使用者確認／新 revision、固定 Detail、profile preview/accept 交易及預設關閉的 HTTP routes；scanner 的候選確認與唯讀 preview 已有隔離 SQLite／fake provider 的瀏覽器 E2E，第五十八批完成跨程序 reservation，第五十九批完成 expiry/restart。第六十一批取得 Android 辨識使用者回報；第六十三批用相同原圖、正式 prompt 和 parser 做兩次模型回放，均將兩處葉菜保守列為泛稱、信心皆高於門檻，但營養配對差異及重量／做法欄位有變動；這不是原手機請求重播或準確率驗收。第六十八批另取得 Android「拍照」模式結果及使用者相機拍攝回報，限定 camera smoke 記為 user-attested 完成；手機截圖仍有舊來源／計數文案，快門與結果關聯無法由截圖獨立驗證。第六十三批修補泛稱加區域字尾的 fallback 漏口，並以精確 TFDA 白飯記錄補一個受限做法相容，不代表普遍提高辨識／營養準確率。Tavily／relay 模型雖已有受限 HTTP replay，production source registry 仍為0，尚無可正式准入的第三層來源；來源權利、實際方案／跨使用者重用及撤回刪除語意仍是阻擋。正式補全功能旗標預設關閉且未改；運行期僅第六十批觀測到 `automatic_web_fallback_enabled=false`，其餘旗標未由 health 暴露，不宣稱已重新核對所有 runtime flags。糯米腸的既有 FDC live Search 為安全 `not_found`，不得用近似食品代填。後續依既定六個工作流驗收，每階段按第22節更新本文。
 使用方式：先讀本段狀態及第 19、22 節；其餘流程與欄位是待落地的規格，不能據此判定功能已存在。
-範圍：先前完成有界模型／Tavily 實測及第四輪審查；依授權已修改正式後端與前端流程。未部署、未新增付費呼叫或修改使用者紀錄。最近證據：[Phase2b2a驗收](../food-nutrition-evaluation/2026-11-14/README.md#phase2b2a-送出與重試完整性)。
+
+**持續模型呼叫授權（使用者於 2026-11-15 明確授權）：**「從現在開始，我開放使用模型呼叫的權限，將我的允許寫到企畫書內」。此授權持續適用於本專案既定範圍內的開發、除錯與驗證，可直接使用已設定的真實模型，不必每批或每次重新詢問；使用者後續可撤回或調整。每批仍事先設定合理呼叫上限，記錄實際呼叫次數、用途、模型回報用量與已知費用；無價格依據時不捏造金額。不輸出或提交金鑰，不把健康史或不必要個資送入模型。此授權不等於放寬來源權利／production registry、啟用正式補全旗標、擴增功能範圍，或允許寫入正式營養／飲食紀錄。第六十三批原照片診斷先以最多 2 次、不自動重試的模型請求執行。
+
+**第六十三批結果（原照片受限模型回放）：**在隔離診斷工具以同一份提供照片及正式視覺提示詞連續呼叫模型兩次，模型皆回七項且嚴格 JSON 驗證成功；兩次都將左上、右下綠菜寫成泛稱（分別為「綠色葉菜」兩項，以及「葉菜（左上格）／葉菜（右下）」），明確說明無法確認確切種類。每項自評辨識信心均高於 0.45 門檻，故這兩份回放中的待確認不是低信心門檻，而是沒有相容的 TFDA／USDA 本機配對；不能因此推論照片物種或用 Tavily 反向證明菜種。照片與提示相同仍有不穩定性：項目排序、葉菜名稱、估重、重量信心及做法欄位改變，且部分項目在第二次因配對條件不同而無法採用。自評 confidence 未校準；沒有稱重或獨立標註集，不能宣稱準確率。
+
+依本次真實輸出補上兩個局部缺口：僅允許有限位置字尾（如「左上格／右下」）辨識為泛稱修飾，避免它們冒充具體菜名取得 FDC／web 搜尋資格；本機 TFDA `A0550601` 白飯描述為電鍋烹煮且熟食，enum 沒有此做法，只在資料鍵／來源／代碼／名稱／描述全部吻合時對應到最接近的 `steamed` enum，其他做法仍拒絕。後者是合約相容映射，不是 TFDA 原欄位明載。完整後端 `1082 passed / 1141 subtests`；獨立複核未發現本批兩修正有廣泛放行漏洞。本批共真模型呼叫2次、0重試、USDA／Tavily呼叫0次、無正式 SQLite 讀寫或保存，原始私密模型回放只留 ignored `tmp/`。目前程式尚未部署到手機伺服器；正式 registry／flags 不變。下一個需要手機配合的子項，是這批 v1.0.2 修改明確部署後做一次不保存掃描，以驗證新版本當下的手機行為；它無法還原或解釋先前手機請求的 bytes／response。證據：[photo-model-replay-20261115.json](../food-nutrition-evaluation/2026-11-14/photo-model-replay-20261115.json)。
+
+**第六十二批狀態（共用食品身分門檻，離線驗證完成）：**在既有工作流 4 內加入純離線的已知泛稱／不確定標記判定，FDC Search、直接 query plan、web-derived positive cache 前及 Tavily 補全核心共用；「炒菜葉」等泛稱不因高 confidence 而取得搜尋資格。第六十一批的七個合成輸入重播後，四個泛稱均被三個 helper／query plan 阻擋，小白菜／大陸妹／青江菜仍保留原名及後續檢查資格；不代表資料庫已有相容熟食營養。
+
+另補舊 snapshot 的模型 suggested／使用者 confirm、既有 issued confirmation 的 Detail authority，以及 direct-SQL preview accept 寫入前檢查；defer／reject 與 immutable evidence 保留，過去已 accepted 的同鍵重播不新增 profile。獨立審查指出的不明標記、「熟食材」剝除及舊 preview 繞過均已修正。完整後端 `1074 passed / 1090 subtests`、0 failed／skipped、`146.98s`；其中真 Flask route＋隔離 SQLite 證明泛稱不讀 web cache、不建 provider、不消耗 quota/JTI，重複同名項保有獨立 ID／合成重量。最終獨立複核未發現本範圍新增重大回歸，不能宣稱整條 pipeline 零缺陷。
+
+界限：這是有限詞彙 guard，不是菜種分類器或白名單；既有 official/custom local hit 優先路徑不變。候選 confirm 原本複製 scan identity，不能當成泛稱已更正；真正身分更正仍須新的 server-owned revision，本批未新增更正 UI／route，也未暗用照片標註回填。未呼叫真 provider、讀 key、存取正式 SQLite、開旗標、重啟服務或 commit/push，因此手機服務不視為已套用本批程式。下一個既定驗收為原照片的受限辨識對照與原始回應／拒絕理由留證；不新增工作流或解除 production admission。證據：[food-identity-gate-regression-20261115.json](../food-nutrition-evaluation/2026-11-14/food-identity-gate-regression-20261115.json)。
+
+**第六十一批狀態（Android 使用者回報／葉菜身分審查，含補充）：**使用者回報本人 Android 手機相機正常開啟、辨識完成、結果大致正確，並確認使用先前提供的 HTTPS scanner 網址。其提供 `food_picture/多種菜色的便當.jpg`，標註左上為「大陸妹」、右下為「青江菜」，兩項均在上半部待確認區顯示為「炒菜葉」（初報概稱「菜葉」）。此為一張照片、兩項使用者菜種標註及真機流程的定性 smoke 證據，非模型已正確辨識菜種。原始 JSON、實際分數／拒絕理由／item ID、來源 metadata、總測試樣本數、重量與營養真值、瀏覽器及是否保存仍未取得；不升格為 Tailscale 私有 peer、FDC／Tavily 或 SQLite 寫入驗收。
+
+目前辨識提示詞明訂不確定菜種時使用「葉菜」等保守名；後處理／前端映射未發現把所有具體菜名改成「菜葉」的規則。已檢視附圖，兩處綠葉菜外觀可區分，但菜種以使用者標註為依據，沒有原始模型回應仍不能定位退回泛稱的原因。待確認區同時接收低辨識信心及營養未匹配；依目前程式，這些項目不進營養合計，但本次沒有原始回應可獨立重算。後端逐項 ID 與前端 key 允許同名多項，未取得本次實際 ID／照片位置綁定。Tavily 是後續營養來源檢索，不能反向補出照片未證實的菜種。
+
+第六十一批修正前，原四個純離線 helper case 之外，另補測確切泛稱「炒菜葉」與具體名稱「大陸妹／青江菜」對照；在合成 confidence=0.95、validation_issues=[]、合法狀態下，七個 case 當時均通過 FDC Search／enrichment／web 三個資格 helper，並建立原名 FDC query plan。這只證明當時的資格缺口，不代表資料庫有相容營養或 provider 成功；第六十二批修正後結果以上方最新狀態為準。
+
+**第六十一批當時交接門檻（歷史紀錄，實作進度見第六十二批）：**在既有工作流 4 的身分確認範圍統一檢查高分泛稱，涵蓋帶做法名稱、web cache、同名多項及合法同義詞；保留原名／分數／各自 item ID，真正更正身分須新的 server-owned revision。不強迫模型猜菜種，不以查得營養反證影像身分，後續仍需清晰照片對照。第六十一批含補充只更新證據與審查，未修改應用程式、呼叫 provider、查服務日誌、存取正式資料庫或調整旗標；本段不表示第六十二批也未改程式。證據：[android-camera-smoke-20261115.json](../food-nutrition-evaluation/2026-11-14/android-camera-smoke-20261115.json)。
+
+**第六十批狀態（Android 實機驗收前預檢）：**已唯讀確認這台 Windows v1.0.2 工作排程、SQLite、Tailscale Funnel 與目前 scanner 靜態資產可用；Funnel 所提供 bundle 與工作目錄匯出檔 SHA-256 相同，SQLite `integrity_check=ok`。這只是本機伺服器與同機 HTTPS 預檢，不代表 Android 真相機或另一裝置已驗收。使用者可用 Android 手機，下一步由其透過 HTTPS 對既有登入流程做不保存的相機辨識 smoke test。健康端點沒有暴露 candidate／confirmation／Detail／preview／accept runtime flags；除 runtime `automatic_web_fallback_enabled=false` 外，其餘運行期狀態不可由本輪單獨證明。不得連接測試 harness 至 Funnel、開旗標、接受 profile 或寫飲食紀錄。證據：[phone-tailscale-preflight-20261115.json](../food-nutrition-evaluation/2026-11-14/phone-tailscale-preflight-20261115.json)。
+
+**第五十九批現況：**已完成隔離 SQLite／fake providers 的 expiry/restart browser UI 驗收及失敗恢復修正。候選查詢不再靜默失敗；暫時斷線保留相同確認決定／冪等鍵重試，terminal 過期會清除相符的候選／確認參考並提示重掃，保留原辨識結果。真停止／重啟同一 DB 後，已保存 confirmation 可重播同 ID／revision 並續作 preview；expired references 與 Detail 進行中過期均拒絕。完整後端 `1051 passed / 734 subtests`、前端 `224 passed`，typecheck／lint／清快取 web export 通過。這解除既定 expiry/restart UI 子門檻，不解除真相機／另一裝置 Tailscale、逐來源 rights／production admission、profile accept／飲食紀錄實機寫入及最後 flags review。已載入預覽仍只是擷取時的唯讀參考，未提供自動到期移除合約。證據：[fdc-expiry-restart-browser-e2e-20261115.json](../food-nutrition-evaluation/2026-11-14/fdc-expiry-restart-browser-e2e-20261115.json)。
+
+第五十八批已另外完成隔離 SQLite 的跨程序 candidate Search reservation 驗收；這是後端專項測試，不擴大第五十六批 browser E2E 的證據範圍。同 revision 併發只執行一份 fake query plan，第三個新程序直接重播既有 snapshot；provider 失敗由現有等待者共用失敗結果，之後的新請求才重試；中止 owner 後以推進測試時鐘驗證 lease 到期接手。提交同時驗證 owner／lease／active scan，snapshot 與 lease 清除同交易，並防守 stale owner、rollback 及 Python／SQLite 鎖順序。來源 admission、真相機／另一裝置 Tailscale、expiry/restart UI 及最後 flags review 仍是既定門檻。證據見 [fdc-candidate-search-reservation-20261115.json](../food-nutrition-evaluation/2026-11-14/fdc-candidate-search-reservation-20261115.json)。
+
+第五十七批完成官方來源條款與現有 retention／withdrawal 實作的再審：FDC 資料權利支持針對具體資料建立 server-reviewed policy，但不等於本輪已批准 production admission；Tavily 保留輸出的服務條款不授予原出版者內容權利，且實際帳戶方案與跨客戶 cache 權限未確認。source withdrawal 仍不會物理清除依來源保存的列，因此 registry 保持空集合、所有正式 flags 保持 false。證據見 [source-rights-recheck-20261115.json](../food-nutrition-evaluation/2026-11-14/source-rights-recheck-20261115.json)。
+
+## 範圍凍結與剩餘工作邊界（2026-11-15）
+
+目前剩餘工作收斂為六個收尾工作流，不再新增第三層以外的功能或資料庫架構：
+
+1. **真 USDA FDC 固定 Detail replay**：以可核對食品驗證固定 ID、response ID、hash、每 100g 欄位、單位、錯誤與 timeout；這不能宣稱已解決糯米腸，因為糯米腸目前 FDC Search 仍維持 `not_found`。
+2. **來源 rights／policy／production registry 審核**：確認 USDA FDC、Tavily 及各原始來源的取回、保存、撤回與跨使用者重用條件。權利或 adapter 不合格的來源直接不進 registry，不為了湊滿來源而無限擴大搜尋。
+3. **手機／Tailscale／SQLite bounded E2E**：在所有相關旗標仍可關閉的前提下，驗證 confirmation → issued revision → preview → accept，以及 401、斷線、重試、過期、重啟、配額／429 等既有契約。
+4. **scanner／UI 接線**：將已驗證的 server-reference contract 接入掃描流程與確認操作；不得把第三層結果反向提高影像辨識信心，也不得接受 client 自帶 FDC ID、重量或營養值。
+5. **今日／歷史／趨勢／洞察讀取畫面**：屬已明確延後的產品工作，並非第三層核心開通前置；本版本可維持不接線。
+6. **production flag／registry 最終審查**：只有前述核心閘門、真來源權利與部署驗收均通過後，才評估小範圍開啟；不承諾一定開啟，任何失敗都以維持關閉為正確結果。
+
+真值照片、人工標註／秤重、HEIC／EXIF、來源表格覆蓋、p50／p95、成本、重試與重啟等，均是上述工作流的驗收子項，不得另立成新功能。新發現只能採以下處置：修正既有工作流的驗收門檻、標記阻擋並維持旗標關閉，或列為 post-release 品質觀測；只有使用者提出新的產品需求時，才另開變更審查與版本。SQLite-only、排除 PostgreSQL／Mongo 正式路徑、禁止近似食品代填及不以營養結果提高影像信心，均為本範圍的固定邊界。
+範圍：企劃書已分階段實作，並非等Tavily完成後才開始。本批只做後端核心與隔離測試，另對FDC網域進行1次受限Tavily Search（未做Extract）；未改金鑰、操作使用者紀錄或重啟既有Tailscale／SQLite服務。最近證據：[Phase3a驗收](../food-nutrition-evaluation/2026-11-14/README.md#phase3a-tavily後端補全核心)。
 實測報告：[2026-11-13 實測與來源審查](../food-nutrition-evaluation/2026-11-13/README.md)。原始回應與失敗案例均保留，不只保留成功結果。
+
+## 資料庫決策（2026-11-14）
+
+**正式部署與專案目標採 SQLite-only；PostgreSQL 不作為正式部署資料庫。**目前的 Tailscale／Windows 伺服器繼續使用既有 SQLite 檔案，不做資料搬遷、不雙寫，也沒有 SQLite 與 PostgreSQL 間的同步。選擇 SQLite 是為了延續目前單機伺服器、既有資料與最簡單的備份／維護方式。
+
+PostgreSQL 17 曾安裝並啟動，僅用於隔離的 repository integration test；第45節的26/26 live test 已完成，不代表正式服務切換或使用者資料曾寫入 PostgreSQL。該測試服務不是正式部署依賴。
+
+**SQLite-only SQL 清理已完成（第48批）：**`backend/app.py`／`backend/repositories/database.py` 不再選用 PostgreSQL；設定非空 `DATABASE_URL` 會在建置資料庫前 fail closed。專案移除 PostgreSQL runtime adapter、專用 driver 依賴及過時 PostgreSQL 測試，完整回歸改以 SQLite／隔離記憶體測試。SQLite 是唯一支援的 SQL backend；既有 MongoDB 為非 SQL 的舊式可選 fallback，並非營養補全的持久化 backend，該路徑仍不納入本企劃正式部署。清理沒有搬移、重建或修改既有 SQLite 使用者資料，也沒有停用／解除安裝本機 PostgreSQL 服務。既有 PostgreSQL 測試章節與26/26 live 結果保留為歷史隔離驗收，不再作為第三層功能的正式部署門檻；詳第48節與 [sqlite-only-cleanup-regression.json](../food-nutrition-evaluation/2026-11-14/sqlite-only-cleanup-regression.json)。
 
 ## 1. 目的與成功定義
 
@@ -32,10 +81,13 @@
 | 份量重算 | `frontend/store/useStore.ts:498` 使用已四捨五入的原份量數值縮放；沒有標準每 100g 原始值 |
 | 歷史合計 | storage已全範圍讀取並支援v2逐營養coverage；舊客戶端讀到該範圍v2紀錄回upgrade_required；前端趨勢仍待接線 |
 | 前端新版基礎 | nutrition-contract.ts／nutrition-calculation.ts／nutrition-record-api.ts已新增獨立v2型別、原格計算及顯式API；未將nullable資料送進舊數字消費端 |
+| 新版讀取與彙總 | nutrition-read-model／read-aggregation／read-history區分legacy申報值、驗證點值、缺值、界限及完整查詢範圍；嚴格驗證歷史逐日與summary，尚未接畫面 |
+| Tavily補全核心 | tavily_retrieval_service／nutrition_source_adapter／nutrition_extraction_model_service／web_nutrition_service已串隔離流程；只收server-owned snapshots及審核policy，正式registry空、未接HTTP |
 | 離線佇列 | queue schema v2分流；舊scanner先保存完整原輸入／本地帶時區時間／餐別／目標後端再POST。Web Locks協調新版分頁；native仍單runtime。舊未綁定目標／混版需調解，新版dispatcher未接 |
 | 服務容量 | `backend/app.py:1708` Waitress 有 8 個請求執行緒；不可無限制增加外部呼叫 |
 | 警告重算 | `frontend/store/useStore.ts:451` 只重算數值；`scanner.tsx:293` 的 mealWarnings 仍來自原始掃描回應，改重不會觸發新評估 |
 | SQL 欄位 | `backend/repositories/storage.py:11` 的實際食品欄位名為 records.foods，內容經 JSON 序列化，不存在 foods_json 欄位 |
+| 資料庫部署決策 | 正式部署及專案目標為 SQLite-only；現行伺服器使用 SQLite。PostgreSQL live integration 僅為已完成的隔離測試，程式碼中的 PostgreSQL runtime／repository 路徑仍待清理，詳「資料庫決策」 |
 
 第四輪補查：兩層實際上是本機 JSON 匯入後合併匹配，不是逐次呼叫 TFDA／USDA 線上 API。目前 TFDA 2,213 筆、USDA FNDDS 2021–2023 共 5,431 筆；USDA 僅 12 筆具中文名稱／別名。第一批修復另加入「全脂牛奶 → 指定 USDA Milk, whole」的本機審核映射，不直接信任模型 name_en 作等價配對；其餘雙語覆蓋仍有限。查無只能代表「本機目前映射／相容候選未命中」，不能宣稱完整 USDA 沒有此食品。
 修前證據見 [routing-offline.json](../food-nutrition-evaluation/2026-11-13/routing-offline.json)，修後控制見 [routing-repaired.json](../food-nutrition-evaluation/2026-11-13/routing-repaired.json)。括號內餡、含湯、自訂基準及無效數字反例已轉為回歸測試；資料庫快照本身未發現布林／負數／非有限核心值。兩庫載入已分開回報 available／unavailable；TFDA 98 筆核心 null 保留為缺值、不使全庫失效。輸出檔案預期雜湊尚未設定，不宣稱版本固定已驗證。
@@ -73,7 +125,7 @@ Tavily 初測 8 次 Search 與 2 次 Extract；後續參數對照增加 3 次 Se
 搜尋摘要只用來找來源，不作為最後的營養數字依據；必須取得可核對的完整表格與份量上下文。
 首版處理可讀取文字的 HTML 表格及經人工驗證的來源轉接器；圖片標示、掃描 PDF 與複雜動態頁另列能力範圍，不默默猜值。
 第一批可先由開發者選定少量允許使用的來源與資料轉接器，再擴大一般搜尋。
-首版只有已審核 profile 或具備欄列驗證的轉接器可自動納入營養；一般新來源先列候選供審核，不因 AI 判 candidate 就寫入可共用資料或攝取合計。擴大自動來源前，必須先通過相同食品、狀態、基準及表格證據驗證。
+首版只有已審核 profile 或具備欄列驗證的轉接器可自動納入營養；一般新來源先列候選供審核，不因 AI 判 candidate 就寫入可共用資料或攝取合計。擴大自動來源前，必須先通過相同食品、狀態、基準及表格證據驗證。本批registry需明列搜尋、擷取、快照保存及跨使用者重用權限與查核參照；合格policy不等於已確認真來源權限，正式清單仍空。每項若同時符合多份policy先回ambiguous_source，不讓模型任選參考表；未實作一般跨來源消歧。
 本輪已核對臺安醫院地瓜球的一頁文字型 PDF，首版可將這類「人工核對過欄位、單位及範圍的文字 PDF」列入來源轉接器；不等同支援任意 PDF／掃描圖。
 Tavily Extract 成功不保證營養表在 raw_content 中：初輪 GREEN & SAFE 商品頁的表格被省略，而直接 HTML 仍能取得數字；後輪Extract可取得，原因未隔離，詳見第20節。需先驗表格覆蓋，再走已允許的直接來源轉接器；缺表不以模型記憶補值。
 
@@ -281,10 +333,10 @@ Phase2b1離線queue_schema_version=2。舊資料只標v1，不從舊0補來源�
 
 cache key 至少包含食品正規身分、品牌/口味、食用狀態、準備方式、含湯與配菜範圍、區域、來源及規則版本。
 同義詞只能用已驗證別名；不能把「豆腐」「臭豆腐」「炸臭豆腐」共用一筆。
-正式可保存 profiles 透過 repository 新表／集合存放，支援目前 SQLite、Postgres、記憶體及現有 Mongo 路徑；migration 與跨部署版本檢查要一起提供。
-SQL 的食品快照利用既有 records.foods；未配對項目另存新增的 records.nutrition_context。SQLite/Postgres 都需新增此欄位並更新序列化、讀取與聚合；Supabase 新表沿用既有 RLS 保護。
-Phase2a已新增records.nutrition_contract_version及nutrition_context；未解項也保留foods，context保存分母／來源辨識限制及當次風險。SQLite schema v2有備份後migration，Postgres採ADD COLUMN IF NOT EXISTS；真Postgres尚未執行。記憶體／SQLite／模擬Mongo快照往返與revision測試通過，不等於真Mongo／跨部署並行驗收。Mongo既有先查再insert仍未有資料庫唯一索引保證並行去重，第三層啟用前須補驗。
-history 的 coverage 由同範圍 nutrition_context 與食品快照計算；不得只 SUM 數字或受固定筆數截斷後宣稱完整。記憶體／Mongo 實作需有同等行為。
+正式可保存 profiles 透過 SQLite repository 持久化；記憶體只用於隔離測試，不新增 PostgreSQL 或 Mongo 作為正式 SQL／持久化 fallback。SQLite migration 與 schema version 檢查須一併提供。
+SQL 的食品快照利用既有 records.foods；未配對項目另存 records.nutrition_context。正式 schema、序列化、讀取與聚合只維護 SQLite 路徑；不新增 Supabase／PostgreSQL RLS 或第二套 SQL migration。
+Phase2a已新增records.nutrition_contract_version及nutrition_context；未解項也保留foods，context保存分母／來源辨識限制及當次風險。SQLite schema v2有備份後migration。既有 PostgreSQL schema 與測試是此前相容性實作及歷史驗收，不是正式部署要求；既有 Mongo 路徑亦不作第三層持久化 fallback。
+history 的 coverage 由同範圍 nutrition_context 與食品快照計算；不得只 SUM 數字或受固定筆數截斷後宣稱完整。記憶體實作僅供隔離測試；正式持久化路徑為 SQLite，不新增 Mongo fallback。
 快取 TTL 依來源更新頻率與授權設定，建議先以 7 天成功、1 小時確定查無資料為試行值；供應商錯誤、429、逾時不可當查無資料快取。
 未允許保存的來源不快取；過期後採有界刷新，來源撤回時停止新引用，歷史快照依原保存權限處理，不靜默改既有紀錄。
 快取不可自動提升成 TFDA／USDA，也不可把使用者自訂與個人資訊流入跨帳號快取。
@@ -296,6 +348,7 @@ history 的 coverage 由同範圍 nutrition_context 與食品快照計算；不�
 取回器只允許登記來源的 HTTPS，對 hostname、DNS 解析、實際連線 IP 及每次 redirect 重驗；拒絕內網、localhost、雲端 metadata、含帳密及非 HTTP(S) URL。
 設 connect/read/整體 timeout、redirect、回應大小、解壓後大小、字數與來源頁數上限；拒絕未知型別和執行網頁腳本。
 受控網域的 URL 也可能導向不可信端點，不能只檢查第一個 URL 或僅靠黑名單。
+Phase3a只呼叫固定Tavily API，來源URL限伺服器審核的精確HTTPS位址；沒有直接抓取來源站。URL語法檢查不是DNS／實際連線IP驗證，也不能證明Tavily內部最終重導位址；本批依來源identity_line及唯一表格驗證回傳內容。以下DNS pinning與redirect規格保留給未來直接fetch實作，不能把本批標成已完成該門檻。
 先解析DNS檢查後再讓 requests 自行重解域名仍有重綁風險；使用已驗證的安全取回器或受控 egress 代理，確保實際目的IP與TLS主機驗證一致，並測試重導與IPv6路徑。
 網頁資料放進獨立 SOURCE_BLOCKS，不放 system 指令；擷取呼叫不開放任意工具或金鑰，輸出僅能引用登記 ID。
 不把來源 HTML 原樣渲染到前端；只顯示經處理的文字、數值與安全來源連結。
@@ -306,11 +359,13 @@ history 的 coverage 由同範圍 nutrition_context 與食品快照計算；不�
 | --- | --- | --- |
 | Phase 0 能力與來源驗證 | 中轉站文件／搜尋證據、獨立搜尋候選、來源與儲存權限、10 種具體缺資料食品的來源盤點、兩層本機資料與雙語映射盤點 | 目前僅局部能力完成；來源與保存權限、有效食品覆蓋及成本上限仍待定，不能整階段標通過 |
 | Phase 1 合約與離線計算 | profile/schema/prompt、各營養素 coverage、單位／份量驗證、完整 fixture；先修本機相容／排序、身分保留、雙語候選與嚴格解析 | 本機修復、限定adapter的欄列驗證／九項可空profile／界限／coverage離線服務已完成；真來源adapter、正式保存接線與新模型合約仍未驗，不等於全pipeline通過 |
-| Phase 2a 後端保存及風險 | opt-in版本、record/save/edit/history、原始profile／context、preview、known-sum/unknown、migration／revision | 後端實作及離線回歸完成；null／0／界限往返、未知分母、已知超量、舊客戶端與並行覆寫保護；真Postgres／Mongo與部署未驗 |
+| Phase 2a 後端保存及風險 | opt-in版本、record/save/edit/history、原始profile／context、preview、known-sum/unknown、SQLite migration／revision | 後端實作及離線回歸完成；null／0／界限往返、未知分母、已知超量、舊客戶端與 SQLite 並行覆寫保護；正式部署沿用 SQLite。PostgreSQL／Mongo不列為上線驗收條件 |
 | Phase 2b1 前端基礎 | 獨立nullable型別、原格計算／coverage、顯式v2 API、offline queue及舊retry時間銜接 | 已完成限定基礎驗收；45項新測試／114項前端回歸及型別／lint／build通過。五寬錯誤banner通過，不等於新版保存全鏈完成 |
 | Phase 2b2a 送出完整性 | 舊scanner／manual／OCR固定原內容、時間、餐別及後端，先本機後POST、跨日重送、分頁鎖 | 限定完成；新增25項測試，完整前端139項及型別／lint／build通過。mock瀏覽器跨午夜／OCR重試與舊佇列保留通過；非真HTTP或實機驗收 |
-| Phase 2b2 其餘全鏈相容 | nullable scanner／manual／OCR、coverage顯示／重算／preview、v2 dispatcher、history／趨勢／推薦 | 尚待實作；先獨立coverage-aware讀取模型，再轉各顯示／編輯端與來源context，完成舊佇列調解／實機驗收，才可啟用部分營養及第三層 |
-| Phase 3 檢索與補全 | allowlist adapters、搜尋、擷取、deadline、cache、限流、單項隔離、簽署上下文 | TFDA/USDA 不多呼叫外部；補全失敗仍回既有結果；無 SSRF 或來源偽造 |
+| Phase 2b2b 讀取基礎 | versioned紀錄投影、coverage每日／範圍彙總、限定目標比較、歷史summary驗證 | 純helper與40項新增測試完成；不等於UI／實機或餐點完整性驗收，詳第28節 |
+| Phase 3a 檢索核心（優先） | Tavily固定請求、reviewed registry、限定Markdown原格、單次模型、協調器及失敗隔離 | 已完成離線限定驗收，詳第29節；不是正式啟用。沒有真來源policy或公開route |
+| Phase 3b 正式補全接線 | 首批真來源權限／adapter、簽署scan/profile權威、帳號配額／冪等／快取／跨請求single-flight、影像容量預留 | 完成來源真頁與有界模型重播；不可接受客戶端任意name／URL／profile觸發付費或保存 |
+| Phase 2b2 最小必要相容 | scanner nullable／原始context、重量preview／revision、v2保存／重送及舊版下游保護 | 未解項不變0、不丟來源；舊數字消費端明確阻擋。今日／歷史／趨勢／洞察完整改造依使用者要求延後，不要求新增分析功能才做Tavily |
 | Phase 4 掃描互動 | pending/partial/terminal、來源展開、名稱與重量校正、scan revision、快照保存 | 遲到回應不覆蓋新掃描；紀錄不重複、不被背景改值；手機可操作 |
 | Phase 5 真實評估與漸進啟用 | 固定模型／提示、來源核對、同圖多次、保留測試集、延遲／費用量測 | 先關閉開關驗證基準，再少量啟用；有退回既有兩層的開關 |
 
@@ -367,15 +422,15 @@ history 的 coverage 由同範圍 nutrition_context 與食品快照計算；不�
 | 自訂／TFDA／USDA路由 | 已修內餡保留、狀態／含湯／方法、自訂二次換算與相容排序；新增嚴格數字及方法正反例 | 補充更廣的菜色、品牌／口味與參考映射；未知烹調或只有生食資料時寧可保留未配對，不能宣稱所有食品相容性完備 |
 | USDA實際覆蓋 | 本機5,431筆，僅12筆中文資料；已加入一筆具體全脂牛奶審核映射，不採任意模型英文 | 擴充審核雙語集並報假陽性、漏配；尚未改善整庫翻譯覆蓋 |
 | 兩層故障與跨段上下文 | 缺檔／損壞／錯schema明確unavailable，API附健康；matched/rejected均有server ID及重量／狀態context | 目前僅單次掃描，尚無簽署token／跨enrich協調器，不能宣稱revision重播與防竄改已驗 |
-| 全pipeline整合 | 照片、本機配對、Tavily、模型擷取各有局部試驗，未在正式協調器串成一條 | 先離線重播真實回應，驗「官方命中零外搜／合格缺項才補／部分失敗保留已知值」；再有界真實端到端 |
-| 擷取及表格驗證器 | 已有adapter限定source/table/column/row validator、九項null、界限／單位／份重、完整ID集合及可見雙欄矛盾離線測試 | 尚無真HTML／PDF adapter、長頁多產品解析或新模型合約實測；OCR的既有寬鬆parser／小於值未接新合約，不因synthetic fixtures宣稱真頁擷取已驗 |
+| 全pipeline整合 | Phase3a以合成來源串真本機matcher、Search／Extract假transport、adapter、模型假選格與真validator／換算；官方命中零付費、失敗保留已知與分母已測 | 尚未串正式照片HTTP／簽署scan／真來源policy／模型及保存；下一步真來源核可與authority，不以mock串測冒充端到端 |
+| 擷取及表格驗證器 | 新增單一連續Markdown表adapter；唯一品名行／完整表頭、原格／kJ／雙基準矛盾、缺核心、0／null／小於界限已測 | 尚無已登錄真頁adapter、任意HTML／PDF、多產品或圖片解析；OCR小於值未接新合約，受限格式改變即拒絕 |
 | 命名與來源相容 | 吉林名稱分類只有設計，未核對配方；有11網址但不是10種均有可用食品 | 審核具體食品／品牌／地域／狀態；同產品與同類參考分開算精度及有效覆蓋 |
 | Tavily參數泛化 | 11 Search＋6 Extract是小型觀察，非正式A/B | 固定query／順序控制、多來源配對評估；language、advanced search及圖片／動態頁未驗，首版不依賴它們 |
-| 缺值保存及風險 | v2後端及前端獨立型別／原格preview／transport已保留null、界限、未解分母；資料不符coverage會拒絕 | 尚待scanner／顯示／offline v2 dispatcher／OCR接線、真Postgres／Mongo及部署migration；純helper不代表正式UI已支援 |
+| 缺值保存及風險 | v2後端及前端獨立型別／原格preview／transport已保留null、界限、未解分母；資料不符coverage會拒絕 | 尚待scanner／顯示／offline v2 dispatcher／OCR接線及 SQLite 部署migration；PostgreSQL／Mongo驗證不屬SQLite-only正式部署條件；純helper不代表正式UI已支援 |
 | 舊版／開關 | 協商／完整範圍保護、queue版本分流與跨日metadata；新增write-ahead、不可變重試／本地日期、Web Locks／目標後端。mock瀏覽器重試原body相同且舊未綁定queue不送不刪 | 尚待混版／舊目標調解、新版retry、舊lockless分頁及實機端到端；五寬驗證不是完整手機離線驗收 |
-| deadline／容量／費用 | 實測已否定25秒冷成功承諾；正式共享金鑰池、全局配額未驗 | 分冷／熱路徑p50/p95；429、斷線、重啟、同食品並發、取消與尾端費用；官方掃描不被補全占滿 |
+| deadline／容量／費用 | Phase3a有25秒共用deadline、4不同食品／每項2查、6頁、單次模型、process內2作業及同請求去重；429／額度／逾時測試通過 | 無跨process／跨請求配額、single-flight或快取，模型池影像容量未保留；25秒不是冷成功SLA或硬中止保證，仍需真實p50/p95／費用／重啟測試 |
 | 手機及辨識真值 | 13舊圖重複測穩定性；無獨立標註／秤重，q70不是Expo管線 | 至少30張保留測試集、人工名稱／狀態／範圍／秤重；相機／相簿、HEIC／EXIF／blob、壓縮與顯示校正 |
-| 安全及保存權限 | 邊界僅規劃，來源授權未逐項確認 | 對自己控制的fixture測取回／重導／不可信文字；查明Tavily、原來源及歷史快照權限後，僅啟用合格來源 |
+| 安全及保存權限 | 固定provider、精確URL、串流大小／完整JSON、拒陌生來源、權限明列及提示注入fixture通過；不直接fetch。正式registry為0 | Tavily及原來源保存權限仍待逐項核可；未驗provider內部重導、不宣稱任意URL SSRF安全；HTTP route權限／重播及真來源內容改版仍待測 |
 
 中轉站原生搜尋仍未驗證，獨立Tavily方案不依賴它，因此不列首版阻擋條件。來源權限屬文件／合約查核，不可拿HTTP實測替代。一般新網頁首版仍須審核，沒有假設「AI看過即可自動驗證」。
 同一批高風險反例零錯配只是一項必要門檻，不能推導真實世界100%正確。未測項保持待辦，Gate不符則縮小功能／來源範圍。
@@ -429,8 +484,8 @@ history 的 coverage 由同範圍 nutrition_context 與食品快照計算；不�
 ## 19. 實測後的放行決定
 
 可採用：Tavily作獨立搜尋、現有模型擷取已取得的文字、後端數值換算，以及人工核對來源的同類熟食參考。
-暫不放行正式自動補全：Phase2a後端保存／協商／風險已完成，但前端缺值鏈、名稱正規化、真來源adapter、任務預算與完整未計入項目仍未整合驗證。
-優先序：前兩層修復、限定adapter離線合約、Phase2a後端、Phase2b1基礎與Phase2b2a送出完整性已完成。下一步先建獨立v2／legacy讀取模型與coverage-aware聚合，避免直接擴大既有數字型別而讓null被當0；再轉掃描身分／重量preview／顯示編輯、新版dispatcher、OCR與推薦。舊目標／混版調解及13筆來源一致性待審仍保留。其後串少量審核來源，最後啟用有界動態搜尋；不以名稱候選或較少錯配當作攝取營養準確率。
+暫不放行正式自動補全：Phase3a核心已做離線整合，但正式來源policy為0，缺簽署scan/profile權威、帳號配額／重播控制及掃描保存最低接線；詳第29節。
+優先序已依使用者修正：今日／歷史／趨勢／洞察完整改造延後；先完成Tavily核心（本批），再核可首批真來源與保存權限、建立server-owned scan/profile及有界HTTP協調、接掃描結果／重量preview／v2保存與重送、維持未轉版下游明確阻擋，最後做Tailscale／SQLite與手機的有界端到端後才開試用。各階段已是企劃書實作，不存在「Tavily做完才正式開始全部計畫」的切點。不能為延後畫面而把null轉0或拆掉舊版保護。舊目標／混版調解及13筆來源一致性待審保留；不宣稱照片或攝取營養準確率提高。
 本輪67次模型請求、45次照片實驗及Tavily實測只證明局部能力與風險。尚未完成真手機相機／相簿、獨立標註集、秤重真值、正式並發、來源授權及部署端到端驗收。
 
 ## 20. 官方指南查核後的搜尋與擷取控制
@@ -514,6 +569,16 @@ Tavily Search找URL，Extract取原文；現有模型再依第7節提示詞擷�
 | 第三批Phase2a後端 | 新版保存／讀取／改重／preview、完整分母、舊客戶端保護、SQLite／Postgres欄位、原子revision、風險unknown及每日coverage | 後端限定流程交付，前端／queue／OCR／推薦仍待Phase2b；第三層停用，詳第25節 |
 | v1.0.2／第四批Phase2b1（11月14日） | 依指示建立分支並保留工作樹；前端nullable合約／計算／API、queue版本分流、固定重送metadata及錯誤banner | 45項新測試／114項前端回歸與型別／lint／build通過；五寬banner／資料保留驗收。v2掃描及下游未接線，詳第26節 |
 | v1.0.2／第五批Phase2b2a（11月14日） | 原事件write-ahead、不可變重試、本地時區／後端綁定、後端重讀刷新、Web Locks與新草稿保留 | 新增25項／完整前端139項與型別／lint／build通過；跨午夜／OCR fixture重試及舊資料保留驗收，詳第27節。nullable全鏈與第三層仍停用 |
+| v1.0.2／第六批Phase2b2b（11月14日） | 獨立versioned讀取、coverage每日／範圍彙總、保守洞察與嚴格歷史驗證；沿用現有Tailscale／SQLite伺服器 | 新增40項／完整前端179項與型別／lint／兩種build通過；備份後啟動v1.0.2，本機與Funnel health／首頁確認。nullable畫面與第三層仍未接線，詳第28節 |
+| v1.0.2／第七批Phase3a（11月14日） | 依新優先序先做Tavily retrieval、審核registry、Markdown adapter、單次模型橋接及自動補全協調器 | 105項禁止socket的新增測試通過；正式registry仍空、route與保存未接、未啟用。完整回歸與限制詳第29節 |
+| v1.0.2／第九批Phase3b（11月14日） | USDA FDC bounded client、server-side key設定、scan/profile authority、process-local冪等／single-flight／quota合約 | USDA client／adapter 21項、authority 10項、guard 11項通過；正式route、durable repository、跨程序配額與production registry仍未接。詳第31節 |
+| v1.0.2／第十批Phase3b durable storage（11月14日） | SQLite/Postgres scan context、JTI replay、enrichment request lease/result、idempotency/fingerprint與user/global quota reservation | 32項repository測試、完整後端908項（885通過、23略過）通過；HTTP／scanner／production registry仍未接，詳第33–35節 |
+| 第六十三批：原照片模型對照與兩項修正（11月15日） | 同圖兩次模型 replay，辨明保守泛稱與本機配對兩類拒絕；修正區域字尾泛稱 bypass、精確TFDA電鍋白飯 enum 對應 | 2次模型呼叫、0重試；完整後端1082 passed／1141 subtests。無手機原始封包、獨立真值或部署驗收；詳本節頂端與 replay evidence |
+| 第六十四批：部署目前 v1.0.2（11月16日） | 備份 SQLite、build:local、重啟既有排程；核對 Funnel health 與 scanner bundle 同步 | 本機／Funnel health 200，bundle SHA-256 相同，正式 fallback 仍 false；Android 不保存拍照尚待使用者實測，詳本節末 |
+| 第六十五批：Android 相簿辨識與結果文案修正（11月16日） | 依使用者五張截圖記錄兩項資料庫配對、五項待確認；修正來源 badge 與已配對數描述 | 白飯 TFDA、雞腿 USDA 參考，588 kcal／420mg 鈉算術相符；Android 相簿流程完成，非相機快門或保存驗收；前端24項與型別／lint通過 |
+| 第六十六批：relay 模型聯網能力重測（11月16日） | 以現有 OpenAI-compatible relay 做受限網頁讀取／一般 function-tool 控制 | 4次呼叫、0重試；目前 relay 未呈現網路搜尋能力，Tavily／USDA呼叫0；詳第六十六批 |
+| 第六十七批：Android 相簿結果追測（11月16日） | 記錄相簿辨識、營養配對與 bundle 對照 | 7候選、2配對、5待確認；598 kcal／440mg鈉算術吻合；不是相機 gate，詳第六十七批 |
+| 第六十八批：Android 拍照結果回報（11月16日） | 記錄使用者相機辨識 smoke 與五張結果截圖；核對配對、待確認、合計及 UI 文案 | 使用者回報相機拍攝並取得結果；8候選、2配對、6待確認，357 kcal／77mg鈉算術吻合。截圖不能獨立證明快門關聯；公開修正版 bundle 已核對，手機實載資產與是否保存仍未知，詳本節末 |
 
 每階段實際完成時同步更新[審查紀錄](2026-11-13-web-nutrition-fallback-review.md)及[實測報告](../food-nutrition-evaluation/2026-11-13/README.md)中受影響結論；未執行的功能與驗收明確保留待辦。
 
@@ -618,3 +683,788 @@ Browser plugin未提供，使用Playwright CLI，正常auth模式搭配隔離假
 375／390／430／768／1440寬的失敗banner無水平溢位；390x844與1440x1000截圖目視確認。舊未綁定queue的自動／手動補送均0 POST且原字串不變。最終流程無framework overlay；每輪刻意503各一項預期resource console error及既有pointerEvents警告，沒有未解app error。首次測試程式重複處理同一file chooser造成Expo removeChild overlay；改單次CLI upload、重載並完整重跑後未再發生，列為測試工具操作失誤而非產品缺陷。
 
 下一步先建立獨立versioned讀取模型及coverage-aware每日／趨勢／洞察，再轉掃描context／來源／preview、nullable UI與紀錄編輯。舊目標／混版調解、v2 dispatcher、OCR小於值、推薦、來源授權／安全取回、真DB與真值照片驗收仍未完成。automatic_web_fallback_enabled保持false；本批無模型／Tavily付費請求、使用者DB修改、commit或部署。
+
+## 28. 第六批：Phase 2b2b 讀取模型與本機架設沿用
+
+2026-11-14完成限定純讀取／彙總層，所有變更位於v1.0.2；refs/heads/v1.0.1仍為bb81e922ac9d2d69440d446bf7f02f4b822efba6，未移動或覆蓋。同名tag另有既存內容，因此版本保護檢查使用完整branch ref，避免把tag誤認分支。
+
+nutrition-response-validation.ts從v2 transport抽出純回應驗證，補跨營養分母、正值界限、已知項數／合計、食品ID及曆日檢查。nutrition-read-model.ts保留完整server快照、profile／context／原身分及當地日期前綴，不將臺灣凌晨歸到UTC前日。legacy只保留原total_*為reported_value，不能從食品重算，也不能把舊0升格為已確認0；缺欄位仍null。
+
+每營養分開value（完整點值）、known_value（驗證過的已知部分）、reported_value（legacy申報值）、lower_bound、排他upper_bound及scope_complete。混有legacy的known_sum包含舊申報量，不得當驗證下界；由完整食品快照彙總時可另外保留驗證點值。只有history摘要時無法拆回兩者，維持null，不虛構精度。這些投影不驗證來源權威或醫療判斷。
+
+nutrition-read-aggregation.ts要求明確user／起迄曆日／complete或page範圍，重驗原快照，防止直接修改投影取得完整宣告；同stable ID重複、越界／跨帳號拒絕。缺紀錄日為no_records，分頁沒載到為not_loaded，都不是攝取0；未解項留分母。整日全not_consumed也不宣稱完整0。跨日摘要沿用有紀錄日分母；全排除日令summary保持不完整，再次彙總不得恢復已抑制的完整或上界。
+
+限定目標比較只在非legacy、完整查詢範圍使用：可信已知部分超過上限仍可提示known_excess；剩餘量、within_limit及minimum不足／達標須該營養點值完整。沒有食品安全結論。完整只描述該查詢已保存且計入的食品，不代表使用者一天吃的食物已全記錄，也不提高visual_completeness。
+
+nutrition-read-history.ts驗證逐日數字／coverage、日期／筆數、summary逐欄合併與avg_known_sum。實際後端fixture重現0.1／0.2兩日：Decimal已知合計平均為0.1，legacy浮點相容avg_sodium為0.2，兩者可合法不同；另Python3.14補償求和也與JS逐項加總不同。相容avg_*只驗有限非負格式，讀取模型完全不使用；權威coverage與avg_known_sum仍逐欄驗證，Python round ties-to-even保留。純本機範圍平均不預先捨入，server歷史平均為一位小數，不能直接要求兩者相同。
+
+v2 records／history transport補核對請求使用者、records日期及history天數，格式不符仍回NutritionApiError.invalid_response，不降級。history未帶明確range anchor／抓取時間，本批只能驗內部範圍一致性，不能證明回應新鮮度；畫面整合時仍須session／request guard及明確全量讀取策略，不以單頁count當全量。
+
+新增40項（record投影11、彙總17、history12），socket禁止的Python純服務產實際snapshot，fetch mock，不操作正式紀錄。完整前端179項全過、0失敗／略過；typecheck／lint／build:web及部署用build:local通過。[manifest](../food-nutrition-evaluation/2026-11-14/frontend-read-model-regression.json)可由既有驗證工具重建。後端只有版本常數由v1.0.1改v1.0.2，編譯及啟動health通過；未重跑既有733項。Expo／package／lock根版本同步1.0.2，沒有更換模型／金鑰。純helper尚未接UI，本批沒有新渲染變更或手機操作驗收。
+
+使用者確認原v1.0.1服務已停止並指定沿用架設。實查outer start／stop BAT只控制NutriLens Backend排程；排程執行目前專案的background runner，未固定分支。先以部署Python備份既有SQLite，再build:local及啟動同排程；不搬資料、不重建task／Funnel、不改env。health確認v1.0.2、sqlite、auth_required=true、v2 scanner仍false；本機只綁loopback、首頁與JS200，Funnel health／首頁200且內容相同、外部DB路徑隱藏。[無私密設定的啟動紀錄](../food-nutrition-evaluation/2026-11-14/local-server-v1.0.2.json)。正式SQLite因啟動會沿用既有備份／migration／維護流程，不能將它描述為純測試的零DB存取；沒有登入、讀寫飲食紀錄、付費AI或Tavily請求。服務依要求保持執行。
+
+本批當時下一步為nullable畫面；使用者其後明確要求延後今日／歷史／趨勢／洞察，改先做Tavily。現行優先序與啟用門檻以第19、29節為準。automatic_web_fallback_enabled保持false，未宣稱辨識準確率提高。
+
+## 29. 第七批：Phase 3a Tavily 後端補全核心
+
+2026-11-14在v1.0.2完成限定後端核心。未修改v1.0.1、模型／金鑰設定、正式掃描路由、使用者資料或服務排程；既有服務保持執行。這不是完整第三層上線，也不是重新開始企劃。
+
+### 已實作流程與實測界線
+
+新增tavily_retrieval_service：金鑰僅明確從TAVILY_API_KEY讀取，不讀TavilyKey.txt；固定api.tavily.com、禁止redirect／環境代理／自動retry。Search固定basic／restrict網域／禁答案及摘要採用；只保留精確審核URL。Extract收本次核可URL、完整Markdown，拒陌生／重複回應、超量、非有限或重複鍵JSON，缺頁保留failed_urls；記request_id、usage及成功頁數，0 credits不等於免費。
+
+新增nutrition_source_adapter：只支援一個連續的pipe Markdown表，精確唯一原品名行／全部表頭／已審份重、原文hash與來源metadata；標示0、小於界限、缺格分開。略過salt／added sugar等異類，不將其冒充canonical；疑似Energy(kJ)等未審列名直接拒絕，避免隱藏矛盾。不是任意網頁、圖片、HTML或PDF parser，尚無正式真頁policy。
+
+新增nutrition_extraction_model_service：沿用relay_chat並新增可選max_attempts；此用途固定1次，原本辨識呼叫的預設輪替不變。只接受stop與有界完整輸出，逾時／截斷不補救。模型只選已核發source/table/column/row ID；後端原格validator與Decimal計算才產生每100g及本份營養。
+
+新增web_nutrition_service：重新跑既有自訂／TFDA／USDA相容性及優先規則，本機命中不付費；保留原始自訂每份格，不拿已換過的100g值再縮放。official unavailable、source_conflict、低於現有辨識門檻或validation issues均不外搜。只有精確審核食品名／品牌／口味／狀態／範圍與權限均相符才可檢索；多份相符policy回ambiguous_source。正式registry明確為空；fixture權限聲明不能授權真網站。
+
+同請求同食品共用搜尋／表格，item_id／revision／估重與信心各自保留；4不同食品、每項最多2查、最多6頁、單次模型及process內最多2作業，不排隊等槽位。共用最長25秒deadline，晚到輸出丟棄；網路層是合作式限制，不宣稱OS級硬中止。模型輸入採欄位白名單，不傳帳號／健康史／照片。未知營養不填0；四核心缺點值或只有上界不自動採用，缺重量只提供profile、不假設100g。單項錯格／份量或整體溢位隔離，仍保留未知分母及其他已知結果；完整模型批次漏ID／重複ID則整批擷取拒絕，官方結果保留。
+
+### 驗證與已修反例
+
+[socket禁止驗證](../food-nutrition-evaluation/2026-11-14/tavily-core-offline.json)：105項全通過（client23、adapter35、模型14、協調器33）。[工具](../../tools/verify_web_nutrition.py)可重建；完全合成來源／假transport與模型選格，真validator與換算，沒有新付費或正式DB存取。完整後端838項中815通過、23項真Postgres因未配置測試DB略過、0失敗／錯誤，106.538秒，詳[regression](../food-nutrition-evaluation/2026-11-14/tavily-backend-regression.json)。未改前端，不新增手機／桌面渲染或照片準確率聲明。
+
+獨立審查已補：核心點值採用門檻、多來源歧義、web份量與跨項合計溢位、模型錯誤／額度終態、既有辨識門檻一致、原始自訂份量基準及模型欄位白名單。初次socket攔截用函式破壞PySocks類別繼承，已改拒建socket的子類；測試初次漏import mock、原值字串斷言及未標熟食fixture均已校正。完整回歸另找出既有SQLite API測試在台灣凌晨用無時區本地日期、被當UTC未來日拒絕；只修測試payload帶本地時區並增加錯誤診斷，未改正式日期政策。
+
+### 尚未完成與下一步
+
+先核可Tavily與首批真來源的擷取／保存／重用條款及具體adapter格式，再加入正式policy；完成真頁及有界模型重播。之後建簽署／持久化scan與profile repository、帳號配額／冪等／跨請求single-flight與合法快取、共享模型池影像容量預留，才接enrich HTTP。現有核心不授權任意客戶端傳name／URL／profile，也不防重放或提供跨process全域費用限制。
+
+掃描結果的來源／缺值、重量preview／revision、v2保存／重送及舊數字消費端保護是正式試用最低需求；今日／歷史／趨勢／洞察完整改造依使用者要求延後。完成這些並通過手機、Tailscale／SQLite有界端到端後，才評估開啟automatic_web_fallback_enabled。一般新來源、直接fetch DNS／redirect、任意PDF／OCR、真DB並行與獨立標註／秤重照片仍未驗；不因105個fixture通過就宣稱Tavily自動補全已可正式使用。
+
+## 30. 第八批：來源權限與首批候選審查（2026-11-14）
+
+本批先完成來源權利與保存範圍的文件查核，沒有啟用任何production policy。官方證據顯示USDA FoodData Central資料為CC0 1.0，適合作為第一個真頁重播候選；但API key、速率、資料類型／版本、食品身分及表格相容性仍是獨立門檻。TFDA資料集的政府開放資料描述與網站／資料庫個別頁面權利不能混為一談，因此先列review-only。Tavily可保存輸出不等於取得原出版者權利；跨使用者快取需依方案向Tavily確認。本批已完成一次受限FDC網域Search，未把key寫入證據。
+
+來源registry的rights合約已補強：除了四個允許旗標與review reference，政策現在必須提供license URL／名稱、attribution、reuse scope、provider cache scope、retention／withdrawal policy、reviewer及唯一evidence URLs。若宣稱cross-user reuse，必須同時明列provider的cross_user_approved；否則不會進入compatible候選。這只是政策格式與拒絕條件，不是自動授權。
+
+證據與狀態見[來源權限審查](../food-nutrition-evaluation/2026-11-14/source-rights-audit.json)。本批對FDC網域做一次受限Tavily Search，沒有找到穩定的food-details營養頁；改以伺服器端USDA API key取得單筆Foundation JSON，經`fooddata_central_adapter`及既有evidence/profile validator離線重播通過，結果見[usda-fdc-api-replay.json](../food-nutrition-evaluation/2026-11-14/usda-fdc-api-replay.json)。Foundation同時有Atwater General／Specific能量及多個營養編號，adapter已要求server policy明確指定編號，不能讓模型自行挑。這是API格式可行性，不是Tavily頁面可取得性或食品相容性驗收；正式policy、signed authority及production registry仍未建立，TFDA不納入。新增的bounded FDC client只接受後端`USDA_FDC_API_KEY`，不讀`USDA KEY.txt`，並通過855項後端回歸（832通過、23項未配置PostgreSQL略過）；該回歸未發出新的USDA／Tavily請求。
+
+## 31. 第九批：USDA client、authority與冪等配額邊界
+
+本批仍在v1.0.2，沒有修改v1.0.1、正式掃描route、production registry、使用者資料或現有排程服務。新增`fooddata_central_client.py`固定單筆FDC JSON取回，僅讀server-side `USDA_FDC_API_KEY`；`backend/.env.local.example`與[Windows部署說明](../Local_Server_Deployment.md)明列配置方式，使用者提供的`USDA KEY.txt`保持gitignore，不被程式自動讀取。client禁止proxy／redirect／retry，使用共用deadline、512KB串流上限、strict JSON、回應`fdcId`比對與credential-free payload hash。真實key測試成功取得FDC 1750340 Foundation資料；沒有把key或完整回應寫入報告。
+
+新增`nutrition_authority_service.py`：HMAC-SHA256 key-id rotation、canonical有限JSON、短效scan_context／profile_authority token、user／scan revision／item identity／profile hash／source ID綁定、過期／future clock／tamper／unknown kid／cross-user拒絕，以及process-local atomic consume replay guard。profile identity使用完整白名單，不能夾帶健康史、照片或任意欄位。
+
+新增`nutrition_enrichment_guard_service.py`：以server-owned request欄位產生canonical fingerprint；同fingerprint single-flight、同idempotency key不同fingerprint回conflict；per-user與global window quota在同一把lock內reserve，timeout／rate limit／upstream error／busy釋放，`not_found`消耗額度但不作成功快取；完成項按window清理，pending仍可加入。authority 10項、guard 11項、FDC client 15項及adapter 6項通過；加入本批後完整隔離後端回歸為876項（853通過、23項未配置PostgreSQL略過、0失敗／錯誤），證據見[phase3b-backend-regression.json](../food-nutrition-evaluation/2026-11-14/phase3b-backend-regression.json)。
+
+上述兩個新服務刻意未接`app.py`、scanner或正式repository。authority consume、idempotency結果、provider quota與profile cache仍是process-local，重啟／多程序／多台伺服器會失去狀態；正式啟用前必須使用共享資料庫的原子insert／compare-and-set、user與global quota reserve、結果保存與撤回／TTL策略，並加入HTTP 401／403、舊revision、profile source/hash mismatch、並行只一次provider call、429／timeout重試與重啟驗收。automatic_web_fallback_enabled仍false。
+
+## 32. 第十批：SQLite/Postgres profile/source repository（2026-11-14）
+
+本批先落地正式補全前的伺服器資料邊界，仍未開啟自動fallback。新增`backend/repositories/nutrition_profile_repository.py`，只接受現有`NutritionSourceRegistry`已審核的source policy；policy目前列與`nutrition_source_policy_versions`不可變歷史並存，profile snapshot則保存owner、profile revision、canonical hash、food identity、source policy revision及完整`NutritionProfileV1`。
+
+每次寫入都在SQLite/Postgres transaction內重新鎖定source並執行CAS revision。repository會拒絕跨帳號讀取、未批准的cross-user reuse、snapshot/reuse權利為false、撤回或換版來源、食品名稱／狀態／準備方式／範圍不符、來源URL／content hash／adapter version不符的profile。來源撤回只阻止未來authority／enrichment；已保存飲食紀錄仍讀自己的profile snapshot，不回頭改寫歷史。
+
+10項離線repository測試通過：檔案重啟、兩SQLite連線不可靜默覆蓋、來源歷史、撤回、provenance、權利與owner/reuse邊界，以及Postgres JSONB／RLS／`FOR UPDATE`合約。證據見[第十批repository驗收](../food-nutrition-evaluation/2026-11-14/nutrition-profile-repository.json)。這個repository目前刻意不接`app.py`、scanner、HTTP、authority consume或production registry；Mongo atomic路徑尚未做，因此仍不可啟用付費補全。
+
+下一步必須在此SQL repository之上建立durable scan context、authority replay、idempotency/single-flight result、quota reservation/release與TTL/withdrawal cache，再做HTTP route驗收。`automatic_web_fallback_enabled`保持`false`。
+
+## 33. 第十一批：durable scan context／authority replay（2026-11-14）
+
+本批新增`backend/repositories/scan_context_repository.py`。scanner的`user_id`、`scan_id`、`scan_revision`及完整辨識項目集合現在有SQLite/Postgres持久化邊界；server以canonical item-set hash驗證完整集合，拒絕遺漏、重複、未知項目及跨帳號讀取。scan revision必須依序建立，同一revision的重送只在集合相同時冪等返回；建立新revision會將舊版本標成`superseded`，不可再授權。期限與`active`／`expired`／`consumed`／`superseded`／`revoked`狀態寫入資料庫，重啟不會重置。
+
+scanner的完整`recognition_context`含有展示用欄位（例如alternatives、name_en、count、weight_basis），route不得原樣寫入權威context；必須先由server narrow成authority白名單欄位，再交給repository驗證。這避免把非必要視覺提示或客戶端欄位帶進付費來源請求。
+
+authority JTI使用獨立unique replay table，與scan context消費在同一transaction中寫入，並以SQLite `BEGIN IMMEDIATE`／Postgres row lock保證並行請求只會有一個消費者。8項離線測試涵蓋完整集合、user/revision、expiry、replay、重啟、相同revision冪等與兩連線併發，證據見[scan-context-repository.json](../food-nutrition-evaluation/2026-11-14/scan-context-repository.json)。這仍是route前置儲存層；沒有接`app.py`、scanner、production registry或自動fallback。
+
+下一步已轉為durable enrichment request結果、idempotency／fingerprint唯一性、pending lease reclaim及per-user/global quota reservation（第34–35節）；在TTL／撤回及作業協調完成前仍不得接HTTP provider route。
+
+## 34. 第十二批：durable enrichment request／single-flight（2026-11-14）
+
+新增`backend/repositories/nutrition_enrichment_repository.py`。每筆請求以server建立的`user_id`、idempotency key、fingerprint、request payload hash及request revision固定身分；SQLite/Postgres分別以unique constraint保證`(user_id, idempotency_key)`及fingerprint不重複。相同請求在重啟後可讀取已保存結果，變更body或revision回明確conflict，跨使用者重用同fingerprint拒絕。
+
+pending請求保存lease owner、到期時間與attempts；同一server-owned payload可加入既有single-flight，過期lease可由下一個相同請求原子接管，舊owner不能完成。`timeout`、`rate_limited`、`upstream_error`、`busy`及`not_found`不會被當成成功快取；前四者可重試，`not_found`保留結果狀態但下一次仍需新provider嘗試。結果與錯誤payload有大小上限，不能由客戶端任意指定保存內容。
+
+## 35. 第十三批：durable per-user/global quota（2026-11-14）
+
+新增`backend/repositories/nutrition_quota_repository.py`。單次reservation在同一SQL transaction中鎖定user window與global window、檢查剩餘量並寫入pending reservation；跨SQLite連線的最後一個global slot只能由一方取得。完成時同時把reserved移至consumed或釋放；retryable provider failure釋放兩層配額，`not_found`及其他terminal outcome消耗配額但不保存營養結果。
+
+本批33項聚焦repository測試（scan context 8、enrichment request 6、quota 9、profile/source 10）及完整隔離後端回歸908項（885通過、23項因未配置真Postgres略過、0失敗／錯誤），證據見[scan-context-repository.json](../food-nutrition-evaluation/2026-11-14/scan-context-repository.json)與[durable-enrichment-repositories-regression.json](../food-nutrition-evaluation/2026-11-14/durable-enrichment-repositories-regression.json)。本批沒有付費模型／Tavily呼叫、使用者資料寫入、服務重啟或production policy變更。
+
+獨立審查後仍有阻擋：Mongo沒有atomic unique-index實作；authority token的consume仍需由HTTP route明確呼叫scan repository；request repository與quota reservation尚未由一個更上層的作業協調器綁成可恢復的工作狀態；cache TTL、source withdrawal與cross-user reuse policy尚未完成。沒有接`app.py`、scanner、Tavily fallback或正式registry，`automatic_web_fallback_enabled`仍為`false`。下一步先補合法快取／TTL／撤回行為與作業協調規格，再接authenticated HTTP route與其401/403、stale revision、profile hash/source mismatch、併發只一次provider call、429/timeout及重啟測試。
+
+## 36. 第十四批：合法快取／TTL與可恢復作業協調（2026-11-14）
+
+本批完成正式HTTP route前的最後一層持久化與作業協調基礎，仍未開啟自動fallback。新增`nutrition_cache_repository.py`，成功營養profile才可寫入；cache key固定綁定食品完整身分、source／policy ID與revision、來源URL、adapter／retrieval版本，並以SQLite/Postgres保存TTL。預設成功TTL為7日、上限90日；過期只回miss，可由`purge_expired`清理。沒有`not_found`或provider failure的寫入API，避免把暫時錯誤或查無結果變成負快取。
+
+快取寫入會重新檢查來源仍為active、snapshot/reuse權利、cross-user是否明確核准、server-internal是否綁定owner，以及profile provenance與server計算hash。每次讀取重查目前source policy revision與withdrawal狀態；來源撤回／換版立即使舊快取失效，歷史飲食紀錄仍保留原始snapshot。這是政策與持久化門檻，不代表任何真網站已取得保存授權。
+
+新增`nutrition_enrichment_coordinator.py`，只接收server-owned scan items／profile references及已完成TFDA→USDA miss的provider closure。流程為scan item-set與source/profile revision驗證、durable request lease、每次attempt獨立quota reservation、單次provider呼叫、結果先持久化再commit quota；retryable錯誤釋放額度，`not_found`與其他terminal outcome消耗額度。provider完成後再次檢查scan/source withdrawal，避免TOCTOU下接受已撤回來源。結果已落地但quota finalize失敗時，重播會reconcile reservation且不重複呼叫provider；pending lease過期也可接管。`budget_exceeded`保留於error envelope並轉成明確terminal `invalid_output`，不冒充查無資料。
+
+本批驗證：repository聚焦35項、cache 8項、coordinator 6項全數通過；完整隔離後端925項，902通過、23項因未配置真PostgreSQL略過，0失敗／錯誤。證據見[phase3c-durable-orchestration-regression.json](../food-nutrition-evaluation/2026-11-14/phase3c-durable-orchestration-regression.json)。測試未呼叫付費模型／Tavily、未寫使用者飲食紀錄；PostgreSQL競態以conflict-safe SQL contract驗證，仍需專用真DB重跑。
+
+仍有阻擋：Mongo atomic repository未實作；協調器尚未接authenticated HTTP route、authority token consume、scanner完整recognition context保存、真provider closure、正式來源registry或前端preview。不得直接把legacy `/predict/vision-food`包成web provider，否則會在TFDA／USDA命中時誤扣第三層quota。下一步建立獨立enrichment route與server-owned scan adapter，驗證401／403、user／item set／expired／stale revision、profile hash／source mismatch、並行single-flight、429／timeout、重啟與quota恢復；在這些測試通過前，`automatic_web_fallback_enabled`持續`false`。
+
+## 37. 第十五批：authenticated enrichment route與server-owned scan adapter（2026-11-14）
+
+本批新增獨立`POST /nutrition/enrichment`入口及`nutrition_enrichment_route_service.py`，沒有包裝或修改既有`/predict/vision-food`。入口先要求登入並綁定`user_id`，再以durable scan context比對完整且唯一的item set、scan revision與有效期限；只使用context內的白名單欄位，不信任請求者改寫的辨識內容。TFDA／USDA本地matcher先跑，接著才查成功profile正向快取；只有仍有miss且路由旗標、來源policy、profile hash／revision皆有效時，才建立coordinator與provider closure。provider初始化本身也延後到權威檢查之後，避免過期來源或錯誤profile觸發第三層流程。
+
+路由回應固定包含`status`、`request_id`、`replayed`、`result`與typed `error`；quota忙碌、timeout／429、source conflict、idempotency conflict及HTTP 401／403各自映射，不把供應商金鑰或原始錯誤回給前端。Mongo或未選定SQLite/Postgres時，即使環境旗標為true也不啟用；預設`NUTRITION_ENRICHMENT_ROUTE_ENABLED=false`，`automatic_web_fallback_enabled`仍為`false`，production source registry仍為0。
+
+新增9項route service測試，涵蓋item set mismatch、expired／revoked／superseded scan、local hit不進provider且不占quota、provider單次呼叫與durable replay、feature fail-closed、source revision在provider factory前拒絕、profile hash mismatch及user quota exhaustion。完整隔離後端回歸為936項（913通過、23項因未配置真PostgreSQL略過、0失敗／錯誤），證據見[phase3d-route-regression.json](../food-nutrition-evaluation/2026-11-14/phase3d-route-regression.json)。手動Flask test client亦確認缺少Authorization回401、user mismatch回403；未呼叫真Tavily／模型，未啟用正式來源或寫入使用者飲食紀錄。
+
+仍未達正式開啟條件：route尚未接scanner產生流程與authority JTI consume、沒有真來源policy／真provider closure的HTTP端到端驗收，未實測真PostgreSQL／Mongo併發、429／timeout重試及跨重啟HTTP流程；positive cache寫入仍需在provider結果成功且來源權利核准後接上。下一步先完成server-owned scanner adapter、authority consume與route integration fixtures，再以隔離fake provider驗收並行single-flight、重啟、quota reconciliation，最後才審查首批真來源policy及是否開啟旗標。
+
+## 38. 第十六批：scanner接線、authority JTI consume與HTTP整合（2026-11-14）
+
+本批把前一節列出的接線完成，但仍不代表第三層正式啟用。`nutrition_scan_context_adapter.py`在`/predict/vision-food`成功後，從伺服器產生的`recognition_context.items`只保留authority白名單欄位，排除`name_en`、`alternatives`、`count`、`visual_evidence`等展示資料，再以scan id／revision／完整item set寫入SQLite/Postgres scan context；空辨識結果不建立可補全context。持久化失敗時，旗標關閉仍保留舊辨識回應並標示context unavailable，旗標開啟則fail closed。
+
+新增server-only `NUTRITION_AUTHORITY_SECRET`（至少32 bytes）設定。只有在SQL持久化、authority secret及`NUTRITION_ENRICHMENT_ROUTE_ENABLED=true`同時成立時，scanner才回傳短效`scan_context.authority_token`；token不含營養數值，且不寫入日誌。`POST /nutrition/enrichment`驗證token的user／scan revision／canonical item-set，將JTI與scan消費以同一個durable transaction寫入；同一idempotency key可在已消費scan上重播或接管retry lease，新idempotency key不能重用同一scan。provider factory先完成設定驗證，避免缺少provider設定時提前消費authority。
+
+新增scanner→route、白名單縮減、完整item set、profile/source mismatch、authority replay及Flask HTTP整合fixture。聚焦authority／route／adapter／integration測試通過；完整隔離後端回歸為949項（926通過、23項因未配置真PostgreSQL略過、0失敗／錯誤），證據見[phase3e-scanner-authority-regression.json](../food-nutrition-evaluation/2026-11-14/phase3e-scanner-authority-regression.json)。本批沒有真Tavily／模型呼叫、沒有讀取或暴露`TavilyKey.txt`／`USDA KEY.txt`，也沒有寫入使用者飲食紀錄。production source registry仍為空，`automatic_web_fallback_enabled`與預設route flag仍為`false`。
+
+本批當時仍未達開啟條件：真PostgreSQL／Mongo併發與跨重啟HTTP尚未實測，真來源policy／provider HTTP、429／timeout及成功profile的positive cache write仍未接；positive cache後續於第39批完成route接線驗證。掃描context會保留低信心／被拒項目以維持完整item set；第40批已決定正式第三層採confirmation_required fail-closed，必須先完成使用者確認與新的server-owned scan revision。
+
+## 39. 第十七批：provider resilience、配額恢復與正向快取接線驗證（2026-11-14）
+
+本批針對第38節列出的作業風險補上隔離 fake-provider 實測。`NutritionEnrichmentCoordinator` 以 durable request lease 維持 single-flight：兩個執行緒使用同一 user／scan／idempotency key 時只允許一個 provider call，另一方等待並重播相同結果。`timeout` 與 `rate_limited` 會保存為可重試結果並釋放 reservation；下一次同 key 重新取得 lease 時使用新的 reservation。provider 結果先保存、quota 結算後做；若 release／commit 的回應在資料庫已完成後遺失，下一次重播會 reconciliation，不會再次呼叫 provider。SQLite 關閉重開後，已完成 request 仍直接回放結果，第二個 process 的 provider call 為零。
+
+route 端的正向快取已實際接線，並非只讀：只有 `origin=web` 且 `accepted`／`complete`、`nutrition_status=complete`、核心點值完整且 provenance 通過的 profile 才呼叫 `put_success`。partial、not_found、timeout、429、invalid output 與非 web 結果都不寫入；cache repository 仍依 source policy rights、source revision、owner／cross-user scope、TTL 與 provenance 再次拒絕不合格資料，cache 寫入失敗不覆蓋已保存的 enrichment 結果。
+
+新增 coordinator resilience 4 項與 route/cache regression，並重跑完整隔離後端：`955` 項，`932` 通過、`23` 項因未配置真 PostgreSQL 跳過、`0` 失敗／錯誤；證據見[phase3f-provider-resilience.json](../food-nutrition-evaluation/2026-11-14/phase3f-provider-resilience.json)。本批沒有呼叫真 Tavily／模型、沒有讀取或暴露 `TavilyKey.txt`／`USDA KEY.txt`，沒有寫入正式使用者飲食紀錄。這些測試證明 SQLite／fake provider 的恢復語意，不等於真 PostgreSQL、Mongo、真 provider HTTP 或跨服務部署已驗收。
+
+重新審查後，正式開啟仍有三個阻擋：首批真來源 policy 與保存／重用權利尚未核准；真 PostgreSQL／Mongo 的多程序併發與跨重啟 HTTP 尚未驗；frontend `runPrediction()` 尚未呼叫 enrichment route，v2 nullable 結果也尚未接入今日／歷史／趨勢／洞察。低信心／validation flags 已決定採 fail-closed，必須先由使用者確認並建立新的 server-owned scan revision。故 `PRODUCTION_SOURCE_REGISTRY` 維持空、`automatic_web_fallback_enabled` 與 `NUTRITION_ENRICHMENT_ROUTE_ENABLED` 維持預設關閉，不能宣稱第三層已上線。
+
+## 40. 第十八批：低信心／驗證旗標的 fail-closed 門檻（2026-11-14）
+
+複核發現 route 原本會在 local／cache miss 後建立 provider，再由 web core 才把低信心或帶 `validation_issues` 的 item 標為 `needs_identity`；這會無效消耗 provider quota，也可能讓使用者誤以為營養查到就代表影像身分可靠。現在 `nutrition_enrichment_route_service.py` 在 provider factory、authority JTI consume 與 coordinator 之前，以既有 `VISION_FOOD_MIN_CONFIDENCE` 及空 `validation_issues` 作為 web eligibility 門檻；不符合者直接回 typed `confirmation_required`，HTTP 映射為409，provider call與quota reservation皆為零。TFDA／USDA或正向cache命中仍可正常返回，因為它們不涉及第三層外搜。
+
+這不是把低信心名稱潤飾成可信名稱，也不是在本次請求覆寫辨識證據。後續若使用者確認，必須由 server 建立新的 scan revision／item authority 後重新走 TFDA→USDA→web 流程。新增 route／HTTP regression；完整隔離後端回歸為`959`項，`936`通過、`23`項真 PostgreSQL 未配置跳過、`0`失敗／錯誤，證據見[phase3i-confidence-http.json](../food-nutrition-evaluation/2026-11-14/phase3i-confidence-http.json)。
+
+正式開啟阻擋仍未解除：真來源 policy／權利、真 PostgreSQL／Mongo 多程序與跨重啟 HTTP、frontend enrichment 接線及四個畫面的 v2 nullable 消費仍未完成；production registry與兩個自動補全旗標維持關閉。
+
+## 41. 第十九批：完整結果合約與混合來源 coverage（2026-11-14）
+
+本批修正複核發現的兩個結果邊界。`nutrition_enrichment_provider_factory` 現在會先拒絕非物件、缺少 `items`、缺少 `item_id` 或無法驗證 coverage 的 provider 輸出；TFDA／USDA／正向 cache 已命中的 item 不會被 web 結果覆蓋，合併後會依完整 server-owned item set 重新計算 `NutritionCoverageV1`。route 的 `_combine` 也要求每個新增 item 具備 canonical revision、status、origin、recognition context、profile 與 portion；只有 `item_id` 的 `complete` payload 會落成 `invalid_output`。
+
+coordinator 的 complete／accepted 結果除 schema 與 coverage 外，現在還必須與本次 request 的 item IDs 完全一致，避免未知 item 被持久化後以 HTTP 200 重播。新增 mixed local+web coverage、malformed complete、unknown item ID 與 multi-scan quota fixtures；enrichment focused suite 共34項通過。
+
+完整隔離後端回歸為`962`項，`939`通過、`23`項因未配置真 PostgreSQL 略過、`0`失敗／錯誤，證據見[phase3j-contract-regression.json](../food-nutrition-evaluation/2026-11-14/phase3j-contract-regression.json)。前端營養回歸為`117`項全通過；仍未呼叫真 Tavily／模型、未讀取或暴露 key 檔、未寫入正式使用者飲食紀錄。
+
+本批只收斂結果可信度與 coverage，不代表第三層已上線。真來源 policy／權利、真 PostgreSQL／Mongo 多程序與跨重啟 HTTP、frontend `runPrediction()` 接線及四畫面的 v2 nullable 消費仍是正式開啟阻擋；`PRODUCTION_SOURCE_REGISTRY`、`automatic_web_fallback_enabled` 與 `NUTRITION_ENRICHMENT_ROUTE_ENABLED` 持續關閉。
+
+## 42. 第二十批：本機正式服務的 fail-closed 驗證（2026-11-14）
+
+以目前實際執行中的 v1.0.2 Windows 服務做無密鑰 smoke check：`/health` 回傳 HTTP 200，確認版本為 v1.0.2、SQLite、`auth_required=true`，TFDA／USDA 官方資料層可用；`automatic_web_fallback_enabled=false` 與 `NUTRITION_ENRICHMENT_ROUTE_ENABLED=false` 均維持關閉。未讀取或記錄 Tavily／USDA 私密金鑰，未建立 provider，未寫入使用者飲食紀錄。
+
+此驗證只證明部署中的預設安全邊界與關閉狀態，不代表真 Tavily／模型、真來源權利、PostgreSQL／Mongo 多程序或跨重啟流程已驗收。證據見[local-enrichment-route-disabled.json](../food-nutrition-evaluation/2026-11-14/local-enrichment-route-disabled.json)。下一步仍是完成前端能力協商／scanner transport 的明確接線，再以核准的來源 policy 與專用真 DB 做端到端驗證；在此之前不得開啟任何自動補全旗標。
+
+## 43. 第二十一批：scanner enrichment transport 的能力閘門接線（2026-11-14）
+
+前端 `runPrediction()` 現在保留後端回傳的 server-owned `scan_context`、authority token 與 item ID；scanner 只有在 `EXPO_PUBLIC_NUTRITION_ENRICHMENT_ENABLED=true`、context 已持久化且含 authority token、以及部署注入完整 `EXPO_PUBLIC_NUTRITION_SOURCE_POLICY_ID`／`REVISION` 時，才會建立 `POST /nutrition/enrichment` 請求。policy 不在 client 推導或硬編，Tavily／USDA 金鑰也不進 Expo 設定。缺少任一條件、provider／policy 錯誤或低信心門檻失敗時，原本的 TFDA／USDA 結果保持可見，不能用缺值冒充 0；只有可安全合併的 point values 才更新掃描項目。
+
+新增 enrichment request／scan context／合併結果測試，並修正 legacy `DetectedFood` 的缺值邊界：`fiber` 等會參與既有總量計算的欄位不會被寫成 `undefined`，新項目缺必要點值時保留未解狀態。前端完整回歸為 189 項、typecheck、lint、web export 全數通過；後端隔離回歸為 962 項（939 通過、23 項因未配置真 PostgreSQL 略過、0 失敗／錯誤）。證據見[phase3k-frontend-regression.json](../food-nutrition-evaluation/2026-11-14/phase3k-frontend-regression.json)與[phase3k-backend-regression.json](../food-nutrition-evaluation/2026-11-14/phase3k-backend-regression.json)。
+
+這只是可關閉的 transport 接線，不是第三層上線，也沒有改變目前部署的旗標。仍須完成來源權利／policy、真 PostgreSQL／Mongo 多程序與跨重啟 HTTP、真 Tavily／模型 replay，以及今日／歷史／趨勢／洞察對 nullable v2 read model 的正式接線；在這些條件完成前，三層自動補全保持關閉。
+
+## 44. 第二十二批：真 PostgreSQL 驗證前置審查（2026-11-14）
+
+依序執行企劃書列出的下一步，先檢查真 PostgreSQL 的驗收條件。現有測試環境沒有本機 PostgreSQL service、`psql`、Docker／Podman，也沒有配置 `NUTRILENS_TEST_DATABASE_URL`；目前 `start-server.bat` 仍使用 SQLite。因此不能把現有服務的 SQLite 資料庫或 production URL 當成 PostgreSQL 測試庫。
+
+實測結果：`test_postgres*.py` 共52項，其中29項 driver／連線／交易／SQL contract 通過，23項真 PostgreSQL integration 因缺少測試 URL 略過；database selection 14項全通過；營養 cache／enrichment request／profile／quota repository 的離線回歸35項全通過。完整證據見[postgres-validation-blocked.json](../food-nutrition-evaluation/2026-11-14/postgres-validation-blocked.json)。
+
+另新增`test_nutrition_postgres_integration.py`，在有測試 URL 時會以隨機schema驗證scan authority JTI replay、enrichment request跨連線結果重播與quota global last-slot；目前單獨執行3項皆因環境缺口略過，沒有嘗試連線。
+
+重跑隔離後端全套後為965項：939通過、26項略過（上述23項既有live PostgreSQL加新fixture 3項）、0失敗／錯誤；證據見[phase3l-backend-regression.json](../food-nutrition-evaluation/2026-11-14/phase3l-backend-regression.json)。
+
+本批沒有讀取或暴露 `TavilyKey.txt`／`USDA KEY.txt`，沒有呼叫 Tavily、USDA 或模型，沒有寫入使用者資料，也沒有改變 production registry 或任何自動補全旗標。已確認的結果只涵蓋 driver／SQL contract 與 SQLite／離線語意，不涵蓋真 PostgreSQL 的 row lock、cross-process lease、quota last-slot、重啟 replay 或 HTTP。
+
+目前阻擋條件明確化：需取得一個可丟棄、非 production 的 PostgreSQL／Supabase 測試 URL，透過 `NUTRILENS_TEST_DATABASE_URL` 注入後，才可執行營養 repository 的 schema、跨程序併發、跨重啟及 HTTP replay 驗收。Mongo enrichment 仍明確不支援，維持 fail-closed；本階段不補一個未具備 transaction／unique-index 保證的假 Mongo 路徑。`PRODUCTION_SOURCE_REGISTRY`、`automatic_web_fallback_enabled` 與 `NUTRITION_ENRICHMENT_ROUTE_ENABLED` 繼續關閉。
+
+## 45. 第二十五批：安裝本機 PostgreSQL 並完成 live persistence 驗收（2026-11-14）
+
+依上一批列出的阻擋條件安裝 PostgreSQL 17，建立只供本機測試使用的
+`nutrilens_test_runner` 角色，並讓它只在 `postgres` 測試資料庫建立隨機 schema。
+服務保持 `postgresql-x64-17`／Automatic、只接受 `127.0.0.1:5432`，驗證規則恢復為
+`scram-sha-256`；測試 URL／密碼只注入單次程序，不寫入 repo、`.env.local` 或 evidence。
+
+先前的 `postgres-validation-blocked.json` 與第44批文字保留，因為它們正確記錄安裝前
+「沒有服務／沒有 URL」的歷史狀態；本節與新 evidence 記錄安裝後結果，不覆蓋歷史結果。
+
+| 驗收 | 結果 |
+| --- | --- |
+| 既有 `test_postgres_integration.py` | 23/23 通過 |
+| `test_nutrition_postgres_integration.py` | 3/3 通過 |
+| 合計 | 26/26 通過 |
+| teardown 後測試 schema | 0 殘留 |
+
+這批實際驗證了 storage／auth／交易 rollback／唯一性／並行寫入／重連，以及營養 scan
+authority JTI 單次消費、enrichment request 跨連線重播與 global quota 最後名額競態。
+`start-server.bat` 仍讓正式 v1.0.2 使用 SQLite；PostgreSQL 服務不會自動接管正式使用者資料。
+
+本批解除「真 PostgreSQL persistence」這一項，但尚未解除第三層正式開啟條件：Mongo atomic
+路徑、真 Tavily／模型 HTTP replay、來源 policy／保存權利、跨重啟 authenticated route、
+以及四個統計畫面的 nullable v2 消費仍需完成。所有 production registry 與自動補全旗標保持關閉。
+
+## 46. 第二十六批：單一來源 policy／adapter admission 閘門（2026-11-14）
+
+PostgreSQL persistence 通過後，依企劃順序先驗收真 provider 之前的來源准入邊界。web
+nutrition policy／identity／rights、reviewed source adapter、profile/source repository
+三組聚焦回歸合計 `82/82` 通過，證據見
+[source-policy-admission-regression.json](../food-nutrition-evaluation/2026-11-14/source-policy-admission-regression.json)。
+
+本批確認 production registry 仍為空；沒有合法且唯一的來源 policy 時，不會進 Tavily
+search／extract、不會讓模型選格、不會建立 profile，也不會寫入 positive cache。adapter
+保留原始營養格、單位、比較界限與 content hash，缺值、矛盾、未支援列名、食品身分或
+rights 不明時 fail-closed；來源撤回／revision 變更會阻擋新 profile，跨帳號 reuse 必須
+有明確 provider cache 授權。
+
+本批沒有 Tavily、USDA、模型或使用者資料副作用。下一步是用已核准的單一來源 policy 做
+不落盤的真 Tavily／模型 HTTP replay；USDA FDC 若維持 API-only，必須走固定 FDC adapter，
+不能把 API JSON 或搜尋結果誤當 Tavily 網頁來源。Mongo enrichment 仍維持 fail-closed，
+所有 production registry 與自動補全旗標保持關閉。
+
+## 47. 第二十七批：真 Tavily／模型單一來源 HTTP replay（2026-11-14）
+
+依第46批順序，以臺安醫院 QQ 王子地瓜球 PDF 作為「單一請求、不可重用」的隔離來源，
+只驗證 Tavily Search／Extract、現有 relay 模型與 adapter 的真實 HTTP 邊界。測試使用後端
+`TAVILY_API_KEY`與既有 relay 設定，沒有讀取或寫入正式 SQLite／PostgreSQL、沒有建立
+production profile／cache，也沒有呼叫使用者掃描 route。證據：
+[Tavily Search／Extract](../food-nutrition-evaluation/2026-11-14/live-tavily-single-source-replay.json)、
+[模型與 adapter replay](../food-nutrition-evaluation/2026-11-14/live-tavily-model-replay.json)、
+[production query replay](../food-nutrition-evaluation/2026-11-14/live-tavily-query-replay.json)。
+
+| 實測 | 結果 |
+| --- | --- |
+| Search（兩個 production query） | HTTP 成功；第一個查詢回空集合，第二個回核准 PDF；各 1 credit |
+| Extract（核准 PDF） | 1 個文件、`failed_urls=0`、可追溯 request id／content hash；本次 0 credit |
+| relay 模型固定格式 | 完成 `NutritionExtractionV1`，`finish=stop`、項目完整，判定 `no_evidence`，9 個營養選格皆為 null |
+| reviewed Markdown adapter | 預期拒絕 `ambiguous_identity`：Tavily 將 PDF 表格壓成單行文字，沒有可安全對齊的 Markdown 表格 |
+| 副作用 | production registry／route／automatic fallback／cache 全未使用；資料庫與使用者紀錄未修改 |
+
+這次實測解除的是「真 HTTP 可呼叫」疑問，不是「來源可自動納入」或「營養數字已可信」。
+Search 空集合在目前兩次 query 規則下是合法結果；只有核准 URL 明確回來才進 Extract。更
+重要的是，模型即使看見原文中的數字，也被固定提示詞要求在沒有 audited table／欄位證據時
+回 `no_evidence`，不能靠模型記憶補值。PDF／線性 HTML 目前不能直接套 reviewed Markdown
+adapter；若要支援，下一批必須新增「指定來源、指定表格版型、保留原文 cell evidence」的
+專用 adapter 與其正反例，不得加入通用正則或讓模型自行重排數字。來源出版者權利仍未核准，
+因此不能把本來源放入 `PRODUCTION_SOURCE_REGISTRY` 或跨使用者快取。
+
+下一步先完成 SQLite-only 程式清理：移除 PostgreSQL runtime selection、專用 adapter／driver
+dependency及不再需要的 PostgreSQL tests，保留既有 SQLite 使用者資料並跑完整 SQLite 回歸；
+此項完成前不宣稱專案程式碼已 SQLite-only。接著才選一個已完成權利審查且有可驗證營養表的
+來源，完成專用 adapter 的正向 candidate、缺欄、單位／基準矛盾與錯誤身分測試，再接到
+authenticated route 做跨重啟、quota、JTI replay 與前端 transport 驗收。USDA FDC 繼續走固定
+API client／adapter，不經 Tavily 網頁層；不以 PostgreSQL／Mongo 作為正式部署或第三層驗收條件，
+所有自動補全旗標維持 fail-closed。
+
+## 48. 第二十八批：SQLite-only SQL 清理與來源准入重審（2026-11-14）
+
+依資料庫決策移除專案內的 PostgreSQL SQL 執行路徑：`backend/repositories/database.py` 僅開啟 SQLite／明確記憶體模式，若 `DATABASE_URL` 非空則安全停止；`app.py`、備份與重設密碼工具均不會將 PostgreSQL URL 當 SQLite 使用或退回記憶體。移除 PostgreSQL adapter、專用 driver 依賴及舊 PostgreSQL 測試；保留第45批 PostgreSQL live test 的歷史證據與本機 PostgreSQL 服務，不搬移／修改 SQLite 使用者資料。舊 `render.yaml` 仍指向 `v1.0.1` 並注入 `DATABASE_URL`，因此它是舊版部署設定，不可拿來部署目前 SQLite-only 的 `v1.0.2`；正式維運依 [Windows Tailscale + SQLite 部署說明](../Local_Server_Deployment.md)。
+
+| 驗收 | 結果 |
+| --- | --- |
+| SQLite database selection／`DATABASE_URL` fail-closed | 通過；另有 subprocess app import 驗證 PostgreSQL driver 缺席時仍可啟動 SQLite |
+| JTI consume／revoke／跨重啟 replay 與 authenticated route targeted tests | 32/32 通過 |
+| 完整後端回歸 | 906 tests、682 subtests 全通過，0 failed、0 skipped |
+| PostgreSQL runtime／driver／test files | 已由目前 v1.0.2 工作樹移除；第45批26/26 live PostgreSQL 結果仍只作歷史隔離證據 |
+| v1.0.1、SQLite 使用者資料、本機 PostgreSQL 服務 | 未修改；沒有資料庫遷移或服務停用 |
+
+證據見[sqlite-only-cleanup-regression.json](../food-nutrition-evaluation/2026-11-14/sqlite-only-cleanup-regression.json)。這只確認 SQL backend 與部署文件決策，不代表第三層已可啟用。`PRODUCTION_SOURCE_REGISTRY` 仍為空、automatic fallback 與 enrichment route 仍關閉。USDA FDC 的 CC0 資料權利僅支持把它列為固定 ID API replay 候選；現有 adapter 未提供食材搜尋／辨識候選選擇，也未接 scan route。Tavily／模型對地瓜球來源的單次測試因頁面表格不可安全對齊而拒絕，且出版者／跨使用者保存權利未核准。不得把單一 Apple API replay 或單次 PDF 請求擴大解讀為一般食品已可補全。
+
+下一步應先針對 USDA FDC 做「搜尋候選身分→人工／server policy 確認→固定 ID 取值」的離線合約與負例設計，再決定它是否適合作為第三層的一個獨立 provider。Tavily 網頁來源則須另外找到可審核、權利明確且 adapter 能保留原始營養格的來源；在此之前不新增 production policy、不接通自動 fallback、不把營養資料用於提高影像信心。Mongo fallback 不屬 SQL 決策範圍，但不支援這條 durable enrichment pipeline。
+
+## 49. 第二十九批：USDA FDC 候選搜尋與身分選擇離線合約（2026-11-14）
+
+新增 bounded `FoodDataCentralClient.search_foods()`：固定 FDC Search endpoint、僅限 Foundation／SR Legacy／Survey (FNDDS)、單頁最多10筆、共用 deadline／512KB回應限制／strict JSON／無redirect或retry，回傳時只保留候選 ID、描述、資料類型與有限識別 metadata，不輸出搜尋回應中的營養列。新增 `FdcCandidateSelectionV1` prompt／validator，將辨識食品名稱、食用狀態、料理方式、組成範圍、品牌與變體交給模型做候選身分建議；不提供份量、信心、健康資訊或營養值。候選 ID 必須是 canonical 正整數字串且最多18位，candidate metadata 限白名單；狀態／料理／組成範圍未知或缺漏時禁止 suggestion。即使模型提出 suggestion，也一律降為 `confirmation_required`，不會接受候選、取回固定 ID 詳情或建營養 profile。
+
+| 驗收 | 結果 |
+| --- | --- |
+| FDC client／adapter／selection 定向回歸 | 31 passed、12 subtests passed |
+| 完整隔離後端回歸 | 922/922 passed、0 failed／skipped，117.876秒 |
+| FDC ID／metadata／身分未知負例 | 0、前導零、19位 ID、錯型描述／品牌、非分析資料類型、未知／缺漏 state/preparation/scope 均拒絕 suggestion |
+| 外部副作用 | 0 USDA Search／Extract、0 Tavily／模型呼叫、0 key read、0使用者DB操作 |
+
+證據見[fdc-candidate-selection-regression.json](../food-nutrition-evaluation/2026-11-14/fdc-candidate-selection-regression.json)。這是離線合約驗收，不證明中文／英文 query 的真 FDC 命中率、同名食品精確度、照片辨識可靠度或每100g營養相容性。模型候選僅是待確認的識別建議，不得增加影像信心，也不得直接成為 nutrition profile。production registry 為0，`automatic_web_fallback_enabled` 與 `NUTRITION_ENRICHMENT_ROUTE_ENABLED` 維持 false。
+
+獨立複核另外列出 route wiring 前的阻擋：prompt 與 validator 目前各自收候選 mapping；正式接線必須由同一 server-owned、normalized、不可變的 item/candidate snapshot 同時建立 prompt 與驗證結果，並以 scan revision／item-set 與候選 digest 防止兩階段資料漂移。下一步先做小範圍 live USDA Search replay，記錄中文及英文 query 的候選與空結果；之後只對明確確認的 FDC ID 取固定 food detail 並驗 adapter。未完成候選 snapshot binding、使用者確認流程、固定 ID adapter 串接與來源 policy 前，不可接正式 scan route 或開啟自動補全。Tavily 網頁來源仍須另外完成出版權利與原始表格 cell adapter 審查。
+
+## 50. 第三十批：糯米腸 USDA FDC live Search replay（2026-11-14）
+
+使用本機 `USDA KEY.txt` 只執行三次受限 `/foods/search`（每頁最多10筆；沒有 Extract、Detail、模型或資料庫）：一次原本預期為「糯米腸」的查詢在 Windows PowerShell→Python 管線中發生字元轉碼，不能視為有效中文 query；一次 ASCII 英文 `rice sausage` 查詢成功，回傳10筆，其中有西班牙／波多黎各香腸飯、一般豬／牛／煙燻香腸及美式 pork sausage rice links，沒有可確認為台式糯米腸的項目；以 Python Unicode escape 重新正確送出「糯米腸」後，API 成功但回傳0筆。API key 僅在程序環境使用，未輸出或記錄其值；沒有查詢營養明細或寫入使用者資料。
+
+完整逐筆清單及限制見[fdc-live-search-replay.json](../food-nutrition-evaluation/2026-11-14/fdc-live-search-replay.json)。此結果只代表這兩種 query 下的 bounded Search 結果，不能宣稱 USDA FDC 完整資料庫沒有糯米腸；但已足以證明目前以中文直查或寬泛 `rice sausage` 自動映射會造成 miss／誤配風險。該候選集若送入身分 validator，應回 `ambiguous` 或 `no_match`，不得挑選一個看似接近的 sausage/rice 記錄，更不能因此產生營養值或提高照片辨識信心。
+
+下一步先改進並離線驗證 query normalization／受控同義詞策略（例如保留「糯米腸」原名，同時產生明確、低數量的英文變體），再以相同 bounded Search 方式測試；任何擴展 query 仍須以候選身分審查作判定，不能依搜尋排名自動採用。若沒有明確同物候選，FDC 對此食品就應保持 not_found，再由獲准的其他來源流程決定是否可補值。正式 route、source policy、使用者確認 UI、snapshot digest binding 及 automatic fallback 均未開啟。
+
+## 51. 第三十一批：受控 FDC query normalization 與計畫綁定（2026-11-14）
+
+新增 `FdcSearchQueryPlanV1`。對每個 server-owned scan item，原始中文名稱永遠是第一個 query；英文變體只能來自 server allowlist，糯米腸目前只允許 `glutinous rice sausage` 與 `Taiwanese glutinous rice sausage`，明確排除前一批已證明誤配風險高的 `rice sausage`。英文 alias 最多兩個；超量、重複、品牌混入、控制字元或模型自產 alias 直接拒絕，不靜默截斷或去重。
+
+query plan 同時保存 `item_id`、`scan_revision`、canonical identity digest、query source 與是否允許 identity expansion。後續驗證若名稱、品牌、食用狀態、料理方式、組成範圍、variant 或 revision 變更，舊 plan 會回 `plan_mismatch`，不能把舊查詢的候選套到新照片。若 state、preparation 或 components scope 缺漏／unknown，plan 只保留原始名稱，不擴張英文查詢。
+
+| 驗收 | 結果 |
+| --- | --- |
+| query normalization targeted suite | 6 passed、6 subtests passed |
+| FDC client／adapter／selection／query suites | 31 passed、18 subtests passed |
+| full backend isolated regression | 以 [fdc-query-normalization-regression.json](../food-nutrition-evaluation/2026-11-14/fdc-query-normalization-regression.json) 記錄 |
+| 自動採用／營養副作用 | 0；query plan 不選候選、不取營養、不提高照片信心 |
+
+此批只驗證查詢產生與身分綁定，沒有新增 USDA Search、Tavily、模型或使用者 DB 呼叫。下一步可用這組 query plan 做第二輪受限 live FDC Search，但每個 alias 的候選仍需交給同一份 immutable candidate snapshot 與 `FdcCandidateSelectionV1` validator；沒有明確同物候選時維持 `not_found`。正式 scan route、固定 ID detail、人工確認 UI、production source policy 與 automatic fallback 仍維持關閉。
+
+## 52. 第三十二批：受控 alias 的 FDC live Search（2026-11-14）
+
+依第51批的 `FdcSearchQueryPlanV1` 實測原始中文與兩個 server allowlist alias，各發出一次 bounded FDC Search；沒有 food detail、模型、Tavily 或資料庫操作。`糯米腸` 回0筆；`glutinous rice sausage` 與 `Taiwanese glutinous rice sausage` 各回10筆，前六筆主要是 glutinous rice flour／cooked glutinous rice／rice cake，後續混入 sausage-and-rice dishes，兩組結果相同，沒有可確認為台式糯米腸的候選。
+
+證據見[fdc-alias-live-search-replay.json](../food-nutrition-evaluation/2026-11-14/fdc-alias-live-search-replay.json)。這表示 allowlist alias 改善了「糯米」文字召回，但沒有改善完整食品身分精確度；不能把糯米、飯糕或香腸飯的 profile 當成糯米腸。對本 item 的安全結果仍是 `not_found`，不進固定 ID detail、不建立 nutrition profile、不提高影像信心。下一步應優先處理使用者確認／其他已核准來源，不再為了提高召回而擴張模糊 alias；candidate snapshot、人工確認與 source policy 仍是正式 route 前置條件。
+
+## 53. 第三十三批：FDC immutable candidate snapshot binding（2026-11-14）
+
+新增 `FdcCandidateSnapshotV1`，由伺服器一次正規化 scan item identity 與 FDC candidate metadata，並固定候選順序。snapshot 綁定 `scan_revision`、有序 item identity digest、`item_set_digest` 及 canonical `snapshot_digest`；只保留 `fdcId`、描述、資料類型及有限識別 metadata，不帶營養值、影像信心、份量或健康資料。prompt 與 validator 都只能接收同一份已驗證 snapshot，模型回傳必須帶回 `snapshot_digest` 與 `scan_revision`；任何 snapshot、候選、item identity、revision 或模型輸出漂移均 fail-closed。選中的候選仍只回 `confirmation_required`，不會自動接受或建立 nutrition profile。
+
+| 驗收 | 結果 |
+| --- | --- |
+| snapshot／query／client／adapter 定向回歸 | 38 passed、18 subtests passed |
+| 完整隔離後端回歸 | 929/929 passed、0 failed／skipped |
+| drift／tamper 負例 | snapshot digest、item-set digest、revision、identity、模型 digest、快照外 FDC ID、重複／缺漏 item、未知欄位均拒絕 |
+| 外部副作用 | 0 USDA Search／Detail、0 Tavily／模型、0 key read、0使用者 DB操作、0 profile、0影像信心變更 |
+
+證據見 [fdc-candidate-snapshot-regression.json](../food-nutrition-evaluation/2026-11-14/fdc-candidate-snapshot-regression.json)。本批仍是離線 selection contract，不代表 FDC 食品辨識或營養值可用；沒有接 scan route、人工確認 UI、固定 ID detail、來源 policy 或 automatic fallback。SQLite-only 正式部署決策不變，PostgreSQL 仍非正式部屬 SQL。
+
+下一步只能在完成使用者確認及固定 FDC detail／adapter 的獨立驗證後，才可評估是否納入第二層後的受限來源流程；糯米腸目前 live Search 結果仍維持 `not_found`，不得用近似糯米／飯糕／香腸飯資料補值。
+
+## 54. 第三十四批：FDC 使用者確認契約（2026-11-14）
+
+新增 `FdcCandidateConfirmationV1` 離線 validator，與模型候選建議分離。使用者只能在同一份 server-owned immutable snapshot 內選擇已呈現的 FDC ID；`reject` 與 `defer` 不得攜帶 FDC ID。
+
+確認結果初始狀態為 `confirmed_pending_revision`，綁定 `snapshot_digest`、`scan_revision` 與 `identity_digest`；現行實作在同一 SQLite transaction 內簽發新的 server-owned scan revision，再保持 Detail replay pending。確認不會改寫照片信心、不會直接取營養、不會寫入 profile 或使用者資料庫；快照外 ID、digest／revision 漂移、重複／缺漏 item 及拒絕／延後帶 ID 均 fail-closed。
+
+定向 client／adapter／selection／confirmation suite 為 `40 passed`、0 failed；其中包含 Detail → `NutritionProfileV1` → 150g portion 的每100g換算回歸。完整隔離後端回歸為 `936 passed`、`0 skipped`、`0 failed`。本批沒有 live USDA Detail、Tavily、模型、key、route 或資料庫副作用；Detail adapter 只以 fake transport／離線 payload 驗證固定 endpoint、ID、adapter version、retrieval version、每100g限制與實際份量公式。正式 route 必須由伺服器依 authenticated user、scan_id、revision 與 digest 取回持久化 snapshot，不能信任客戶端自帶 snapshot。下一步不是再做離線換算，而是完成 server-persisted snapshot／使用者確認 endpoint 與新的 server-owned scan revision；糯米腸目前 Search 結果仍為 `not_found`，不得以近似候選代填。
+
+## 55. 第三十五批：FDC candidate snapshot 的 SQLite server-owned 持久化（2026-11-14）
+
+新增 `FdcCandidateSnapshotRepository`，以 SQLite-only 獨立資料表保存候選快照。正式 API 只接受伺服器端 FDC Search 結果的 `candidates_by_item`；repository 會重新讀取 authenticated user 綁定的 scan context，從其完整 item identity 重新建立 `FdcCandidateSnapshotV1`，再保存 `scan_id`、`scan_revision`、`item_set_digest`、`snapshot_digest`、expiry 與狀態。production-facing API 不接受客戶端傳入的 snapshot 或 digest；完整快照寫入僅存在 private persistence primitive。
+
+同一 scan revision 的不同候選 mapping 會回 `snapshot_conflict`；錯誤使用者、revision／identity 漂移、digest 不符、過期、撤回、重啟後讀取及新 revision 使舊快照失效均 fail-closed。快照仍不含營養值、份量、影像信心或健康資料；模型建議與使用者確認尚未由本 repository 自動接受。
+
+| 驗收 | 結果 |
+| --- | --- |
+| FDC snapshot repository + scan context + selection + Detail adapter focused suite | `39 passed`、`21 subtests passed` |
+| server-owned boundary | 只從 persisted scan context + server candidate mapping 建立 snapshot；client snapshot／digest 不可直接寫入 |
+| persistence 負例 | candidate mapping drift、wrong user、revision／digest mismatch、expiry、restart、new revision invalidation 均拒絕 |
+| 外部副作用 | 0 live USDA Detail、0 Tavily／模型、0 API key read、0 confirmation/profile／使用者飲食紀錄 |
+
+本批只完成 server-owned snapshot storage，沒有 confirmation endpoint、actor/time/idempotency/expiry confirmation record、固定 Detail route 或前端確認 UI。正式流程下一步仍必須新增 authenticated confirmation endpoint：只接受 server 取回的 snapshot reference，記錄 actor、時間與 idempotency，並在 `confirm` 後建立新的 server-owned scan revision；`reject`／`defer` 不得攜帶 FDC ID。自動補全旗標與 production source registry 維持關閉。
+
+## 56. 第三十六批：FDC 使用者確認的 SQLite durable contract（2026-11-15）
+
+新增 `FdcCandidateConfirmationRepository`，只接受確認 envelope，不接受客戶端 snapshot。它先依 authenticated user、`scan_id`、`scan_revision` 與 envelope 中的 digest 取回 server-owned snapshot，再以同一份 snapshot 驗證每個 item 的 `confirm`／`reject`／`defer`。持久化記錄綁定 actor、snapshot／item-set digest、request hash、idempotency key、建立時間與 expiry。
+
+`confirm` 保存為待 Detail replay 的確認結果，並固定 `requires_new_scan_revision=true`、`photo_confidence_changed=false`；目前 SQLite 原子 transaction 已簽發該新 revision，但不直接取 Detail、建立 nutrition profile 或提高影像可信度。`reject`／`defer` 不得攜帶 FDC ID；相同 idempotency key 只能重播同一結果，換 payload 會回 conflict。錯誤 actor、錯誤 digest、客戶端候選、過期、舊 revision、重播及同一 snapshot 的衝突決策均 fail-closed。
+
+| 驗收 | 結果 |
+| --- | --- |
+| confirmation + snapshot + selection focused suite | `28 passed`、`16 subtests passed` |
+| durable binding | authenticated user、actor、scan revision、item-set／snapshot digest、request hash、idempotency、expiry 均保存 |
+| 外部副作用 | 0 live FDC／Tavily／模型、0 key read、0 Detail/profile、0影像信心變更 |
+
+此批仍不是 HTTP/UI 流程：confirmation repository 已由 app 初始化，但尚未建立 authenticated confirmation endpoint，也尚未在 confirm 後自動建立新的 scan revision。下一步才是 route／UI integration 與新 revision transaction；在此之前所有自動補全旗標與 production source registry 維持關閉。
+
+## 57. 第三十七批：authenticated FDC confirmation HTTP contract（2026-11-15）
+
+新增 `POST /nutrition/fdc/confirmation`，但預設 `FDC_CONFIRMATION_ROUTE_ENABLED=false`。路由順序固定為先驗證 Bearer 登入，再檢查 feature flag，再拒絕未知欄位／user mismatch，最後只把 `scan_id`、`scan_revision`、`idempotency_key` 與確認 envelope 交給 `FdcCandidateConfirmationRepository`。請求不能攜帶候選 snapshot；repository 會由 server-owned snapshot 重新驗證候選。
+
+`confirm` 回 HTTP `202` 與 `confirmed_pending_revision=true`；`reject`／`defer` 仍不能授權 FDC ID。response 明確帶出 `photo_confidence_changed=false`，避免前端把確認誤當成影像模型信心提升。route error mapping 對 wrong user、snapshot mismatch、過期、confirmation conflict、idempotency conflict 與 feature disabled 維持穩定 typed code。
+
+| 驗收 | 結果 |
+| --- | --- |
+| confirmation HTTP + repository + snapshot + selection focused suite | `33 passed`、`16 subtests passed` |
+| authentication／feature gate | 未登入先回401；旗標關閉回503；不會先讀 snapshot 或呼叫 provider |
+| client boundary | user mismatch／未知欄位／client snapshot 皆拒絕；repository 只收到 envelope |
+| 外部副作用 | 0 live FDC／Tavily／模型、0 key read、0 nutrition profile、0新 scan revision |
+
+這仍不是完整確認流程：本節記錄的初始 route 尚未把 confirm 與新 scan revision 原子化；該缺口已於第58節補上。前端確認 UI、固定 Detail HTTP、profile／份量接續與 production source policy 仍未完成。`FDC_CONFIRMATION_ROUTE_ENABLED`、`FDC_DETAIL_ROUTE_ENABLED`、`NUTRITION_ENRICHMENT_ROUTE_ENABLED`、`automatic_web_fallback_enabled` 與 production registry 維持關閉。
+
+## 58. 第三十八批：FDC confirmation 與 scan revision 原子簽發（2026-11-15）
+
+confirmation repository 在 SQLite `BEGIN IMMEDIATE` 交易中先查 idempotency key，再驗證 server-owned active snapshot；若 payload 為 `confirm`，同一 transaction 呼叫 scan context repository 將舊 revision 標成 `superseded`、建立下一個 server-owned revision，並保存 confirmation 結果及明確選取的 FDC ID。response 回 `confirmed_revision_issued`、`issued_scan_revision` 與 `requires_detail_replay=true`；保留 `requires_new_scan_revision=true` 表示這次確認要求的新版已發出。HTTP 對成功 `confirm` 回202，`reject`／`defer` 回200且不建立新 revision。照片信心不變；candidate ID 沒有被複製成影像辨識 identity。
+
+相同 user／idempotency key／actor／scan／revision／digest／canonical payload 重播時先回既有紀錄，無須再讀已 superseded 的 snapshot，也不會新增 revision；任何綁定或 payload 不同都拒絕。scan context、confirmation 和 revision 更新在一筆 SQLite 交易中，故後續 INSERT 失敗時 rollback 會一併恢復舊 active revision。拒絕／延後只有決策紀錄；混合 confirm+defer 發行 scan revision 但各項狀態仍分開保存，deferred item 不會取得 FDC ID，之後不能被當成已確認項目。
+
+| 驗收 | 結果 |
+| --- | --- |
+| confirmation repository + HTTP + scan context 聚焦 suite | `23 passed` |
+| 完整隔離後端回歸 | `970 passed`、`710 subtests passed`、0 skipped／failed；120.12 秒 |
+| 負例／恢復 | idempotent replay、payload conflict、SQLite close/reopen replay、兩連線並發只建立一筆、rollback、reject/defer 不發 revision、混合決策未確認項目保留、photo confidence 不變、lookup active/expiry/owner binding |
+| 副作用界線 | 0 USDA／Tavily／模型／FDC Detail 請求、0 API key read、0 profile 或使用者飲食紀錄寫入 |
+
+此批只證明 SQLite 確認及 revision 的原子持久化，不代表 scanner 已能讓使用者操作。`FDC_CONFIRMATION_ROUTE_ENABLED` 預設仍為 false；固定 Detail HTTP boundary 已於第59節記錄，但仍沒有前端 UI、profile／portion 接續、來源 rights／policy 或真 HTTP／行動端驗收。Detail route 必須使用 authenticated server-owned confirmation record 和 issued revision 取回確認 ID，不得接受任意 client FDC ID。`FDC_DETAIL_ROUTE_ENABLED`、`NUTRITION_ENRICHMENT_ROUTE_ENABLED`、`automatic_web_fallback_enabled` 與 production registry 維持關閉。正式部署 SQL 維持 SQLite-only，PostgreSQL 不作正式部署使用。
+
+## 59. 第三十九批：固定 FDC Detail replay HTTP boundary（2026-11-15）
+
+新增 `POST /nutrition/fdc/detail`，預設 `FDC_DETAIL_ROUTE_ENABLED=false`。請求只接受 `confirmation_id`、`scan_id`、`issued_scan_revision`、`item_id`；authenticated route 透過 server-owned confirmation lookup 取得 active issued revision 中已確認的 FDC ID，不能接受 client `fdc_id`。provider client 僅能呼叫固定 FoodData Central Detail endpoint，單次 bounded timeout、禁止 redirect／retry，並驗證 numeric ID、response `fdcId` 與 provider error；route 只回 bounded document，不寫 nutrition profile／portion／使用者紀錄，也不改 photo confidence。
+
+Detail HTTP focused suite 與 confirmation／scan suite 合計 `29 passed`。覆蓋未登入、feature-off 不讀 confirmation/provider、client ID injection、confirmation／revision 不存在、未確認 item 不呼叫 provider、response mismatch sanitized error；沒有 live USDA、key、Detail、profile 或手機端副作用。仍未完成 Detail → `NutritionProfileV1` → portion 的線上接續、source rights/policy、前端確認 UI、真 HTTP／手機驗收，故 `FDC_DETAIL_ROUTE_ENABLED` 與所有自動補全旗標維持關閉。
+
+## 60. 第四十批：FDC Detail → NutritionProfileV1 → 份量預覽離線接續（2026-11-15）
+
+新增純函式 `build_fdc_detail_profile()`，但尚未接 HTTP 或資料庫。它只接受伺服器已取得的固定 FDC Detail document、reviewed FDC spec、確認後 scan identity、item_id 與實際重量；不接受客戶端自帶 FDC ID、營養 profile 或來源文件。流程固定為：FDC adapter 驗證固定 URL／ID／hash／retrieval version／資料類型與每100g基準，再由既有 evidence validator 建立 `NutritionProfileV1`，最後以 `calculate_portion()` 從原始 source cells 計算目前重量。
+
+辨識名稱與來源名稱分開保存，例如 scan 的 `蘋果` 與 FDC 的 `Apples, raw, with skin` 可以共存；food state、preparation、components scope、brand、variant 必須逐欄相等，`unknown` 與 `None` 不是 wildcard。缺少 calories/protein/carbs/fat 任一核心點值、身分不符、重量未知／非有限／非正值、來源矛盾或重複換算均 fail-closed。輸出包含 recognition identity、source identity、source block、profile 與 portion，刻意不帶 confidence，也不會提高影像可信度。
+
+| 驗收 | 結果 |
+| --- | --- |
+| FDC detail profile focused + adapter/detail/repository suite | `59 passed`、`7 subtests passed` |
+| 每100g → 150g | 52 kcal → 78 kcal；鈉 1 mg → 1.5 mg，直接由原始格計算 |
+| 身分界線 | 中英文名稱可分離；品牌、狀態與 unknown wildcard 負例拒絕 |
+| 份量界線 | `None`、非有限、非正重量拒絕；不預設 100g |
+| 外部副作用 | 0 live USDA/Tavily/model、0 API key、0 SQLite profile／飲食紀錄、0 photo confidence 變更 |
+
+這一批只解除「固定 FDC 文件能安全進入既有 profile／份量合約」的離線前置條件，沒有證明 FDC Search 對糯米腸或其他台灣食品有可用身份精度，也沒有取得來源 policy／保存與跨使用者重用權利。下一步應把純接續綁到 server-owned source policy、confirmation issued revision 與單獨的 preview/write transaction；在這些條件完成前，`FDC_DETAIL_ROUTE_ENABLED`、`NUTRITION_ENRICHMENT_ROUTE_ENABLED`、`automatic_web_fallback_enabled` 與 production registry 維持關閉。
+
+## 61. 第四十一批：USDA FDC 專用 source policy 契約（2026-11-15）
+
+新增獨立的 `fdc_source_policy_service.py`，不把 FDC API 假裝成 Tavily Extract。FDC policy 必須標出 `provider_kind=usda_fdc_api`、canonical FDC ID、對應固定 Detail URL、source ID、per-100g table ID、adapter/retrieval version 與完整且已知的來源身份；政策另需 server-side approved review record、具體 reviewer/time 與既有 rights/retention/withdrawal 欄位。裸 FDC Search candidate 沒有此格式與 server review record，不能被直接升格為來源 policy。此 validator 只驗 policy 結構，review 權限、實際來源授權與 production 登錄仍是另一道人工／server-owned gate。
+
+| 驗收 | 結果 |
+| --- | --- |
+| FDC source policy validator | `7 passed` |
+| 固定 ID／URL／table／versions | 不相符即拒絕 |
+| candidate promotion／provider kind／review status | candidate、錯 provider、未 approved 均拒絕 |
+| 外部副作用 | 0 provider／模型呼叫、0 DB／profile 寫入、0 production policy |
+
+測試 fixture 只代表 validator contract，並非正式批准或跨使用者儲存權確認。下一步需讓 durable profile repository 對 FDC policy 強制重驗 `retrieval_version`、table、FDC ID 與 source identity provenance，再測 withdrawn policy、CAS 與 restart；web/Tavily policy contract 必須保持相容。所有 route、自動補全旗標及 production registry 仍關閉。
+
+## 62. 第四十二批：FDC policy 與 profile provenance durable binding（2026-11-15）
+
+本批把前一節列出的 provenance 缺口補到 SQLite profile repository，但仍停在 server-owned offline contract。FDC-shaped policy 不可透過改寫 provider kind 降級繞過固定來源檢查；專用 validator 會固定 provider、numeric ID、Detail URL/source ID、per-100g table、adapter/retrieval version、source identity 與 server review。profile 寫入 transaction 重新驗證 FDC ID/provider kind、table/retrieval version 和完整 source identity；Detail continuation 會輸出這些 provenance 欄位。candidate Search 結果仍沒有 policy promotion 資格。
+
+| 驗收 | 結果 |
+| --- | --- |
+| FDC policy validator + repository + detail focused suite | `26 passed`、`9 subtests passed` |
+| 完整 backend regression | `985 passed`、`719 subtests passed`、0 failed |
+| 負例 | candidate promotion、ID／URL／table／adapter／retrieval drift、source identity drift、provider downgrade、缺 review／rights 均拒絕 |
+| Web/Tavily 相容性 | 既有 generic policy/profile tests 全數通過 |
+| 外部副作用 | 0 live USDA/Tavily/model、0 API key、0 route/UI、0 production registry、0 enabled automatic fallback |
+
+測試 policy 只是 fixture，並非正式 rights 核准。尚未完成 FDC policy withdrawal／CAS／restart 的獨立 durable regression，也尚未把 confirmation-issued scan revision、source policy 與 profile preview/write 綁在一個不會巢狀開交易的 private transaction primitive。所有自動補全旗標維持關閉；正式部署 SQL 維持 SQLite-only。
+
+## 63. 第四十三批：FDC policy durable regression 與 server-owned profile preview（2026-11-15）
+
+本批完成兩個仍可離線驗證的邊界。第一，SQLite FDC policy 專項回歸涵蓋 source ID／URL provenance 偽造、過期 CAS，以及關閉／重啟後 withdrawn policy 仍阻擋新 profile 寫入但保留歷史讀取。第二，新增唯讀 `FdcProfilePreviewService`：它只接受 authenticated confirmation、issued scan revision 與 item reference，從 server-owned scan context 取得 item revision、身份與實際重量，從 canonical active `usda-fdc-{fdc_id}` policy 取得固定 spec，呼叫固定 Detail client 後重新檢查 confirmation、scan context、policy、item 與重量，最後以 `build_fdc_detail_profile()` 產生 preview。client 不能提供 FDC ID、document、policy、profile 或重量；preview 不寫 profile、不寫飲食紀錄、不改 photo confidence。
+
+| 驗收 | 結果 |
+| --- | --- |
+| FDC preview focused suite | `10 passed` |
+| FDC policy／profile repository／preview focused suite | `32 passed`、`9 subtests passed` |
+| 完整 backend regression | `997 passed`、`721 subtests passed`、0 failed；120.91 秒 |
+| TOCTOU／負例 | policy withdrawal、confirmation revision drift、scan weight drift、stale context、未確認 item、未知重量、provider ID mismatch、malformed detail 均 fail-closed |
+| 外部副作用 | 0 live USDA/Tavily/model、0 API key、0 route/UI、0 profile／飲食紀錄、0 production registry、0 enabled automatic fallback |
+
+這一批仍不是可用功能：preview service 沒有 HTTP route，production registry 仍為空，測試 policy 的 `server_review=approved` 只是結構 fixture，不是正式法律／跨使用者 rights 核准。下一步才是設計獨立 preview persistence 與 accept/write transaction：同一 SQLite transaction 重新檢查 confirmation-issued revision、active policy revision、detail/profile hash、expiry 與 profile CAS，並證明 rollback、restart、idempotent replay 與兩連線競態；不可巢狀呼叫現有會自行開 transaction 的 `save_profile()`。所有 route 與自動補全旗標維持關閉。
+
+## 64. 第四十四批：FDC preview 持久化與原子 accept/write（2026-11-15）
+
+新增 `FdcProfilePreviewRepository` 保存 server-owned preview 的完整綁定（authenticated user、confirmation、scan revision/item revision、snapshot digest、FDC policy/source、detail content hash、profile hash、份量與辨識 identity）。`accept_preview()` 只接受 authenticated user、preview reference 與 idempotency key；在同一個 SQLite `BEGIN IMMEDIATE` transaction 內重新檢查 confirmation、issued scan context、item revision／完整 recognition identity／server-owned weight、active policy revision／provenance 及 profile hash，然後原子寫入 `nutrition_profiles` 並將 preview 標為 accepted。
+
+驗收涵蓋 profile insert 或 preview consume 失敗的完整 rollback、重啟後同 key replay、不重複建立 profile、不同 key conflict、兩個 SQLite connections 同時 accept 只成功一次、expired／withdrawn／policy revision／份量／identity drift、儲存 hash tamper，以及相同 preview ID 但不同完整 binding 的衝突。FDC focused suite `60 passed`；完整 backend regression `1000 passed`。沒有真 USDA Detail、Tavily、模型或 API key 呼叫。
+
+這一批仍不是正式可用功能：accept primitive 尚未接 HTTP、scanner/UI、authority consume 或飲食紀錄，也沒有把任何測試 policy 視為正式 rights 核准。`FDC_CONFIRMATION_ROUTE_ENABLED`、`FDC_DETAIL_ROUTE_ENABLED`、`NUTRITION_ENRICHMENT_ROUTE_ENABLED`、`automatic_web_fallback_enabled` 與 production source registry 全部維持關閉。正式部署 SQL 維持 SQLite-only，PostgreSQL 不作正式部署 SQL。下一步限定為 authenticated、disabled-by-default 的 preview/accept HTTP boundary；route 不得接受 client preview/profile/FDC ID/weight，且只能引用 server-owned preview。
+
+## 第四十五批：preview/accept authenticated HTTP boundary（2026-11-15）
+
+新增兩個預設關閉的 route：`POST /nutrition/fdc/profile-preview` 與 `POST /nutrition/fdc/profile-accept`。兩者均先驗證 Bearer 登入，再檢查各自 feature flag。preview request 只允許 `confirmation_id`、`scan_id`、`issued_scan_revision`、`item_id`；服務端依持久化 confirmation、issued scan context、active FDC policy 與固定 Detail client 產生 preview，並由 repository 產生 server-owned preview ID。accept request 只允許 `preview_id` 與 `idempotency_key`，profile、FDC ID、weight、document、source policy 等 client 欄位一律拒絕。
+
+route focused suite `7 passed`；另以真 Flask route、隔離 SQLite、scan/snapshot/confirmation/source/profile repositories 與真 preview service（只替換 fake Detail provider）完成 `2 passed` integration tests；FDC focused suite `69 passed`。測試涵蓋未登入先回401、旗標關閉不讀 service/repository、user-bound server references、client 欄位注入拒絕、typed error 不外洩 provider 細節、preview→accept→同鍵 replay 只保存一筆 profile、response profile/portion/source mapping 與 accept repository error mapping。沒有真 USDA/Tavily/model 呼叫、API key 讀取、scanner/UI 或飲食紀錄寫入。
+
+這仍不是正式開啟第三層：`FDC_PROFILE_PREVIEW_ROUTE_ENABLED`、`FDC_PROFILE_ACCEPT_ROUTE_ENABLED`、`FDC_CONFIRMATION_ROUTE_ENABLED`、`FDC_DETAIL_ROUTE_ENABLED`、`NUTRITION_ENRICHMENT_ROUTE_ENABLED`、`automatic_web_fallback_enabled` 與 production source registry 維持關閉。下一步只可做 HTTP contract review 及 Detail -> profile/portion 線上接續的 disabled-by-default 設計；完成真來源 rights、手機／Tailscale／SQLite bounded 驗收前，不得開啟 automatic fallback。
+
+## 第四十六批：前端 preview／accept 純 contract helper（2026-11-15）
+
+本批只新增前端隔離層，沒有接入 scanner、辨識主流程或任何畫面。`frontend/lib/nutrition-fdc-preview-api.ts` 僅允許送出伺服器參考：`confirmation_id`、`scan_id`、`issued_scan_revision`、`item_id`；accept 僅允許 `preview_id` 與 `idempotency_key`。FDC ID、重量、Detail document、營養 profile、source policy 等欄位若由客戶端注入，會在發出 HTTP 前拒絕。response 亦以嚴格 schema 驗證，不以 TypeScript cast 當成驗證；保留 Bearer、401 通知、typed error code 與 `Retry-After`，重播結果由伺服器的 `replayed` 欄位傳回。停用旗標優先於 request validation，且預設不發出網路請求。
+
+| 驗收 | 結果 |
+| --- | --- |
+| FDC helper 定向測試 | `6 passed`（含停用旗標優先、欄位注入阻擋、response schema、錯誤／Retry-After） |
+| 前端 nutrition regression | `124 passed` |
+| TypeScript／ESLint | `npx tsc --noEmit` 通過；helper 與測試 ESLint 通過 |
+| 後端 FDC focused | `30 passed`；完整後端 `1010 passed` |
+| 界線 | 0 scanner/UI 接線、0 live USDA/Tavily/model、0 API key、0 production flag 開啟 |
+
+這一批解除的是「手機端未來可使用固定 server-reference contract」的前置條件，不是使用者可見功能。尚未完成 confirmation UI、preview/accept 的手機／Tailscale bounded test、真 USDA Detail replay、正式來源 rights／production registry，也沒有把 profile 寫入接到飲食紀錄。`FDC_PROFILE_PREVIEW_ROUTE_ENABLED`、`FDC_PROFILE_ACCEPT_ROUTE_ENABLED`、`FDC_CONFIRMATION_ROUTE_ENABLED`、`FDC_DETAIL_ROUTE_ENABLED`、`NUTRITION_ENRICHMENT_ROUTE_ENABLED`、`automatic_web_fallback_enabled` 仍必須維持 `false`；正式部署 SQL 維持 SQLite-only，PostgreSQL 不作正式部署 SQL。下一步應先做真 USDA 固定 Detail 的 server-side replay 與 policy／rights review，再安排 disabled-by-default 的手機端 preview→accept 流程測試；在此之前不得開啟自動補全。
+
+## 第四十七批：真 USDA FDC 固定 Detail replay（2026-11-15）
+
+以後端環境變數注入的 USDA FDC API key，對固定 `GET /fdc/v1/food/1750340` 做兩次 read-only replay；金鑰只存在 process environment，沒有寫入報告、前端、提示詞或資料庫。兩次回應均為 HTTP 200、`fdcId=1750340`、`Apples, fuji, with skin, raw`、`Foundation`、35 列；固定 client 的 `retrieval_version=usda-fdc-api-v1`、response ID、大小／timeout／redirect／錯誤界線均通過。指定 server-reviewed nutrient numbers（energy 957、protein 203、fat 204、carbs 205、fiber 291、sodium 307、sugar 269）後，adapter、`NutritionProfileV1` 與 150g portion 公式通過；每100g值為 kcal 64.6609、protein 0.1484375g、carbs 15.6511625g、sugar 13.33g、fat 0.1625g、fiber 2.075g、sodium 1.013mg，飽和脂肪／反式脂肪保持 null；150g 為 kcal 96.99135、protein 0.22265625g、carbs 23.47674375g、sugar 19.995g、fat 0.24375g、fiber 3.1125g、sodium 1.5195mg。證據見 [usda-fdc-detail-replay-20261115.json](../food-nutrition-evaluation/2026-11-14/usda-fdc-detail-replay-20261115.json)。
+
+同一固定 ID 的完整 payload hash 可能因 USDA 回應中的選用 metadata 欄位而變動；hash 作為每次 retrieval 的 provenance，不作永久 byte-for-byte equality gate。兩次回應的食品 ID、描述、資料類型、列數、選定營養編號與數值一致；若核心 ID／描述／數值／資料類型改變，仍必須 fail-closed 並重新進行 source policy review。一次重播成功不代表糯米腸有可用同物候選，也不代表來源 policy、跨使用者保存權或 production registry 已批准；糯米腸的 FDC Search `not_found` 結論維持不變。
+
+| 驗收 | 結果 |
+| --- | --- |
+| 真固定 Detail replay | 2 次 HTTP 200；固定 ID／回應 ID／Foundation／35 列通過 |
+| adapter／profile／份量 | `28 passed`、`7 subtests passed`；真 payload profile 與 150g 換算通過 |
+| replay hash 行為 | metadata-only hash drift 已觀察；核心營養內容穩定，hash 每次保存 |
+| 外部副作用 | 0 SQLite／profile／飲食紀錄／route／UI／confidence／production registry 寫入 |
+
+本批仍保持 `FDC_*`、`NUTRITION_ENRICHMENT_ROUTE_ENABLED` 與 `automatic_web_fallback_enabled` 關閉；正式部署 SQL 維持 SQLite-only。修正 `tools/verify_fooddata_central.py` 讓 replay verifier 引用正式 `RETRIEVAL_VERSION`，避免 client 與離線工具版本漂移。
+
+## 第四十八批：來源 rights／保存／撤回 fail-closed 複核（2026-11-15）
+
+本批完成 USDA FDC、Tavily 與原始網站來源的權利邊界複核。USDA FDC 官方 API Guide 可確認資料為 public domain／CC0、應列 attribution、API key 必須留在伺服器，並有預設每 IP 每小時 1,000 次及 429 限制；這只支持 FDC 作為固定 ID replay 候選，不等於任意食品身份或第三層來源已核准。Tavily 官方文件可確認 Search／Extract 輸出可長期保存且沒有服務層最大保留期，但原始出版者權利仍須逐站確認，跨多使用者共用 cache 也要先確認方案權限。現有 `source-rights-audit.json` 保留這些查核參照，未把查核文字當成 production 授權。
+
+複核發現並修正 `NutritionProfileSourceRepository.get_profile_for_user()` 的撤回邊界：來源撤回後，owner 可在明確 `include_withdrawn` 歷史讀取路徑取得嵌入快照；非 owner 即使要求歷史讀取，也必須回 typed `source_unavailable`，不可因 `source=None` 落到 rights lookup 造成 `TypeError`／500。SQLite profile cache 原本已有 TTL、source revision、owner scope 與撤回後 read-miss；新增負例確認跨使用者撤回讀取同樣 fail-closed。
+
+| 驗收 | 結果 |
+| --- | --- |
+| profile/source/cache/FDC rights focused suite | `16 + 8 + 7` tests passed |
+| 完整隔離 backend regression | `1011/1011 passed`、0 skipped／failed；證據見 [source-rights-withdrawal-regression-20261115.json](../food-nutrition-evaluation/2026-11-14/source-rights-withdrawal-regression-20261115.json) |
+| production registry／旗標 | registry `0`；`automatic_web_fallback_enabled`、enrichment、FDC confirmation/detail/preview/accept 均維持關閉 |
+| 外部副作用 | 本批回歸未新增 USDA、Tavily、模型或 API key 呼叫；沒有寫入使用者 profile／飲食紀錄 |
+
+本批**未解除來源閘門**。`retention_policy`／`withdrawal_policy` 目前仍是供審查的文字證據，撤回 primitive 會讓未來 authority/cache 失效，但不會依來源條款自動刪除既有 profile、cache 或 raw snapshot；若未來來源要求撤回即刪除，必須先新增明確 purge 語意或拒絕該來源進 registry。Tavily 原始網站權利及跨使用者共用 cache plan 尚未完成，故正式來源 registry 維持空集合。下一步依範圍凍結進入手機／Tailscale／SQLite 的 disabled-by-default bounded E2E；不因本批權利查核而開啟任何 production flag。
+
+## 第四十九批：SQLite／排程／Tailscale disabled-by-default HTTP smoke（2026-11-15）
+
+先停止再重啟現有 Windows 工作排程 `NutriLens Backend`，確認排程重新載入目前工作樹的 v1.0.2 程式；沒有搬移或寫入正式 SQLite 使用者資料。重啟後本機 `http://127.0.0.1:5000/health` 與 Tailscale Funnel `https://nutrilens-botto.tailcfc6d9.ts.net/health` 均 HTTP 200，回報 `app_version=v1.0.2`、`database=sqlite`、`auth_required=true`、`automatic_web_fallback_enabled=false`、`nutrition_v2_scanner_enabled=false`。證據見 [phase4-disabled-e2e-20261115.json](../food-nutrition-evaluation/2026-11-14/phase4-disabled-e2e-20261115.json)。
+
+對本機與 Tailscale 的 `/nutrition/enrichment`、FDC confirmation/detail/profile-preview/profile-accept 五條受保護路徑，在未帶 Bearer 時全部回 `401`；沒有 provider、Tavily、USDA 或 profile 寫入。另以臨時 SQLite 啟動隔離 HTTP 服務，註冊／登入臨時帳號後確認四條 FDC 路徑在旗標 false 時全部回 typed `503 feature_disabled`。營養 enrichment 的 malformed `{}` 請求回 `400 invalid_request`，未觸發 provider；其完整 valid server-owned scan contract 仍由既有 HTTP／route regression 覆蓋，不把 malformed 請求誤當成 production flag 開啟證據。
+
+本批發現一個部署操作事實：工作排程只會啟動既有進程，不會 hot-reload `app.py`；程式更新後若不先停止再啟動，health 可能仍顯示 v1.0.2，但新 route 仍是舊的 `Allow: GET` 行為。現有 `Local_Server_Deployment.md` 已要求更新前停止、更新後重啟與檢查 health；本次已按此修正實測。這不是資料庫破損，也不是開啟第三層的理由。
+
+| 驗收 | 結果 |
+| --- | --- |
+| scheduled task／SQLite／Tailscale health | 本機與 Funnel `2/2` HTTP 200；排程重啟後 Running |
+| 未登入 route boundary | 5 routes × 2 endpoints 全部 `401` |
+| 隔離登入＋停用旗標 | FDC confirmation/detail/preview/accept 全部 `503 feature_disabled` |
+| provider／資料副作用 | 0 live USDA／Tavily／model；正式 SQLite 未寫入；photo confidence 未變 |
+
+這只是部署與安全邊界 smoke，不是手機相機／相簿、使用者 confirmation UI 或完整 confirmation → issued revision → preview → accept 的真機流程。下一步仍可在不開啟旗標的前提下做 scanner/UI 接線檢查；若接線前置條件不足，保持 flags 關閉即為通過結果。
+
+## 第五十批：scanner／UI server-owned reference 接線審查（2026-11-15）
+
+本批以離線方式檢查 scanner、前端 transport helper 與後端 FDC route 是否已形成可安全操作的完整 reference flow。前端目前只呼叫 `/predict/vision-food`，再依明確環境旗標與 server-issued authority token 選擇性呼叫 `/nutrition/enrichment`；它沒有呼叫 FDC confirmation、profile-preview 或 profile-accept，也沒有在畫面狀態中保留 `scan_id`、issued revision、candidate snapshot digest 或 confirmation reference。這在 flags 關閉時不會造成誤用，但代表 FDC UI 尚未接線。
+
+後端雖已有 SQLite `FdcCandidateSnapshotRepository`、confirmation、Detail、preview 與 accept contract，候選 snapshot 的建立尚未由 `/predict/vision-food` 或其他 authenticated HTTP route 接通，亦沒有供 scanner 讀取 server-owned candidate snapshot／selection 結果的 reference-only endpoint。故目前若直接新增確認按鈕，客戶端將無法在不攜帶候選或 FDC ID 的前提下建立合法請求，不能實作。
+
+| 驗收 | 結果 |
+| --- | --- |
+| frontend nutrition regression | `124 passed`、0 failed |
+| frontend static checks | `typecheck passed`、`lint passed` |
+| FDC snapshot／confirmation／Detail／preview focused backend suite | `35 passed`、0 failed；隔離 SQLite／fake transport |
+| FDC UI transport call sites | confirmation／preview／accept 均為 `0`；scanner 只保留一般 enrichment context |
+| 外部副作用 | 0 live USDA／Tavily／模型、0 production DB/profile write、0 photo confidence change |
+
+證據見 [scanner-server-reference-audit-20261115.json](../food-nutrition-evaluation/2026-11-14/scanner-server-reference-audit-20261115.json)。本批結論是 `blocked_pending_server_candidate_contract`，不是前端測試失敗：下一個必要工作是先把 server-side FDC Search 結果依 scan revision 建立並保存 candidate snapshot，提供 authenticated reference-only read/selection contract，再保留 scanner reference 並接 confirmation UI。所有 FDC、enrichment、automatic fallback flags 與 production registry 繼續關閉；SQLite-only 決策不變。
+
+審查同時修正一個資料完整性問題：enrichment 若新增 item 且沒有 `portion.weight_g` 或正的 `recognition_context.estimated_weight_g`，前端不得再 fallback 到 `100g`。現在該 item 會留在 unresolved，不新增可記錄食物；既有 detection 的未知重量也不會被新的 enrichment payload 強行改寫。scanner records focused regression 為 `12 passed`，並已包含未知、零值與負值重量的 fail-closed 反例。
+
+## 第五十一批：server-owned FDC candidate search HTTP contract（2026-11-15）
+
+新增預設關閉的 `POST/GET /nutrition/fdc/candidates` 與 `FdcCandidateSearchService`。POST body 嚴格只接受 `scan_id`、`scan_revision`，使用 Bearer owner 從 SQLite 載入 active scan context；伺服器確認 TFDA 與 USDA FNDDS 資料集健康後，重跑既有本地 lookup。只有高信心、無 recognition validation issue 且 `no_local_mapping` 的項目會建立 FDC query plan；matched、source conflict、incomplete profile、incompatible、低信心或格式有問題均不會對 USDA Search 發請求。Search 僅使用 server allowlist query，限每個 scan 4 個真正 miss、12 次 Search、每次 5 筆候選與共用 25 秒期限；超出 item 預算時整個請求 fail-closed，不以未搜尋偽裝成 not-found。
+
+候選保存沿用 `FdcCandidateSnapshotRepository`，綁定完整 scan revision、identity 與 digest，request replay 讀回同一快照；程序內同一 scan/revision 以 keyed lock 避免並行重複 Search。GET 只讀 authenticated owner 的 active snapshot。HTTP response 僅含 server references、digest、scan/item revision、辨識 identity 與 FDC Search candidate metadata，不含 Detail 或營養數字；client 不能提交 item list、candidate、FDC ID、nutrition 或 digest。feature flag 是 `FDC_CANDIDATE_ROUTE_ENABLED=false`，SQLite-only 條件與 auth-first 順序不變。
+
+| 驗收 | 結果 |
+| --- | --- |
+| candidate service + HTTP contract | `13 passed`；含 auth-before-gate、owner boundary、client injection、local miss/status gate、replay、Search/deadline/candidate bounds、錯誤遮罩 |
+| FDC snapshot／query／client／scanner／enrichment + SQLite HTTP integration suite | `66 passed`、`68 subtests passed` |
+| 完整隔離 backend pytest | `1032 passed`、`721 subtests passed`、0 failed／skipped |
+| 外部副作用 | 0 live USDA Search、0 Tavily/model、0 API key read、0 production SQLite/profile/food record write |
+| production flags | `FDC_CANDIDATE_ROUTE_ENABLED`、所有 confirmation/detail/preview/accept/enrichment flags 與 automatic fallback 維持關閉；source registry 維持空集合 |
+
+詳細 evidence 見 [fdc-candidate-search-http-20261115.json](../food-nutrition-evaluation/2026-11-14/fdc-candidate-search-http-20261115.json)。本批解除的是 server-owned candidate snapshot 的建立與讀取 HTTP 前置，不是 scanner UI 或正式功能上線；跨 process 的 provider single-flight 尚未驗證，部署仍限定單一後端程序。下一步是在 scanner 掃描結果中保留 server references、顯示僅有候選的 item，並以現有 confirmation contract 提交 user selection；在 UI 與手機 bounded E2E 完成前不可開啟 candidate/confirmation flags。
+
+## 第五十二批：scanner candidate reference transport 與生命週期（2026-11-15）
+
+新增 `nutrition-fdc-candidate-api.ts`，前端只送 `scan_id`／`scan_revision`，支援建立與讀取 owner-bound snapshot；成功回應需通過精確 schema 驗證，並綁定請求 scan reference、digest、revision、候選上限及 `available`／`empty` 一致性檢查。未知欄位（含任何 nutrition 值）、跨 scan 回應、不合法 FDC ID 或不相容 snapshot 都 fail-closed。`empty` 是有效的「沒有候選」結果，不會被誤判成 transport failure。
+
+scanner 將辨識回應中的 `scan_id`／revision 暫存於 Zustand，但不保存 authority token。候選 Search 僅在 `EXPO_PUBLIC_FDC_CANDIDATE_SEARCH_ENABLED=true` 且使用者已有登入 token 時以背景請求執行；預設值為 `false`。回應只在原 scan reference 仍是目前狀態、owner 與 API host 相符時才可寫入。重新掃描、開始下一次掃描、清除結果、登出、換帳號或切換 API host 都會清除 reference/snapshot；舊請求完成時不能再附著到新狀態。候選取得不改變辨識名稱、照片信心、營養值或可記錄項目，失敗不阻擋既有 scanner 流程。
+
+| 驗收 | 結果 |
+| --- | --- |
+| frontend nutrition regression | `131 passed`、0 failed |
+| scanner records + reference lifecycle | `15 passed`、0 failed |
+| frontend static checks | TypeScript typecheck 與 ESLint 通過 |
+| backend candidate route/service focused | `8 passed`；隔離 SQLite／fake FDC，未呼叫 live provider |
+| default/network boundary | 前端與後端 candidate flags 預設關閉；本批 0 live USDA/Tavily/model/key；0 production profile/record write |
+
+本批完成的是 scanner reference transport 與 store 清理，不是使用者確認畫面，也沒有執行 enabled candidate Search。另有一項 UI 前置需先處理：目前掃描器重量可由 client 本地調整，但 FDC preview 只讀 server-owned scan weight；若 UI 顯示調整後重量卻提交既有 preview，使用者看到的克數會與計算基準不同。下一步可接 item-by-item 候選確認畫面及既有 `/nutrition/fdc/confirmation`，但須先明確決定要在 preview 顯示伺服器原重量，或先以受控 revision route 保存重量調整；不得以 client weight 覆蓋 server source。確認 UI 仍須以 server snapshot digest／identity 驗證，並保持照片 confidence 不變。完成手機 camera/gallery 與 SQLite/Tailscale bounded E2E、來源 rights admission 前不可開啟 production flags；跨 process Search single-flight 也仍未驗證。
+
+## 第五十三批：server-owned weight contract 與逐項 candidate confirmation UI（2026-11-15）
+
+先檢視重量調整的真實資料流：`updateScanFoodWeight()` 只在 Zustand 依掃描原始 profile 重算本機顯示／待記錄營養；目前沒有重量更新 HTTP route。既有 `create_revision_in_transaction()` 用於確認候選時原樣簽發下一版，並要求 item-set hash 不變，不能安全地當成重量修改 API。因此本批選擇較窄的契約：候選確認只確認使用者選中的 server snapshot candidate；未來 FDC preview 必須以 server-owned scan weight 計算。面板明示本機份量校正只用於目前飲食紀錄，候選不含營養，確認也不會寫入 profile 或 dietary record。尚未提供數字版 server weight preview，也尚未建立可修改重量的授權 revision route。
+
+新增 `nutrition-fdc-confirmation-api.ts` 與 `FdcCandidateReview`。前端 request 精確限制為 authenticated scan reference、stable retry idempotency key、snapshot digest 和每項 `confirm`／`reject`／`defer`；不傳 snapshot、client FDC ID 以外的來源識別、營養 profile、重量或 confidence。`confirm` 的 FDC ID 必須存在於該 item 的 server-returned candidate list；每個 snapshot item 都須明確選擇。成功 response 需綁回 scan/revision/digest/item identity，禁止營養欄位，並驗證 confidence 不變與 issued revision。issued revision 成功後 scanner reference 只前進一版並清除舊 snapshot；原辨識 detection 保留。失敗重試沿用同一 request/idempotency key，快速連點有同步鎖保護。`EXPO_PUBLIC_FDC_CONFIRMATION_ENABLED` 新增為預設 false，且仍需後端 `FDC_CONFIRMATION_ROUTE_ENABLED`。
+
+| 驗收 | 結果 |
+| --- | --- |
+| frontend nutrition regression | `138 passed`、0 failed |
+| scanner reference lifecycle | `16 passed`、0 failed |
+| TypeScript typecheck／ESLint | 通過 |
+| existing backend confirmation + profile preview API contracts | `12 passed` |
+| browser smoke | Expo Web `http://localhost:8081/` 載入登入畫面；390×844 viewport；0 console errors/warnings；未登入，未到達確認面板 |
+| external side effects | 0 live USDA/Tavily/model/key、0 production SQLite/profile/dietary-record write；沒有開啟 feature flag |
+
+證據見 [fdc-confirmation-ui-contract-20261115.json](../food-nutrition-evaluation/2026-11-14/fdc-confirmation-ui-contract-20261115.json)。此批完成的是前端確認 contract 與 scanner 顯示，不是 end-to-end 功能驗收：確認路由未在瀏覽器呼叫，尚未驗證手機相機／相簿、SQLite/Tailscale enabled flow，也未把 confirmation 接固定 Detail/profile preview 或 accept。來源 rights admission、production registry 與跨 process Search reservation 仍是上線 gate；在這些條件解除前所有 candidate、confirmation、preview、accept、enrichment 和 automatic fallback flags 維持 false，SQLite-only 決策不變。下一步先以隔離 SQLite 和 fake Detail provider 完成 camera/gallery → candidate → confirmation → server-owned preview 的 bounded E2E，並檢查 revision／重量在全流程一致；不要連接 profile accept 或飲食紀錄寫入。
+
+## 第五十四批：scanner server-owned FDC profile preview（2026-11-15）
+
+在逐項候選確認結果上新增「預覽固定資料營養」操作；只有已確認且已簽發新 scan revision 的項目可以請求 preview，並採逐項手動載入，避免候選載入時自動觸發固定 Detail。前端只送 `confirmation_id`、`scan_id`、`issued_scan_revision`、`item_id`，回應須符合該 reference、原 candidate snapshot digest、item revision、使用者確認的 FDC ID，且 `portion.weight_g` 必須與 server response 的 `weight_g` 一致；不讀取本機調整重量做覆寫。UI 同時呈現每100g與伺服器估重份量的營養值，點值缺失但有上限時顯示 `< 上限`，未提供的欄位保留為未提供。預覽不套用掃描結果、不變更影像信心度、不寫入 `nutrition_profiles` 或飲食紀錄。
+
+新增獨立前端開關 `EXPO_PUBLIC_FDC_PROFILE_PREVIEW_ENABLED=false`，仍需後端 `FDC_PROFILE_PREVIEW_ROUTE_ENABLED`。preview API response 增加 exact-key 與 confirmation／scan／revision／item 綁定檢查；401 只有在請求仍屬於原 session 時才通知登出，避免帳號切換後舊請求影響新帳號。元件沒有呼叫 profile-accept API。注意後端 preview route 會將短效 preview capability 存入 `nutrition_fdc_profile_previews`，以供後續接受流程重新驗證；這不是 profile 寫入，但不是零資料庫寫入。
+
+新增隔離記憶體 SQLite 的真 HTTP route 測試，從實際 confirmation route 取得 revision 1 後接續呼叫 preview，Detail 使用 fake provider。偽造 `weight_g` 的請求在 provider 呼叫前回 400；合法 preview 取 server context 的 150g，portion 熱量為 78 kcal，確認 `nutrition_profiles` 筆數為 0，僅有一筆短效 preview capability。未呼叫 accept。
+
+| 驗收 | 結果 |
+| --- | --- |
+| frontend typecheck／ESLint／web export | 通過 |
+| frontend nutrition regression | `141 passed`、0 failed |
+| confirmation／preview／repository／service／Detail focused backend suite | `52 passed`、`2 subtests passed` |
+| isolated SQLite confirmation HTTP → issued revision → preview HTTP | 通過；偽造重量 `400` 且 provider 呼叫 0；合法預覽 `150g`、`78 kcal`；profile row `0`、preview row `1` |
+| browser smoke | `http://localhost:8081/` 載入成功但停在登入畫面；本批未以瀏覽器走到 preview 面板，故 mobile／desktop preview layout 尚未驗收 |
+| external／production side effects | 0 live USDA／Tavily／model，0 production DB/profile/meal-record write；profile-accept 未呼叫；正式功能旗標未變更 |
+
+詳細證據見 [fdc-profile-preview-ui-flow-20261115.json](../food-nutrition-evaluation/2026-11-14/fdc-profile-preview-ui-flow-20261115.json)。目前完成的是 confirmation→server-owned preview 的前端接線及隔離後端 HTTP contract，不是相機／相簿到預覽的完整 E2E。下一步應以隔離登入、SQLite 與 fake route/provider 驅動手機尺寸的 browser flow，驗證候選確認、版本前進與 preview UI；另需完成來源 rights／production registry 與跨 process Search reservation 審查。所有正式 flags 維持 false，preview 暫存列的期限／清除流程與 profile-accept 仍分開驗證；SQLite-only 決策不變。
+
+## 第五十五批：scanner gallery → FDC preview responsive browser E2E（2026-11-15）
+
+以獨立 Expo Web 埠 `8082` 啟動本機瀏覽器測試；candidate／confirmation／preview 前端 flags 僅在該測試程序設為 true，API origin `8090` 的所有請求均由 Playwright route mocks 攔截。使用 synthetic localStorage login、mock user profile、1×1 PNG gallery file chooser 與 fake vision/candidate/confirmation/preview responses，實際操作畫面完成：相簿選圖 → 候選選擇 → confirmation revision `0 → 1` → server-owned preview。確認 request 只帶 scan reference、idempotency key、digest 與使用者逐項決定；preview 僅送 `confirmation_id`、`scan_id`、`issued_scan_revision`、`item_id`，伺服器重量 150g 與 portion weight 相同，78 kcal 的份量值依 UI 顯示。第一次 preview 故意回 `503`，畫面呈現可重試錯誤；重試後成功。全程未呼叫 profile accept 或飲食紀錄寫入。
+
+實測抓到 responsive 生命週期問題：手機與桌面曾用條件式替換 capture/results 子樹，造成 `FdcCandidateReview` 卸載，切換至桌面版時已載入的 preview 消失。現在共用同一個子樹，只依 viewport 調整排版方向；另將 mobile child 的 flex sizing 改為不指定 flex，避免 React Native Web 把內容壓成零高度。修正後 390×844 與 1440×1000 均無橫向溢出，preview 在手機轉桌面後仍保留。
+
+| 驗收 | 結果 |
+| --- | --- |
+| Browser flow | gallery file chooser → fake vision → candidate → confirmation `202`／issued revision `1` → preview `503` error → retry preview `200`；contract request body assertions passed |
+| responsive behavior | 390×844 手機與 1440×1000 桌面皆無水平溢出；preview survives breakpoint change |
+| scanner regression | `16 passed`、0 failed |
+| frontend static checks | TypeScript typecheck、ESLint、Expo web export 通過 |
+| console | 0 page runtime errors；觀察到刻意注入 preview `503` 對應的瀏覽器資源錯誤，及既有 `props.pointerEvents` deprecation warning |
+| side effects | 0 live USDA／Tavily／model、0 backend／database request、0 accept／record write；正式 flags 未變更 |
+
+詳細證據見 [fdc-profile-preview-browser-e2e-20261115.json](../food-nutrition-evaluation/2026-11-14/fdc-profile-preview-browser-e2e-20261115.json)。此輪是實際 UI 加 fake API 的 browser E2E，不是瀏覽器直連 SQLite backend，也沒有使用真實相機；隔離 SQLite confirmation→preview HTTP 證據仍見上一批。下一步應把此瀏覽器互動接到隔離 SQLite HTTP server 與 fake FDC Detail provider，再完成來源 rights／production registry 和跨 process reservation gate 審查。production flags 仍關閉，SQLite-only 決策不變。
+
+## 第五十六批：scanner → 隔離 SQLite HTTP → FDC preview browser E2E（2026-11-15）
+
+新增 test-only 啟動器 [scanner_browser_e2e_server.py](../../backend/scripts/scanner_browser_e2e_server.py)，只允許使用 system temp 下專用新建資料夾的 SQLite 檔；後端以新 subprocess 載入，測試 token 僅接受固定值，且只在該 subprocess 開啟 candidate／confirmation／preview flags。Vision function、FDC Search 與 FDC Detail provider 以固定 fixture 取代；真實 scanner UI、Flask HTTP routes、owner auth boundary、scan context、candidate snapshot、confirmation revision、preview service 和 SQLite repositories 保持實際執行。Playwright 沒有攔截 `/predict/vision-food` 或 `/nutrition/fdc/*`。profile-accept、nutrition-enrichment 和飲食紀錄寫入沒有接通。
+
+實測發現上一批 E2E 雖走完 UI，但候選與確認 API 都是假回應，且高信心但沒有任何 local nutrition detection 時，scanner 原本會把 persisted server scan reference 清掉，因而跳過 candidate Search。現在新增 `hasReviewableNutritionMiss()`：只接受 server 回傳的 recognized/unmatched 狀態，且必須與 persisted scan item ID 相符、沒有 validation issue；前端保存該 scan reference 並繼續候選核對。低信心項目沒有 unmatched 狀態，無效 recognition item 仍被排除。空 detection 結果改顯示營養資料待確認，不再誤稱尚未辨識。此修正不改 confidence、營養值、source authority 或記錄行為。
+
+以合成 1×1 PNG 完成真瀏覽器相簿選圖 → 真 `/predict/vision-food` → 真 SQLite-backed candidate POST → 使用者選 candidate → 真 confirmation HTTP `202` 並簽 revision `0 → 1` → 真 preview HTTP `200`。fake FDC Detail 取回 server-owned ID 171688 的 per-100g profile；server weight 與 portion weight 均為 150g，52 kcal/100g 換算顯示 78 kcal。本輪 SQLite 留存 2 個 scan context（revision 0 與 1）、1 candidate snapshot、1 confirmation、1 active preview；`nutrition_profiles=0`、`records=0`。人工慢速操作有一輪因既有 120 秒 scan/confirmation expiry 收到 409；縮短流程後成功，TTL 保持不變，expiry fail-closed 行為正常。
+
+| 驗收 | 結果 |
+| --- | --- |
+| browser → Flask HTTP | vision `200` → candidate `200` → confirmation `202`／revision `1` → preview `200`；nutrition routes 無 Playwright interception |
+| SQLite writes | scan contexts `2`、snapshot `1`、confirmation `1`、active preview `1`、profile `0`、meal records `0` |
+| viewport | 390×844 與 1440×1000 皆無水平溢出；preview 在 breakpoint 變更後保留 |
+| scanner regression | `18 passed`、0 failed；低信心、validation issue 及跨 item ID 不會開啟 candidate review |
+| focused backend HTTP integration | `3 passed`；preview fake provider 與 SQLite integration |
+| frontend checks | typecheck、ESLint、Expo web export 通過 |
+| browser console | 0 runtime errors；僅既有 `pointerEvents` deprecation warning |
+| side effects | 0 live USDA／Tavily／model、0 production DB writes、0 profile accept／meal-record writes；正式部署 flags 未變更 |
+
+證據見 [fdc-profile-preview-sqlite-browser-e2e-20261115.json](../food-nutrition-evaluation/2026-11-14/fdc-profile-preview-sqlite-browser-e2e-20261115.json)。此批解除的是瀏覽器到真 SQLite HTTP route 的 bounded preview flow，仍非正式啟用。下一 gate 依序為來源權利／production registry 審查、跨 process Search reservation、真實相機與另一裝置/Tailscale 驗收，以及 expiry/restart 的 bounded UI 行為；profile-accept 與飲食紀錄寫入不在本階段。所有正式 flags 及 SQLite-only 決策維持不變。
+
+## 第五十七批：來源權利與 production registry 再審（2026-11-15）
+
+重新查核 USDA FDC、Tavily 官方資料與本機來源 policy／保存實作。USDA FDC API Guide 表明 FDC 資料為 public domain／CC0 1.0，建議標示 FDC 為資料來源；API key 必須留在 server，預設速率上限為每 IP 每小時 1,000 次，超限回 429。這只支持針對特定 FDC ID 和已審 adapter 建立候選 policy，不代表可用近似食品、所有資料型別一致或已批准 production registry。
+
+Tavily 官方說明允許保存 Search／Extract／Crawl 輸出，沒有最大保留期或 Tavily 層級的刪除要求，也允許在應用程式顯示結果；但 Tavily 不授予原出版者內容權利，出版者的條款與歸屬要求仍須逐站確認。Tavily 文件建議跨多客戶共用 cache 前聯絡其確認適用方案；目前實際 API 帳戶 order form／書面方案未檢視。現行 Platform Terms 對 API grant 描述為 customer internal business purposes，故也不臆測此個人架設環境的具體授權範圍。來源頁面未逐站 review 前，不允許以 Tavily Search 命中直接建立可重用營養來源。
+
+程式審查確認 source policy withdrawal 會使新的 authority／cache read fail-closed，但不等於刪除：source policy history、profile、cache、preview（含 profile／portion／source block）、過期 scan context、candidate snapshot、confirmation 及 enrichment request/result 都沒有 source-notice cascade purge；目前唯一明確物理清除流程是 cache 的 TTL `purge_expired()`。原始 Tavily Markdown 經 adapter/model 路徑使用，沒有發現獨立 raw-page table；但選取的原始表格列證據與營養 profile 可保存，不視為自動豁免出版者限制。若來源條款要求撤回即刪除，未實作 SQLite、WAL／journal 和 backup 範圍的 purge contract 前，該來源必須排除。
+
+決策：`PRODUCTION_SOURCE_REGISTRY` 維持空、`automatic_web_fallback_enabled`、enrichment、FDC candidates／confirmation／preview／accept flags 全部維持關閉。FDC 只列為 rights evidence 支持的逐筆 policy 候選，不作全域批准；Tavily Web 營養來源和 TFDA 個別網頁仍 blocked/review-only。沒有外部 provider call、讀取 API key、production DB write 或旗標變更。完整證據及官方連結見 [source-rights-recheck-20261115.json](../food-nutrition-evaluation/2026-11-14/source-rights-recheck-20261115.json)。
+
+下一個既定 gate 是以 SQLite 做跨程序 candidate Search reservation／single-flight 驗收；來源 admission 仍須逐站權利審核，若任何候選來源要求刪除，先補 purge contract 或排除該來源。真相機與另一裝置/Tailscale、expiry/restart UI 還是部署前界限，不能因此提早開啟 production flags。
+
+## 第五十八批：SQLite 跨程序 candidate Search reservation（2026-11-15）
+
+確認並修正原本只靠 class-level `threading.Lock` 的限制：SQLite snapshot 唯一鍵只能阻止兩份快照，無法阻止兩個 worker 都先執行 Search。新增以 `scan_id`／`scan_revision` 為鍵、綁 authenticated owner 的 durable reservation；預設 lease 為 60 秒，等待者最多等待 30 秒、每 50ms 唯讀查詢狀態。只有第一次 claim／到期接手需要短 `BEGIN IMMEDIATE`；搜尋本身維持既有 25 秒 provider deadline，期間不持有 SQLite writer transaction。
+
+完成時在單一交易重新驗證目前 lease owner、lease expiry 與 active scan，再寫 immutable snapshot 並刪除該 reservation；回滾時兩者均不提交。成功重播直接讀既有 snapshot；失敗則留 sanitized error code，現有等待者不自行串接重試，後續新請求才可重新 claim。程序中斷的 pending lease 到期後可由新程序接手，舊 token 不能提交或清除 successor 的 lease。reservation 不保存 provider 全文或營養值；過期 metadata 在 repository 啟動及後續有效 claim 時清理，沒有宣稱背景排程會即時刪除。
+
+獨立複核另發現 writer transaction 與 scan／snapshot Python lock 的兩種順序反轉，均已修正：durable snapshot 只依 SQLite connection／transaction lock，transaction-local scan state 與 durable snapshot read 直接讀同一連線，不再取得另一 repository 的 Python lock；記憶體單元測試仍保留原有鎖。regression 禁止 durable 路徑取得 snapshot lock，並檢查既有 confirmation 外層交易能讀 snapshot。
+
+| 驗收 | 結果 |
+| --- | --- |
+| Windows spawn 兩程序併發 | 確認 follower 在 provider 放行前已加入 reservation；只執行 1 份 query plan、3 次 fake Search；兩者 digest 相同 |
+| 第三個新程序重播 | 相同 digest；額外 provider call `0`；snapshot `1`、reservation `0` |
+| provider failure／retry | 兩個程序共用 `upstream_error`，失敗階段呼叫 `1` 次；之後新程序重試成功，累計 `4` 次 |
+| owner 中斷與恢復 | 真正 terminate 受控測試 worker；SQLite 保留 pending lease；注入時鐘 `1000 → 1006` 越過 `1005` expiry 後，新程序成功接手；含失去結果的呼叫累計 `4` 次 |
+| repository／wait guards | wrong owner、stale token、快照先完成競態、atomic rollback、唯讀輪詢及鎖順序均通過；等待只有初次 claim 的 `1` 個寫交易 |
+| 完整後端回歸 | 最後鎖順序修正後 `1044 passed`、`721 subtests passed`、0 failed／skipped，`141.07s`；其中 candidate focused collection `40` 項 |
+| 副作用 | 0 live USDA／Tavily／model／key read；0 production DB／profile／record write；未重啟正式服務、未 stage／commit，正式 flags 與 registry 未變 |
+
+證據：[fdc-candidate-search-reservation-20261115.json](../food-nutrition-evaluation/2026-11-14/fdc-candidate-search-reservation-20261115.json)。這是 lease single-flight 與至少一次恢復，不是外部 API exactly-once 保證；worker 在上游回應後、SQLite commit 前中斷時可能需要再次搜尋。crash 測試確實中止程序，但以注入時鐘推進驗證到期，沒有等正式 60 秒或呼叫真 provider。
+
+下一步先完成既定 expiry/restart bounded UI，之後再做可用實機的真相機／另一裝置 Tailscale 驗收及最後 production flag review；來源 rights／registry admission 仍獨立阻擋。六個工作流範圍與 SQLite-only 不變，不增加統計畫面或新資料庫工作；所有正式補全 flags 維持關閉。
+
+## 第五十九批：過期／重啟 UI 與原決定重試（2026-11-15）
+
+本批接續第五十八批的既定子項，沒有擴增六工作流。實測前查到三個可重現缺口：candidate catch 吞掉錯誤；確認／預覽過期仍原樣顯示英文並鼓勵重試舊參考；candidate parser 以裝置時間否決伺服器有效 snapshot。現以共用 typed recovery helper 分類錯誤，對暫時錯誤提供手動重試，對 terminal expiry/stale 清除匹配參考並顯示中文重掃提示。store 清理保留 detections／timestamp；舊帳號、舊 backend、舊 scan／revision 與晚到回應不能清除或回填新結果。確認網路失敗保留完整 pending request，重試不得重建冪等鍵。
+
+`scanner_browser_e2e_server.py` 僅在 loopback、專用系統 temp 目錄及 DB-specific marker 下允許 `--resume`。測試時鐘使用真時間加持久 offset，scan／snapshot／confirmation／preview repository 與 service 共用；`120s` TTL 不變。控制端點需測試 token，fake Search／Detail／Vision 不接外網；resume 不增加 policy revision，accept／enrichment 持續停用。
+
+| 驗收 | 結果 |
+| --- | --- |
+| candidate 失敗／重試 | fake upstream `502` 有中文提示，可手動重試成功；另測失敗後到期再重試回 `409`，Search calls `1 → 1`，舊重試按鈕移除 |
+| candidate 過期再確認 | `409`，沒有 confirmation／issued revision／Detail call；保留待補資料食品，提示重掃 |
+| confirmation 過期再 preview | `409 expired`，Detail `0`；新 issued scan 的 TTL 不會延長原 confirmation 的期限 |
+| Detail 進行中過期 | fake Detail 返回時推進時鐘 `121s`；post-I/O 重驗回 `409`，Detail `1 → 2`、preview rows `3 → 3`，沒有晚到預覽 |
+| 真服務停止／重啟 | server down 產生連線錯誤，UI 保留原決定；同 SQLite 新 PID 啟動後 body／冪等鍵完全相同，只建一個新 revision，preview `150g / 78 kcal` |
+| 已保存 confirmation 再重啟 | PID `37612 → 38124`，clock offset `363s`、policy revision `0` 與既有 rows 保持；replay `202`、同 confirmation ID／revision，續作 preview `200` |
+| 重啟後 expiry | 再推進 `121s`，confirmation replay／preview 都 `409`，Detail calls 不增加；清除辨識結果會移除舊 preview／reference |
+| responsive | error／preview 在 `375 / 390 / 430 / 768 / 1440` 寬度無水平溢出；390 與1440截圖檢視通過 |
+| 回歸 | 前端 `224 passed`；後端 `1051 passed / 734 subtests`、0 failed／skipped、`151.23s`；typecheck／lint／web export 通過 |
+
+瀏覽器採 Playwright CLI，因本環境沒有 Browser plugin。初期 programmatic file chooser 已處理後又呼叫 CLI upload，造成測試自身的 `removeChild` 錯誤；改用單一 CLI click/upload 流程後，以新 browser session 複測。最終 session 沒有 runtime exception／framework overlay，只有刻意觸發的 `502`、`409` resource log 與登入頁既有 form verbose 訊息。第一次人工跨重啟操作超過原120秒後正常拒絕；改為連續 bounded 操作成功，未延長期限。測試 server／browser sessions 已關閉；既有5000／8081服務保留。
+
+另外驗到 Metro 快取可能保留前一次測試環境開關。切換測試／一般設定後必須清快取再驗匯出；最終使用 `npm run build:web -- --clear`、same-origin 與四個 FDC／enrichment 前端 flags=false。一般 bundle `entry-348aeccb919537013547959488cd7c13.js` 不含測試8090位址或測試token，逐處確認 candidate／confirmation／preview 為false、enrichment直接保留原結果。測試開關僅存在專用temp匯出與測試server，不修改正式環境設定。
+
+本輪累積測試 DB 為13 scan contexts、7 snapshots、5 confirmations、3 preview rows，profiles／meal records 均0。rows 的 persisted `status=active` 不代表仍有效，實際權限還要驗expires_at；沒有宣稱定時 purge 或自動移除已顯示的唯讀預覽。未啟用 accept／飲食紀錄，未做真模型、USDA或Tavily呼叫，未檢視key內容、修改正式DB或重啟正式服務；`v1.0.1` exact branch仍為`bb81e922ac9d2d69440d446bf7f02f4b822efba6`。下一步只進入既定真相機／另一裝置Tailscale的可執行驗收；無法取得實機證據時保持阻擋，不以桌面瀏覽器替代，也不新增功能範圍。
+
+## 第六十四批：部署目前 v1.0.2 工作樹，等待 Android 未保存掃描（2026-11-16）
+
+依既有 Windows 部署手冊，先確認 `NutriLens Backend` 排程及 loopback 服務當時正常，使用 `python backend/scripts/backup_db.py` 完成 SQLite 備份，再執行 `npm --prefix frontend run build:local`，Expo web export 成功。接著停止原排程並確認其狀態已停止、`127.0.0.1:5000` 無 listener，再啟動同一排程；未建立新排程、搬移 SQLite 或改 `.env`／金鑰。重啟後排程為 Running、僅有一個本機 5000 listener，local 與 Funnel `/health` 均 HTTP 200，皆回報 `v1.0.2`、`sqlite`、`auth_required=true`、`automatic_web_fallback_enabled=false`、`nutrition_v2_scanner_enabled=false`、`ai_relay_enabled=true`。FDC／enrichment route flags 未由 health 暴露，本批沒有更動旗標，也不將未暴露旗標記為獨立實測。
+
+Funnel scanner 頁 HTTP 200，引用新 bundle `entry-348aeccb919537013547959488cd7c13.js`；以 SHA-256 比對遠端下載與本機 `frontend/dist`，皆為 `15c433c5bba7bcf8b478c240c51425246e7c858dc8b05fd954d49b667728e462`。health 的 `database_path` 欄位在外部 Funnel 回應為 null、本機回應有值，確認個人絕對路徑沒有外洩。部署證據見 [deployment-phone-smoke-preflight-20261116.json](../food-nutrition-evaluation/2026-11-14/deployment-phone-smoke-preflight-20261116.json)。
+
+此輪沒有登入、相機／相簿、辨識、profile accept 或飲食紀錄寫入；亦沒有觸發模型、USDA、Tavily 請求。服務啟動仍依正常 SQLite schema／維護流程存取資料庫，不能描述為完全未碰正式 DB；明確執行的 HTTP 僅 health、scanner HTML 與其 JS bundle。持續模型呼叫授權仍限開發／除錯／驗證，未授權正式補全、來源准入或正式紀錄。`refs/heads/v1.0.1` 仍是 `bb81e922ac9d2d69440d446bf7f02f4b822efba6`；SQLite-only 決策不變。
+
+使用者隨後提供 Android 行動瀏覽器截圖，畫面選中「相簿」，因此完成的是相簿上傳辨識，不是相機快門 E2E。實際結果與文案修正見第六十五批；相機流程仍需獨立驗收。
+
+## 第六十五批：Android 相簿辨識結果與來源摘要文案（2026-11-16）
+
+依使用者提供的四張 Android 結果截圖及一張便當照片記錄：共7個辨識候選，2項有可配對本機營養、5項待確認而未計入合計。白飯（97%，200g）顯示 TFDA、366 kcal／鈉4mg；滷雞腿（93%，105g）顯示 USDA 參考資料、222 kcal／鈉416mg。`366+222=588 kcal`、`4+416=420mg`，與摘要完全一致。此處的 USDA 標示是營養參考來源，不足以證明呼叫了 live USDA API。
+
+五項待確認為菜葉82%、茄子88%、豆干87%、毛豆84%、菜葉83%；UI 均表示缺少相同食品與食用狀態的可信營養資料，尚未計入。兩個葉菜仍是泛稱；截圖和單張照片不能獨立證明植物種類、項目位置對應或信心分數已校準。這與本批維持的身分門檻一致：不強迫模型猜大陸妹／青江菜，也不以菜葉泛稱查網路或相近食物營養。白飯卡片標示總糖、反式脂肪缺值；雞腿卡片說明 USDA 一般食物參考配方可能不同、可食重排除骨頭但包含皮，且反式脂肪缺值。所有可見營養仍是資料庫參考值按影像估重換算，非秤重或化驗真值。
+
+截圖暴露兩項 UI 語意不精確：頁首固定寫「Gemini + TFDA」，但此次雞腿卡片為 USDA 來源，而且 relay 設定可用，頁首不能表示此次實際模型／資料來源；上方「已辨識2項食物」實際只數到有營養配對的兩項，和五項已辨識但未配對的 pending 列表矛盾。已修正為依配對食物顯示實際來源摘要，無來源時使用中性標籤；標題改為「已配對 N 項營養資料」，辨識結果總數包含待確認食物，部分待確認時以警示 icon 表示。新增 helper 合約測試。`npm run test:scanner` 24項通過，TypeScript typecheck、Expo lint、`build:local` 通過；Playwright rendered QA 在390×844與1440×1000均無水平溢出、0應用程式錯誤（僅既有`pointerEvents`棄用警告）。重啟部署後 public bundle `entry-a14ad6f15a5616c7c0db5aed6c916e85.js` 與本機 SHA-256 `65a1c6ad6ae466bdcfa76aaea307201e36e9b96cd15f00da2896d1b1bebd24d9` 相同，health200且正式 flags仍關閉。
+
+驗收範圍是 Android 公開 HTTPS 頁面上的相簿照片辨識。首張圖明確選中「相簿」，不代表相機權限／快門流程通過。五張圖沒有顯示加入紀錄成功或錯誤，但也不足以證明未曾保存；儲存狀態未知。實際模型供應商、呼叫次數／重試、usage／費用、原始 request／response、Tavily／USDA live API 次數及 profile／meal DB 寫入均無法從截圖判定；上次部署 preflight 的 automatic fallback=false 不是本次 request trace。證據與每張圖 SHA-256 見 [android-gallery-recognition-20261116.json](../food-nutrition-evaluation/2026-11-14/android-gallery-recognition-20261116.json)。
+
+此文案修正已完成 build/deploy，public HTTPS bundle 與本機 build 雜湊相同，health 200；完整紀錄見第六十五批前段。下一步是使用者以 Android 相機快門走同一張照片流程，辨識後停在結果、不確認候選、不保存紀錄。相簿結果不應充當相機驗收，亦不作模型準確率聲明。
+
+## 第六十六批：目前 relay 原模型聯網能力重測（2026-11-16）
+
+依使用者授權，以現有受限診斷工具發出4次模型請求，全部0重試。requested alias `[AN]gemini-4-hydrogen-high`，relay回傳 `gemini-4-hydrogen`。一般 payload 與加上 `web_search_options` 的固定網頁讀取探測均 HTTP 200，但模型明確表示沒有網路搜尋／讀取能力；回應沒有 `tool_calls`、`annotations`、`grounding_metadata`。簡單 strict schema 控制通過；required function-tool 控制回傳1個 function call，證明一般工具呼叫介面可用，不能證明有搜尋工具。總回報 usage 為2,948 tokens，0重試；relay沒有價格資料，故不估算費用。證據：[model-capability-recheck-20261116.json](../food-nutrition-evaluation/2026-11-14/model-capability-recheck-20261116.json)。
+
+本批0 Tavily／USDA呼叫，未傳照片、未登入、未寫正式 SQLite／profile／meal-record，沒有更動正式 source registry 或 flags。本結果只代表目前 OpenAI-compatible relay payload／模型接線，不排除未來使用供應商原生 API 並明確啟用 Google Search grounding、保留可稽核來源 metadata。第三層目前建議是「受控搜尋與取回來源 → 模型從來源擷取結構化每100g營養欄位 → 後端驗證與按份量計算」；Tavily負責檢索，不判定食品身分或生成營養真值。正式 registry 仍空，automatic fallback仍關閉；模型不可憑記憶補數字，泛稱「菜葉」不具搜尋資格。
+
+此手機相機辨識待辦由第六十八批使用者回報接續；第六十八批只關閉 user-attested camera smoke，不代表 Tailscale／SQLite 營養 preview/accept、來源權利或正式補全驗收已通過。
+
+## 第六十七批：Android 相簿結果追測與 bundle 對照（2026-11-16）
+
+使用者提供另一組五張 Android 結果截圖。第1張模式列選中「相簿」，主要按鈕是「選擇餐點照片」，因此本批確認的是相簿流程，不是相機快門。畫面共7個候選，其中2項有營養配對、5項待確認。白飯97%、估重200g，TFDA資料顯示366 kcal、蛋白質6.2g、碳水82g、脂肪0.6g、飽和脂肪0.2g、膳食纖維1.2g、鈉4mg；總糖與反式脂肪未提供。滷雞腿96%、估重110g，USDA參考資料顯示232 kcal、蛋白質24.6g、脂肪14.7g、飽和脂肪4.1g、鈉436mg；碳水／總糖／纖維為畫面顯示的0，反式脂肪未提供。合計598 kcal、鈉440mg，`366+232` 與 `4+436` 算術吻合。
+
+五項待確認為綠色葉菜78%、茄子92%、豆干92%、毛豆仁90%、綠色葉菜80%，未計入營養合計。高信心分數不能證明身分或營養正確；綠色葉菜仍是泛稱，不應直接作為聯網檢索食材名。與第65批相比，雞腿估重105g→110g，顯示熱量222→232 kcal、鈉416→436mg；差異與估重改變相符，但沒有重量真值，不能據此評估精度。
+
+截圖1仍呈現舊版「Gemini + TFDA」及「已辨識2項食物」摘要。審查時僅以唯讀 GET 取得公開 scanner HTML 與 JS，各 HTTP 200；JS SHA-256 `65a1c6ad6ae466bdcfa76aaea307201e36e9b96cd15f00da2896d1b1bebd24d9` 與前次記錄的修正後 build 一致。截圖可能是在部署前擷取，或手機載入舊 bundle；沒有當時的 request／cache trace，無法判定原因，故不宣稱當前部署回歸。後續以手機重載頁面再測相機模式，並核對來源摘要是否為目前文案。
+
+截圖4看得到「加入今日紀錄」按鈕，但無成功／失敗回饋，是否曾保存仍未知。本批 agent 只 GET 靜態頁與 JS，未呼叫模型、USDA、Tavily或 application API，未接觸 SQLite，未改正式 flags、source registry 或程式。模型／USDA／Tavily app 執行時呼叫、登入、profile／meal writes、usage及費用均不能由截圖判定。完整雜湊與可證／未證項見 [android-gallery-followup-20261116.json](../food-nutrition-evaluation/2026-11-14/android-gallery-followup-20261116.json)。
+
+**下一步仍是相機快門驗收，不是再做相簿測試：**Android 開啟目前 HTTPS scanner 並重新載入、選「拍照」，用相機快門拍同一份便當，辨識後停在結果頁；不確認候選、不接受 profile、不加入今日紀錄。截圖需能證明相機路徑；若仍出現舊摘要或來源 badge，另記 bundle／瀏覽器快取資訊。相機 gate 完成前不宣稱手機端相機流程通過。
+
+## 第六十八批：Android 拍照辨識結果（2026-11-16）
+
+使用者回報已使用 Android 相機拍照辨識，並提供五張結果截圖。第一張顯示「拍照」模式選中、公開 HTTPS scanner 網域及辨識結果；使用者回報與畫面合併記錄為 user-attested camera smoke 完成。畫面沒有快門預覽／來源照片，結果頁仍顯示「啟動相機」，因此截圖本身不能獨立證明這些結果由該次快門產生，也不是原始 request／response trace。
+
+共8個候選，2項有營養配對、6項待確認。白飯（97%，估重180g，TFDA）顯示329 kcal、蛋白質5.6g、碳水73.8g、脂肪0.5g、飽和脂肪0.2g、膳食纖維1.1g、鈉4mg；總糖與反式脂肪未提供。茄子（88%，估重55g，USDA參考）顯示28 kcal、蛋白質0.6g、碳水3.4g、總糖2g、脂肪1.6g、飽和脂肪0.4g、膳食纖維1.7g、鈉73mg；反式脂肪未提供。畫面合計357 kcal、蛋白質6.2g、鈉77mg，逐項加總吻合。待確認為菜菜75%、熟肉塊35%（信心過低）、豆干丁90%、毛豆仁88%、雞腿95%、青江菜72%。信心為模型輸出，不是校準後真值；營養仍以估重計算，無秤重或配方真值。
+
+對照第六十七批截圖，兩批可見候選數、營養配對組合及白飯估重不同；這次茄子由待確認顯示為 USDA 參考配對，雞腿則待確認。由於未取得兩次完全相同的原始影像 bytes／取景條件，只記為可見結果差異，不推論同圖重跑穩定度或哪次更準。
+
+結果頁仍有「Gemini + TFDA」badge及「已辨識 2 項食物」舊摘要，與卡片顯示的 USDA 參考來源及6項待確認不一致。唯讀 GET 公開 `/scanner` 與 JS bundle 均 HTTP 200；目前 bundle `entry-a14ad6f15a5616c7c0db5aed6c916e85.js` SHA-256 `65a1c6ad6ae466bdcfa76aaea307201e36e9b96cd15f00da2896d1b1bebd24d9`，與本機 `frontend/dist` 相同，且不含截圖裡舊 badge／標題字串。這使手機載入舊資產或截圖攝於較早版本成為可能，但實際手機 cache／HTML／JS trace 未取得，確切原因仍未知。畫面有「加入今日紀錄」按鈕但沒有操作結果，資料保存狀態未知。模型／USDA／Tavily app runtime 呼叫、模型 tokens／費用、登入及 SQLite writes 均未由截圖揭示。
+
+本批 agent 只 GET 公開 scanner HTML／JS 各一次及讀取圖片／既有文件；沒有發出模型、USDA、Tavily或 application API 請求，沒有存取資料庫或修改程式／flags／registry。完整逐張雜湊、狀態及限制見 [android-camera-results-20261116.json](../food-nutrition-evaluation/2026-11-14/android-camera-results-20261116.json)。camera smoke 已依使用者回報完成；下一個手機 UI 窄驗收是完整重新載入 HTTPS scanner 並確認修正文案，再依既有 SQLite/Tailscale bounded E2E 工作流繼續。production registry 空、自動補全關閉及 SQLite-only 決策不變。

@@ -271,7 +271,7 @@ class SqliteApiTests(ApiTestBase):
             ).get_json()
             user_id = session["user"]["id"]
             headers = {"Authorization": f"Bearer {session['access_token']}"}
-            payload = {**meal("r1"), "user_id": user_id}
+            payload = {**meal("r1"), "user_id": user_id, "timestamp": app_now().isoformat()}
 
             first = self.client.post("/record", json=payload, headers=headers)
             second = self.client.post("/record", json=payload, headers=headers)
@@ -279,7 +279,7 @@ class SqliteApiTests(ApiTestBase):
             history = self.client.get(f"/history/{user_id}?days=7", headers=headers)
             deleted = self.client.delete(f"/records/{user_id}/r1", headers=headers)
 
-        self.assertEqual(first.status_code, 201)
+        self.assertEqual(first.status_code, 201, first.get_json())
         self.assertTrue(second.get_json()["deduplicated"])
         self.assertEqual(len(listed), 1)
         self.assertEqual(history.status_code, 200)

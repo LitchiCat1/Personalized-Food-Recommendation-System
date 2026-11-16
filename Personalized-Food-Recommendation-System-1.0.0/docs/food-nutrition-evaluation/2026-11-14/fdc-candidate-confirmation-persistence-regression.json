@@ -1,0 +1,58 @@
+{
+  "generated_at": "2026-11-15T00:10:00+08:00",
+  "scope": "sqlite_fdc_candidate_confirmation_persistence_contract",
+  "branch": "v1.0.2",
+  "contract": {
+    "database": "SQLite-only",
+    "client_snapshot_accepted": false,
+    "confirm_status": "confirmed_pending_revision",
+    "requires_new_scan_revision": true,
+    "photo_confidence_changed": false,
+    "actor_binding": "authenticated user must equal actor",
+    "idempotency": "same key replays exact result; changed request conflicts"
+  },
+  "targeted_regression": {
+    "command": "python -m pytest tests/test_fdc_candidate_confirmation_repository.py tests/test_fdc_candidate_snapshot_repository.py tests/test_fooddata_central_selection.py -q",
+    "passed": 28,
+    "subtests_passed": 16,
+    "failed": 0,
+    "errors": 0
+  },
+  "full_backend_regression": {
+    "command": "python -m pytest tests -q",
+    "tests_run": 947,
+    "passed": 947,
+    "subtests_passed": 710,
+    "failed": 0,
+    "skipped": 0,
+    "errors": 0,
+    "elapsed_seconds": 115.62
+  },
+  "negative_cases": [
+    "wrong actor",
+    "snapshot digest mismatch",
+    "client-selected FDC ID outside stored snapshot",
+    "expired snapshot",
+    "old scan revision",
+    "idempotency conflict",
+    "duplicate final decision on one snapshot"
+  ],
+  "external_side_effects": {
+    "usda_requests": 0,
+    "tavily_requests": 0,
+    "model_requests": 0,
+    "api_key_read": false,
+    "detail_requests": 0,
+    "nutrition_profiles_created": 0,
+    "photo_confidence_changed": false,
+    "http_confirmation_endpoint": false,
+    "new_scan_revision_created": false
+  },
+  "limitations": [
+    "No authenticated HTTP endpoint or frontend UI",
+    "No atomic confirm-to-new-revision transaction",
+    "No live FDC Detail or production source policy",
+    "Automatic enrichment flags remain disabled"
+  ],
+  "successful": true
+}

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import * as calculation from '../lib/nutrition-calculation.ts';
+import { loadNutritionModule } from './helpers/load-nutrition-module.mjs';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -16,6 +17,8 @@ const code = ts.transpileModule(fs.readFileSync(apiFile, 'utf8'), {
 }).outputText;
 new Function('require', 'module', 'exports', code)((id) => {
   if (id === './nutrition-calculation') return calculation;
+  if (id === './nutrition-response-validation') return loadNutritionModule('nutrition-response-validation');
+  if (id === './nutrition-read-history') return loadNutritionModule('nutrition-read-history');
   throw new Error(`Unexpected runtime dependency: ${id}`);
 }, module, module.exports);
 const api = module.exports;

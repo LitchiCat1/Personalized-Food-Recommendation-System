@@ -18,21 +18,37 @@ import SegmentedControl from '@/components/ui/segmented-control';
 import FeedbackBanner from '@/components/ui/feedback-banner';
 import ScannerManualTools, { ScannerPendingFoods } from '@/components/scanner/ScannerManualTools';
 import ScannerResults from '@/components/scanner/ScannerResults';
+import FdcCandidateReview from '@/components/scanner/FdcCandidateReview';
 import MenuCheckResults from '@/components/scanner/MenuCheckResults';
 import { checkMenuPhoto, type MenuPhotoCheckResponse } from '@/lib/api';
 import { resolveImageBase64 } from '@/lib/image';
 import {
   buildOCRDetectedFood,
+  formatScannerResultTitle,
+  formatScannerSourceBadge,
   FOOD_NAME_REQUIRED_MESSAGE,
+  hasReviewableNutritionMiss,
   manualSearchFood,
   normalizeFoodName,
   runNutritionLabelOCR,
   runPrediction,
+  mergeNutritionEnrichmentResult,
   saveCustomFood,
   saveRecord,
   type OCRDraft,
   type RejectedDetection,
 } from '@/lib/scanner';
+import {
+  buildNutritionEnrichmentRequest,
+  requestNutritionEnrichment,
+  NutritionEnrichmentApiError,
+  type NutritionScanContext,
+} from '@/lib/nutrition-enrichment-api';
+import { createNutritionFdcCandidateSnapshot } from '@/lib/nutrition-fdc-candidate-api';
+import { getNutritionFdcRecovery } from '@/lib/nutrition-fdc-recovery';
+import type { NutritionFdcConfirmationResponse } from '@/lib/nutrition-fdc-confirmation-api';
+import type { NutritionFdcCandidateSnapshotResponse } from '@/lib/nutrition-fdc-candidate-api';
+import type { ScannerServerScanReference } from '@/store/useStore';
 import { getAutoMealType } from '@/lib/meal';
 import { formatLocalTimestamp } from '@/lib/dietary-records';
 import { createRecordSubmissionSession, RecordSubmissionError } from '@/lib/record-submission';
@@ -62,6 +78,12 @@ type RecordFeedback = {
 type ActiveRecordSubmission = {
   key: string;
   source: RecordSource;
+};
+
+type FdcConfirmationDisplay = {
+  reference: ScannerServerScanReference;
+  snapshot: NutritionFdcCandidateSnapshotResponse;
+  result: NutritionFdcConfirmationResponse;
 };
 
 const recordSubmissions = createRecordSubmissionSession({ mealType: getAutoMealType, timestamp: formatLocalTimestamp });
@@ -217,6 +239,7 @@ export default function ScannerScreen() {
   const {
     scanResult,
     setScanResult,
+    advanceFdcCandidateScanRevision,
     updateScanFoodWeight,
     clearScan,
     setScanning,
@@ -241,12 +264,35 @@ export default function ScannerScreen() {
   const [syncingRecord, setSyncingRecord] = useState(false);
   const [activeRecordSubmission, setActiveRecordSubmission] = useState<ActiveRecordSubmission | null>(null);
   const [recordFeedback, setRecordFeedback] = useState<RecordFeedback | null>(null);
+  const [fdcConfirmationDisplay, setFdcConfirmationDisplay] = useState<FdcConfirmationDisplay | null>(null);
+  const [candidateFailure, setCandidateFailure] = useState<{
+    reference: ScannerServerScanReference; recovery: ReturnType<typeof getNutritionFdcRecovery>;
+  } | null>(null);
+  const [candidateLoading, setCandidateLoading] = useState<ScannerServerScanReference | null>(null);
+  const candidateRequestRef = useRef<ScannerServerScanReference | null>(null);
   const [pendingRecordQueue, setPendingRecordQueue] = useState<PendingRecordSync[]>([]);
   const recordSubmitInFlightRef = useRef(false);
   const recordSyncInFlightRef = useRef(false);
+  const scanAttemptRef = useRef(0);
   const ocrSubmissionKeyRef = useRef(buildSubmissionKey('nutrition-label'));
 
   const results = scanResult.detections;
+  const scanItemCount = results.length + rejectedDetections.length;
+  const sourceBadge = formatScannerSourceBadge(results.map((food) => food.source), rejectedDetections.length);
+  const resultTitle = formatScannerResultTitle(results.length, rejectedDetections.length);
+  const serverScanReference = scanResult.serverScanReference;
+  const fdcCandidateSnapshot = scanResult.fdcCandidateSnapshot ?? (
+    fdcConfirmationDisplay && serverScanReference &&
+    fdcConfirmationDisplay.reference.ownerUserId === user.userId &&
+    fdcConfirmationDisplay.reference.apiBaseUrl === apiBaseUrl &&
+    fdcConfirmationDisplay.reference.scan_id === serverScanReference.scan_id &&
+    (fdcConfirmationDisplay.reference.scan_revision === serverScanReference.scan_revision ||
+      fdcConfirmationDisplay.result.issued_scan_revision === serverScanReference.scan_revision)
+      ? fdcConfirmationDisplay.snapshot : null
+  );
+  const completedFdcConfirmation = fdcCandidateSnapshot && fdcConfirmationDisplay &&
+    fdcCandidateSnapshot.snapshot.snapshot_digest === fdcConfirmationDisplay.snapshot.snapshot.snapshot_digest
+    ? fdcConfirmationDisplay.result : null;
   const totalCal = results.reduce((sum, f) => sum + f.nutrition.calories, 0);
   const totalSodium = results.reduce((sum, f) => sum + f.nutrition.sodium, 0);
   const userPendingRecords = pendingRecordQueue.filter((item) => item.userId === user.userId);
@@ -257,6 +303,131 @@ export default function ScannerScreen() {
   const submittingManualFoodId = activeRecordSubmission?.source === 'manual'
     ? activeRecordSubmission.key.slice('manual:'.length)
     : null;
+
+  const clearScanAndInvalidate = () => {
+    scanAttemptRef.current += 1;
+    setFdcConfirmationDisplay(null);
+    setCandidateFailure(null);
+    clearScan();
+  };
+
+  const isCurrentFdcReference = (reference: ScannerServerScanReference) => {
+    const current = useStore.getState();
+    return current.user.userId === reference.ownerUserId && current.accessToken === accessToken &&
+      current.apiBaseUrl === reference.apiBaseUrl && current.scanResult.serverScanReference === reference;
+  };
+
+  const handleFdcReferenceUnavailable = (reference: ScannerServerScanReference, message: string) => {
+    if (!isCurrentFdcReference(reference)) return;
+    useStore.getState().invalidateFdcScanReference(reference);
+    setFdcConfirmationDisplay(null);
+    setCandidateFailure(null);
+    setRecordFeedback({ tone: 'error', title: '掃描參考已失效', message });
+  };
+
+  const loadFdcCandidates = async (reference: ScannerServerScanReference) => {
+    if (!accessToken || !isCurrentFdcReference(reference) || candidateRequestRef.current === reference) return;
+    candidateRequestRef.current = reference;
+    setCandidateLoading(reference);
+    setCandidateFailure(null);
+    try {
+      const snapshot = await createNutritionFdcCandidateSnapshot(reference.apiBaseUrl, {
+        scan_id: reference.scan_id, scan_revision: reference.scan_revision,
+      }, { accessToken }, { enabled: true, isCurrentSession: () => isCurrentFdcReference(reference) });
+      if (isCurrentFdcReference(reference)) useStore.getState().setFdcCandidateSnapshot(reference, snapshot);
+    } catch (error) {
+      if (!isCurrentFdcReference(reference)) return;
+      const recovery = getNutritionFdcRecovery(error);
+      if (recovery.rescan) handleFdcReferenceUnavailable(reference, recovery.message);
+      else setCandidateFailure({ reference, recovery });
+    } finally {
+      if (candidateRequestRef.current === reference) {
+        candidateRequestRef.current = null;
+        setCandidateLoading(null);
+      }
+    }
+  };
+
+  const isCurrentCandidateSnapshot = (reference: ScannerServerScanReference, snapshotDigest: string) => {
+    const current = useStore.getState();
+    const currentReference = current.scanResult.serverScanReference;
+    const currentSnapshot = current.scanResult.fdcCandidateSnapshot;
+    return current.user.userId === reference.ownerUserId && current.accessToken === accessToken &&
+      current.apiBaseUrl === reference.apiBaseUrl && currentReference?.scan_id === reference.scan_id &&
+      currentReference.scan_revision === reference.scan_revision && currentSnapshot?.snapshot.snapshot.snapshot_digest === snapshotDigest;
+  };
+
+  const isCurrentFdcPreview = (reference: ScannerServerScanReference, confirmationId: string,
+    issuedRevision: number, snapshotDigest: string) => {
+    const current = useStore.getState();
+    const currentReference = current.scanResult.serverScanReference;
+    const display = fdcConfirmationDisplay;
+    return current.user.userId === reference.ownerUserId && current.accessToken === accessToken &&
+      current.apiBaseUrl === reference.apiBaseUrl && currentReference?.ownerUserId === reference.ownerUserId &&
+      currentReference.apiBaseUrl === reference.apiBaseUrl && currentReference.scan_id === reference.scan_id &&
+      currentReference.scan_revision === issuedRevision && reference.scan_revision === issuedRevision &&
+      display?.reference.ownerUserId === reference.ownerUserId && display.reference.apiBaseUrl === reference.apiBaseUrl &&
+      display.reference.scan_id === reference.scan_id && display.result.confirmation_id === confirmationId &&
+      display.result.issued_scan_revision === issuedRevision &&
+      display.snapshot.snapshot.snapshot_digest === snapshotDigest;
+  };
+
+  const handleFdcCandidateConfirmation = (
+    reference: ScannerServerScanReference,
+    snapshot: NutritionFdcCandidateSnapshotResponse,
+    result: NutritionFdcConfirmationResponse,
+  ) => {
+    setFdcConfirmationDisplay({ reference, snapshot, result });
+    if (result.issued_scan_revision !== null) {
+      advanceFdcCandidateScanRevision(reference, result.issued_scan_revision);
+    }
+  };
+
+  const isCurrentScanSession = (attemptId: number, authRevision: number) => {
+    const current = useStore.getState();
+    return scanAttemptRef.current === attemptId && current.user.userId === user.userId &&
+      current.accessToken === accessToken && current.apiBaseUrl === apiBaseUrl &&
+      current.dietaryRecordsRevision === authRevision;
+  };
+
+  const enrichIfConfigured = async (
+    detections: DetectedFood[], context: NutritionScanContext | null,
+    isCurrentSession: () => boolean,
+  ): Promise<DetectedFood[]> => {
+    // The server-issued authority token is the capability signal. The
+    // remaining metadata is deployment configuration and must be explicit;
+    // no source policy ID is inferred or hard-coded in the client.
+    const enabled = process.env.EXPO_PUBLIC_NUTRITION_ENRICHMENT_ENABLED?.trim().toLowerCase() === 'true';
+    const sourcePolicyId = process.env.EXPO_PUBLIC_NUTRITION_SOURCE_POLICY_ID?.trim();
+    const revisionText = process.env.EXPO_PUBLIC_NUTRITION_SOURCE_POLICY_REVISION?.trim();
+    const sourcePolicyRevision = revisionText === undefined || revisionText === '' ? NaN : Number(revisionText);
+    if (!enabled || !context?.authority_token || !sourcePolicyId
+        || !Number.isSafeInteger(sourcePolicyRevision) || sourcePolicyRevision < 0) {
+      return detections;
+    }
+    try {
+      const request = buildNutritionEnrichmentRequest({
+        userId: user.userId,
+        context,
+        sourcePolicyId,
+        sourcePolicyRevision,
+      });
+      const response = await requestNutritionEnrichment(
+        apiBaseUrl, request, { accessToken }, { enabled: true },
+      );
+      return mergeNutritionEnrichmentResult(detections, response);
+    } catch (error) {
+      // Enrichment is additive. A provider or policy failure must leave the
+      // original database-backed scan visible and must not block recording it.
+      if (isCurrentSession() && error instanceof NutritionEnrichmentApiError && error.code === 'confirmation_required') {
+        setRecordFeedback({
+          tone: 'error', title: '需要先確認食物名稱',
+          message: '影像辨識信心不足，網路營養資料未套用；請確認名稱或改用營養標示。',
+        });
+      }
+      return detections;
+    }
+  };
 
   const handleCamera = async () => {
     setRecordFeedback(null);
@@ -284,7 +455,7 @@ export default function ScannerScreen() {
     }
   };
 
-  const handlePrediction = async (imageBase64: string) => {
+  const handlePrediction = async (imageBase64: string, isCurrentSession: () => boolean) => {
     const response = await runPrediction({
       apiBaseUrl,
       imageBase64,
@@ -292,34 +463,60 @@ export default function ScannerScreen() {
       allergens: user.allergens,
       userId: user.userId,
       auth: { accessToken },
+      isCurrentSession,
     });
-    setRejectedDetections(response.rejectedDetections);
+    if (!isCurrentSession()) return false;
+    const enrichedDetections = await enrichIfConfigured(response.detections, response.scanContext, isCurrentSession);
+    if (!isCurrentSession()) return false;
+    const enrichedIds = new Set(enrichedDetections.map((food) => food.id));
+    setRejectedDetections(response.rejectedDetections.filter((item) => !enrichedIds.has(item.item_id || '')));
     setMealWarnings(response.mealWarnings);
-    if (response.detections.length > 0) {
-      setScanResult(response.detections);
+    const candidateSearchEnabled = process.env.EXPO_PUBLIC_FDC_CANDIDATE_SEARCH_ENABLED?.trim().toLowerCase() === 'true';
+    const scanReference: ScannerServerScanReference | null = response.scanContext ? {
+        ownerUserId: user.userId,
+        apiBaseUrl,
+        scan_id: response.scanContext.scan_id,
+        scan_revision: response.scanContext.scan_revision,
+      } : null;
+    const canReviewNutritionMiss = candidateSearchEnabled && Boolean(accessToken && scanReference) &&
+      hasReviewableNutritionMiss(response.rejectedDetections, response.scanContext);
+    if (enrichedDetections.length > 0 || canReviewNutritionMiss) {
+      setScanResult(enrichedDetections, scanReference);
       setManualResults([]);
+      if (candidateSearchEnabled && accessToken && scanReference) {
+        void loadFdcCandidates(scanReference);
+      }
       return true;
     }
     return false;
   };
 
   const analyzeImage = async (imageBase64: string) => {
+    setFdcConfirmationDisplay(null);
+    setCandidateFailure(null);
+    const attemptId = scanAttemptRef.current + 1;
+    scanAttemptRef.current = attemptId;
+    const authRevision = useStore.getState().dietaryRecordsRevision;
+    const isCurrentSession = () => isCurrentScanSession(attemptId, authRevision);
+    if (!isCurrentSession()) return false;
     setScanning(true);
     setRecordFeedback(null);
     try {
-      const ok = await handlePrediction(imageBase64);
+      const ok = await handlePrediction(imageBase64, isCurrentSession);
+      if (!isCurrentSession()) return false;
       if (!ok) {
-        clearScan();
+        clearScanAndInvalidate();
         setRecordFeedback({ tone: 'error', title: '尚無可記錄的營養結果', message: '請查看下方待確認食物與缺少資料的原因，可用營養標示或手動搜尋補充。若未列出任何食物，請重新拍攝完整餐盤。' });
       }
       return ok;
     } catch (error: any) {
+      if (!isCurrentSession()) return false;
       setRejectedDetections([]);
-      clearScan();
+      clearScanAndInvalidate();
       setRecordFeedback({ tone: 'error', title: 'AI 辨識暫時不可用', message: error?.message || '請先使用手動搜尋加入餐點。' });
       return false;
     } finally {
-      setScanning(false);
+      if (scanAttemptRef.current === attemptId) setScanning(false);
     }
   };
 
@@ -673,7 +870,7 @@ export default function ScannerScreen() {
       onSuccess: () => {
         const current = useStore.getState().scanResult;
         const currentKey = `camera:${current.timestamp || current.detections.map((food) => food.id).join(',')}`;
-        if (currentKey === submissionKey) clearScan();
+        if (currentKey === submissionKey) clearScanAndInvalidate();
       },
     });
   };
@@ -765,16 +962,22 @@ export default function ScannerScreen() {
         <View style={styles.scanIcon}>
           {scanResult.isScanning || ocrQuerying || menuChecking ? (
             <ActivityIndicator size="large" color={Palette.accent.green} />
-          ) : results.length > 0 && scanMode !== 'menu' ? (
+          ) : results.length > 0 && rejectedDetections.length === 0 && scanMode !== 'menu' ? (
             <Ionicons name="checkmark-circle-outline" size={42} color={Palette.accent.green} />
+          ) : scanItemCount > 0 && scanMode !== 'menu' ? (
+            <Ionicons name="alert-circle-outline" size={42} color={Palette.status.warning} />
           ) : (
             <Ionicons name={modeConfig.icon} size={42} color={Palette.accent.green} />
           )}
         </View>
         <Text style={styles.scanTitle}>
-          {menuChecking ? '正在用 AI 分析菜單' : scanResult.isScanning ? '正在分析照片' : results.length > 0 && scanMode !== 'menu' ? `已辨識 ${results.length} 項食物` : modeConfig.title}
+          {menuChecking ? '正在用 AI 分析菜單' : scanResult.isScanning ? '正在分析照片' : resultTitle && scanMode !== 'menu' ? resultTitle : modeConfig.title}
         </Text>
-        <Text style={styles.scanHint}>{results.length > 0 && scanMode !== 'menu' ? `${rejectedDetections.length > 0 ? '已配對項目合計' : '估計合計'} ${totalCal} kcal，鈉 ${totalSodium}mg。${rejectedDetections.length > 0 ? `另有 ${rejectedDetections.length} 項待確認，尚未計入。` : '請確認份量後加入。'}` : modeConfig.hint}</Text>
+        <Text style={styles.scanHint}>{scanItemCount > 0 && scanMode !== 'menu'
+          ? results.length > 0
+            ? `${rejectedDetections.length > 0 ? '已配對項目合計' : '估計合計'} ${totalCal} kcal，鈉 ${totalSodium}mg。${rejectedDetections.length > 0 ? `另有 ${rejectedDetections.length} 項待確認，尚未計入。` : '請確認份量後加入。'}`
+            : `目前沒有配對營養資料；${rejectedDetections.length} 項待確認，尚未計入。`
+          : modeConfig.hint}</Text>
         {scanMode !== 'manual' ? (
           <PrimaryButton label={modeConfig.action} onPress={modeConfig.onPress} disabled={scanResult.isScanning || ocrQuerying || menuChecking} icon={<Ionicons name={modeConfig.icon} size={18} color={Palette.text.inverse} />} />
         ) : null}
@@ -784,8 +987,8 @@ export default function ScannerScreen() {
         {scanMode === 'menu' && menuCheck ? (
           <SecondaryButton label="清除菜單結果" onPress={() => setMenuCheck(null)} disabled={menuChecking} icon={<Ionicons name="trash-outline" size={16} color={Palette.text.secondary} />} />
         ) : null}
-        {results.length > 0 && scanMode !== 'menu' ? (
-          <SecondaryButton label="清除辨識結果" onPress={clearScan} icon={<Ionicons name="trash-outline" size={16} color={Palette.text.secondary} />} />
+        {(results.length > 0 || rejectedDetections.length > 0 || serverScanReference) && scanMode !== 'menu' ? (
+          <SecondaryButton label="清除辨識結果" onPress={clearScanAndInvalidate} icon={<Ionicons name="trash-outline" size={16} color={Palette.text.secondary} />} />
         ) : null}
       </View>
     </>
@@ -799,9 +1002,21 @@ export default function ScannerScreen() {
     <View style={styles.resultWorkspace}>
       <View style={styles.resultHeader}>
         <Text style={styles.sectionTitle}>辨識結果</Text>
-        {results.length > 0 ? <DataPill tone="success">{results.length} 項</DataPill> : null}
+        {scanItemCount > 0 ? <DataPill tone={rejectedDetections.length > 0 ? 'warning' : 'success'}>{scanItemCount} 項食物</DataPill> : null}
       </View>
       <ScannerPendingFoods rs={rs} items={rejectedDetections} />
+      {candidateLoading === serverScanReference && candidateLoading ? (
+        <View accessibilityRole="progressbar"><ActivityIndicator color={Palette.accent.blue} /><Text>正在取得 USDA 候選</Text></View>
+      ) : null}
+      {candidateFailure && candidateFailure.reference === serverScanReference ? (
+        <View>
+          <FeedbackBanner tone="error" title="USDA 候選查詢失敗" message={candidateFailure.recovery.message} />
+          {candidateFailure.recovery.retryable ? (
+            <SecondaryButton label="重試 USDA 候選查詢" onPress={() => void loadFdcCandidates(candidateFailure.reference)}
+              icon={<Ionicons name="refresh-outline" size={17} color={Palette.text.secondary} />} />
+          ) : null}
+        </View>
+      ) : null}
       <ScannerResults
         hasUnmatchedFoods={rejectedDetections.length > 0}
         rs={rs}
@@ -814,6 +1029,21 @@ export default function ScannerScreen() {
         sodiumDailyTarget={dailyNutrition.sodium.target}
         mealWarnings={mealWarnings}
       />
+      {fdcCandidateSnapshot && serverScanReference ? (
+        <FdcCandidateReview
+          snapshot={fdcCandidateSnapshot}
+          reference={serverScanReference}
+          enabled={process.env.EXPO_PUBLIC_FDC_CONFIRMATION_ENABLED?.trim().toLowerCase() === 'true'}
+          previewEnabled={process.env.EXPO_PUBLIC_FDC_PROFILE_PREVIEW_ENABLED?.trim().toLowerCase() === 'true'}
+          completedResult={completedFdcConfirmation}
+          onConfirm={handleFdcCandidateConfirmation}
+          onUnavailable={handleFdcReferenceUnavailable}
+          isCurrentSnapshot={isCurrentCandidateSnapshot}
+          isCurrentPreview={isCurrentFdcPreview}
+          apiBaseUrl={apiBaseUrl}
+          accessToken={accessToken}
+        />
+      ) : null}
       {ocrDraft ? (
         <OCRDraftCard
           draft={ocrDraft}
@@ -859,7 +1089,7 @@ export default function ScannerScreen() {
       <ScreenHeader
         title="AI 食物辨識"
         subtitle="拍照、上傳相簿或掃描營養標示，系統會套用健康條件和過敏原做安全檢查。"
-        badge="Gemini + TFDA"
+        badge={sourceBadge}
         badgeTone="info"
       />
 
@@ -902,14 +1132,14 @@ export default function ScannerScreen() {
         </View>
       ) : null}
 
-      {isDesktop ? (
-        <View style={styles.desktopColumns}>
-          <View style={styles.desktopCapture}>{captureWorkspace}{manualTools}{conditionSummary}</View>
-          <View style={styles.desktopResults}>{resultWorkspace}</View>
+      <View style={[styles.desktopColumns, !isDesktop && styles.mobileColumns]}>
+        <View style={isDesktop ? styles.desktopCapture : styles.mobileCapture}>
+          {captureWorkspace}{manualTools}{conditionSummary}
         </View>
-      ) : (
-        <>{captureWorkspace}{manualTools}{resultWorkspace}{conditionSummary}</>
-      )}
+        <View style={isDesktop ? styles.desktopResults : styles.mobileResults}>
+          {resultWorkspace}
+        </View>
+      </View>
     </AppContainer>
   );
 }
@@ -971,8 +1201,11 @@ const styles = StyleSheet.create({
     ...Shadows.card,
   },
   desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xl },
+  mobileColumns: { flexDirection: 'column', alignItems: 'stretch' },
   desktopCapture: { flex: 1, minWidth: 0 },
+  mobileCapture: { minWidth: 0 },
   desktopResults: { flex: 1.08, minWidth: 0 },
+  mobileResults: { minWidth: 0 },
   resultWorkspace: { minWidth: 0 },
   scanIcon: {
     width: 82,

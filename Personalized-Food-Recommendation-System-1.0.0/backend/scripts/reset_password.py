@@ -7,7 +7,7 @@
 會要求輸入兩次新密碼（輸入時畫面上不會顯示）。重設後，這個帳號在每個裝置
 上都要重新登入。不帶暱稱執行會列出所有帳號（舊帳號的暱稱就是它的 Email）。
 
-要重設 Render 上（Supabase）的帳號：先把 DATABASE_URL 設成 Supabase 的連線字串再執行。
+僅支援本機 SQLite；執行前會確認 DATABASE_PATH 指向既有資料庫檔案。
 """
 
 import getpass
@@ -27,28 +27,29 @@ from services.env_service import load_local_env  # noqa: E402
 
 def main() -> int:
     load_local_env()
-    if not os.environ.get("DATABASE_URL", "").strip():
-        # 本機：資料庫檔不存在就停下來，不要建一個新的空檔
-        database_path = resolve_database_path()
-        if not database_path or database_path == ":memory:" or not os.path.exists(database_path):
-            print(f"找不到資料庫檔案：{database_path}")
-            return 1
-        problem = virtualized_appdata_problem(database_path)
-        if problem:
-            print(problem)
-            return 1
+    if os.environ.get("DATABASE_URL", "").strip():
+        print("此版本僅支援 SQLite；請移除不支援的 DATABASE_URL。")
+        return 1
+    # 資料庫檔不存在就停下來，不要由密碼工具建一個新的空檔
+    database_path = resolve_database_path()
+    if not database_path or database_path == ":memory:" or not os.path.exists(database_path):
+        print(f"找不到資料庫檔案：{database_path}")
+        return 1
+    problem = virtualized_appdata_problem(database_path)
+    if problem:
+        print(problem)
+        return 1
     try:
         sql, label = open_database()
     except DatabaseUnavailable as error:
         print(error)
         return 1
     print(f"資料庫：{label}")
-    if sql is not None and sql.dialect == "sqlite":
-        try:
-            check_schema_version(sql)
-        except SchemaVersionError as error:
-            print(error)
-            return 1
+    try:
+        check_schema_version(sql)
+    except SchemaVersionError as error:
+        print(error)
+        return 1
     repo = AuthRepository(sql)
 
     if len(sys.argv) < 2:

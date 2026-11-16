@@ -228,7 +228,7 @@ class AutoBackupSettingsTests(unittest.TestCase):
 
 
 class BackendStartsAutoBackupTests(ApiTestBase):
-    def test_memory_only_and_postgres_have_nothing_to_back_up(self):
+    def test_memory_only_has_nothing_to_back_up(self):
         for path in (None, ":memory:"):
             with self.subTest(path=path), patch.object(self.app_module, "database_path", path):
                 self.assertIsNone(self.app_module.start_auto_backup())

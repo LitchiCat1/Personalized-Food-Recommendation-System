@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 # 在任何測試 import app 之前：不讀 backend/.env.local（裡面是真的金鑰），
 # DATABASE_PATH 設成空字串（不設的話後端會開本機正式的 SQLite 檔），
-# 拿掉 DATABASE_URL（有的話後端會連 Supabase），測試只寫記憶體。
+# 清除外部資料庫設定；測試只使用記憶體儲存，不連正式 SQLite 檔。
 os.environ["NUTRILENS_SKIP_LOCAL_ENV"] = "1"
 os.environ["DATABASE_PATH"] = ""
 os.environ.pop("DATABASE_URL", None)
@@ -82,6 +82,29 @@ class ApiTestBase(unittest.TestCase):
 
 
 class ApiRouteTests(ApiTestBase):
+    def test_nutrition_enrichment_requires_authentication(self):
+        response = self.client.post("/nutrition/enrichment", json={})
+        self.assertEqual(response.status_code, 401)
+
+    def test_nutrition_enrichment_rejects_user_mismatch_before_scan_lookup(self):
+        item = {
+            "item_id": "scan-1:0", "item_revision": 0, "name_zh": "未知食材",
+            "confidence": 0.9, "weight_confidence": 0.8, "estimated_weight_g": 100,
+            "food_state": "prepared", "preparation_method": "unknown",
+            "components_scope": "food_only", "brand": None, "variant": None,
+            "validation_issues": [],
+        }
+        body = {
+            "user_id": "user-b", "scan_id": "scan-1", "scan_revision": 0,
+            "items": [item], "idempotency_key": "http-user-mismatch",
+            "source_policy_id": "source-1", "source_policy_revision": 0,
+        }
+        with self.mock_auth("user-a"):
+            response = self.client.post(
+                "/nutrition/enrichment", json=body, headers=self.auth_headers())
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.get_json()["error"]["code"], "wrong_user")
+
     def test_medical_metadata_route_exposes_governance_metadata(self):
         response = self.client.get("/medical-metadata")
 

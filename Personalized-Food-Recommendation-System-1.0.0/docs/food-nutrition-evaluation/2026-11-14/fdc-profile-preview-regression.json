@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "verified_local_date": "2026-11-15",
+  "branch": "v1.0.2",
+  "scope": "offline server-owned FDC policy provenance and read-only profile preview",
+  "tests": [
+    {
+      "command": "python -m pytest tests/test_fdc_profile_preview_service.py -q",
+      "tests_run": 10,
+      "passed": 10,
+      "failed": 0,
+      "errors": 0
+    },
+    {
+      "command": "python -m pytest tests/test_fdc_source_policy_service.py tests/test_nutrition_profile_repository.py tests/test_fdc_profile_preview_service.py -q",
+      "tests_run": 32,
+      "subtests": 9,
+      "passed": 32,
+      "failed": 0,
+      "errors": 0
+    },
+    {
+      "command": "python -m pytest -q",
+      "tests_run": 997,
+      "subtests": 721,
+      "passed": 997,
+      "failed": 0,
+      "errors": 0,
+      "duration_seconds": 120.91
+    }
+  ],
+  "production_registry_policy_count": 0,
+  "network_side_effects": {
+    "tavily_called": false,
+    "usda_called": false,
+    "model_called": false,
+    "api_key_read": false,
+    "user_records_written": false,
+    "profile_written": false,
+    "photo_confidence_changed": false
+  },
+  "verified_boundaries": [
+    "FDC policy source ID and URL provenance are rechecked",
+    "expired compare-and-set and withdrawn policy fail closed across SQLite restart",
+    "preview uses only server-owned confirmation, issued scan context, policy, identity and weight",
+    "provider and authorization state are rechecked after detail retrieval",
+    "malformed or mismatched FDC detail cannot produce a persisted profile"
+  ],
+  "not_verified": [
+    "production source rights approval or registry admission",
+    "HTTP route, scanner/UI and mobile/Tailscale acceptance",
+    "preview persistence and accept/write transaction",
+    "live USDA/Tavily/model provider calls"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "generated_at": "2026-11-15T06:29:47.207124+00:00",
+  "scope": "isolated_backend_regression",
+  "tests_run": 1011,
+  "passed": 1011,
+  "skipped": 0,
+  "skip_reasons": {},
+  "failures": 0,
+  "errors": 0,
+  "failure_details": [],
+  "successful": true,
+  "elapsed_seconds": 125.769,
+  "isolation": {
+    "skip_local_env": true,
+    "database_path": "",
+    "external_db_and_relay_env_cleared": true,
+    "tavily_env_cleared": true
+  },
+  "rights_review": {
+    "usda_fdc": {
+      "service_rights": "public_domain_cc0",
+      "api_key_server_side_only": true,
+      "attribution_required": true,
+      "rate_limit_recorded": "1000_requests_per_hour_per_ip_default",
+      "production_admitted": false,
+      "reason": "Food identity, adapter compatibility and source policy still require server review"
+    },
+    "tavily": {
+      "service_output_retention": "permitted_without_maximum_retention_period",
+      "publisher_rights_reviewed": false,
+      "cross_user_cache_plan_confirmed": false,
+      "production_admitted": false
+    },
+    "withdrawal": {
+      "future_authority_and_cache_reads_blocked": true,
+      "owner_historical_snapshot_read_explicit_only": true,
+      "non_owner_withdrawn_reuse_fails_closed": true,
+      "automatic_purge_on_provider_notice": false,
+      "purge_semantics_required_before_sources_with_delete_terms": true
+    },
+    "production_registry_policy_count": 0
+  },
+  "limitations": [
+    "PostgreSQL is not supported by this project; SQLite is the only durable SQL backend",
+    "Mongo behavior uses offline test doubles; no live Mongo server",
+    "No new paid model or Tavily calls; no mobile UI or recognition accuracy evaluation"
+  ]
+}

@@ -1,6 +1,7 @@
 import type { DetectedFood } from '@/constants/mock-data';
 import type { ApiAuth } from '@/lib/api';
 import type { MealType } from '@/lib/meal';
+import type { NutritionEnrichmentItem, NutritionEnrichmentResponse, NutritionScanContext } from '@/lib/nutrition-enrichment-api';
 
 
 // 後端回 401 時通知 AuthGate 帶回登入畫面（事件名稱見 lib/auth.ts 的 UNAUTHORIZED_EVENT）。
@@ -42,11 +43,47 @@ export function normalizeImageBase64(value: string): string {
 }
 
 export type RejectedDetection = {
+  item_id?: string;
   label: string;
   confidence: number;
   reason: string;
   search_hints?: string[];
+  recognition_status?: 'recognized';
+  nutrition_status?: 'unmatched';
 };
+
+export function formatScannerSourceBadge(sources: Array<string | undefined>, pendingCount = 0): string {
+  const labels = new Set<string>();
+  for (const value of sources) {
+    const source = String(value || '').trim().toLowerCase();
+    if (!source) continue;
+    if (source === 'tfda' || source === 'tfda-search') labels.add('TFDA');
+    else if (source.includes('usda')) labels.add('USDA');
+    else if (source === 'custom' || source === 'custom-food') labels.add('自訂');
+    else if (source.startsWith('web:')) labels.add('網路');
+    else labels.add('其他');
+  }
+  if (labels.size > 0) return Array.from(labels).join(' + ');
+  return pendingCount > 0 ? '待營養配對' : '資料來源';
+}
+
+export function formatScannerResultTitle(matchedCount: number, pendingCount: number): string | null {
+  if (matchedCount > 0) return `已配對 ${matchedCount} 項營養資料`;
+  if (pendingCount > 0) return `${pendingCount} 項食物待確認`;
+  return null;
+}
+
+export function hasReviewableNutritionMiss(
+  rejectedDetections: RejectedDetection[],
+  scanContext: NutritionScanContext | null,
+): boolean {
+  if (!scanContext) return false;
+  const validItemIds = new Set(scanContext.items
+    .filter((item) => item.validation_issues.length === 0)
+    .map((item) => item.item_id));
+  return rejectedDetections.some((item) => item.recognition_status === 'recognized' &&
+    item.nutrition_status === 'unmatched' && typeof item.item_id === 'string' && validItemIds.has(item.item_id));
+}
 
 export type OCRDraft = {
   product_name?: string;
@@ -87,7 +124,9 @@ export function normalizeFoodName(value?: string | null): string {
 
 function mapApiDetections(detections: any[]): DetectedFood[] {
   return detections.map((d: any, i: number) => ({
-    id: `det_${Date.now()}_${i}`,
+    // Keep the server-owned item ID so a later enrichment response can be
+    // joined without trusting a client-generated index or timestamp.
+    id: typeof d.item_id === 'string' && d.item_id.trim() ? d.item_id : `det_${Date.now()}_${i}`,
     foodName: d.name_zh || d.label,
     confidence: Math.round((d.confidence || 0) * 1000) / 10,
     source: d.source,
@@ -115,6 +154,160 @@ function mapApiDetections(detections: any[]): DetectedFood[] {
   }));
 }
 
+function mapScanContext(value: any): NutritionScanContext | null {
+  if (!value || value.status !== 'persisted' || typeof value.scan_id !== 'string'
+      || !Number.isSafeInteger(value.scan_revision) || value.scan_revision < 0
+      || !Array.isArray(value.items) || value.items.length === 0) {
+    return null;
+  }
+  const items: NutritionEnrichmentItem[] = [];
+  for (const item of value.items) {
+    if (!item || typeof item !== 'object' || typeof item.item_id !== 'string'
+        || !Number.isSafeInteger(item.item_revision) || item.item_revision < 0
+        || typeof item.name_zh !== 'string' || !Array.isArray(item.validation_issues)) {
+      return null;
+    }
+    const numeric = (candidate: unknown): number | null =>
+      candidate === null || candidate === undefined
+        ? null
+        : typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : Number.NaN;
+    const confidence = numeric(item.confidence);
+    const weightConfidence = numeric(item.weight_confidence);
+    const estimatedWeight = numeric(item.estimated_weight_g);
+    if ([confidence, weightConfidence, estimatedWeight].some((candidate) => Number.isNaN(candidate))) {
+      return null;
+    }
+    items.push({
+      item_id: item.item_id,
+      item_revision: item.item_revision,
+      name_zh: item.name_zh,
+      confidence,
+      weight_confidence: weightConfidence,
+      estimated_weight_g: estimatedWeight,
+      food_state: typeof item.food_state === 'string' ? item.food_state : null,
+      preparation_method: typeof item.preparation_method === 'string' ? item.preparation_method : null,
+      components_scope: typeof item.components_scope === 'string' ? item.components_scope : null,
+      brand: typeof item.brand === 'string' ? item.brand : null,
+      variant: typeof item.variant === 'string' ? item.variant : null,
+      validation_issues: item.validation_issues.filter((issue: unknown): issue is string => typeof issue === 'string'),
+    });
+  }
+  return {
+    status: 'persisted',
+    scan_id: value.scan_id,
+    scan_revision: value.scan_revision,
+    items,
+    ...(typeof value.expires_at === 'string' ? { expires_at: value.expires_at } : {}),
+    ...(typeof value.authority_token === 'string' && value.authority_token.trim()
+      ? { authority_token: value.authority_token } : {}),
+  };
+}
+
+function finite(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function enrichedFood(item: any, existing?: DetectedFood): DetectedFood | null {
+  if (!item || typeof item !== 'object' || typeof item.item_id !== 'string'
+      || !item.portion || typeof item.portion !== 'object') return null;
+  const values = item.portion.values;
+  if (!values || typeof values !== 'object'
+      || !['calories', 'protein', 'carbs', 'fat', 'sodium'].every((key) => finite(values[key]))
+      || (!existing && !finite(values.fiber))) {
+    // A partial profile is deliberately left unresolved. The legacy scanner
+    // must not turn missing point values into invented zeroes.
+    return null;
+  }
+  const context = item.recognition_context && typeof item.recognition_context === 'object'
+    ? item.recognition_context : {};
+  // A nutrition profile without a server-owned positive weight cannot be
+  // turned into a recordable food.  In particular, never invent 100g for a
+  // missing portion because that would make the displayed nutrients look
+  // precise while silently applying the wrong serving size.
+  const hasPortionWeight = Object.prototype.hasOwnProperty.call(item.portion, 'weight_g')
+    && item.portion.weight_g !== null && item.portion.weight_g !== undefined;
+  const portionWeight = hasPortionWeight && finite(item.portion.weight_g) && item.portion.weight_g > 0
+    ? item.portion.weight_g : null;
+  if (hasPortionWeight && portionWeight === null) return null;
+  const contextWeight = finite(context.estimated_weight_g) && context.estimated_weight_g > 0
+    ? context.estimated_weight_g : null;
+  const estimatedWeight = portionWeight ?? contextWeight;
+  if (estimatedWeight === null) return null;
+  const sourceDetails = item.nutrition_profile?.source_details;
+  const sourceId = sourceDetails && typeof sourceDetails.source_id === 'string'
+    ? sourceDetails.source_id : null;
+  const source = item.origin === 'web' ? `web:${sourceId || 'reviewed-source'}` : (existing?.source || 'nutrition-enrichment');
+  const nutrition = {
+    calories: values.calories,
+    protein: values.protein,
+    carbs: values.carbs,
+    fat: values.fat,
+    sodium: values.sodium,
+    // Keep the existing numeric snapshot when the enrichment source omits an
+    // optional field. This preserves arithmetic safety and the original
+    // evidence while missingNutritionFields still tells the UI the value is
+    // not supplied by the new profile.
+    fiber: finite(values.fiber) ? values.fiber : existing?.nutrition.fiber,
+    sugar: finite(values.sugar) ? values.sugar : existing?.nutrition.sugar,
+    saturated_fat: finite(values.saturated_fat) ? values.saturated_fat : existing?.nutrition.saturated_fat,
+    trans_fat: finite(values.trans_fat) ? values.trans_fat : existing?.nutrition.trans_fat,
+    is_fried: existing?.nutrition.is_fried,
+  };
+  const missing = Array.isArray(item.portion.missing_nutrition_fields)
+    ? item.portion.missing_nutrition_fields.filter((value: unknown): value is string => typeof value === 'string') : [];
+  const warning = item.origin === 'web'
+    ? '營養資料由已核准的網路來源補全，仍請確認食物名稱與份量'
+    : '營養資料已由伺服器資料層重新計算';
+  if (existing) {
+    return {
+      ...existing,
+      source,
+      nutrition,
+      missingNutritionFields: missing,
+      needsConfirmation: existing.needsConfirmation || item.status !== 'accepted' && item.status !== 'complete',
+      warnings: [...new Set([...(existing.warnings || []), warning])],
+    };
+  }
+  const confidence = finite(context.confidence) ? context.confidence : 0;
+  return {
+    id: item.item_id,
+    foodName: typeof item.original_visual_name === 'string' ? item.original_visual_name : (context.name_zh || '未命名食品'),
+    confidence: Math.round(confidence * 1000) / 10,
+    source,
+    needsConfirmation: item.status !== 'accepted' && item.status !== 'complete',
+    missingNutritionFields: missing,
+    boundingBox: { x: 0, y: 0, w: 0, h: 0 },
+    estimatedWeight,
+    originalEstimatedWeight: estimatedWeight,
+    portionEstimationMethod: 'server_nutrition_enrichment',
+    reliability: { level: item.origin === 'web' ? 'medium' : 'high', score: confidence, reasons: [warning] },
+    nutrition,
+    originalNutrition: nutrition,
+    gi: 'medium',
+    allergens: [],
+    warnings: [warning],
+  };
+}
+
+/** Merge only complete point-value portions; unresolved items remain visible. */
+export function mergeNutritionEnrichmentResult(
+  detections: DetectedFood[], response: NutritionEnrichmentResponse | null,
+): DetectedFood[] {
+  const items = response?.result?.items;
+  if (!Array.isArray(items)) return detections;
+  const existingIds = new Set(detections.map((food) => food.id));
+  const merged = detections.map((food) => {
+    const item = items.find((candidate) => candidate && typeof candidate === 'object' && candidate.item_id === food.id);
+    return enrichedFood(item, food) || food;
+  });
+  for (const item of items) {
+    if (!item || typeof item !== 'object' || typeof item.item_id !== 'string' || existingIds.has(item.item_id)) continue;
+    const food = enrichedFood(item);
+    if (food) merged.push(food);
+  }
+  return merged;
+}
+
 export async function runPrediction(params: {
   apiBaseUrl: string;
   imageBase64: string;
@@ -122,7 +315,13 @@ export async function runPrediction(params: {
   allergens: string[];
   userId?: string;
   auth?: ApiAuth;
-}): Promise<{ detections: DetectedFood[]; rejectedDetections: RejectedDetection[]; mealWarnings: string[] }> {
+  isCurrentSession?: () => boolean;
+}): Promise<{
+  detections: DetectedFood[];
+  rejectedDetections: RejectedDetection[];
+  mealWarnings: string[];
+  scanContext: NutritionScanContext | null;
+}> {
   const body = {
     image: normalizeImageBase64(params.imageBase64),
     health_conditions: params.healthConditions,
@@ -135,7 +334,7 @@ export async function runPrediction(params: {
     headers: buildHeaders(params.auth, 'application/json'),
     body: JSON.stringify(body),
   });
-  reportIfUnauthorized(resp);
+  reportIfUnauthorized(resp, params.isCurrentSession);
   const data = await readJson(resp);
   if (!resp.ok) {
     throw new Error(failureMessage(resp, data, 'Gemini 食物辨識失敗'));
@@ -145,6 +344,7 @@ export async function runPrediction(params: {
     rejectedDetections: data.rejected_detections || [],
     // 每道菜單獨都在額度內、加起來卻超過整餐上限的提醒
     mealWarnings: data.meal_warnings || [],
+    scanContext: mapScanContext(data.scan_context),
   };
 }
 

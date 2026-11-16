@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "verified_local_date": "2026-11-14",
+  "branch": "v1.0.2",
+  "endpoint": "/nutrition/enrichment",
+  "base_url": "http://127.0.0.1:5000",
+  "health_status": 200,
+  "health_app_version": "v1.0.2",
+  "health_database": "sqlite",
+  "health_auth_required": true,
+  "health_automatic_web_fallback_enabled": false,
+  "health_nutrition_v2_scanner_enabled": false,
+  "post_without_auth_status": 405,
+  "post_without_auth_body": "{\"error\":\"The method is not allowed for the requested URL.\"}",
+  "get_endpoint_status": 200,
+  "get_endpoint_behavior": "same-origin SPA fallback; enrichment route is not mounted while NUTRITION_ENRICHMENT_ROUTE_ENABLED is false",
+  "secrets_read_or_logged": false,
+  "provider_calls": 0,
+  "user_record_writes": 0,
+  "conclusion": "production enrichment remains fail-closed and unavailable on the running local server",
+  "limitations": [
+    "This does not validate an enabled authenticated route",
+    "No Tavily, model, USDA API, PostgreSQL or Mongo request was made",
+    "The route must remain disabled until source rights, durable multi-process validation and frontend integration pass"
+  ]
+}

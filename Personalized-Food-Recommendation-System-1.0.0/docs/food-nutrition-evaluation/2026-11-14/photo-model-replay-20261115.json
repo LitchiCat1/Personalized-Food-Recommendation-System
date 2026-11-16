@@ -1,0 +1,145 @@
+{
+  "date": "2026-11-15",
+  "batch": 63,
+  "branch": "v1.0.2",
+  "result": "two_live_model_calls_completed; backend_regression_passed; not_deployed",
+  "scope": "Replay the supplied original bento image twice through the production vision prompt and strict parser, then ground the exact saved normalized results offline against local official datasets. No production app route, FDC/Tavily provider, or production database.",
+  "user_authorization": {
+    "granted": true,
+    "date": "2026-11-15",
+    "scope": "Ongoing real model calls for this project’s development, debugging and verification, within each bounded task scope; no repeated per-call permission request required.",
+    "project_plan_updated": true,
+    "limits": "This does not authorize opening production feature flags, bypassing source admission, sending unnecessary health or personal data, or writing production food/profile records. Calls, purpose, returned usage and known cost are recorded; credentials are never reported."
+  },
+  "protected_branch": {
+    "ref": "refs/heads/v1.0.1",
+    "commit": "bb81e922ac9d2d69440d446bf7f02f4b822efba6",
+    "unchanged": true
+  },
+  "input": {
+    "photo": "food_picture/多種菜色的便當.jpg",
+    "sha256": "1ba15472326f83205c3d2b7f5279808491376021c25622205f3fa33c8d6170ea",
+    "bytes": 47567,
+    "dimensions": "516x387",
+    "mime": "image/jpeg",
+    "same_bytes_and_prompt_for_both_calls": true,
+    "user_annotations_sent_to_model": false,
+    "android_request_bytes_verified": false,
+    "android_camera_uses_quality_0_7": true
+  },
+  "execution": {
+    "path": "tools/probe_food_nutrition.py vision",
+    "uses_production_prompt": true,
+    "uses_production_strict_json_parser_and_normalizer": true,
+    "retry_count_per_call": 0,
+    "parallel_workers": 1,
+    "requested_model_identifier": "[AN]gemini-4-hydrogen-high",
+    "returned_model_identifier": "gemini-4-hydrogen",
+    "provider_identity_independently_verified": false,
+    "prompt_sha256": "2f68a2b43d3dea16dc616f8922745b56f46e1f50e0a0ca0a34c47231e082a98a",
+    "http_statuses": [200, 200],
+    "finish_reasons": ["stop", "stop"],
+    "latency_seconds": [34.761, 19.891],
+    "returned_usage": {
+      "prompt_tokens": 3868,
+      "completion_tokens": 2114,
+      "reasoning_tokens": 6446,
+      "reported_total_tokens": 12428,
+      "provider_reported_per_call_totals": [7600, 4828],
+      "cost": "Not available from the relay response; no price inferred."
+    },
+    "source_dataset_preflight": {
+      "TFDA": {
+        "status": "available",
+        "records": 2213,
+        "incomplete_core_profiles": 98,
+        "raw_sha256": "498647298f230297ec24ca24b4d38ef0f0103ec3a1104e8fab7e52bcdbad3643"
+      },
+      "USDA FNDDS": {
+        "status": "available",
+        "records": 5431,
+        "incomplete_core_profiles": 0,
+        "raw_sha256": "7de8563a2bc64b71bd5289095ae646e286cc4c333535ca58541e4d8c6daf2677"
+      },
+      "expected_trusted_hash_configured": false
+    },
+    "diagnostic_report": "Full raw relay response is retained locally at ignored path tmp/photo-model-replay-batch63-20261115.json; credentials and image bytes are not in that report."
+  },
+  "observations": {
+    "repeat_1": {
+      "recognized_items": 7,
+      "all_confidences_at_or_above_existing_0_45_recognition_threshold": true,
+      "items": [
+        {"name": "白飯", "confidence": 0.98, "estimated_weight_g": 200, "weight_confidence": 0.5, "method": "steamed"},
+        {"name": "滷雞腿", "confidence": 0.92, "estimated_weight_g": 105, "weight_confidence": 0.5, "method": "braised"},
+        {"name": "綠色葉菜", "confidence": 0.75, "estimated_weight_g": 45, "weight_confidence": 0.45, "method": "unknown"},
+        {"name": "綠色葉菜", "confidence": 0.75, "estimated_weight_g": 60, "weight_confidence": 0.45, "method": "unknown"},
+        {"name": "茄子", "confidence": 0.9, "estimated_weight_g": 45, "weight_confidence": 0.4, "method": "unknown"},
+        {"name": "豆干", "confidence": 0.9, "estimated_weight_g": 50, "weight_confidence": 0.45, "method": "unknown"},
+        {"name": "毛豆仁", "confidence": 0.88, "estimated_weight_g": 10, "weight_confidence": 0.35, "method": "unknown"}
+      ],
+      "leafy_green_uncertainty": "Model explicitly says species and preparation cannot be determined; possible names include 大陸妹、油菜、小白菜、青江菜.",
+      "offline_local_match_after_repairs": {
+        "matched": ["白飯 (TFDA)", "滷雞腿 (USDA FNDDS)", "茄子 (USDA FNDDS)", "豆干 (TFDA)"],
+        "unmatched_or_incompatible": ["綠色葉菜 (no_local_mapping)", "綠色葉菜 (no_local_mapping)", "毛豆仁 (incompatible; only matching TFDA record is raw)"],
+        "total_rejected": 3,
+        "totals_scope": "matched items only; whole-meal nutrition remains incomplete"
+      }
+    },
+    "repeat_2": {
+      "recognized_items": 7,
+      "all_confidences_at_or_above_existing_0_45_recognition_threshold": true,
+      "items": [
+        {"name": "滷雞腿", "confidence": 0.95, "estimated_weight_g": 120, "weight_confidence": 0.55, "method": "braised"},
+        {"name": "白飯", "confidence": 0.97, "estimated_weight_g": 210, "weight_confidence": 0.6, "method": "steamed"},
+        {"name": "葉菜（左上格）", "confidence": 0.8, "estimated_weight_g": 45, "weight_confidence": 0.55, "method": "stir_fried"},
+        {"name": "葉菜（右下）", "confidence": 0.82, "estimated_weight_g": 55, "weight_confidence": 0.55, "method": "stir_fried"},
+        {"name": "茄子", "confidence": 0.9, "estimated_weight_g": 40, "weight_confidence": 0.5, "method": "stir_fried"},
+        {"name": "豆干丁", "confidence": 0.9, "estimated_weight_g": 45, "weight_confidence": 0.55, "method": "stir_fried"},
+        {"name": "毛豆仁", "confidence": 0.88, "estimated_weight_g": 10, "weight_confidence": 0.5, "method": "stir_fried"}
+      ],
+      "leafy_green_uncertainty": "Model explicitly retains generic leafy-vegetable labels to avoid guessing species.",
+      "offline_local_match_after_repairs": {
+        "matched": ["滷雞腿 (USDA FNDDS)", "白飯 (TFDA)"],
+        "unmatched_or_incompatible": ["葉菜（左上格） (no_local_mapping)", "葉菜（右下） (no_local_mapping)", "茄子 (incompatible method metadata)", "豆干丁 (no exact local mapping)", "毛豆仁 (incompatible; only matching TFDA record is raw)"],
+        "total_rejected": 5,
+        "totals_scope": "matched items only; whole-meal nutrition remains incomplete"
+      }
+    },
+    "repeatability": "Same image and prompt produced 7 items in both runs, but ordering, rice/chicken weights, weight confidence, vegetable naming and several preparation fields differed. This is qualitative instability from two calls, not a calibrated accuracy estimate.",
+    "pending_section_cause": "No item fell below the configured 0.45 vision threshold in either replay. Pending/unmatched behavior in these two results comes from missing or incompatible local nutrition matches, not a low-confidence threshold rejection.",
+    "confidence_limit": "Model self-rated confidence is not calibrated correctness; weight confidence was only 0.35-0.60, with no weighed ground truth."
+  },
+  "bounded_repairs": {
+    "generic_name_with_location": "Added finite visual-region suffix handling so 葉菜（左上格） and 葉菜（右下） remain generic and cannot qualify for FDC/web fallback. Specific labels with the same suffix, such as 青江菜（左上格）, remain eligible for existing checks. Original stored names are unchanged.",
+    "cooked_white_rice": "Exact TFDA A0550601 record is cooked white rice prepared in an electric rice cooker, but has no method enum. The existing schema's nearest reviewed `steamed` compatibility applies only to key 白飯 plus exact source/code/name/description; other method choices and altered records remain incompatible. This is an enum compatibility, not source-supplied method metadata.",
+    "diagnostic_tool": "Live photo probe now uses production strict JSON parsing, accepted finish policy and detected image MIME; it preserves raw text and pre-normalized JSON for audit."
+  },
+  "verification": {
+    "diagnostic_probe_contract": "20 passed, 67 subtests passed",
+    "location_identity_gate": "14 passed, 369 subtests passed",
+    "rice_matching": "12 passed, 61 subtests passed",
+    "full_backend_pytest": "1082 passed, 1141 subtests passed, 134.61 seconds",
+    "git_diff_check": "passed"
+  },
+  "not_established": [
+    "The original Android request payload, server logs, device-side processed bytes or exact earlier model output.",
+    "Independent botanical ground truth for either vegetable or any other image item; the user-provided names were not sent to the model and do not independently calibrate the visual output.",
+    "Correctness of weights, confidence calibration, image completeness, whole-meal nutrient totals or individual source/recipe equivalence beyond the explicit reviewed local mappings.",
+    "That adding Tavily will improve photographed food identity; Tavily was not called and must not be used as visual identity evidence.",
+    "Production registry/source admission, pricing, current server flag state, live phone behavior or deployment of this batch."
+  ],
+  "side_effects": {
+    "live_model_calls": 2,
+    "live_tavily_calls": 0,
+    "live_usda_api_calls": 0,
+    "production_app_route_calls": 0,
+    "production_database_access_or_writes": 0,
+    "profile_or_meal_record_writes": 0,
+    "feature_flags_or_source_registry_changed": false,
+    "service_restarts_or_deployment": 0,
+    "credential_values_reported": false,
+    "commit_or_push": false
+  },
+  "next_bounded_step": "After these local v1.0.2 edits are explicitly deployed, run one non-saving Android scan to assess current deployed on-device behavior. A new scan cannot recover or explain the earlier Android request's bytes or response. Keep source admission and automatic completion disabled."
+}

@@ -155,16 +155,24 @@ def relay_chat(
     image_mime_type: str | None = None,
     timeout: float = 60,
     deadline: float | None = None,
+    *,
+    max_attempts: int | None = None,
 ) -> tuple[str, str | None]:
     config = get_relay_config()
     if config is None:
         raise ValueError("AI relay is not configured")
+    if max_attempts is not None and (
+        isinstance(max_attempts, bool) or not isinstance(max_attempts, int)
+        or not 1 <= max_attempts <= len(config.keys)
+    ):
+        raise ValueError("AI relay max_attempts must be within the configured key count")
+    attempt_limit = len(config.keys) if max_attempts is None else max_attempts
     deadline = min(deadline, time.monotonic() + timeout) if deadline is not None else time.monotonic() + timeout
     pool = _key_pool(config.base_url, config.keys)
     attempted: set[str] = set()
     last_error = None
     payload = openai_chat_payload(config.model, prompt, max_tokens, image_base64, image_mime_type)
-    while len(attempted) < len(config.keys):
+    while len(attempted) < attempt_limit:
         try:
             key = pool.acquire(attempted, deadline)
         except requests.HTTPError:

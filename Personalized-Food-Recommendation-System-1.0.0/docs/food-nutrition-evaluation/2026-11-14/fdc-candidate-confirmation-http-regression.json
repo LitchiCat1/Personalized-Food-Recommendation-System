@@ -1,0 +1,49 @@
+{
+  "generated_at": "2026-11-15T00:25:00+08:00",
+  "scope": "authenticated_fdc_confirmation_http_boundary",
+  "branch": "v1.0.2",
+  "route": {
+    "method": "POST",
+    "path": "/nutrition/fdc/confirmation",
+    "default_enabled": false,
+    "authentication_before_feature_gate": true,
+    "client_snapshot_accepted": false,
+    "confirm_response": {
+      "http_status": 202,
+      "status": "confirmed_pending_revision",
+      "requires_new_scan_revision": true,
+      "photo_confidence_changed": false
+    }
+  },
+  "targeted_regression": {
+    "command": "python -m pytest tests/test_fdc_confirmation_api.py tests/test_fdc_candidate_confirmation_repository.py tests/test_fdc_candidate_snapshot_repository.py tests/test_fooddata_central_selection.py -q",
+    "passed": 33,
+    "subtests_passed": 16,
+    "failed": 0,
+    "errors": 0
+  },
+  "cases": [
+    "unauthenticated request returns 401 before feature gate",
+    "disabled route returns feature_disabled",
+    "authenticated user mismatch returns 403",
+    "unknown fields and client snapshot are rejected",
+    "enabled route forwards only confirmation envelope",
+    "repository typed error maps to stable HTTP error"
+  ],
+  "external_side_effects": {
+    "usda_requests": 0,
+    "tavily_requests": 0,
+    "model_requests": 0,
+    "api_key_read": false,
+    "nutrition_profiles_created": 0,
+    "new_scan_revision_created": false,
+    "automatic_fallback_enabled": false
+  },
+  "limitations": [
+    "Confirm-to-new-revision atomic transaction is not implemented",
+    "No frontend confirmation UI",
+    "No live FDC Detail or production source registry",
+    "Route remains disabled by default"
+  ],
+  "successful": true
+}

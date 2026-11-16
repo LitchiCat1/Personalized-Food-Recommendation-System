@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-11-14T10:06:44.448Z",
+  "branch": "v1.0.2",
+  "scope": "Phase3k scanner enrichment transport, versioned read models, coverage-aware aggregation and strict history validation; nullable dashboard/history UI not activated",
+  "paid_calls": 0,
+  "real_user_database_access": false,
+  "backend_snapshot_test": "Pure Python services with socket disabled; mocked fetch; no live HTTP integration",
+  "checks": [
+    {
+      "name": "frontend_tests",
+      "command": "node --test --test-reporter=tap scripts/test-*.mjs",
+      "exit_code": 0,
+      "duration_ms": 1665,
+      "passed": true,
+      "tests": 189,
+      "pass": 189,
+      "fail": 0,
+      "skipped": 0,
+      "files": [
+        "test-browser-location.mjs",
+        "test-build-env.mjs",
+        "test-dietary-records.mjs",
+        "test-dietary-trends.mjs",
+        "test-nutrition-calculation.mjs",
+        "test-nutrition-enrichment-api.mjs",
+        "test-nutrition-read-aggregation.mjs",
+        "test-nutrition-read-history.mjs",
+        "test-nutrition-read-model.mjs",
+        "test-nutrition-record-api.mjs",
+        "test-record-submission.mjs",
+        "test-record-sync-contract.mjs",
+        "test-record-sync-locks.mjs",
+        "test-safety-selection.mjs",
+        "test-scanner-records.mjs",
+        "test-trend-insights.mjs",
+        "test-venue-indexing.mjs"
+      ]
+    },
+    {
+      "name": "typecheck",
+      "command": "npm run typecheck",
+      "exit_code": 0,
+      "duration_ms": 6810,
+      "passed": true
+    },
+    {
+      "name": "lint",
+      "command": "npm run lint",
+      "exit_code": 0,
+      "duration_ms": 8864,
+      "passed": true
+    },
+    {
+      "name": "build:web",
+      "command": "npm run build:web",
+      "exit_code": 0,
+      "duration_ms": 15788,
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "limitations": [
+    "Does not test real Postgres/Mongo, live AI/Tavily, photo accuracy, or native device input",
+    "V2 OCR/dashboard/history/trend/recommendation UI and v2 retry dispatcher remain unconnected; scanner enrichment is capability-gated and off by default",
+    "Web Locks coordinate updated cooperating tabs only; native remains one-runtime and old lockless tabs are not covered",
+    "Missing or different queue backend target blocks replay; legacy binding and mixed-key reconciliation remain pending",
+    "Rendered checks are recorded separately and are not rerun by this command",
+    "Read-model completeness describes included recorded items in the declared query scope, not all food actually consumed",
+    "Local summary means are unrounded; server history means retain Python one-decimal rounding and compatibility float averages",
+    "History response has no explicit range anchor; internal consistency does not prove freshness or expected current dates"
+  ]
+}

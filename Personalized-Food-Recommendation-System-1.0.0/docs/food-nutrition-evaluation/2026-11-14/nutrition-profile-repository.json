@@ -1,0 +1,36 @@
+{
+  "generated_at": "2026-11-14T00:00:00+08:00",
+  "scope": "durable nutrition source/profile repository offline acceptance",
+  "branch": "v1.0.2",
+  "tests_run": 10,
+  "passed": 10,
+  "failed": 0,
+  "checks": [
+    "SQLite profile/source round trip and server-computed authority hash",
+    "SQLite file restart persistence",
+    "Two SQLite connections cannot silently overwrite the same source revision",
+    "Profile and source compare-and-set revision conflicts",
+    "Immutable source policy revision history",
+    "Source withdrawal blocks new profiles and future owner reads while historical opt-in reads remain explicit",
+    "Owner boundary and approved cross-user reuse",
+    "Reviewed identity, source URL, adapter version and content hash provenance binding",
+    "snapshot/reuse rights denial",
+    "Postgres JSONB/RLS schema and FOR UPDATE contract"
+  ],
+  "implementation": {
+    "module": "backend/repositories/nutrition_profile_repository.py",
+    "durable_backends": ["sqlite", "postgres"],
+    "memory_mode": "explicit test-only fallback",
+    "mongo": "not implemented; enrichment must remain disabled for Mongo deployments",
+    "wired_to_app": false,
+    "automatic_web_fallback_enabled": false,
+    "production_source_registry": "empty"
+  },
+  "limitations": [
+    "No HTTP enrichment route or signed scan-context persistence yet",
+    "No durable idempotency/quota/replay repository yet",
+    "No live PostgreSQL database or Mongo server was used",
+    "No Tavily/model calls were made"
+  ],
+  "successful": true
+}

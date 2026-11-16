@@ -1,0 +1,79 @@
+{
+  "generated_at": "2026-11-14",
+  "scope": "nutrition_postgres_validation",
+  "branch": "v1.0.2",
+  "database": {
+    "test_env_present": false,
+    "environment_variable": "NUTRILENS_TEST_DATABASE_URL",
+    "local_postgres_service": false,
+    "local_cli": false,
+    "docker_or_podman": false,
+    "production_database_touched": false
+  },
+  "commands": [
+    {
+      "command": "python -m unittest discover -s tests -p test_postgres*.py -v",
+      "tests_run": 52,
+      "passed": 29,
+      "skipped": 23,
+      "failures": 0,
+      "errors": 0,
+      "skipped_reason": "NUTRILENS_TEST_DATABASE_URL is not configured"
+    },
+    {
+      "command": "python -m unittest discover -s tests -p test_database_selection.py -v",
+      "tests_run": 14,
+      "passed": 14,
+      "skipped": 0,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "command": "python -m unittest discover -s tests -p test_nutrition_*repository.py -v",
+      "tests_run": 35,
+      "passed": 35,
+      "skipped": 0,
+      "failures": 0,
+      "errors": 0,
+      "scope_note": "SQLite and offline SQL contract coverage only"
+    },
+    {
+      "command": "python -m unittest discover -s tests -p test_nutrition_postgres_integration.py -v",
+      "tests_run": 3,
+      "passed": 0,
+      "skipped": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped_reason": "NUTRILENS_TEST_DATABASE_URL is not configured",
+      "scope_note": "Live fixture is ready but intentionally does not connect without an explicit disposable test URL"
+    }
+  ],
+  "verified": [
+    "PostgreSQL driver, placeholder conversion, SSL selection, retry and reconnect behavior",
+    "database selection refuses an unreachable configured PostgreSQL instead of silently falling back",
+    "SQLite repository restart, idempotency, quota, TTL and offline concurrency contracts"
+  ],
+  "not_verified": [
+    "live PostgreSQL nutrition repository schema creation",
+    "cross-process request lease and idempotency behavior",
+    "live PostgreSQL quota row locking and last-slot contention",
+    "cross-restart HTTP enrichment behavior on PostgreSQL",
+    "live Mongo atomic repository behavior"
+  ],
+  "prepared_live_fixture": [
+    "scan context schema and authority JTI replay",
+    "enrichment request result replay across independent connections",
+    "quota global last-slot enforcement across independent connections"
+  ],
+  "safety": {
+    "tavily_called": false,
+    "usda_called": false,
+    "provider_called": false,
+    "private_key_files_read": false,
+    "production_source_registry_changed": false,
+    "automatic_web_fallback_enabled": false,
+    "nutrition_enrichment_route_enabled": false
+  },
+  "status": "blocked_pending_isolated_postgresql_test_database",
+  "next_required_input": "Provide a disposable PostgreSQL/Supabase test URL and test credentials through NUTRILENS_TEST_DATABASE_URL; do not use a production URL."
+}

@@ -267,6 +267,33 @@ export function aggregateNutritionCoverage(items: NutritionCoverageInput[]): Nut
   };
 }
 
+export function sumNutritionNumbers(values: readonly number[]): number {
+  return numeric(values.reduce((total, value) => add(total, decimal(value, false, false)), ZERO_FRACTION))!;
+}
+
+// History uses Python round(float_mean, 1): round the actual binary quotient
+// with ties to even, rather than Math.round's different halfway rule.
+export function roundNutritionMean(total: number, count: number): number {
+  decimal(total, false, false);
+  if (!Number.isSafeInteger(count) || count <= 0) {
+    throw new NutritionCalculationError('invalid_number', 'Expected a positive day count');
+  }
+  const mean = total / count;
+  if (total > 0 && mean === 0) {
+    throw new NutritionCalculationError('numeric_range', 'Nutrition mean underflow');
+  }
+  const buffer = new DataView(new ArrayBuffer(8));
+  buffer.setFloat64(0, mean);
+  const bits = buffer.getBigUint64(0);
+  const encodedExponent = Number((bits >> BigInt(52)) & BigInt(2047));
+  const significand = (bits & ((ONE << BigInt(52)) - ONE)) + (encodedExponent ? ONE << BigInt(52) : ZERO);
+  const exponent = encodedExponent ? encodedExponent - 1075 : -1074;
+  const scaled = exponent >= 0
+    ? fraction((significand * TEN) << BigInt(exponent))
+    : fraction(significand * TEN, ONE << BigInt(-exponent));
+  return numeric(fraction(roundQuotient(scaled.numerator, scaled.denominator), TEN))!;
+}
+
 export function formatNutritionMeasurement(value: number | null, upperBound: number | null, unit = ''): string {
   for (const number of [value, upperBound]) {
     if (number !== null && (typeof number !== 'number' || !Number.isFinite(number) || number < 0)) {

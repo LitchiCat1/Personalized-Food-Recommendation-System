@@ -1,0 +1,66 @@
+{
+  "created_at": "2026-11-14T00:00:00+08:00",
+  "scope": "publisher data rights, Tavily output retention, and first-source admission",
+  "production_registry_policy_count": 0,
+  "sources": [
+    {
+      "source_id": "USDA-FDC",
+      "rights_status": "candidate_data_rights_confirmed",
+      "license": "CC0 1.0 Universal",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "attribution": "U.S. Department of Agriculture, Agricultural Research Service, Beltsville Human Nutrition Research Center. FoodData Central.",
+      "evidence_urls": [
+        "https://fdc.nal.usda.gov/api-guide/",
+        "https://fdc.nal.usda.gov/"
+      ],
+      "constraints": [
+        "API key is required for API requests and must remain server-side",
+        "rate limits and current data type/version must be recorded",
+        "CC0/public-domain status does not prove food identity, preparation, or nutrient-table compatibility"
+      ],
+      "page_replay_status": "tavily_search_found_no_stable_food_details_page",
+      "api_json_replay_status": "validated_single_foundation_record",
+      "adapter_status": "offline_adapter_validated",
+      "production_admission": "blocked_until_server_policy_and_authority_integration"
+    },
+    {
+      "source_id": "TFDA-open-data",
+      "rights_status": "review_only",
+      "license": "Government Data Open License, Version 1 (dataset metadata)",
+      "license_url": "https://data.gov.tw/dataset/8543",
+      "attribution": "衛生福利部食品藥物管理署食品營養成分資料集",
+      "evidence_urls": [
+        "https://data.gov.tw/dataset/8543",
+        "https://www.fda.gov.tw/Tc/opendata.aspx"
+      ],
+      "constraints": [
+        "dataset licensing and individual website/database pages must not be conflated",
+        "special notices and third-party rights still require review",
+        "no web snapshot or cross-user reuse policy is admitted yet"
+      ],
+      "page_replay_status": "not_started",
+      "adapter_status": "not_started",
+      "production_admission": "blocked_pending_source_specific_rights_and_adapter_review"
+    },
+    {
+      "source_id": "Tavily-output",
+      "rights_status": "provider_scope_recorded_not_production_approved",
+      "license": "Tavily Platform Terms / source publisher terms",
+      "license_url": "https://www.tavily.com/terms",
+      "attribution": "Preserve the original source URL and any attribution required by that publisher",
+      "evidence_urls": [
+        "https://help.tavily.com/articles/1612400809-storing-caching-retaining-output",
+        "https://help.tavily.com/articles/4716869118-attribution-third-party-content-rights"
+      ],
+      "constraints": [
+        "publisher rights remain separate from Tavily API rights",
+        "cross-user cached output requires confirmation with Tavily for the selected plan",
+        "no user health history, photo, or account data may be sent to Tavily"
+      ],
+      "page_replay_status": "one_restricted_live_search_found_no_stable_food_details_page;_no_extract",
+      "adapter_status": "not_a_food_source_adapter",
+      "production_admission": "blocked_until_plan_scope_and_source_rights_are_confirmed"
+    }
+  ],
+  "decision": "USDA-FDC_is_the_first_replay_candidate;_no_source_policy_is_enabled"
+}

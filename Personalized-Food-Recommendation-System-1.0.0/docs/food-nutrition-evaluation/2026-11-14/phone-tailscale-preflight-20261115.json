@@ -1,0 +1,64 @@
+{
+  "date": "2026-11-15",
+  "batch": 60,
+  "branch": "v1.0.2",
+  "protected_branch": {
+    "ref": "refs/heads/v1.0.1",
+    "commit": "bb81e922ac9d2d69440d446bf7f02f4b822efba6",
+    "unchanged": true
+  },
+  "scope": "Read-only preflight of the existing Windows v1.0.2 server, SQLite, Tailscale Funnel, and served scanner asset; no phone interaction yet.",
+  "deployment": {
+    "scheduled_task": "NutriLens Backend",
+    "state": "Running",
+    "working_directory_matches_checkout": true,
+    "python": "C:/Python314/pythonw.exe",
+    "listener": "127.0.0.1:5000",
+    "local_health": "ok",
+    "funnel_https_health": "ok",
+    "same_backend_process": true,
+    "app_version": "v1.0.2",
+    "database": "sqlite",
+    "auth_required": true,
+    "remote_health_hides_database_path": true,
+    "automatic_web_fallback_enabled": false
+  },
+  "tailscale": {
+    "version": "1.104.7",
+    "funnel_targets_local_backend": true,
+    "scanner_page_status": 200,
+    "scanner_asset_status": 200,
+    "asset_matches_current_workspace_export": true,
+    "asset_sha256": "15c433c5bba7bcf8b478c240c51425246e7c858dc8b05fd954d49b667728e462",
+    "asset_bytes": 2366640
+  },
+  "sqlite_read_only_check": {
+    "read_only": true,
+    "integrity_check": "ok",
+    "journal_mode": "wal",
+    "user_version": 2
+  },
+  "feature_flags": {
+    "automatic_web_fallback_runtime": false,
+    "FDC_and_enrichment_keys_present_in_local_env_files": false,
+    "candidate_confirmation_detail_preview_accept_runtime_flags_exposed_by_health": false,
+    "runtime_state_of_those_unexposed_backend_flags": "not independently verified; app.py defaults each to false when absent",
+    "frontend_build_keys_present_in_local_env_files": false
+  },
+  "not_verified": [
+    "A request from a second physical device; same-computer Funnel access is not equivalent.",
+    "A real Android browser camera capture and permission flow.",
+    "Candidate confirmation, FDC Detail, preview, accept, profile, or meal-record writes.",
+    "Unrelated provider activity by the already-running service outside this preflight; background logs were not inspected. The explicit requests here were only health, scanner HTML, and its static JavaScript asset.",
+    "Runtime FDC/enrichment flags that the health endpoint does not expose."
+  ],
+  "side_effects": {
+    "sqlite_writes": 0,
+    "profile_or_meal_record_writes": 0,
+    "secret_values_inspected_or_reported": false,
+    "service_restarts": 0,
+    "feature_flag_changes": 0,
+    "provider_calls_triggered_by_preflight": 0
+  },
+  "next_bounded_action": "Use the owner's Android phone and existing account over the HTTPS scanner URL for an unsaved camera-recognition smoke test; record only redacted outcome/error codes. Keep all FDC/enrichment flags off and do not accept/save a profile or meal record."
+}

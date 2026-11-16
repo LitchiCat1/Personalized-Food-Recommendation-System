@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 from repositories.sqlite_db import SqliteDatabase
 from repositories.sqlite_schema import SCHEMA_VERSION, add_record_nutrition_contract, upgrade_schema
-from repositories.storage import POSTGRES_TABLES, RECORD_COLUMNS, StorageRepository
+from repositories.storage import RECORD_COLUMNS, StorageRepository
 from services.app_time_service import app_now
 from services.history_service import build_history_response
 from services.nutrition_profile_service import NUTRIENTS, UNITS, NutritionProfileError, build_nutrition_profile
@@ -272,20 +272,6 @@ class RecordNutritionStorageTests(unittest.TestCase):
                 self.assertEqual(saved["nutrition_context"]["coverage"]["nutrients"]["calories"]["eligible_items"], 2)
             finally:
                 reopened_sql.close()
-
-    def test_postgres_json_columns_and_row_adapter_preserve_null(self):
-        self.assertIn("ALTER TABLE records ADD COLUMN IF NOT EXISTS nutrition_context JSONB", POSTGRES_TABLES)
-        self.assertIn("ALTER TABLE records ENABLE ROW LEVEL SECURITY", POSTGRES_TABLES)
-        record = partial_record()
-        params = dict(zip(RECORD_COLUMNS, StorageRepository._record_values(record)))
-        self.assertEqual(params["nutrition_contract_version"], 2)
-        self.assertEqual(json.loads(params["nutrition_context"])["scan_id"], "scan-fixture")
-        params["foods"] = json.loads(params["foods"])
-        params["nutrition_context"] = json.loads(params["nutrition_context"])
-        repository = StorageRepository(None, False, {}, [], [])
-        saved = repository._record_from_row(params)
-        self.assertIsNone(saved["foods"][0]["nutrition_profile"]["per_100g"]["sodium"])
-        self.assertEqual(saved["nutrition_context"]["scan_id"], "scan-fixture")
 
     def test_history_summary_keeps_known_average_and_unknown_coverage(self):
         repository = StorageRepository(None, False, {}, [], [])

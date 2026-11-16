@@ -13,4 +13,3 @@ beautifulsoup4>=4.12,<5
 
 waitress>=3.0,<4
 bcrypt>=5.0,<6
-psycopg2-binary>=2.9,<3

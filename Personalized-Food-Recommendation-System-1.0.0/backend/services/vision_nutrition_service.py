@@ -96,7 +96,7 @@ def _named_method(name):
     return None
 
 
-def _profile_method(food):
+def _profile_method(food, *, record_key=None):
     method = food.get("preparation_method")
     if method and method != "unknown":
         return method
@@ -109,6 +109,13 @@ def _profile_method(food):
     # assertion that the US recipe equals Taiwanese braised pork.
     if food.get("fdc_id") == 2705901:
         return "braised"
+    # Reviewed TFDA record A0550601 is cooked white rice prepared in an
+    # electric rice cooker. The dataset omits its method enum; keep this
+    # equivalence tied to the exact official record and its documented basis.
+    if (record_key == "白飯" and food.get("source") == "TFDA"
+            and food.get("code") == "A0550601" and food.get("name_zh") == "白飯"
+            and "白米加1.1倍的去離子水,用電鍋烹煮" in str(food.get("description") or "")):
+        return "steamed"
     return None
 
 
@@ -132,7 +139,7 @@ def _profile_state(food):
     return None
 
 
-def _preparation_notes(food, item):
+def _preparation_notes(food, item, *, record_key=None):
     name = str(item.get("name_zh") or "")
     combined = " ".join(str(food.get(field) or "") for field in ("name_zh", "name_en", "description"))
     state = item.get("food_state")
@@ -158,7 +165,7 @@ def _preparation_notes(food, item):
         method = named_method
     elif named_method and named_method != method:
         return None
-    source_method = _profile_method(food)
+    source_method = _profile_method(food, record_key=record_key)
     if method and method != source_method:
         return None
     if source_method and not method and food_identity(name) not in EXPLICIT_TARGETS:
@@ -227,7 +234,7 @@ def find_vision_food_matches(storage, database, item, user_id, build_custom_food
         if food.get("nutrition_basis_status") == "conflicting":
             rejected["source_conflict"] += 1
             continue
-        notes = _preparation_notes(food, item)
+        notes = _preparation_notes(food, item, record_key=key)
         if notes is None:
             rejected["incompatible"] += 1
             continue

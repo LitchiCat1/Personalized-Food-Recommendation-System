@@ -1,0 +1,53 @@
+{
+  "generated_at": "2026-11-14T14:42:03.258408+00:00",
+  "scope": "offline_fdc_query_normalization_and_identity_bound_plan",
+  "branch": "v1.0.2",
+  "query_plan": {
+    "schema_version": "FdcSearchQueryPlanV1",
+    "original_query_first": true,
+    "server_allowlisted_aliases_only": true,
+    "max_english_aliases": 2,
+    "duplicate_aliases_rejected": true,
+    "broad_rice_sausage_alias_rejected": true,
+    "bound_fields": ["item_id", "scan_revision", "identity_digest"],
+    "unknown_identity_disables_alias_expansion": true
+  },
+  "targeted_regression": {
+    "command": "python -m pytest tests/test_food_query_normalization.py tests/test_fooddata_central_client.py tests/test_fooddata_central_selection.py -q",
+    "passed": 31,
+    "subtests_passed": 18,
+    "failed": 0
+  },
+  "tests_run": 928,
+  "passed": 928,
+  "skipped": 0,
+  "skip_reasons": {},
+  "failures": 0,
+  "errors": 0,
+  "failure_details": [],
+  "successful": true,
+  "elapsed_seconds": 111.78,
+  "isolation": {
+    "skip_local_env": true,
+    "database_path": "",
+    "external_db_and_relay_env_cleared": true,
+    "tavily_env_cleared": true
+  },
+  "external_side_effects": {
+    "usda_search_requests": 0,
+    "usda_detail_requests": 0,
+    "tavily_requests": 0,
+    "model_requests": 0,
+    "user_database_operations": 0,
+    "nutrition_profiles_created": 0,
+    "photo_confidence_changed": false,
+    "production_route_or_source_registry_enabled": false
+  },
+  "limitations": [
+    "PostgreSQL is not supported by this project; SQLite is the only durable SQL backend",
+    "Mongo behavior uses offline test doubles; no live Mongo server",
+    "No live USDA Search or food detail request was made in this batch; prior live Search evidence is recorded separately",
+    "Prompt, candidate result, and validator still require one immutable shared candidate snapshot before route wiring",
+    "No new paid model or Tavily calls; no mobile UI or recognition accuracy evaluation"
+  ]
+}

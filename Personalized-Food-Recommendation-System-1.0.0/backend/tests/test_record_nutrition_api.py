@@ -11,7 +11,7 @@ from unittest.mock import patch
 os.environ["NUTRILENS_SKIP_LOCAL_ENV"] = "1"
 os.environ["DATABASE_PATH"] = ""
 for _name in (
-    "DATABASE_URL", "MONGODB_URI", "MONGO_URI", "NUTRILENS_TEST_DATABASE_URL",
+    "DATABASE_URL", "MONGODB_URI", "MONGO_URI",
     "AI_BASE_URL", "AI_MODEL", "AI_API_KEYS", "AI_RELAY_KEYS_FILE",
 ):
     os.environ.pop(_name, None)

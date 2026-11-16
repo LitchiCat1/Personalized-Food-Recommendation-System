@@ -1,0 +1,181 @@
+{
+  "generated_at": "2026-11-14T20:20:18.056945+00:00",
+  "scope": "live_usda_fdc_api_payload_replayed_offline",
+  "replay_count": 2,
+  "fdc_id": 1750340,
+  "description": "Apples, fuji, with skin, raw",
+  "data_type": "Foundation",
+  "food_nutrient_rows": 35,
+  "payload_sha256": "4fe45659fb96c5d96202be2b69d39a557ac22cde67dd5c804b8d643e4accf165",
+  "source_url": "https://api.nal.usda.gov/fdc/v1/food/1750340",
+  "adapter_version": "usda-fdc-json-v1",
+  "selected_rows": [
+    "fdc-calories",
+    "fdc-carbs",
+    "fdc-fat",
+    "fdc-fiber",
+    "fdc-protein",
+    "fdc-sodium",
+    "fdc-sugar"
+  ],
+  "selected_nutrients": {
+    "calories": {
+      "number": "957",
+      "value": 64.6609,
+      "unit": "kcal"
+    },
+    "protein": {
+      "number": "203",
+      "value": 0.1484375,
+      "unit": "g"
+    },
+    "fat": {
+      "number": "204",
+      "value": 0.1625,
+      "unit": "g"
+    },
+    "carbs": {
+      "number": "205",
+      "value": 15.6511625,
+      "unit": "g"
+    },
+    "fiber": {
+      "number": "291",
+      "value": 2.075,
+      "unit": "g"
+    },
+    "sugar": {
+      "number": "269",
+      "value": 13.33,
+      "unit": "g"
+    },
+    "sodium": {
+      "number": "307",
+      "value": 1.013,
+      "unit": "mg"
+    }
+  },
+  "per_100g": {
+    "calories": 64.6609,
+    "protein": 0.1484375,
+    "carbs": 15.6511625,
+    "sugar": 13.33,
+    "fat": 0.1625,
+    "saturated_fat": null,
+    "trans_fat": null,
+    "fiber": 2.075,
+    "sodium": 1.013
+  },
+  "portion_150g": {
+    "values": {
+      "calories": 96.99135,
+      "protein": 0.22265625,
+      "carbs": 23.47674375,
+      "sugar": 19.995,
+      "fat": 0.24375,
+      "saturated_fat": null,
+      "trans_fat": null,
+      "fiber": 3.1125,
+      "sodium": 1.5195
+    },
+    "missing_nutrition_fields": [
+      "saturated_fat",
+      "trans_fat"
+    ]
+  },
+  "comparison": {
+    "payload_sha256": "d4ca010bc3c83a4427baa5493bed63a9b5404884c6274dd0b8112ded8f86db0f",
+    "payload_hash_equal": false,
+    "food_identity_equal": true,
+    "food_nutrient_row_count_equal": true,
+    "selected_nutrients_equal": true,
+    "selected_nutrients": {
+      "calories": {
+        "number": "957",
+        "value": 64.6609,
+        "unit": "kcal"
+      },
+      "protein": {
+        "number": "203",
+        "value": 0.1484375,
+        "unit": "g"
+      },
+      "fat": {
+        "number": "204",
+        "value": 0.1625,
+        "unit": "g"
+      },
+      "carbs": {
+        "number": "205",
+        "value": 15.6511625,
+        "unit": "g"
+      },
+      "fiber": {
+        "number": "291",
+        "value": 2.075,
+        "unit": "g"
+      },
+      "sugar": {
+        "number": "269",
+        "value": 13.33,
+        "unit": "g"
+      },
+      "sodium": {
+        "number": "307",
+        "value": 1.013,
+        "unit": "mg"
+      }
+    },
+    "changed_rows": [
+      {
+        "index": 0,
+        "changed_keys": [
+          "nutrient"
+        ]
+      },
+      {
+        "index": 8,
+        "changed_keys": [
+          "nutrient"
+        ]
+      },
+      {
+        "index": 19,
+        "changed_keys": [
+          "nutrient"
+        ]
+      },
+      {
+        "index": 29,
+        "changed_keys": [
+          "nutrient"
+        ]
+      }
+    ]
+  },
+  "observed_payload_hashes": [
+    "4fe45659fb96c5d96202be2b69d39a557ac22cde67dd5c804b8d643e4accf165",
+    "d4ca010bc3c83a4427baa5493bed63a9b5404884c6274dd0b8112ded8f86db0f"
+  ],
+  "observed_hash_variant_count": 2,
+  "hash_policy": "per_retrieval_provenance_only; compare food identity and selected nutrient values separately",
+  "profile_fields_with_values": [
+    "calories",
+    "carbs",
+    "fat",
+    "fiber",
+    "protein",
+    "sodium",
+    "sugar"
+  ],
+  "profile_fields_null": [
+    "saturated_fat",
+    "trans_fat"
+  ],
+  "validated": true,
+  "limitations": [
+    "Captured with a server-side USDA API key; the key is not persisted in this report",
+    "No production registry policy or user record was changed",
+    "Food identity and preparation compatibility remain server-review responsibilities"
+  ]
+}

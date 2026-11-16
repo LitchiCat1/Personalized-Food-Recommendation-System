@@ -1,6 +1,6 @@
 # 個人化飲食推薦與影像辨識 App
 
-目前版本：**v1.0.1**（2026-11-13）。
+目前版本：**v1.0.2**（2026-11-14）。
 
 > 健康飲食管理工具，結合 Gemini Vision 食物辨識、資料庫營養對應、個人化營養分析與附近店家搜尋。
 
@@ -43,7 +43,7 @@ Personalized-Food-Recommendation-System/
 │   │   └── ...
 │   ├── store/                # Zustand 狀態管理
 │   │   └── useStore.ts       # 全域核心狀態
-│   └── package.json          # 前端依賴與腳本 (v1.0.1)
+│   └── package.json          # 前端依賴與腳本 (v1.0.2)
 └── docs/                     # 專案文件
     ├── PRD.md                # 產品需求文件
     ├── Project_Architecture_and_Status.md # 架構與 Roadmap 稽核表
@@ -106,8 +106,10 @@ npm --prefix frontend install
 三個環境變數若有設定就必須全部填齊；`AI_API_KEYS` 以逗號分隔。
 沒有任何中轉站設定時才沿用舊版 Gemini／OpenAI 設定；中轉站呼叫失敗時不會回退舊金鑰。
 
-Render 等只從 GitHub 建置的服務不會取得本機金鑰檔，請在服務的環境變數介面填入上面三個值；
-`render.yaml` 已列出所需欄位。Docker 若以 `backend` 為建置目錄，請把完整金鑰檔唯讀掛載到
+目前 v1.0.2 正式部署採 Windows 本機 SQLite + Tailscale，請依 [伺服器操作說明](docs/Local_Server_Deployment.md)。
+`render.yaml` 是仍指向 v1.0.1 的舊版 Render Blueprint，包含 PostgreSQL `DATABASE_URL`，不可用來部署
+SQLite-only 的 v1.0.2。若未來另行支援其他部署平台，需先提供持久化 SQLite 磁碟並移除該設定；
+不得把 `DATABASE_URL` 當作 PostgreSQL 相容模式。Docker 若以 `backend` 為建置目錄，請把完整金鑰檔唯讀掛載到
 `/run/secrets/nutrilens-ai`，並設定 `AI_RELAY_KEYS_FILE=/run/secrets/nutrilens-ai`。
 
 `/health` 的 `ai_relay_enabled=true` 表示已載入中轉站設定，不代表已驗證遠端連線。
@@ -123,6 +125,8 @@ Render 等只從 GitHub 建置的服務不會取得本機金鑰檔，請在服�
 
 專案已內附 2,213 筆 TFDA、5,431 筆 USDA FNDDS 2021–2023 資料及各自的 `.source.json` 來源紀錄。
 伺服器啟動直接讀取這些 JSON，**不需要另申請 USDA API key，也不會在啟動時下載資料**。
+目前新增的 USDA FoodData Central API client 仍是受限、未接正式掃描的 server-side replay；若要做該項測試，請只在 `backend/.env.local` 設 `USDA_FDC_API_KEY`。不要把 `USDA KEY.txt` 放到前端、Expo 變數、提示詞或日誌；未設定時維持使用內附 FNDDS 快照。
+正式部署與專案程式採 SQLite-only。已建立 SQLite 持久化的 server-owned source/profile、scan context、enrichment request、quota、正向快取、可恢復協調器與獨立 `POST /nutrition/enrichment` 入口；另有預設關閉的 `POST/GET /nutrition/fdc/candidates`，只會由 server-owned scan context 重查官方本地資料後搜尋真正未命中的 FDC 候選，回傳 digest-bound reference，不回傳營養值。來源撤回、權利、provenance、revision/CAS、user/global quota、request lease 及 7 日預設 TTL 會先在持久化層拒絕或保存。PostgreSQL 僅保留歷史隔離測試紀錄，程式不再連線或支援它；scanner confirmation UI、mobile bounded E2E、真 provider admission 與自動 fallback 仍未完成，因此所有相關 flags 與 production source registry 維持關閉。
 請將兩份資料與來源紀錄一併交付，不要只複製程式檔。
 
 找不到合適資料的食品會顯示在辨識結果的待確認清單；「已配對項目合計」不代表整餐營養。
@@ -145,6 +149,10 @@ python backend/app.py
 ```
 
 打開 http://localhost:5000 註冊帳號就能用。後端的 `/health` 會顯示資料庫檔案的位置。
+
+Windows 完成背景排程設定後，也可以雙擊下載內容根目錄的 `start-server.bat`／`stop-server.bat`
+啟動或停止後端。兩個檔案使用 `NutriLens Backend` 工作排程，不包含個人的 SQLite 路徑；
+第一次架設與更新注意事項見 [Windows 伺服器操作說明](docs/Local_Server_Deployment.md)。
 
 ### 讓其他裝置連進來
 

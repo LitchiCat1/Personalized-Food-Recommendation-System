@@ -1,0 +1,110 @@
+{
+  "date": "2026-11-15",
+  "branch": "v1.0.2",
+  "scope": "Scanner gallery UI to FDC candidate confirmation and profile preview in a mocked browser flow",
+  "environment": {
+    "app_url": "http://localhost:8082/scanner",
+    "api_origin": "http://localhost:8090",
+    "browser": "Playwright 1.65.1 with preinstalled Chromium headless revision 1228",
+    "api_transport": "All auth, scan, candidate, confirmation, and preview requests were intercepted by Playwright routes; no backend service was contacted.",
+    "authentication": "Synthetic localStorage session and mocked auth/user profile responses"
+  },
+  "flow": {
+    "image_input": "Synthetic 1x1 PNG selected through the real browser file chooser; vision response was mocked.",
+    "candidate_request": {
+      "method": "POST",
+      "body": {
+        "scan_id": "browser-e2e-scan",
+        "scan_revision": 0
+      }
+    },
+    "confirmation_request": {
+      "method": "POST",
+      "source_scan_revision": 0,
+      "selected_fdc_id": "171688",
+      "issued_scan_revision": 1,
+      "photo_confidence_changed": false,
+      "request_fields": [
+        "scan_id",
+        "scan_revision",
+        "idempotency_key",
+        "confirmation"
+      ]
+    },
+    "preview_requests": [
+      {
+        "status": 503,
+        "ui_result": "Typed error displayed; retry remained available."
+      },
+      {
+        "status": 200,
+        "body_fields": [
+          "confirmation_id",
+          "scan_id",
+          "issued_scan_revision",
+          "item_id"
+        ],
+        "issued_scan_revision": 1,
+        "fdc_id": "171688",
+        "server_weight_g": 150,
+        "portion_weight_g": 150,
+        "calories_per_100g_kcal": 52,
+        "portion_calories_kcal": 78,
+        "photo_confidence_changed": false,
+        "profile_written": false
+      }
+    ],
+    "forbidden_requests": {
+      "profile_accept": 0,
+      "meal_record_write": 0
+    }
+  },
+  "responsive": {
+    "mobile": {
+      "viewport": "390x844",
+      "document_width": 390,
+      "body_width": 390,
+      "horizontal_overflow": false
+    },
+    "desktop": {
+      "viewport": "1440x1000",
+      "document_width": 1440,
+      "body_width": 1440,
+      "horizontal_overflow": false
+    },
+    "preview_retained_after_mobile_to_desktop_resize": true,
+    "layout_issue_found_and_fixed": "Responsive layout previously replaced the result subtree, unmounting FdcCandidateReview and discarding its loaded preview. Scanner capture/results now share one subtree and switch layout styles without remounting the preview component."
+  },
+  "verification": {
+    "scanner_tests": {
+      "passed": 16,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "eslint": "passed",
+    "expo_web_export": "passed",
+    "browser_page_errors": 0,
+    "browser_console": [
+      "Expected console error emitted by the deliberately mocked first preview HTTP 503.",
+      "Existing React Native Web warning: props.pointerEvents is deprecated."
+    ]
+  },
+  "side_effects": {
+    "live_usda_calls": 0,
+    "live_tavily_calls": 0,
+    "model_calls": 0,
+    "database_calls": 0,
+    "production_database_writes": 0,
+    "production_flags_changed": false
+  },
+  "screenshots": [
+    "C:\\Users\\botto\\AppData\\Local\\Temp\\nutrilens-fdc-preview-mobile.png",
+    "C:\\Users\\botto\\AppData\\Local\\Temp\\nutrilens-fdc-preview-desktop.png"
+  ],
+  "not_tested": [
+    "Physical camera capture; the browser flow used a synthetic gallery file.",
+    "Real SQLite HTTP service in the browser flow; backend SQLite HTTP coverage remains separately documented in fdc-profile-preview-ui-flow-20261115.json.",
+    "Live USDA Search or Detail, Tavily, or model calls.",
+    "Profile acceptance and meal-record writes."
+  ]
+}

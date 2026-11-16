@@ -1,0 +1,47 @@
+{
+  "generated_at": "2026-11-14T05:17:50.009827+00:00",
+  "scope": "bounded_tavily_enrichment_core_offline",
+  "test_patterns": [
+    "test_tavily_retrieval.py",
+    "test_nutrition_source_adapter.py",
+    "test_nutrition_extraction_model.py",
+    "test_web_nutrition.py"
+  ],
+  "tests_run": 107,
+  "passed": 107,
+  "skipped": 0,
+  "skip_reasons": {},
+  "failures": 0,
+  "errors": 0,
+  "failure_details": [],
+  "successful": true,
+  "elapsed_seconds": 0.871,
+  "isolation": {
+    "network_socket_blocked": true,
+    "skip_local_env": true,
+    "database_path": "",
+    "external_db_and_relay_and_tavily_env_cleared": true
+  },
+  "production": {
+    "automatic_enrichment_enabled": false,
+    "reviewed_source_count": 0,
+    "route_connected": false,
+    "persistent_cache_enabled": false
+  },
+  "limits": {
+    "unique_foods": 4,
+    "searches_per_food": 2,
+    "extract_urls": 6,
+    "model_attempts": 1,
+    "job_seconds": 25,
+    "in_process_concurrency": 2
+  },
+  "limitations": [
+    "Synthetic source policies do not grant rights for real websites",
+    "No new paid calls, user database access, UI or native-device verification",
+    "No public route, signed scan/profile repository or per-user durable budget",
+    "No cross-request cache/single-flight, source direct fetching or arbitrary HTML/PDF support",
+    "Cooperative deadline discards late output; no hard network cancellation guarantee",
+    "No weighed photo truth or recognition/nutrition accuracy claim"
+  ]
+}

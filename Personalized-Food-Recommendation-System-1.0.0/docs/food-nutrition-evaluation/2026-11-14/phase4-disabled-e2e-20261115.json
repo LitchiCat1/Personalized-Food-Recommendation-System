@@ -1,0 +1,50 @@
+{
+  "generated_at": "2026-11-15T14:37:25+08:00",
+  "scope": "disabled_by_default_sqlite_tailscale_http_smoke",
+  "deployment": {
+    "branch": "v1.0.2",
+    "protected_baseline": "v1.0.1",
+    "scheduled_task": "NutriLens Backend",
+    "scheduled_task_after_restart": "Running",
+    "database": "sqlite",
+    "tailscale_funnel": "https://nutrilens-botto.tailcfc6d9.ts.net",
+    "port": 5000
+  },
+  "health": {
+    "localhost": {"http_status": 200, "app_version": "v1.0.2", "status": "ok", "auth_required": true,
+                   "automatic_web_fallback_enabled": false, "nutrition_v2_scanner_enabled": false},
+    "tailscale": {"http_status": 200, "app_version": "v1.0.2", "status": "ok", "auth_required": true,
+                  "automatic_web_fallback_enabled": false, "nutrition_v2_scanner_enabled": false}
+  },
+  "unauthenticated_route_boundary": {
+    "localhost": {"nutrition_enrichment": 401, "fdc_confirmation": 401, "fdc_detail": 401,
+                   "fdc_profile_preview": 401, "fdc_profile_accept": 401},
+    "tailscale": {"nutrition_enrichment": 401, "fdc_confirmation": 401, "fdc_detail": 401,
+                  "fdc_profile_preview": 401, "fdc_profile_accept": 401}
+  },
+  "isolated_authenticated_flag_boundary": {
+    "temporary_sqlite_only": true,
+    "temporary_user_created": true,
+    "fdc_confirmation": {"http_status": 503, "error_code": "feature_disabled"},
+    "fdc_detail": {"http_status": 503, "error_code": "feature_disabled"},
+    "fdc_profile_preview": {"http_status": 503, "error_code": "feature_disabled"},
+    "fdc_profile_accept": {"http_status": 503, "error_code": "feature_disabled"},
+    "nutrition_enrichment_malformed_body": {"http_status": 400, "error_code": "invalid_request",
+                                             "provider_called": false},
+    "temporary_files_removed": true
+  },
+  "provider_and_data_side_effects": {
+    "live_usda_calls": 0,
+    "live_tavily_calls": 0,
+    "model_calls": 0,
+    "production_sqlite_written": false,
+    "production_flags_enabled": false,
+    "confidence_changed": false
+  },
+  "limitations": [
+    "No camera or native mobile UI interaction was performed",
+    "Authenticated production-user Tailscale writes were intentionally not attempted",
+    "Full confirmation to issued revision to preview to accept remains disabled and is covered only by isolated contract tests",
+    "The scheduled task must be restarted after code updates; a running task does not hot-reload app.py"
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "generated_at": "2026-11-14",
+  "scope": "bounded_live_usda_fdc_search_using_fdc_search_query_plan_v1",
+  "branch": "v1.0.2",
+  "query_plan": {
+    "schema_version": "FdcSearchQueryPlanV1",
+    "item_id": "rice-sausage-1",
+    "scan_revision": 7,
+    "identity_digest": "dc5454addd10e47782898596650e7f027507b09baaee933dc19ef435763eab2a",
+    "original_name_zh": "糯米腸",
+    "queries": ["糯米腸", "glutinous rice sausage", "Taiwanese glutinous rice sausage"],
+    "query_source": ["original_name", "server_allowlisted_alias", "server_allowlisted_alias"],
+    "identity_expansion_allowed": true
+  },
+  "request_policy": {
+    "endpoint": "https://api.nal.usda.gov/fdc/v1/foods/search",
+    "page_size": 10,
+    "allowed_data_types": ["Foundation", "SR Legacy", "Survey (FNDDS)"],
+    "redirects": false,
+    "automatic_retries": false,
+    "detail_requests": 0
+  },
+  "queries": [
+    {"query": "糯米腸", "status": "ok", "candidate_count": 0, "candidates": []},
+    {
+      "query": "glutinous rice sausage",
+      "status": "ok",
+      "candidate_count": 10,
+      "candidates": [
+        {"fdc_id": "1104867", "description": "Flour, rice, glutinous", "data_type": "Foundation"},
+        {"fdc_id": "2708422", "description": "Rice, white, cooked, glutinous", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2708345", "description": "Cake made with glutinous rice", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "169711", "description": "Rice, white, glutinous, unenriched, cooked", "data_type": "SR Legacy"},
+        {"fdc_id": "168883", "description": "Rice, white, glutinous, unenriched, uncooked", "data_type": "SR Legacy"},
+        {"fdc_id": "2708348", "description": "Cake made with glutinous rice and dried beans", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2706512", "description": "Sausage and rice with cheese sauce", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2706511", "description": "Sausage and rice with mushroom sauce", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2706510", "description": "Sausage and rice with tomato-based sauce", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2708979", "description": "Rice with Spanish sausage, Puerto Rican style", "data_type": "Survey (FNDDS)"}
+      ]
+    },
+    {
+      "query": "Taiwanese glutinous rice sausage",
+      "status": "ok",
+      "candidate_count": 10,
+      "candidates": [
+        {"fdc_id": "1104867", "description": "Flour, rice, glutinous", "data_type": "Foundation"},
+        {"fdc_id": "2708422", "description": "Rice, white, cooked, glutinous", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2708345", "description": "Cake made with glutinous rice", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "169711", "description": "Rice, white, glutinous, unenriched, cooked", "data_type": "SR Legacy"},
+        {"fdc_id": "168883", "description": "Rice, white, glutinous, unenriched, uncooked", "data_type": "SR Legacy"},
+        {"fdc_id": "2708348", "description": "Cake made with glutinous rice and dried beans", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2706512", "description": "Sausage and rice with cheese sauce", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2706511", "description": "Sausage and rice with mushroom sauce", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2706510", "description": "Sausage and rice with tomato-based sauce", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2708979", "description": "Rice with Spanish sausage, Puerto Rican style", "data_type": "Survey (FNDDS)"}
+      ]
+    }
+  ],
+  "interpretation": {
+    "search_http_path_verified": true,
+    "alias_improved_glutinous_rice_recall": true,
+    "exact_taiwanese_glutinous_rice_sausage_candidate_found": false,
+    "safe_fdc_outcome": "not_found",
+    "do_not_fetch_detail": true,
+    "do_not_create_profile": true,
+    "photo_confidence_changed": false
+  },
+  "external_side_effects": {
+    "usda_search_requests": 3,
+    "usda_food_detail_requests": 0,
+    "tavily_requests": 0,
+    "model_requests": 0,
+    "api_key_value_recorded": false,
+    "user_database_reads_or_writes": 0,
+    "production_route_or_source_registry_enabled": false
+  },
+  "next_gate": "Keep this item not_found in FDC; only proceed to a fixed detail ID after independent identity evidence or explicit user confirmation."
+}

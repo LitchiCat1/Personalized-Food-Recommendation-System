@@ -1,0 +1,117 @@
+{
+  "date": "2026-11-15",
+  "batch": 62,
+  "branch": "v1.0.2",
+  "result": "offline_regression_passed_not_deployed",
+  "scope": "Bounded repair of known generic food identity admission within existing workstream 4. No new recognition model, prompt forcing, production admission or identity correction UI.",
+  "protected_branch": {
+    "ref": "refs/heads/v1.0.1",
+    "commit": "bb81e922ac9d2d69440d446bf7f02f4b822efba6",
+    "unchanged": true
+  },
+  "reference_case": {
+    "prior_evidence": "android-camera-smoke-20261115.json",
+    "photo": "food_picture/多種菜色的便當.jpg",
+    "sha256": "1ba15472326f83205c3d2b7f5279808491376021c25622205f3fa33c8d6170ea",
+    "reported_display_name": "炒菜葉",
+    "user_annotations": [
+      {"region": "upper_left", "name": "大陸妹"},
+      {"region": "lower_right", "name": "青江菜"}
+    ],
+    "model_replayed_in_this_batch": false,
+    "species_independently_verified": false,
+    "actual_scan_confidence_rejection_reasons_and_item_ids": null
+  },
+  "guard": {
+    "module": "backend/services/food_identity_service.py",
+    "function": "requires_food_identity_confirmation",
+    "method": "Known whole-label categories, controlled preparation wrappers, comparison-only Unicode normalization, and explicit uncertainty markers.",
+    "not_a_species_classifier_or_trusted_name_allowlist": true,
+    "mutates_name_confidence_weight_or_ids": false,
+    "integration_points": [
+      "FDC candidate Search eligibility before local/provider lookup",
+      "Direct FDC query-plan creation",
+      "Enrichment eligibility before web-derived positive cache and provider construction",
+      "Standalone web enrichment needs_identity gate",
+      "Model candidate suggested validation",
+      "User candidate confirm validation; defer/reject retained",
+      "Issued confirmation read before Detail authority",
+      "Direct-SQL preview acceptance before profile write"
+    ],
+    "local_hit_scope": "Existing official/custom local-hit priority is unchanged. This batch does not ban every generic curated local match.",
+    "legacy_scope": "Immutable snapshots remain readable. Old generic confirmations and active previews cannot grant new Detail/acceptance authority. Already-accepted results retain same-key evidence replay without new profile writes."
+  },
+  "direct_offline_probe": {
+    "inputs": {
+      "confidence": 0.95,
+      "validation_issues": [],
+      "food_state": "prepared",
+      "preparation_method": "stir_fried",
+      "components_scope": "food_only",
+      "estimated_weight_g": 70,
+      "data_type": "Synthetic helper inputs; not recovered phone response or measured food weight"
+    },
+    "results": [
+      {"name_zh": "菜葉", "fdc_search": false, "route_web": false, "web_core": false, "query_plan_error": "confirmation_required", "unchanged": true},
+      {"name_zh": "葉菜", "fdc_search": false, "route_web": false, "web_core": false, "query_plan_error": "confirmation_required", "unchanged": true},
+      {"name_zh": "綠色葉菜", "fdc_search": false, "route_web": false, "web_core": false, "query_plan_error": "confirmation_required", "unchanged": true},
+      {"name_zh": "小白菜", "fdc_search": true, "route_web": true, "web_core": true, "query_plan": ["小白菜"], "unchanged": true},
+      {"name_zh": "炒菜葉", "fdc_search": false, "route_web": false, "web_core": false, "query_plan_error": "confirmation_required", "unchanged": true},
+      {"name_zh": "大陸妹", "fdc_search": true, "route_web": true, "web_core": true, "query_plan": ["大陸妹"], "unchanged": true},
+      {"name_zh": "青江菜", "fdc_search": true, "route_web": true, "web_core": true, "query_plan": ["青江菜"], "unchanged": true}
+    ],
+    "interpretation": "Specific-name eligibility does not establish database coverage, compatible prepared-food nutrition, provider success or correct photo identity."
+  },
+  "regressions": [
+    "High and low confidence known generic names, cooking wrappers, quotations and uncertainty markers",
+    "Specific Chinese names, legitimate English aliases, and 生菜 not blocked by substring",
+    "Duplicate 炒菜葉 IDs with synthetic 40g/70g weights stay separate and unchanged",
+    "Mixed generic/specific batches do not attach another item's candidates or weight",
+    "Generic HTTP candidate POST returns an empty immutable snapshot and exact replay, with no client factory",
+    "Generic HTTP enrichment returns 409 confirmation_required with no cache/provider/quota/request/JTI consumption",
+    "Old generic snapshot cannot issue a confirmation revision or confirmation row",
+    "Already-issued generic confirmation cannot authorize Detail; evidence replay stays intact",
+    "Already-saved generic active preview cannot write profile or change its evidence row",
+    "Previously accepted generic same-key replay adds no profile; changed key conflicts"
+  ],
+  "verification": {
+    "full_backend": {
+      "command": "python -m pytest -q",
+      "cwd": "backend",
+      "environment": {"NUTRILENS_SKIP_LOCAL_ENV": "1", "DATABASE_PATH": "", "DATABASE_URL": ""},
+      "passed": 1074,
+      "subtests_passed": 1090,
+      "failed": 0,
+      "skipped": 0,
+      "duration_seconds": 146.98,
+      "exit_code": 0
+    },
+    "focused_subsets_not_additive_to_full_total": [
+      {"suite": "FDC candidate and enrichment Flask HTTP integration", "passed": 7, "duration_seconds": 7.16},
+      {"suite": "FDC preview repository", "passed": 13, "duration_seconds": 0.64},
+      {"suite": "FDC selection and confirmation repository", "passed": 33}
+    ],
+    "independent_review": "Two read-only review passes found and repaired uncertainty/cooked-label parsing and legacy direct-SQL preview bypasses. Final cross-review found no material new-authority bypass within this bounded scope; not a zero-defect claim.",
+    "frontend_changed": false
+  },
+  "side_effects": {
+    "live_model_usda_tavily_calls": 0,
+    "credential_contents_read": false,
+    "production_database_access": false,
+    "production_service_restarted": false,
+    "production_flags_changed": false,
+    "production_registry_changed": false,
+    "committed_or_pushed": false,
+    "deployment_database": "SQLite-only"
+  },
+  "remaining_boundaries": [
+    "No controlled current-model photo replay or recognition accuracy comparison in this batch",
+    "Actual phone response, scores, rejection reasons, item IDs, save behavior and nutrition truth remain unavailable",
+    "Finite lexical guard cannot certify arbitrary names or infer species from searched nutrition",
+    "Candidate confirmation copies scan identity; selecting a candidate does not correct a generic name",
+    "A genuine identity correction must use a new server-owned revision; no correction UI/route was added here",
+    "Runtime flags were not re-inspected; batch 60 health observed only automatic_web_fallback_enabled=false",
+    "Production source rights/registry admission and full phone nutrition acceptance remain separate gates"
+  ],
+  "next_bounded_step": "Use the supplied photo as a controlled recognition comparison, retaining raw model output and per-item rejection diagnostics to distinguish recognition uncertainty from nutrition mapping. No real provider replay was performed in this batch."
+}

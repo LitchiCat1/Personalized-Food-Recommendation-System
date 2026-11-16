@@ -1,0 +1,127 @@
+{
+  "date": "2026-11-15",
+  "batch": 59,
+  "branch": "v1.0.2",
+  "protected_branch": {
+    "ref": "refs/heads/v1.0.1",
+    "commit": "bb81e922ac9d2d69440d446bf7f02f4b822efba6",
+    "changed": false
+  },
+  "scope": "Bounded scanner expiry/restart recovery over real Flask HTTP and isolated SQLite; all providers are fake",
+  "environment": {
+    "app_url": "http://127.0.0.1:8090/scanner",
+    "browser": "Playwright CLI 0.1.24 with Chromium",
+    "browser_plugin": "Not available; used the documented Playwright CLI path",
+    "frontend": "Isolated static Expo export in the dedicated system temp test directory",
+    "database": "Dedicated system temp SQLite plus database-specific test marker; retained for audit, test server stopped",
+    "authentication": "AUTH_REQUIRED=true with test-only token verifier and seeded synthetic user",
+    "providers": ["Fake Vision apple fixture", "Fake FDC Search", "Fake fixed-ID Detail", "Test-only reviewed source policy"],
+    "scan_ttl_seconds": 120,
+    "clock": "Real time plus persisted forward-only offset shared by scan/snapshot/confirmation/preview repositories and preview service",
+    "api_route_interception": false,
+    "test_flags": {"candidate": true, "confirmation": true, "preview": true, "accept": false, "detail_route": false, "enrichment": false},
+    "production_flags_changed": false
+  },
+  "changes": [
+    "Candidate lookup failures now have localized feedback and explicit temporary-error retry",
+    "Terminal expired/stale responses invalidate only the current matching reference, retain detections and timestamp, and prompt rescan",
+    "Temporary confirmation failure retains identical pending request and idempotency key",
+    "Candidate parser validates the expiry field structurally; server clock remains the authority instead of the device clock",
+    "Test server supports guarded same-file resume and authenticated deterministic clock/provider controls"
+  ],
+  "scenarios": {
+    "candidate_failure_then_successful_retry": {"initial_status": 502, "retry_status": 200, "localized_feedback": true},
+    "candidate_failure_then_expired_retry": {
+      "status": 409, "code": "scan_unavailable", "search_calls_before": 1, "search_calls_after": 1,
+      "old_retry_removed": true, "rescan_feedback": true
+    },
+    "expired_candidate_confirmation": {"status": 409, "new_confirmations": 0, "issued_revisions": 0, "detail_calls": 0, "old_review_removed": true},
+    "expired_confirmation_preview": {"confirmation_status": 202, "preview_status": 409, "code": "expired", "detail_calls": 0},
+    "inflight_detail_expiry": {
+      "injected_advance_seconds": 121, "status": 409, "code": "expired",
+      "detail_calls_before": 1, "detail_calls_after": 2, "preview_rows_before": 3, "preview_rows_after": 3,
+      "late_preview_displayed": false
+    },
+    "server_down_then_same_decision_retry": {
+      "real_process_stop": true, "pid_before": 24992, "pid_after": 37612,
+      "same_sqlite_file": true, "clock_offset_seconds": 242, "same_request_body": true,
+      "same_idempotency_key": true, "new_confirmation_rows": 1, "issued_scan_revision": 1,
+      "confirmation_status": 202, "preview_status": 200, "weight_g": 150, "portion_calories_kcal": 78
+    },
+    "persisted_confirmation_restart_replay": {
+      "pid_before": 37612, "pid_after": 38124, "same_sqlite_file": true,
+      "clock_offset_seconds": 363, "source_policy_revision_before": 0, "source_policy_revision_after": 0,
+      "confirmation_rows_before": 4, "confirmation_rows_after": 4,
+      "preview_rows_before_restart": 2, "preview_rows_after_restart_before_new_request": 2,
+      "replay_status": 202, "same_confirmation_id": true, "same_issued_revision": true,
+      "continued_preview_status": 200, "expired_confirmation_status": 409, "expired_preview_status": 409,
+      "additional_detail_calls_on_expired_replay": 0, "old_preview_removed_on_clear": true
+    },
+    "stale_reply_and_reference_guards": {
+      "tested_in_unit_regression": ["new scan", "clear", "logout", "account switch", "backend switch", "revision advance", "old terminal failure", "late old snapshot"],
+      "detections_and_timestamp_retained_on_matching_invalidation": true
+    }
+  },
+  "responsive": {
+    "widths": [375, 390, 430, 768, 1440],
+    "error_and_preview_horizontal_overflow": false,
+    "screenshots_inspected": [390, 1440]
+  },
+  "browser_qa": {
+    "page_identity": "passed",
+    "meaningful_content": "passed",
+    "framework_overlay": false,
+    "interaction_proof": "passed",
+    "final_fresh_session_runtime_exceptions": 0,
+    "final_fresh_session_expected_browser_resource_errors": ["candidate 502", "expired candidate 409", "expired preview 409"],
+    "other_console_output": "Existing login form DOM verbose notice"
+  },
+  "verification": {
+    "frontend_all_tests": {"passed": 224, "failed": 0, "skipped": 0},
+    "backend_all_tests": {"passed": 1051, "subtests_passed": 734, "failed": 0, "skipped": 0, "duration_seconds": 151.23},
+    "backend_focused": {"passed": 31, "subtests_passed": 13},
+    "independent_frontend_review_tests": {"passed": 31, "failed": 0},
+    "typecheck": "passed", "lint": "passed", "web_export": "passed",
+    "final_default_export_command": "npm run build:web -- --clear",
+    "final_default_export": {
+      "api_base_url": "same-origin", "all_four_frontend_feature_flags": false,
+      "bundle": "entry-348aeccb919537013547959488cd7c13.js",
+      "contains_test_api_origin": false, "contains_test_token": false,
+      "disabled_flag_branches_verified": true
+    }
+  },
+  "sqlite_final_counts": {
+    "scan_contexts": 13, "candidate_snapshots": 7, "confirmations": 5,
+    "preview_rows": 3, "nutrition_profiles": 0, "meal_records": 0
+  },
+  "side_effects": {
+    "live_model_calls": 0, "live_usda_calls": 0, "live_tavily_calls": 0,
+    "production_database_writes": 0, "profile_accept_calls": 0, "meal_record_writes": 0,
+    "production_service_restarts": 0, "stage_commit_push": false,
+    "production_registry": "unchanged empty", "test_server_and_browser_sessions_stopped": true,
+    "preexisting_listener_ports_retained": [5000, 8081], "test_listener_8090_stopped": true
+  },
+  "execution_notes": [
+    "Automatic approval review blocked a test Expo development server command and an agent hidden background smoke command before execution; used a safer isolated static export served by foreground/session test Flask instead",
+    "First slow manual restart crossed original 120-second TTL and correctly failed; continuously orchestrated retry completed within TTL without extending it",
+    "Programmatic chooser plus redundant CLI upload caused test-only Expo removeChild errors; final fresh session used CLI click/upload exclusively and had no runtime exceptions",
+    "An initial wrong-heading wait and a redundant wait after terminal cleanup timed out; corrected the test sequence",
+    "Normal Metro build reused a previous test-config transform; final same-origin flags-disabled export cleared cache and verified the resulting bundle",
+    "An intermediate cache-cleared export was intentionally canceled to add explicit same-origin configuration, then completed successfully"
+  ],
+  "screenshots": [
+    "C:\\Users\\botto\\AppData\\Local\\Temp\\nutrilens-expiry-final-candidate-390.png",
+    "C:\\Users\\botto\\AppData\\Local\\Temp\\nutrilens-expiry-final-candidate-1440.png",
+    "C:\\Users\\botto\\AppData\\Local\\Temp\\nutrilens-expiry-final-preview-390.png",
+    "C:\\Users\\botto\\AppData\\Local\\Temp\\nutrilens-expiry-final-preview-1440.png",
+    "C:\\Users\\botto\\AppData\\Local\\Temp\\nutrilens-expiry-final-rescan-390.png"
+  ],
+  "limitations": [
+    "Fake-provider browser and SQLite evidence does not establish food recognition or nutrition accuracy",
+    "Already-rendered previews are historical read-only snapshots; no automatic expiry-removal contract was added",
+    "Persisted active status alone does not establish validity; runtime expiry and current authorization are still required, and no timed purge is claimed",
+    "Confirmation retains original candidate snapshot expiry; a newer issued scan does not extend confirmation lifetime",
+    "Physical camera, another device over Tailscale, live providers, source-rights admission, profile acceptance and real dietary-record writes remain unverified in this batch",
+    "SQLite-only and the original six workflow boundaries remain unchanged; all production enrichment flags remain disabled"
+  ]
+}

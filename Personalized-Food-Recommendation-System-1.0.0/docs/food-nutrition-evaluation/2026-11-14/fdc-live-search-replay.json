@@ -1,0 +1,71 @@
+{
+  "generated_at": "2026-11-14",
+  "scope": "bounded_live_usda_fdc_candidate_search_for_taiwanese_glutinous_rice_sausage",
+  "branch": "v1.0.2",
+  "endpoint": "https://api.nal.usda.gov/fdc/v1/foods/search",
+  "request_policy": {
+    "page_size": 10,
+    "page_number": 1,
+    "allowed_data_types": ["Foundation", "SR Legacy", "Survey (FNDDS)"],
+    "redirects": false,
+    "automatic_retries": false,
+    "shared_deadline_seconds_per_request": 20
+  },
+  "requests": [
+    {
+      "sequence": 1,
+      "expected_query": "糯米腸",
+      "status": "response_received",
+      "candidate_count": 0,
+      "semantic_result_valid": false,
+      "limitation": "The Windows PowerShell-to-Python native pipe trans-coded the non-ASCII query; this response is not evidence about the correctly encoded query."
+    },
+    {
+      "sequence": 2,
+      "query": "rice sausage",
+      "status": "response_received",
+      "candidate_count": 10,
+      "candidates": [
+        {"fdc_id": "2706512", "description": "Sausage and rice with cheese sauce", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2706511", "description": "Sausage and rice with mushroom sauce", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2706510", "description": "Sausage and rice with tomato-based sauce", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2708979", "description": "Rice with Spanish sausage, Puerto Rican style", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2708978", "description": "Rice with vienna sausage, Puerto Rican style", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "167698", "description": "Pork sausage rice links, brown and serve, cooked", "data_type": "SR Legacy"},
+        {"fdc_id": "174584", "description": "Sausage, smoked link sausage, pork", "data_type": "SR Legacy"},
+        {"fdc_id": "2706204", "description": "Pickled sausage", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2706191", "description": "Pork sausage", "data_type": "Survey (FNDDS)"},
+        {"fdc_id": "2706171", "description": "Beef sausage", "data_type": "Survey (FNDDS)"}
+      ],
+      "identity_decision": "No candidate is supported as equivalent to Taiwanese glutinous rice sausage; do not select a sausage or rice profile by ranking."
+    },
+    {
+      "sequence": 3,
+      "query": "糯米腸",
+      "encoding": "Unicode escape in Python source; sent as the intended Unicode query",
+      "status": "response_received",
+      "candidate_count": 0,
+      "semantic_result_valid": true
+    }
+  ],
+  "interpretation": {
+    "search_client_http_path_verified": true,
+    "exact_supported_candidate_found": false,
+    "proves_food_absent_from_entire_fdc_database": false,
+    "safe_fdc_outcome_for_this_query_set": "not_found",
+    "nutrition_values_retrieved": false,
+    "photo_confidence_changed": false
+  },
+  "external_side_effects": {
+    "usda_search_requests": 3,
+    "usda_food_detail_requests": 0,
+    "tavily_requests": 0,
+    "model_requests": 0,
+    "api_key_source": "local server-side key file, transient process environment only",
+    "api_key_value_recorded": false,
+    "user_database_reads_or_writes": 0,
+    "nutrition_profiles_created": 0,
+    "production_route_or_source_registry_enabled": false
+  },
+  "next_gate": "Offline test a small, explicit query-normalization/English-alias set while preserving the original food identity; any future live query remains bounded and must not turn ranked near-matches into accepted candidates."
+}

@@ -1,0 +1,26 @@
+{
+  "generated_at": "2026-11-14T09:15:18.784287+00:00",
+  "scope": "isolated_backend_regression",
+  "tests_run": 959,
+  "passed": 936,
+  "skipped": 23,
+  "skip_reasons": {
+    "\u6c92\u8a2d NUTRILENS_TEST_DATABASE_URL": 23
+  },
+  "failures": 0,
+  "errors": 0,
+  "failure_details": [],
+  "successful": true,
+  "elapsed_seconds": 115.403,
+  "isolation": {
+    "skip_local_env": true,
+    "database_path": "",
+    "external_db_and_relay_env_cleared": true,
+    "tavily_env_cleared": true
+  },
+  "limitations": [
+    "Real PostgreSQL integration tests require a separate configured test database",
+    "Mongo behavior uses offline test doubles; no live Mongo server",
+    "No new paid model or Tavily calls; no mobile UI or recognition accuracy evaluation"
+  ]
+}

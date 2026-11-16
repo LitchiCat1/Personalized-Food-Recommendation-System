@@ -1,0 +1,58 @@
+{
+  "date": "2026-11-15",
+  "branch": "v1.0.2",
+  "scope": "FDC candidate confirmation to server-owned profile preview",
+  "frontend": {
+    "typecheck": "passed",
+    "eslint": "passed",
+    "web_export": "passed",
+    "nutrition_tests": {
+      "passed": 141,
+      "failed": 0
+    }
+  },
+  "backend": {
+    "focused_tests": {
+      "passed": 52,
+      "subtests_passed": 2,
+      "failed": 0
+    },
+    "database": "isolated in-memory SQLite",
+    "detail_provider": "fake USDA FDC Detail transport"
+  },
+  "http_flow": {
+    "confirmation_route_status": 202,
+    "issued_scan_revision": 1,
+    "forged_client_weight_status": 400,
+    "provider_calls_before_forged_request_rejection": 0,
+    "preview_route_status": 200,
+    "fdc_id": "171688",
+    "server_weight_g": 150,
+    "portion_weight_g": 150,
+    "portion_calories_kcal": 78,
+    "photo_confidence_changed": false,
+    "profile_written": false,
+    "nutrition_profile_rows": 0,
+    "temporary_preview_rows": 1,
+    "accept_route_called": false
+  },
+  "browser_smoke": {
+    "url": "http://localhost:8081/",
+    "result": "The app loaded to the login screen; the preview panel was not reached."
+  },
+  "side_effects": {
+    "live_usda_calls": 0,
+    "live_tavily_calls": 0,
+    "model_calls": 0,
+    "production_database_writes": 0,
+    "profile_writes": 0,
+    "meal_record_writes": 0,
+    "production_flags_changed": false
+  },
+  "not_tested": [
+    "camera or gallery browser flow",
+    "preview panel visual layout at mobile and desktop viewports",
+    "live candidate search or USDA Detail",
+    "profile acceptance"
+  ]
+}

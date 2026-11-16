@@ -2,6 +2,10 @@
 
 > 最後更新：2026-05-07
 
+> 資料庫決策更新（2026-11-14）：本文件中的 Render／Supabase PostgreSQL 操作步驟已過時，
+> `v1.0.2` 僅支援 SQLite。正式部署請依 `docs/Local_Server_Deployment.md`；
+> PostgreSQL 只保留歷史隔離測試紀錄，不是執行依賴。
+
 本文件整合原本分散的操作指令、部署驗收、API key 輪替與事故經驗。後續維運與部署流程以本文件為準。
 
 ## 1. 安全原則

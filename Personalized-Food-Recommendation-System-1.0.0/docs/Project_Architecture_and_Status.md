@@ -2,6 +2,10 @@
 
 > 最後更新：2026-06-17
 > 專案：NutriLens / Personalized Food Recommendation System
+>
+> 資料庫決策更新（2026-11-14）：本文件中的 Render／Supabase PostgreSQL 部署描述為歷史狀態，
+> 不代表目前正式方案。`v1.0.2` 正式部署與程式目標為 SQLite-only；最新狀態以
+> `docs/Local_Server_Deployment.md` 及 `docs/plans/2026-11-13-web-nutrition-fallback.md` 為準。
 
 ## 1. 文件目的
 

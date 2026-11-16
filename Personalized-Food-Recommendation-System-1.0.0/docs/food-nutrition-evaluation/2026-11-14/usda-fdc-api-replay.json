@@ -1,0 +1,39 @@
+{
+  "generated_at": "2026-11-14T05:36:21.628905+00:00",
+  "scope": "single_live_usda_fdc_api_payload_replayed_offline",
+  "fdc_id": 1750340,
+  "description": "Apples, fuji, with skin, raw",
+  "data_type": "Foundation",
+  "food_nutrient_rows": 35,
+  "payload_sha256": "4fe45659fb96c5d96202be2b69d39a557ac22cde67dd5c804b8d643e4accf165",
+  "source_url": "https://api.nal.usda.gov/fdc/v1/food/1750340",
+  "adapter_version": "usda-fdc-json-v1",
+  "selected_rows": [
+    "fdc-calories",
+    "fdc-carbs",
+    "fdc-fat",
+    "fdc-fiber",
+    "fdc-protein",
+    "fdc-sodium",
+    "fdc-sugar"
+  ],
+  "profile_fields_with_values": [
+    "calories",
+    "carbs",
+    "fat",
+    "fiber",
+    "protein",
+    "sodium",
+    "sugar"
+  ],
+  "profile_fields_null": [
+    "saturated_fat",
+    "trans_fat"
+  ],
+  "validated": true,
+  "limitations": [
+    "Captured with a server-side USDA API key; the key is not persisted in this report",
+    "No production registry policy or user record was changed",
+    "Food identity and preparation compatibility remain server-review responsibilities"
+  ]
+}

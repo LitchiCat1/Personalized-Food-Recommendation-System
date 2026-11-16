@@ -1,0 +1,39 @@
+{
+  "stage": "scanner FDC candidate confirmation UI contract",
+  "date": "2026-11-15",
+  "branch": "v1.0.2",
+  "weight_contract": {
+    "decision": "FDC preview uses the server-owned scan weight; scanner weight edits remain local and are not sent as authority",
+    "weight_revision_route": false,
+    "preview_or_profile_write_connected": false,
+    "photo_confidence_mutated": false
+  },
+  "checks": {
+    "frontend_nutrition": { "passed": 138, "failed": 0 },
+    "frontend_scanner": { "passed": 16, "failed": 0 },
+    "frontend_typecheck": "passed",
+    "frontend_eslint": "passed",
+    "backend_confirmation_and_preview_routes": { "passed": 12, "failed": 0 }
+  },
+  "browser_smoke": {
+    "url": "http://localhost:8081/",
+    "viewport": { "width": 390, "height": 844 },
+    "result": "Unauthenticated login screen rendered; confirmation panel could not be reached without a test session and enabled route",
+    "console_errors": 0,
+    "console_warnings": 0
+  },
+  "side_effects": {
+    "live_usda_requests": 0,
+    "tavily_or_model_requests": 0,
+    "api_keys_read": 0,
+    "production_sqlite_reads_or_writes": 0,
+    "profile_or_dietary_record_writes": 0,
+    "feature_flags_enabled": false
+  },
+  "remaining_gates": [
+    "authenticated camera/gallery flow against an isolated SQLite/Tailscale deployment",
+    "fixed Detail and profile preview UI bound to the issued scan revision",
+    "source rights admission and production registry review",
+    "cross-process FDC Search single-flight or durable reservation"
+  ]
+}

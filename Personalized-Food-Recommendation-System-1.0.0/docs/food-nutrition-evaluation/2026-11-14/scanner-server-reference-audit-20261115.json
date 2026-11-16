@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "verified_local_date": "2026-11-15",
+  "branch": "v1.0.2",
+  "scope": "offline scanner/UI server-owned FDC reference connection audit",
+  "result": "blocked_pending_server_candidate_contract",
+  "tests": [
+    {
+      "command": "cd frontend && npm run test:nutrition",
+      "tests_run": 124,
+      "passed": 124,
+      "failed": 0,
+      "errors": 0
+    },
+    {
+      "command": "cd frontend && npm run test:scanner",
+      "tests_run": 12,
+      "passed": 12,
+      "failed": 0,
+      "errors": 0
+    },
+    {
+      "command": "cd frontend && npm run typecheck",
+      "exit_code": 0
+    },
+    {
+      "command": "cd frontend && npm run lint -- --no-cache",
+      "exit_code": 0
+    }
+  ],
+  "verified_boundaries": [
+    "nutrition-fdc-preview-api rejects disabled-by-default calls before network",
+    "preview and accept requests contain server references only",
+    "scanner calls vision prediction and optional enrichment only",
+    "scanner does not import or call FDC confirmation, detail, profile-preview or profile-accept helpers",
+    "scanner does not retain scanContext in component state for a later confirmation action",
+    "backend exposes FDC confirmation/detail/preview/accept POST routes but no HTTP route currently exposes or creates a server-owned candidate snapshot for scanner UI"
+  ],
+  "not_verified": [
+    "candidate snapshot retrieval/creation contract",
+    "confirmation envelope UI and item-by-item candidate selection",
+    "issued scan revision handoff after confirmation",
+    "mobile camera/gallery confirmation -> preview -> accept flow",
+    "Tailscale/SQLite enabled FDC flow",
+    "any production flag or source registry admission"
+  ],
+  "data_integrity_fix": {
+    "issue": "new enrichment item without a positive server-owned weight previously defaulted to 100g",
+    "resolution": "reject the new item from the recordable scanner list and keep existing detections unchanged",
+    "regression": "unknown and non-positive weights remain unresolved; no invented 100g"
+  },
+  "required_before_ui_connection": [
+    "server-owned candidate snapshot must be created from the authenticated scan context and exposed through a bounded, user-bound reference",
+    "snapshot must include digest, scan revision, item identity and presented candidates; client must never invent candidates or FDC IDs",
+    "confirmation route response must provide an issued revision/confirmation reference that the UI can pass to profile-preview",
+    "scanner must retain the server references across the confirmation interaction without changing the displayed photo confidence"
+  ],
+  "production_flags": {
+    "automatic_web_fallback_enabled": false,
+    "nutrition_enrichment_route_enabled": false,
+    "fdc_confirmation_route_enabled": false,
+    "fdc_detail_route_enabled": false,
+    "fdc_profile_preview_route_enabled": false,
+    "fdc_profile_accept_route_enabled": false
+  },
+  "network_side_effects": {
+    "tavily_called": false,
+    "usda_called": false,
+    "model_called": false,
+    "user_records_written": false,
+    "profile_written": false
+  }
+}

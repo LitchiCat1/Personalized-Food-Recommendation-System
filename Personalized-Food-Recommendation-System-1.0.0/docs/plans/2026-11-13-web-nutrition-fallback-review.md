@@ -16,7 +16,13 @@ Scanner 36 項、營養 150 項、typecheck、lint 及隔離 Expo Web 匯出通�
 
 最終 Scanner 36 項、營養 150 項、設定 11 項、typecheck、lint 均通過。預覽開、關各清 Metro 快取匯出 Expo 並比對 entry 不同；Playwright 在 390×844 及 1440×1000 各操作兩種建置的相簿、參考選用、確認，另在 390×844 驗證延後。用合成辨識、既有 FDC 171688 資料離線回放及暫存 SQLite，選用、確認與預覽均走測試 HTTP。開啟時兩次預覽皆顯示 150 g／78 kcal；關閉及延後均未發預覽請求。五次操作無水平溢出、頁面或 console 錯誤；資料庫新增 5 筆確認決定紀錄、2 筆預覽，營養 profile 和餐點紀錄均為 0。這不是實機拍照或第三層真來源驗收。
 
-本機和公開 health、Scanner entry 仍與 `ecceed6c` 部署一致；未提交、推送、重啟或動正式設定。此顯示修正的隔離驗收到此完成。安排發布時依[更新與回復程序](../Local_Server_Deployment.md#更新專案)處理，不改原 Release tag。第三層仍按第19節停在缺少合格案例及來源依據，不新增找圖或來源測試批次。
+隔離驗收當時，本機及公開服務仍為 `ecceed6c`，尚未提交或重啟。發布結果另見下一節。第三層仍按第19節停在缺少合格案例及來源依據，不新增找圖或來源測試批次。
+
+## Scanner 狀態修正部署（2026-11-19）
+
+將修正提交為 `37789cf119213f9a1f0a707f3b8f7aeaa7d3527a`，部署於 `v1.0.3` 分支；原 `v1.0.3` Release 標籤仍指向 `ecceed6c`。後端程式與原 Release 相同。本輪重跑 Scanner 36、營養 150、設定 11 項測試及 typecheck、lint；清 Metro 快取並暫存 same-origin 網頁匯出，檢查 14 份公開文字資產沒有已知伺服器設定及模型金鑰。用既有工具備份 SQLite 並通過完整性檢查。保留原前端與後端私密設定供回復，未改 SQLite、排程或 Tailscale 配置；僅替換前端並更新部署 SHA。
+
+本機與公開 `/health`、`/scanner` 及 Expo entry 均回 200，兩端同為 `37789cf`、`started_at=2026-11-19T21:03:59.773666+08:00`，從送出停止到本機 health 恢復約 3.5 秒。兩端提供 `entry-6cb058201a461e3f3dc3129183adcbe6.js`，SHA-256 同為 `01295fe130a6dce75dfe4f72b02832b06688c4cc819ae53a89a7752d5e11cb87`，與打包檔一致。正式 SQLite 唯讀 `quick_check=ok`，公開 health 未顯示資料庫路徑。登入、TFDA／USDA FNDDS，以及僅 171688 revision 0 的選用、確認與預覽維持原狀；原始 Search／Detail 路由、profile 新增與 Tavily 補全維持關閉。沒有重做手機或供應商測試，不視為第三層真來源驗收。此發布子項結案。
 
 ## v1.0.3 本機正式更新（2026-11-19）
 

@@ -107,12 +107,11 @@ Invoke-RestMethod http://127.0.0.1:5000/health
 
 ## 更新專案
 
-1. 停止 `NutriLens Backend` 工作，確認已停止，再切換分支或更新程式。
-2. 保留原本完整路徑、`backend/.env.local`、`key.txt` 與既有 SQLite 檔案；確認目前為要測試的 `v1.0.3`。
-3. 在目前專案內使用實際部署環境執行 `python backend/scripts/backup_db.py` 備份。
-4. 依賴有變動時更新 Python／Node 套件。
-5. 前端有變動或使用全新下載的原始碼時，執行 `npm --prefix frontend run build:local`。
-6. 啟動工作，再確認本機網站與 Tailscale 網址。
+1. 用 `git rev-parse --verify 'refs/tags/v1.0.3^{commit}'` 取得完整 SHA，與 GitHub 發布版核對。準備符合該提交的原始碼；分支同名或 `app_version` 相同都不足以確認內容。更新依賴並將前端匯出到暫存目錄，不覆蓋仍在服務的 `frontend/dist`。
+2. 使用排程工作相同的 Python、Windows 帳號及 `DATABASE_PATH` 執行 `python backend/scripts/backup_db.py`。保留通過檢查的 SQLite 備份、原設定、舊程式版本與 `frontend/dist` 副本。備份可在服務運作時做；備份失敗則不停止服務。如果更新會遷移資料庫，停機及確認無寫入後、啟動新版前再留一份備份，避免遺失第一次備份之後的新紀錄。
+3. 停止 `NutriLens Backend`，確認工作已停止與 5000 埠已釋放後，再切換程式和靜態檔。保留原工作路徑、`backend/.env.local`、`key.txt` 及 SQLite 路徑。以 `git rev-parse HEAD` 和 `git status --short --untracked-files=no` 核對實際部署工作樹；不要把待提交改動當作標籤內容。核對後才在後端啟動環境設定 `NUTRILENS_DEPLOYED_BRANCH=v1.0.3` 和 `NUTRILENS_DEPLOYED_COMMIT`（已核對的完整 SHA）。同名派送環境變數或根目錄 `.env.local` 可能優先於 `backend/.env.local`；不要只在目前視窗設定後就假定排程會繼承。
+4. 啟動原工作。確認本機與既有 Tailscale 公開 `/health` 都為 200，回報 `v1.0.3`、`deployed_branch=v1.0.3`、預期的七碼 `deployed_commit`、新的 `started_at`、SQLite、需登入及自動補全關閉。比對兩端 `/scanner` 的 Expo entry 與部署目錄；`deployed_commit=local` 只表示沒有版本標記，不能作為標籤部署驗證。
+5. 驗證失敗時停止工作，優先回復舊程式、設定及靜態檔，再驗原服務。只有確定資料庫需要回復並處理備份後新增紀錄時，才在停止後端後使用 `backup_db.py --restore`；不要為了回復前端或程式而直接覆寫正式 SQLite。
 
 排程使用該電腦 `pythonw.exe` 的完整路徑，並以本專案 `backend/scripts/run_in_background.py`
 的完整路徑啟動。搬動專案或變更 Python 安裝位置後，需要修改工作排程的動作與起始位置。

@@ -4,6 +4,20 @@
 方式：第二輪先完成初稿，再從第 1 至 16 節重讀，將承諾、資料流與現有程式逐一對照。
 限制：第二輪為同一代理自行審查，當時未實測；第三輪依授權實測但尚未實作。後續修復已修改後端，Phase2a另由儲存、風險及API代理獨立交叉檢查；仍不等於外部安全或營養專業審核。第五十六批fake vision/FDC瀏覽器E2E、第五十七批條款查核均屬當時限定結果；其後Android相機smoke及固定preview已有使用者驗收，171688也已由第七十八批正式限定發布，不能再概括為完全未測手機或沒有任何正式來源。Tavily Web來源仍未准入，正式真照片條件式preview及準確率未驗證。第97批Detail覆蓋未保存數值或逐欄source metadata，不能作營養來源品質結論；第98批雖完成metadata比較，仍未選定來源或energy method。
 
+## v1.0.3 發布後核對（2026-11-19）
+
+[GitHub Release](https://github.com/LitchiCat1/Personalized-Food-Recommendation-System/releases/tag/v1.0.3) 的標籤與 GitHub 分支 `v1.0.3` 核對到相同提交 `ecceed6c40f49a5f7491e577d1b51e19a17500c2`，本機已在該分支且提交一致。原本未追蹤的照片、截圖及本機測試檔未改動。
+
+本機與既有 Tailscale Funnel 的 `/health` 均回 200：`app_version=v1.0.3`、`database=sqlite`、`auth_required=true`、`automatic_web_fallback_enabled=false`，啟動時間均為 `2026-11-19T17:51:44.495154+08:00`。兩端 `/scanner` 與 Expo entry 均回 200，entry SHA-256 `82028ba5cd38adc19b488a9ed53bb113658614e1347c09bccca42a68e55d4418` 與現行 `frontend/dist` 相同。`deployed_branch` 和 `deployed_commit` 均回 `local`，只能確認服務回報的版本與實際提供的靜態資產，不能證明已部署 GitHub 標籤，也未驗證 Scanner 互動。
+
+本次未部署、重啟、讀寫正式 SQLite、改旗標或呼叫模型／USDA／Tavily。沒有新案例符合第19節，第三層仍停在等待證據，不新增查圖、擴搜或手機重測批次。日後若安排正式更新，再依[維運手冊](../Operations_Runbook.md)備份 SQLite，記錄部署的分支與提交，並於重啟後核對服務及前端資產。
+
+### Windows／SQLite 更新演練
+
+從 `refs/tags/v1.0.3` 的 `ecceed6c` 匯出後端到暫存目錄，以正式排程同版 Python 在不同 loopback 埠執行既有背景啟動程式，用全新 SQLite 且略過本機設定。首次隔離環境缺少 Python 使用者套件路徑而停止；保留 `APPDATA` 讓同版 Python 讀取已安裝的依賴後通過，沒有傳入金鑰或正式連線設定。
+
+兩次隔離啟動均由 `/health` 回報 `v1.0.3`、`ecceed6c`、SQLite、需登入、本機資料可用及自動補全關閉；`started_at` 更新。使用既有 CLI 備份和還原，兩份檔案 `quick_check=ok`；還原後只含備份時的測試列，備份後寫入的測試列仍由原檔改名保留。第二次啟動後還原資料仍在，測試埠已關閉。未測部署後的 Scanner 互動，未動正式排程、資料庫、前端或 Tailscale。已更新 [Windows 部署說明](../Local_Server_Deployment.md#更新專案)；部署準備至此完成，只有安排正式更新時才執行備份與重啟。不影響第19節的 Tavily 停點。
+
 ## 第三層收尾複核（2026-11-19）
 
 以[主計畫第19節](2026-11-13-web-nutrition-fallback.md#19-實測後的放行決定)的現行條件核對既有案例，不重做照片或供應商測試：

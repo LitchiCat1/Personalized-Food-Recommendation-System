@@ -4,6 +4,28 @@
 方式：第二輪先完成初稿，再從第 1 至 16 節重讀，將承諾、資料流與現有程式逐一對照。
 限制：第二輪為同一代理自行審查，當時未實測；第三輪依授權實測但尚未實作。後續修復已修改後端，Phase2a另由儲存、風險及API代理獨立交叉檢查；仍不等於外部安全或營養專業審核。第五十六批fake vision/FDC瀏覽器E2E、第五十七批條款查核均屬當時限定結果；其後Android相機smoke及固定preview已有使用者驗收，171688也已由第七十八批正式限定發布，不能再概括為完全未測手機或沒有任何正式來源。Tavily Web來源仍未准入，正式真照片條件式preview及準確率未驗證。第97批Detail覆蓋未保存數值或逐欄source metadata，不能作營養來源品質結論；第98批雖完成metadata比較，仍未選定來源或energy method。
 
+## Scanner 營養狀態顯示（2026-11-19）
+
+復核第15、19節和現行 Scanner：舊摘要把找到 USDA 參考來源但未套用的品項說成沒有配對，確認後逐項文案仍要求再確認。改用同一掃描快照及對應確認結果產生摘要與逐項狀態；區分已審查來源、未核對的原始候選、確認後僅供預覽、拒絕、延後及明確查無已審查來源。沒有成功回應時保留原原因；舊版確認不能把目前項目改標為預覽。已配對品項才參與原有合計、份量與記錄，不調整資料契約或流程開關。
+
+Scanner 36 項、營養 150 項、typecheck、lint 及隔離 Expo Web 匯出通過。Playwright 在 390×844 和 1440×1000 各測相簿→找到參考→確認→預覽→清除→查無已審查來源，沒有水平溢出或頁面／console 錯誤。使用隔離 SQLite harness 的合成辨識、FDC 搜尋與 Detail；瀏覽器只替換已審查選用回應的展示案例，確認、預覽走測試 HTTP，最後兩份預覽、零份正式營養 profile 或餐點列。首次瀏覽器工具預設版本未安裝，改用既有 Chromium；測試程序已結束。結果不證明真實來源覆蓋或手機拍照準確率。
+
+本輪只修正既有 Phase 4 顯示問題，未部署、未呼叫外部模型／USDA／Tavily，沒有改正式 SQLite 或開關。依第19節，第三層仍等待同一合格案例及來源依據；欄位品質V2、生鮮參考與跨畫面改造不列為本次實作或新增待辦。
+
+**同一子項收尾：**補齊 USDA 區塊本身。送出判定後改顯示結果，不再顯示送出前的標題、指示與逐列確認提示；「稍後處理」不寫成已確認食材及份量。預覽旗標關閉時，畫面顯示已確認但未套用，不宣稱可預覽。
+
+最終 Scanner 36 項、營養 150 項、設定 11 項、typecheck、lint 均通過。預覽開、關各清 Metro 快取匯出 Expo 並比對 entry 不同；Playwright 在 390×844 及 1440×1000 各操作兩種建置的相簿、參考選用、確認，另在 390×844 驗證延後。用合成辨識、既有 FDC 171688 資料離線回放及暫存 SQLite，選用、確認與預覽均走測試 HTTP。開啟時兩次預覽皆顯示 150 g／78 kcal；關閉及延後均未發預覽請求。五次操作無水平溢出、頁面或 console 錯誤；資料庫新增 5 筆確認決定紀錄、2 筆預覽，營養 profile 和餐點紀錄均為 0。這不是實機拍照或第三層真來源驗收。
+
+本機和公開 health、Scanner entry 仍與 `ecceed6c` 部署一致；未提交、推送、重啟或動正式設定。此顯示修正的隔離驗收到此完成。安排發布時依[更新與回復程序](../Local_Server_Deployment.md#更新專案)處理，不改原 Release tag。第三層仍按第19節停在缺少合格案例及來源依據，不新增找圖或來源測試批次。
+
+## v1.0.3 本機正式更新（2026-11-19）
+
+執行檔與前端來源核對至 GitHub Release `ecceed6c40f49a5f7491e577d1b51e19a17500c2`；工作分支 `1a8d266` 與標籤只差三份文件。沿用現有 `NutriLens Backend` 排程、SQLite 路徑及 Tailscale Funnel，未新增排程或切換資料庫。停機前用 SQLite backup 工具建立備份並確認 `quick_check=ok`；原後端設定與前端 `dist` 保留在 Git 外供回復。用保留公開建置設定的 same-origin Expo 匯出替換靜態檔，後端只增部署分支與 SHA 的回報設定，未更動來源、旗標或金鑰。
+
+重啟後本機與公開 `/health` 均 200，`deployed_branch=v1.0.3`、`deployed_commit=ecceed6c`，同一新啟動時間為 `2026-11-19T19:35:08.132126+08:00`。從送出停止到本機 health 恢復，演練腳本量得約 9.1 秒，不是公開停機時間。公開 health 未顯示 SQLite 路徑；原 SQLite 以唯讀檢查仍為 schema 2、`quick_check=ok`，未還原或取代正式資料庫。兩端 `/scanner` 與 Expo entry 均 200，entry `entry-91068c2f1fb8e69dac61e5b802fb8feb.js` 的 SHA-256 `09a6b769c1c7d057a415255ff0964b9d6cfe70204bc736c534e9eed80bf6bf1d` 與部署目錄相同；上線前 14 份公開文字資產未命中所核對的已知伺服器端值。
+
+相同 `started_at` 的私密啟動診斷確認只載入 `usda-fdc-171688` active revision 0；選用、確認及預覽維持開啟，raw Search／Detail、profile accept、enrichment 維持關閉。本機及公開登入仍必須，TFDA／USDA 本機資料層健康。這是正式部署的 HTTP、靜態資產及設定核對，未操作登入後 Scanner、寫入飲食或呼叫模型、USDA／Tavily；不視為第三層真來源驗收。既有停點不變，不再新增部署或辨識測試批次。
+
 ## v1.0.3 發布後核對（2026-11-19）
 
 [GitHub Release](https://github.com/LitchiCat1/Personalized-Food-Recommendation-System/releases/tag/v1.0.3) 的標籤與 GitHub 分支 `v1.0.3` 核對到相同提交 `ecceed6c40f49a5f7491e577d1b51e19a17500c2`，本機已在該分支且提交一致。原本未追蹤的照片、截圖及本機測試檔未改動。

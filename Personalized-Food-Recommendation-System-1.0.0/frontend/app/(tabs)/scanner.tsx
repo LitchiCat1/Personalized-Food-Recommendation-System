@@ -24,9 +24,10 @@ import { checkMenuPhoto, type MenuPhotoCheckResponse } from '@/lib/api';
 import { resolveImageBase64 } from '@/lib/image';
 import {
   buildOCRDetectedFood,
+  describeScannerPendingNutrition,
+  formatScannerNutritionSummary,
   formatScannerResultTitle,
   formatScannerSourceBadge,
-  formatReviewedPendingFoods,
   FOOD_NAME_REQUIRED_MESSAGE,
   hasReviewableNutritionMiss,
   getUserConfirmableIdentityItems,
@@ -332,6 +333,10 @@ export default function ScannerScreen() {
   const completedFdcConfirmation = fdcCandidateSnapshot && fdcConfirmationDisplay &&
     fdcCandidateSnapshot.snapshot.snapshot_digest === fdcConfirmationDisplay.snapshot.snapshot.snapshot_digest
     ? fdcConfirmationDisplay.result : null;
+  const fdcConfirmationEnabled = process.env.EXPO_PUBLIC_FDC_CONFIRMATION_ENABLED?.trim().toLowerCase() === 'true';
+  const fdcPreviewEnabled = process.env.EXPO_PUBLIC_FDC_PROFILE_PREVIEW_ENABLED?.trim().toLowerCase() === 'true';
+  const pendingNutrition = describeScannerPendingNutrition(rejectedDetections, fdcCandidateSnapshot,
+    completedFdcConfirmation, fdcConfirmationEnabled, fdcPreviewEnabled);
   const totalCal = results.reduce((sum, f) => sum + f.nutrition.calories, 0);
   const totalSodium = results.reduce((sum, f) => sum + f.nutrition.sodium, 0);
   const userPendingRecords = pendingRecordQueue.filter((item) => item.userId === user.userId);
@@ -1178,9 +1183,7 @@ export default function ScannerScreen() {
           {menuChecking ? '正在用 AI 分析菜單' : scanResult.isScanning ? '正在分析照片' : resultTitle && scanMode !== 'menu' ? resultTitle : modeConfig.title}
         </Text>
         <Text style={styles.scanHint}>{scanItemCount > 0 && scanMode !== 'menu'
-          ? results.length > 0
-            ? `${rejectedDetections.length > 0 ? '已配對項目合計' : '估計合計'} ${totalCal} kcal，鈉 ${totalSodium}mg。${rejectedDetections.length > 0 ? `另有 ${rejectedDetections.length} 項待確認，尚未計入。` : '請確認份量後加入。'}`
-            : `目前沒有配對營養資料；${rejectedDetections.length} 項待確認，尚未計入。`
+          ? formatScannerNutritionSummary(results.length, totalCal, totalSodium, pendingNutrition)
           : modeConfig.hint}</Text>
         {scanMode !== 'manual' ? (
           <PrimaryButton label={modeConfig.action} onPress={modeConfig.onPress} disabled={scanResult.isScanning || ocrQuerying || menuChecking} icon={<Ionicons name={modeConfig.icon} size={18} color={Palette.text.inverse} />} />
@@ -1214,7 +1217,7 @@ export default function ScannerScreen() {
       </View>
       <ScannerPendingFoods
         rs={rs}
-        items={formatReviewedPendingFoods(rejectedDetections, fdcCandidateSnapshot)}
+        items={pendingNutrition.items}
         identityItems={confirmableIdentityItems}
         identityEnabled={identityConfirmationEnabled}
         identityDrafts={identityNameDrafts}
@@ -1254,8 +1257,8 @@ export default function ScannerScreen() {
         <FdcCandidateReview
           snapshot={fdcCandidateSnapshot}
           reference={serverScanReference}
-          enabled={process.env.EXPO_PUBLIC_FDC_CONFIRMATION_ENABLED?.trim().toLowerCase() === 'true'}
-          previewEnabled={process.env.EXPO_PUBLIC_FDC_PROFILE_PREVIEW_ENABLED?.trim().toLowerCase() === 'true'}
+          enabled={fdcConfirmationEnabled}
+          previewEnabled={fdcPreviewEnabled}
           completedResult={completedFdcConfirmation}
           onConfirm={handleFdcCandidateConfirmation}
           onUnavailable={handleFdcReferenceUnavailable}

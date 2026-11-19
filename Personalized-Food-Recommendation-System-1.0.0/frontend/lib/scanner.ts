@@ -3,6 +3,7 @@ import type { ApiAuth } from '@/lib/api';
 import type { MealType } from '@/lib/meal';
 import type { NutritionEnrichmentItem, NutritionEnrichmentResponse, NutritionScanContext } from '@/lib/nutrition-enrichment-api';
 import type { NutritionFdcCandidateSnapshotResponse } from '@/lib/nutrition-fdc-candidate-api';
+import type { NutritionFdcConfirmationResponse } from '@/lib/nutrition-fdc-confirmation-api';
 
 
 // 後端回 401 時通知 AuthGate 帶回登入畫面（事件名稱見 lib/auth.ts 的 UNAUTHORIZED_EVENT）。
@@ -53,17 +54,69 @@ export type RejectedDetection = {
   nutrition_status?: 'unmatched';
 };
 
-export function formatReviewedPendingFoods(
+export function formatReviewedNutritionReason(reason?: string): string | null {
+  switch (reason) {
+    case 'identity_required': return '食材身分仍需確認，暫不套用營養。';
+    case 'weight_required': return '缺少可用估重，暫不套用營養。';
+    case 'ambiguous_reviewed_source': return '有多筆相容參考，暫不自動選用。';
+    case 'no_reviewed_source': return '未找到相容的已審查營養來源。';
+    default: return null;
+  }
+}
+
+export function describeScannerPendingNutrition(
   items: RejectedDetection[], snapshot: NutritionFdcCandidateSnapshotResponse | null,
-): RejectedDetection[] {
-  if (!snapshot?.selection) return items;
-  const matched = new Set(snapshot.selection.items
-    .filter((item) => item.reason === 'reviewed_match')
+  confirmation: NutritionFdcConfirmationResponse | null, confirmationEnabled: boolean, previewEnabled: boolean,
+) {
+  let reviewCount = 0;
+  let previewCount = 0;
+  if (!snapshot) return { items, reviewCount, previewCount };
+  const selected = new Map(snapshot.selection?.items.map((item) => [item.item_id, item.reason]));
+  const candidates = new Set(snapshot.snapshot.snapshot.items.filter((item) => item.candidates.length > 0)
     .map((item) => item.item_id));
-  return items.map((item) => item.item_id && matched.has(item.item_id) &&
-    item.recognition_status === 'recognized' && item.nutrition_status === 'unmatched'
-    ? { ...item, reason: '已找到相容的 USDA 參考營養；請在下方確認名稱與估計份量，尚未計入營養合計。', search_hints: [] }
-    : item);
+  const completed = confirmation?.snapshot_digest === snapshot.snapshot.snapshot_digest &&
+    confirmation.scan_id === snapshot.snapshot.scan_id && confirmation.scan_revision === snapshot.snapshot.scan_revision
+    ? new Map(confirmation.items.map((item) => [item.item_id, item.status]))
+    : null;
+
+  const displayItems = items.map((item) => {
+    if (!item.item_id) return item;
+    const selectionReason = selected.get(item.item_id);
+    const status = completed?.get(item.item_id);
+    if (status === 'rejected') return { ...item, reason: '已標記 USDA 參考資料不相符；尚未計入營養合計。' };
+    if (status === 'confirmation_required') return { ...item, reason: '參考資料已保留待處理；尚未計入營養合計。' };
+    if (status === 'confirmed_pending_revision') {
+      if (previewEnabled) previewCount++;
+      return { ...item, reason: previewEnabled
+        ? '已確認 USDA 參考來源，營養僅供預覽，尚未計入合計。'
+        : '已確認 USDA 參考來源，尚未計入營養合計。', search_hints: [] };
+    }
+    if (candidates.has(item.item_id) && item.recognition_status === 'recognized' && item.nutrition_status === 'unmatched') {
+      if (confirmationEnabled) reviewCount++;
+      const source = selectionReason === 'reviewed_match' ? '已找到相容的 USDA 參考來源' : '已找到 USDA 參考候選';
+      return { ...item, reason: confirmationEnabled
+        ? `${source}，尚待確認，未計入營養合計。`
+        : `${source}，尚未計入營養合計。`, search_hints: [] };
+    }
+    const reason = formatReviewedNutritionReason(selectionReason);
+    return reason ? { ...item, reason } : item;
+  });
+  return { items: displayItems, reviewCount, previewCount };
+}
+
+export function formatScannerNutritionSummary(
+  count: number, calories: number, sodium: number,
+  pending: ReturnType<typeof describeScannerPendingNutrition>,
+): string {
+  if (pending.items.length === 0) return `估計合計 ${calories} kcal，鈉 ${sodium}mg。請確認份量後加入。`;
+  const remaining = pending.items.length - pending.reviewCount - pending.previewCount;
+  const categories = [
+    pending.reviewCount > 0 ? `${pending.reviewCount} 項參考來源待確認` : '',
+    pending.previewCount > 0 ? `${pending.previewCount} 項營養僅供預覽` : '',
+    remaining > 0 ? `${remaining} 項未納入` : '',
+  ].filter(Boolean).join('、');
+  if (count > 0) return `已配對項目合計 ${calories} kcal，鈉 ${sodium}mg。另有 ${categories}。`;
+  return `尚無已計入的營養。${categories}。`;
 }
 
 export function formatScannerSourceBadge(sources: Array<string | undefined>, pendingCount = 0): string {
@@ -78,12 +131,12 @@ export function formatScannerSourceBadge(sources: Array<string | undefined>, pen
     else labels.add('其他');
   }
   if (labels.size > 0) return Array.from(labels).join(' + ');
-  return pendingCount > 0 ? '待營養配對' : '資料來源';
+  return pendingCount > 0 ? '尚未計入營養' : '資料來源';
 }
 
 export function formatScannerResultTitle(matchedCount: number, pendingCount: number): string | null {
   if (matchedCount > 0) return `已配對 ${matchedCount} 項營養資料`;
-  if (pendingCount > 0) return `${pendingCount} 項食物待確認`;
+  if (pendingCount > 0) return `${pendingCount} 項未計入營養合計`;
   return null;
 }
 

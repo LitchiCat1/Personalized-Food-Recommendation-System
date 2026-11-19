@@ -53,9 +53,9 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
     return (
       <View style={styles.placeholderCard}>
         <Ionicons name="image-outline" size={rs(34)} color={Palette.text.tertiary} />
-        <Text style={styles.placeholderTitle}>{hasUnmatchedFoods ? '營養資料尚待確認' : '尚未產生辨識結果'}</Text>
+        <Text style={styles.placeholderTitle}>{hasUnmatchedFoods ? '目前沒有可記錄的營養' : '尚未產生辨識結果'}</Text>
         <Text style={styles.placeholderText}>{hasUnmatchedFoods
-          ? '已辨識的食物目前沒有可直接記錄的營養資料，請查看待確認項目。'
+          ? '上方列出的食物尚未納入營養合計。'
           : '拍攝餐點、上傳相簿或使用手動搜尋後，結果會出現在這裡。'}</Text>
       </View>
     );

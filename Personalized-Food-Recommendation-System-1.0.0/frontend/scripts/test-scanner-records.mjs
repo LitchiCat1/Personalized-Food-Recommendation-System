@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildOCRDetectedFood,
+  describeScannerPendingNutrition,
+  formatScannerNutritionSummary,
   formatScannerResultTitle,
   formatScannerSourceBadge,
-  formatReviewedPendingFoods,
   FOOD_NAME_REQUIRED_MESSAGE,
   hasReviewableNutritionMiss,
   hasUserConfirmableIdentity,
@@ -19,34 +20,82 @@ import { getAutoMealType, normalizeMealType, perMealBudget } from '../lib/meal.t
 
 test('scanner summary distinguishes matched nutrition from pending foods', () => {
   assert.equal(formatScannerResultTitle(2, 5), '已配對 2 項營養資料');
-  assert.equal(formatScannerResultTitle(0, 5), '5 項食物待確認');
+  assert.equal(formatScannerResultTitle(0, 5), '5 項未計入營養合計');
   assert.equal(formatScannerResultTitle(0, 0), null);
 });
 
 test('scanner source badge reflects matched nutrient sources without guessing the model', () => {
   assert.equal(formatScannerSourceBadge(['TFDA', 'USDA FNDDS', 'TFDA']), 'TFDA + USDA');
   assert.equal(formatScannerSourceBadge(['custom-food']), '自訂');
-  assert.equal(formatScannerSourceBadge([], 5), '待營養配對');
+  assert.equal(formatScannerSourceBadge([], 5), '尚未計入營養');
   assert.equal(formatScannerSourceBadge([]), '資料來源');
 });
 
-test('reviewed source availability changes only matching pending wording, never identity or confidence', () => {
-  const items = [
-    { item_id: 'apple-1', label: '蘋果', confidence: 0.95, reason: 'missing',
-      recognition_status: 'recognized', nutrition_status: 'unmatched', search_hints: ['蘋果'] },
-    { item_id: 'apple-2', label: '蘋果', confidence: 0.3, reason: 'low-confidence' },
+function pendingNutritionFixture() {
+  return [
+    [
+      { item_id: 'apple-1', label: '蘋果', confidence: 0.95, reason: 'missing',
+        recognition_status: 'recognized', nutrition_status: 'unmatched', search_hints: ['蘋果'] },
+      { item_id: 'apple-2', label: '蘋果', confidence: 0.3, reason: 'low-confidence' },
+    ],
+    { selection: { items: [{ item_id: 'apple-1', reason: 'reviewed_match', weight_g: 150 }] },
+      snapshot: { scan_id: 'scan-1', scan_revision: 0, snapshot_digest: 'digest-1', snapshot: { items: [
+        { item_id: 'apple-1', candidates: [{ fdcId: '171688' }] },
+      ] } } },
   ];
-  assert.equal(formatReviewedPendingFoods(items, null), items);
-  const result = formatReviewedPendingFoods(items, { selection: { items: [
-    { item_id: 'apple-1', reason: 'reviewed_match', weight_g: 150 },
-  ] } });
+}
+
+test('reviewed source availability changes only its pending row and does not count estimated nutrition', () => {
+  const [items, snapshot] = pendingNutritionFixture();
+  assert.equal(describeScannerPendingNutrition(items, null, null, true, true).items, items);
+  const state = describeScannerPendingNutrition(items, snapshot, null, true, true);
+  const result = state.items;
+  assert.equal(state.reviewCount, 1);
   assert.match(result[0].reason, /已找到相容/);
-  assert.match(result[0].reason, /尚未計入/);
+  assert.match(result[0].reason, /未計入/);
   assert.equal(result[0].label, items[0].label);
   assert.equal(result[0].confidence, items[0].confidence);
   assert.deepEqual(result[0].search_hints, []);
   assert.equal(items[0].reason, 'missing');
   assert.equal(result[1], items[1]);
+  assert.equal(formatScannerNutritionSummary(0, 0, 0, state), '尚無已計入的營養。1 項參考來源待確認、1 項未納入。');
+});
+
+test('confirmed reference is preview-only; stale or unavailable review actions do not count', () => {
+  const [items, snapshot] = pendingNutritionFixture();
+  const confirmation = { scan_id: 'scan-1', scan_revision: 0, snapshot_digest: 'digest-1', items: [
+    { item_id: 'apple-1', status: 'confirmed_pending_revision' },
+  ] };
+  const state = describeScannerPendingNutrition(items, snapshot, confirmation, true, true);
+  assert.match(state.items[0].reason, /僅供預覽/);
+  assert.equal(formatScannerNutritionSummary(1, 110, 2, state),
+    '已配對項目合計 110 kcal，鈉 2mg。另有 1 項營養僅供預覽、1 項未納入。');
+  for (const key of ['scan_id', 'scan_revision', 'snapshot_digest']) {
+    const stale = describeScannerPendingNutrition(items, snapshot, { ...confirmation, [key]: 'stale' }, true, true);
+    assert.equal(stale.reviewCount, 1);
+    assert.equal(stale.previewCount, 0);
+  }
+  assert.doesNotMatch(describeScannerPendingNutrition(items, snapshot, confirmation, true, false).items[0].reason, /預覽/);
+  assert.doesNotMatch(describeScannerPendingNutrition(items, snapshot, null, false, false).items[0].reason, /待確認/);
+});
+
+test('raw candidates, reviewed no-match, deferred, and rejected have distinct wording', () => {
+  const [items, snapshot] = pendingNutritionFixture();
+  const raw = describeScannerPendingNutrition(items, { ...snapshot, selection: undefined }, null, true, true);
+  assert.match(raw.items[0].reason, /候選/);
+  assert.doesNotMatch(raw.items[0].reason, /相容/);
+  snapshot.selection.items[0].reason = 'no_reviewed_source';
+  snapshot.snapshot.snapshot.items[0].candidates = [];
+  const miss = describeScannerPendingNutrition(items, snapshot, null, true, true);
+  assert.match(miss.items[0].reason, /未找到相容的已審查營養來源/);
+  assert.equal(miss.reviewCount, 0);
+  for (const [status, expected] of [['confirmation_required', /保留待處理/], ['rejected', /不相符/]]) {
+    const state = describeScannerPendingNutrition(items, snapshot, {
+      scan_id: 'scan-1', scan_revision: 0, snapshot_digest: 'digest-1', items: [{ item_id: 'apple-1', status }],
+    }, true, true);
+    assert.match(state.items[0].reason, expected);
+    assert.equal(state.reviewCount + state.previewCount, 0);
+  }
 });
 
 function detectedFood(name = '原始名稱') {

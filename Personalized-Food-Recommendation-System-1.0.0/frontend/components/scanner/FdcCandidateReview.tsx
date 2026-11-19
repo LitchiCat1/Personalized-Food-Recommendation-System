@@ -13,6 +13,7 @@ import {
 } from '@/lib/nutrition-fdc-confirmation-api';
 import type { NutritionFdcCandidateSnapshotResponse } from '@/lib/nutrition-fdc-candidate-api';
 import { getNutritionFdcRecovery } from '@/lib/nutrition-fdc-recovery';
+import { formatReviewedNutritionReason } from '@/lib/scanner';
 import {
   buildNutritionFdcProfilePreviewRequest,
   NutritionFdcPreviewApiError,
@@ -192,22 +193,28 @@ export default function FdcCandidateReview({
     <View style={styles.section}>
       <View style={styles.header}>
         <View style={styles.headingCopy}>
-          <Text style={styles.title}>{reviewed ? '確認食材與估計份量' : '營養參考資料核對'}</Text>
-          <Text style={styles.subtitle}>
-            {reviewed ? '使用系統配對的 USDA 參考營養。請確認食材與估計份量；不相符時可選「稍後處理」。'
-              : '以下是 USDA 的參考食品，不代表照片已辨識出該品種或品牌。不確定是否相符時可選「稍後處理」。'}
-          </Text>
+          <Text style={styles.title}>{completedResult ? 'USDA 參考資料結果'
+            : reviewed ? '確認食材與估計份量' : '營養參考資料核對'}</Text>
+          {!completedResult ? (
+            <Text style={styles.subtitle}>
+              {reviewed ? '使用系統配對的 USDA 參考營養。請確認食材與估計份量；不相符時可選「稍後處理」。'
+                : '以下是 USDA 的參考食品，不代表照片已辨識出該品種或品牌。不確定是否相符時可選「稍後處理」。'}
+            </Text>
+          ) : null}
         </View>
         <Ionicons name="checkmark-done-outline" size={22} color={Palette.accent.blue} />
       </View>
 
-      <View style={styles.contractNotice}>
-        <Ionicons name="information-circle-outline" size={17} color={Palette.accent.blue} />
-        <Text style={styles.contractText}>
-          {reviewed ? '以下份量來自本次影像估重，並非秤重結果。確認後可預覽營養，尚不會加入飲食紀錄。'
-            : '目前份量校正只用於本機飲食紀錄。後續資料預覽使用伺服器掃描估重，本階段不會套用營養素或寫入紀錄。'}
-        </Text>
-      </View>
+      {!completedResult ? (
+        <View style={styles.contractNotice}>
+          <Ionicons name="information-circle-outline" size={17} color={Palette.accent.blue} />
+          <Text style={styles.contractText}>
+            {reviewed ? '以下份量來自本次影像估重，並非秤重結果。'
+              : '目前份量校正只用於本機飲食紀錄，參考資料仍使用伺服器掃描估重。'}
+            {enabled && previewEnabled ? '確認後可預覽營養，尚不會加入飲食紀錄。' : '參考資料尚不會加入飲食紀錄。'}
+          </Text>
+        </View>
+      ) : null}
 
       {snapshot.status === 'empty' ? (
         <View style={styles.emptyNotice}>
@@ -230,7 +237,7 @@ export default function FdcCandidateReview({
             {item.candidates.length === 0 ? (
               <Text style={styles.noCandidate}>{reviewed
                 ? reviewedReasonLabel(snapshot.selection?.items.find((entry) => entry.item_id === item.item_id)?.reason)
-                : '沒有可確認的參考食品；可保留待處理或標記不相符。'}</Text>
+                : '沒有可確認的參考食品。'}</Text>
             ) : (
               <View style={styles.candidateList}>
                 {item.candidates.map((candidate) => {
@@ -258,10 +265,13 @@ export default function FdcCandidateReview({
                         <Text style={styles.candidateName}>{reviewed
                           ? `${item.recognition_identity.name_zh} · 估計 ${weight} g`
                           : `參考食品：${candidate.description}`}</Text>
-                        {reviewed ? <Text style={styles.candidateMeta}>確認名稱、此估計份量及採用 USDA 參考營養</Text> : <Text style={styles.candidateMeta}>
+                        {reviewed && !completedItem ? (
+                          <Text style={styles.candidateMeta}>確認名稱、此估計份量及採用 USDA 參考營養</Text>
+                        ) : null}
+                        {!reviewed ? <Text style={styles.candidateMeta}>
                           {candidate.dataType}{candidate.brandOwner ? ` · ${candidate.brandOwner}` : ''}
                           {candidate.foodCategory ? ` · ${candidate.foodCategory}` : ''}
-                        </Text>}
+                        </Text> : null}
                       </View>
                     </Pressable>
                     {reviewed ? <>
@@ -325,10 +335,13 @@ export default function FdcCandidateReview({
         <View style={styles.resultNotice}>
           <Ionicons name="checkmark-circle-outline" size={18} color={Palette.status.success} />
           <View style={styles.resultCopy}>
-            <Text style={styles.resultTitle}>{reviewed ? '食材與份量確認已記錄' : '參考資料確認已記錄'}</Text>
+            <Text style={styles.resultTitle}>{!completedResult.requires_detail_replay ? '處理結果已記錄'
+              : reviewed ? '食材與份量確認已記錄' : '參考資料確認已記錄'}</Text>
             <Text style={styles.resultText}>
               {completedResult.requires_detail_replay
-                ? '確認的項目可供營養預覽；預覽僅供核對，尚未套用至掃描結果或飲食紀錄。'
+                ? previewEnabled
+                  ? '確認的項目可供營養預覽；預覽僅供核對，尚未套用至掃描結果或飲食紀錄。'
+                  : '已確認的參考資料尚未套用至掃描結果或飲食紀錄。'
                 : '尚未確認資料來源；保留與拒絕的項目不會建立營養資料。'}
             </Text>
           </View>
@@ -352,13 +365,8 @@ export default function FdcCandidateReview({
 }
 
 function reviewedReasonLabel(reason?: string): string {
-  switch (reason) {
-    case 'identity_required': return '食材身分仍需確認，暫不套用營養。';
-    case 'weight_required': return '缺少可用估重，暫不套用營養。';
-    case 'local_priority': return '優先保留原有的本機營養查詢結果。';
-    case 'ambiguous_reviewed_source': return '有多筆相容參考，暫不自動選用。';
-    default: return '尚無符合目前食用狀態的已審查來源。';
-  }
+  return reason === 'local_priority' ? '優先保留原有的本機營養查詢結果。'
+    : formatReviewedNutritionReason(reason) ?? '尚未套用參考營養。';
 }
 
 function FdcProfilePreview({

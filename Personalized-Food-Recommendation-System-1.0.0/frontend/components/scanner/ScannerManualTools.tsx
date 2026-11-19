@@ -45,7 +45,7 @@ export function ScannerPendingFoods({
         <View style={styles.rejectedCard}>
           <View style={styles.rejectedHeader}>
             <Ionicons name="alert-circle-outline" size={rs(16)} color={Palette.status.warning} />
-            <Text style={styles.rejectedTitle}>需確認或補充營養資料的食物</Text>
+            <Text style={styles.rejectedTitle}>尚未納入營養合計的食物</Text>
           </View>
           {items.map((item, index) => (
             <View key={`${item.label}_${index}`} style={styles.rejectedItem}>

@@ -3,6 +3,7 @@ import time
 import unittest
 from unittest.mock import Mock, patch
 
+from repositories.fdc_candidate_snapshot_repository import FdcCandidateSnapshotRepository
 from repositories.nutrition_enrichment_repository import NutritionEnrichmentRequestRepository
 from repositories.nutrition_quota_repository import NutritionQuotaRepository
 from repositories.scan_context_repository import NutritionScanContextRepository
@@ -58,6 +59,12 @@ class NutritionEnrichmentHttpIntegrationTests(ApiTestBase):
         }
 
     def test_authority_is_consumed_once_and_same_request_replays(self):
+        self._check_search_before_enrichment(confirmed_no_hits=True)
+
+    def test_empty_raw_search_without_zero_hit_evidence_cannot_start_enrichment(self):
+        self._check_search_before_enrichment(confirmed_no_hits=False)
+
+    def _check_search_before_enrichment(self, *, confirmed_no_hits):
         clock = time.time()
         db = SqliteDatabase(":memory:")
         self.addCleanup(db.close)
@@ -67,7 +74,7 @@ class NutritionEnrichmentHttpIntegrationTests(ApiTestBase):
         requests = NutritionEnrichmentRequestRepository(db, clock=lambda: clock)
         quota = NutritionQuotaRepository(db, per_user_limit=2, global_limit=2, clock=lambda: clock)
         fdc_client = Mock()
-        fdc_client.search_foods.return_value = {"candidates": [], "confirmed_no_hits": True}
+        fdc_client.search_foods.return_value = {"candidates": [], "confirmed_no_hits": confirmed_no_hits}
         official_health = {source: {"status": "available"} for source in ("TFDA", "USDA FNDDS")}
         local_lookup = Mock(return_value={"status": "no_local_mapping"})
         fdc_search = FdcCandidateSearchService(
@@ -119,6 +126,17 @@ class NutritionEnrichmentHttpIntegrationTests(ApiTestBase):
             self.assertEqual(official.status_code, 200)
             self.assertEqual(official.get_json()["status"], "empty")
             fdc_client.search_foods.assert_called_once()
+
+            if not confirmed_no_hits:
+                blocked = self.client.post(
+                    "/nutrition/enrichment", json=self._body(token), headers=self.auth_headers())
+                self.assertEqual(blocked.status_code, 409)
+                self.assertEqual(blocked.get_json()["error"]["code"], "official_nutrition_pending")
+                cache.get.assert_not_called()
+                factory.assert_not_called()
+                self.assertEqual(quota.quota_snapshot("user-a")["user_used"], 0)
+                self.assertEqual(db.query_one("SELECT COUNT(*) AS count FROM nutrition_scan_authority_replays")["count"], 0)
+                return
 
             with patch.dict(official_health, {"TFDA": {"status": "unavailable"}}):
                 unavailable = self.client.post(
@@ -320,4 +338,3 @@ class NutritionEnrichmentHttpIntegrationTests(ApiTestBase):
 
 if __name__ == "__main__":
     unittest.main()
-from repositories.fdc_candidate_snapshot_repository import FdcCandidateSnapshotRepository

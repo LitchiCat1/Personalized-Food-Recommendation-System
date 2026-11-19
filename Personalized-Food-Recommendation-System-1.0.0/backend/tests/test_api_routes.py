@@ -82,6 +82,22 @@ class ApiTestBase(unittest.TestCase):
 
 
 class ApiRouteTests(ApiTestBase):
+    def test_health_uses_explicit_local_deployment_labels(self):
+        with patch.dict(os.environ, {
+            "NUTRILENS_DEPLOYED_BRANCH": "v1.0.3",
+            "NUTRILENS_DEPLOYED_COMMIT": "abcdef1234567890",
+            "RENDER_GIT_BRANCH": "retired-branch", "RENDER_GIT_COMMIT": "retired-commit",
+        }):
+            health = self.client.get("/health").get_json()
+            self.assertEqual(health["deployed_branch"], "v1.0.3")
+            self.assertEqual(health["deployed_commit"], "abcdef1")
+            self.assertFalse(health["mongo"])
+            os.environ.pop("NUTRILENS_DEPLOYED_BRANCH")
+            os.environ.pop("NUTRILENS_DEPLOYED_COMMIT")
+            health = self.client.get("/health").get_json()
+            self.assertEqual(health["deployed_branch"], "local")
+            self.assertEqual(health["deployed_commit"], "local")
+
     def test_nutrition_enrichment_requires_authentication(self):
         response = self.client.post("/nutrition/enrichment", json={})
         self.assertEqual(response.status_code, 401)
@@ -1277,7 +1293,7 @@ class ExternalApiFailureTests(ApiTestBase):
 
 
 class AuthDefaultTests(unittest.TestCase):
-    """預設就要驗證。先前只有偵測到 RENDER 才驗證，其他部署方式全部不設防。"""
+    """預設就要驗證，與部署平台或殘留環境變數無關。"""
 
     def setUp(self):
         self.saved = {
@@ -1384,7 +1400,7 @@ class VenueIndexListingTests(ApiTestBase):
 
 
 class AllowedOriginNormalisationTests(unittest.TestCase):
-    """Render 給的是不帶協定的主機名，CORS 比對的是完整 origin。"""
+    """ALLOWED_ORIGINS 可省略協定，CORS 比對的是完整 origin。"""
 
     def setUp(self):
         import app as app_module
@@ -1392,7 +1408,7 @@ class AllowedOriginNormalisationTests(unittest.TestCase):
         self.normalise = app_module._normalise_origin
 
     def test_a_bare_hostname_becomes_an_https_origin(self):
-        self.assertEqual(self.normalise("nutrilens-web.onrender.com"), "https://nutrilens-web.onrender.com")
+        self.assertEqual(self.normalise("nutrilens.example.com"), "https://nutrilens.example.com")
 
     def test_an_explicit_scheme_is_left_alone(self):
         self.assertEqual(self.normalise("https://example.com"), "https://example.com")

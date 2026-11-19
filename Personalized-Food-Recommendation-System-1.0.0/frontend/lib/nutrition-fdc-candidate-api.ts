@@ -31,6 +31,12 @@ export type NutritionFdcCandidateItem = {
 
 export type NutritionFdcCandidateSnapshotResponse = {
   status: 'available' | 'empty';
+  selection?: {
+    schema_version: 'ReviewedFdcSelectionV1';
+    items: { item_id: string; weight_g: number | null; reason: string }[];
+    user_confirmation_required: true;
+    photo_confidence_changed: false;
+  };
   snapshot: {
     scan_id: string;
     scan_revision: number;
@@ -167,7 +173,7 @@ async function requestSnapshot(
   request: NutritionFdcCandidateRequest,
   auth: ApiAuth | undefined,
   method: 'POST' | 'GET',
-  options?: { enabled?: boolean; isCurrentSession?: () => boolean },
+  options?: { enabled?: boolean; isCurrentSession?: () => boolean; reviewedSelection?: boolean },
 ): Promise<NutritionFdcCandidateSnapshotResponse> {
   if (options?.enabled !== true) {
     throw new NutritionFdcCandidateApiError('FDC 候選搜尋尚未啟用', 503, 'feature_disabled');
@@ -178,7 +184,7 @@ async function requestSnapshot(
 
   const baseUrl = apiBaseUrl.replace(/\/$/, '');
   const url = method === 'POST'
-    ? `${baseUrl}/nutrition/fdc/candidates`
+    ? `${baseUrl}/nutrition/fdc/${options?.reviewedSelection ? 'reviewed-selection' : 'candidates'}`
     : `${baseUrl}/nutrition/fdc/candidates?scan_id=${encodeURIComponent(request.scan_id)}&scan_revision=${request.scan_revision}`;
   let response: Response;
   try {
@@ -205,7 +211,30 @@ async function requestSnapshot(
       response.headers.get('Retry-After'),
     );
   }
-  return parseResponse(data, request);
+  if (!options?.reviewedSelection) return parseResponse(data, request);
+  const invalid = () => new NutritionFdcCandidateApiError('營養來源配對回傳格式不相容', 200, 'invalid_response');
+  if (!object(data) || !exactKeys(data, ['status', 'snapshot', 'selection']) || !object(data.selection)) throw invalid();
+  const parsed = parseResponse({ status: data.status, snapshot: data.snapshot }, request);
+  const selection = data.selection;
+  if (!exactKeys(selection, ['schema_version', 'items', 'user_confirmation_required', 'photo_confidence_changed']) ||
+      selection.schema_version !== 'ReviewedFdcSelectionV1' || selection.user_confirmation_required !== true ||
+      selection.photo_confidence_changed !== false || !Array.isArray(selection.items) ||
+      selection.items.length !== parsed.snapshot.snapshot.items.length) throw invalid();
+  const reasons = new Set(['reviewed_match', 'identity_required', 'weight_required', 'local_priority',
+    'no_reviewed_source', 'ambiguous_reviewed_source']);
+  const ids = new Set<string>();
+  for (const entry of selection.items) {
+    if (!object(entry) || !exactKeys(entry, ['item_id', 'weight_g', 'reason']) ||
+        !text(entry.item_id) || ids.has(entry.item_id) || !reasons.has(String(entry.reason)) ||
+        (entry.weight_g !== null && (typeof entry.weight_g !== 'number' ||
+          !Number.isFinite(entry.weight_g) || entry.weight_g <= 0 || entry.weight_g > 2000))) throw invalid();
+    const item = parsed.snapshot.snapshot.items.find((item) => item.item_id === entry.item_id);
+    if (!item || item.candidates.length > 1 ||
+        (entry.reason === 'reviewed_match') !== (item.candidates.length === 1) ||
+        (entry.reason === 'reviewed_match' && entry.weight_g === null)) throw invalid();
+    ids.add(entry.item_id);
+  }
+  return { ...parsed, selection: selection as unknown as NonNullable<NutritionFdcCandidateSnapshotResponse['selection']> };
 }
 
 export function buildNutritionFdcCandidateRequest(params: NutritionFdcCandidateRequest): NutritionFdcCandidateRequest {
@@ -231,4 +260,13 @@ export function getNutritionFdcCandidateSnapshot(
   options?: { enabled?: boolean; isCurrentSession?: () => boolean },
 ): Promise<NutritionFdcCandidateSnapshotResponse> {
   return requestSnapshot(apiBaseUrl, request, auth, 'GET', options);
+}
+
+export function selectReviewedNutritionFdcSource(
+  apiBaseUrl: string,
+  request: NutritionFdcCandidateRequest,
+  auth?: ApiAuth,
+  options?: { enabled?: boolean; isCurrentSession?: () => boolean },
+): Promise<NutritionFdcCandidateSnapshotResponse> {
+  return requestSnapshot(apiBaseUrl, request, auth, 'POST', { ...options, reviewedSelection: true });
 }

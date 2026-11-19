@@ -1,0 +1,119 @@
+{
+  "batch": 80,
+  "date": "2026-11-17",
+  "branch": "v1.0.3",
+  "scope": "documentation_progress_reconciliation_and_read_only_serving_observation",
+  "outcome": "current_summaries_reconciled_no_new_feature_or_deployment",
+  "source_evidence": [
+    "usda-fdc-detail-replay-20261115.json",
+    "sqlite-restart-replay-regression.json",
+    "fdc-candidate-search-reservation-20261115.json",
+    "fdc-expiry-restart-browser-e2e-20261115.json",
+    "live-tavily-single-source-replay.json",
+    "live-tavily-model-replay.json",
+    "scanner-phone-preview-gateway-20261116.json",
+    "android-candidate-preview-acceptance-20261116.json",
+    "source-admission-boundary-20261116.json",
+    "fdc-reviewed-source-acceptance-20261116.json",
+    "fdc-generic-apple-source-20261116.json",
+    "fdc-generic-apple-acceptance-20261116.json",
+    "fdc-reviewed-selection-browser-e2e-20261116.json",
+    "fdc-preview-admission-review-20261116.json",
+    "fdc-reviewed-source-lifecycle-20261116.json",
+    "fdc-preview-rollout-preflight-20261116.json",
+    "fdc171688-preview-release-20261116.json",
+    "deployment-legacy-cleanup-20261117.json"
+  ],
+  "corrected_progress": [
+    "Replace first-batch-only status with implemented through batch79 and documentation-only batch80 audit.",
+    "Separate current summaries from historical per-batch next steps, flags, test counts and deployment statements.",
+    "Distinguish empty production Tavily Web registry from installed and enabled FDC171688 source.",
+    "Mark bounded real FDC Detail replay completed and phone/SQLite work partially completed, preserving unfinished real-photo and formal-save gates.",
+    "Update phase1, phase3a/3b and phase4/5 summaries to acknowledge real FDC adapters, guarded HTTP, durable state and bounded published preview.",
+    "Add missing batch69-73 and batch75-79 stage rows, restore batch74 chronology and add batch80 audit row.",
+    "Relabel the evaluation index's historical batch71 latest paragraph and update review preface beyond batch56/57.",
+    "Point current synchronization to the current evaluation index rather than the initial November13 report."
+  ],
+  "current_progress": {
+    "vision": "implemented; real model calls and user-attested Android camera smoke exist; latest prompt adherence, weighed accuracy and formal conditional real-photo preview not established",
+    "tfda": "local compatible matching in use; preserve priority",
+    "usda": "local FNDDS in use; reviewed fixed-ID171688 selection-confirmation-preview released; general Search/raw Detail HTTP disabled",
+    "tavily_and_model": "core and guarded HTTP implemented and isolated-tested; real Search/Extract/model calls tested, PDF evidence rejected; production Web registry empty and automatic enrichment disabled",
+    "new_source_save": "isolated captured-source preview/accept/profile/reopen tested; formal profile accept and meal integration remain disabled",
+    "cross_user_cache": "not_approved_or_enabled",
+    "new_dashboard_ui": "deferred_by_user_not_third_layer_prerequisite",
+    "latest_full_regression_evidence": "batch79; not rerun in batch80",
+    "running_release": "batch78; batch79 cleanup not deployed"
+  },
+  "read_only_observations": {
+    "local_health_observed_at": "2026-11-17T00:41:44.9462882+08:00",
+    "task": "NutriLens Backend",
+    "task_state": "Running",
+    "listener": {"host": "127.0.0.1", "port": 5000, "pid": 32084},
+    "local_and_public_health": {
+      "status": "ok",
+      "app_version": "v1.0.3",
+      "started_at": "2026-11-16T23:42:59.209397+08:00",
+      "database": "sqlite",
+      "auth_required": true,
+      "automatic_web_fallback_enabled": false
+    },
+    "public_database_path_hidden": true,
+    "local_and_public_scanner_reference_expected_entry": true,
+    "served_entry": "/_expo/static/js/web/entry-5115ba442ac55ef3887c0fae59bdaf53.js",
+    "local_public_disk_entry_sha256": "8c1840d3f1d52dcf85f1b26cab3d98da7e277d7f0eafda79b5981c6909695bca",
+    "entry_and_started_at_match_batch78": true,
+    "source_files_checked_against_batch79_sha256": 9,
+    "source_hash_mismatches": 0,
+    "production_web_registry_default": "empty_no_argument_build_production_web_registry_call_in_reviewed_source",
+    "fdc_source_default": "empty_tuple_with_explicit_server_file_loading_in_app",
+    "tls_verification_disabled": false
+  },
+  "limitations": [
+    "This is a documentation consistency audit, not new feature, provider, browser, real-photo or nutrition-accuracy acceptance.",
+    "Only health and static assets were requested and selected health fields retained. Private flag/key files, installed policies and database files were not directly opened by the audit.",
+    "Health performs existing read-only database count queries and checks relay configuration, potentially consulting its key-file cache; this is not zero database/configuration access. No direct database connection or production application data write was performed by the audit.",
+    "Detailed source/flag status relies on bounded batch78 release evidence; health/hash equality is not a fresh independent attestation of every runtime flag or installed row.",
+    "Nine batch79 source/test hashes are a scoped drift check, not a complete repository checksum.",
+    "Historical evidence and original failures retain their original results and scope; old next-step statements are historical."
+  ],
+  "corrected_audit_command_errors": [
+    "Initial PowerShell foreach pipeline failed parsing before execution; wrapped results in an array and reran read-only observation successfully.",
+    "Guessed standalone registry module and Detail artifact paths did not exist; located the actual registry in web_nutrition_service.py and the existing usda-fdc-detail-replay artifact using rg.",
+    "A later read-only search used unsupported brace-style shell paths and failed parsing; replaced them with explicit PowerShell paths.",
+    "Final code read-back found health's SQL count queries and relay configuration check; corrected the draft zero-database-access statement to distinguish no direct database/credential-file access from ordinary server health reads."
+  ],
+  "side_effects": {
+    "provider_calls": {"model": 0, "usda": 0, "tavily": 0},
+    "direct_database_connection_or_file_access": false,
+    "health_uses_existing_read_only_database_counts": true,
+    "production_application_data_written": false,
+    "direct_credential_or_private_flag_file_reads": false,
+    "health_checks_existing_relay_configuration": true,
+    "settings_or_feature_flags_changed": false,
+    "restarted_or_deployed": false,
+    "application_code_changed": false,
+    "full_tests_rerun": false,
+    "fixed_android_fixture_repeated": false,
+    "committed_or_pushed": false
+  },
+  "verification": {
+    "markdown_documents": 8,
+    "local_links": 275,
+    "balanced_fences": true,
+    "source_evidence_json_files_parsed": 18,
+    "audit_json_parses": true,
+    "source_files_match_batch79": 9,
+    "chronological_stage_rows_69_to_80": 12,
+    "single_current_latest_label": true,
+    "git_diff_whitespace": "passed",
+    "prior_full_regressions_reused_with_original_scope": true
+  },
+  "next_existing_item": "normal_scanner_real_photo_local_priority_identity_and_conditional_171688_confirmation_preview_acceptance",
+  "next_item_constraints": [
+    "Do not force a local miss or bypass TFDA/USDA priority.",
+    "Do not infer skin/state/brand/cultivar or raise recognition confidence from nutrition.",
+    "Do not repeat the completed fixed Android fixture or add a new workstream.",
+    "Tavily, formal profile accept, new-source meal integration and cross-user cache remain excluded."
+  ]
+}

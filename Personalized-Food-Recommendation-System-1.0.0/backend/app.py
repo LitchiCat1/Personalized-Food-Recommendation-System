@@ -81,6 +81,7 @@ from services.vision_food_service import (
 from services.nutrition_database_service import load_official_nutrition_dataset, build_nutrition_dataset_context
 from services.nutrition_enrichment_route_service import (
     NutritionEnrichmentRouteError,
+    build_local_nutrition_item_result,
     process_enrichment_request,
 )
 from services.nutrition_enrichment_coordinator import NutritionEnrichmentCoordinatorError
@@ -90,7 +91,10 @@ from services.nutrition_scan_context_adapter import (
     persist_vision_scan_context,
 )
 from repositories.nutrition_profile_repository import NutritionProfileSourceRepository
-from repositories.scan_context_repository import NutritionScanContextRepository
+from repositories.scan_context_repository import NutritionScanContextRepository, ScanContextRepositoryError
+from repositories.nutrition_identity_confirmation_repository import (
+    NutritionIdentityConfirmationError, NutritionIdentityConfirmationRepository,
+)
 from repositories.nutrition_enrichment_repository import NutritionEnrichmentRequestRepository
 from repositories.nutrition_quota_repository import NutritionQuotaRepository
 from repositories.nutrition_cache_repository import NutritionProfileCacheRepository
@@ -114,6 +118,10 @@ from services.fdc_candidate_search_service import (
     FdcCandidateSearchService,
     FdcCandidateSearchError,
 )
+from services.fdc_reviewed_selection_service import (
+    FdcReviewedSelectionError, FdcReviewedSelectionService, PRODUCTION_REVIEWED_FDC_SOURCES,
+)
+from services.fdc_reviewed_source_lifecycle_service import load_installed_reviewed_fdc_sources
 from services.web_nutrition_service import (
     PRODUCTION_SOURCE_REGISTRY,
     enrich_nutrition,
@@ -178,32 +186,12 @@ if database_path:
         sql_db.close()
         sys.exit(1)
 
-# ─── Optional MongoDB (only when SQLite is off) ──────────────
-mongo = None
-USE_MONGO = False
-db = None
-if sql_db is None:
-    try:
-        from pymongo import MongoClient
-        MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
-        mongo = MongoClient(MONGO_URI, serverSelectionTimeoutMS=2000)
-        mongo.server_info()  # trigger connection check
-        db = mongo["nutrilens"]
-        USE_MONGO = True
-        print("[OK] MongoDB connected")
-    except Exception:
-        if mongo is not None:
-            mongo.close()
-        USE_MONGO = False
-        db = None
-        print("[WARN] MongoDB unavailable - using in-memory storage")
-
-# ─── In-memory fallback storage ──────────────────────────────
+# Explicit temporary storage is used only when DATABASE_PATH is empty.
 _mem_users = {}
 _mem_records = []
 _mem_custom_foods = []
 
-storage = StorageRepository(db, USE_MONGO, _mem_users, _mem_records, _mem_custom_foods, sql=sql_db)
+storage = StorageRepository(_mem_users, _mem_records, _mem_custom_foods, sql=sql_db)
 # 帳號跟著資料庫走。沒有資料庫時帳號只存在記憶體，重啟就要重新註冊。
 auth_repo = AuthRepository(sql_db)
 if sql_db is None:
@@ -348,8 +336,8 @@ def require_local_request(action: str) -> None:
 def _normalise_origin(value: str) -> str:
     """接受 `example.com` 或 `https://example.com` 都算數。
 
-    Render 的 RENDER_EXTERNAL_HOSTNAME 給的是不帶協定的主機名，而 CORS 比對的
-    是完整 origin。不補協定的話，貼上主機名看起來設定好了，實際仍會被擋。
+    ALLOWED_ORIGINS 可填主機名或完整 origin；省略協定時，本機使用 HTTP，
+    其他主機使用 HTTPS。同源的 Tailscale 網站不需要額外設定 CORS。
     """
     value = value.strip().rstrip("/")
     if not value:
@@ -369,8 +357,7 @@ if _allowed_origins:
     CORS(app, origins=_allowed_origins, supports_credentials=True)
     print(f"[OK] CORS 只放行：{', '.join(_allowed_origins)}")
 else:
-    # 沒設定時放行本機開發，外加本專案自己的前端。列成具名清單而不是萬用字元：
-    # 「任何 onrender.com」等於誰都能在 Render 上架個網站來打這個後端。
+    # 跨來源預設只放行本機 Expo 開發埠；外部網站須逐一列入 ALLOWED_ORIGINS。
     CORS(app, origins=[
         "http://localhost:8081",
         "http://localhost:8083",
@@ -421,6 +408,7 @@ def add_security_headers(response):
 # 會呼叫 Gemini / Google Places 的路由要限流，那些都是按次計費的
 _paid_api_limiter = build_limiter("RATE_LIMIT_PAID_CALLS", 12)
 _fdc_candidate_limiter = build_limiter("RATE_LIMIT_FDC_CANDIDATE_CALLS", 4)
+_identity_confirmation_limiter = build_limiter("RATE_LIMIT_IDENTITY_CONFIRMATION_CALLS", 12)
 # 會寫進資料庫的路由（飲食紀錄、自訂食品、健康檔案）。先前這個限流器建了卻沒有
 # 任何路由用：避免重複或暴增請求耗盡外部服務額度與本機儲存空間。
 _general_limiter = build_limiter("RATE_LIMIT_GENERAL_CALLS", 120)
@@ -532,11 +520,10 @@ def signup_mode() -> str:
     """open：直接註冊；code：要邀請碼；closed：不開放。
 
     在這台電腦上永遠可以註冊。從其他裝置或 tunnel 來的，要有主人設定的
-    SIGNUP_CODE 才能註冊——不然任何拿到網址的人都能註冊、花你的 Gemini 額度。
+    SIGNUP_CODE 才能註冊，避免任何拿到網址的人都能使用付費模型額度。
     主人設 OPEN_SIGNUP=true 就是明白要開放給所有人，不用邀請碼。
-    Render 上（會自動設 RENDER）沒設 OPEN_SIGNUP 就當作開放；設 OPEN_SIGNUP=false 才關。
     """
-    open_signup = os.environ.get("OPEN_SIGNUP", "true" if os.environ.get("RENDER") else "").lower()
+    open_signup = os.environ.get("OPEN_SIGNUP", "").lower()
     if is_local_request() or open_signup == "true":
         return "open"
     return "code" if (os.environ.get("SIGNUP_CODE") or "").strip() else "closed"
@@ -602,6 +589,11 @@ TFDA_DB.update(USDA_DB)
 # acceptance are complete.  Constructing these repositories is side-effect
 # free apart from creating their own tables in the already-selected SQL DB.
 nutrition_scan_context_repository = NutritionScanContextRepository(sql_db)
+nutrition_identity_confirmation_repository = (
+    NutritionIdentityConfirmationRepository(
+        sql_db, scan_context_repository=nutrition_scan_context_repository)
+    if sql_db is not None and getattr(sql_db, "dialect", None) == "sqlite" else None
+)
 fdc_candidate_snapshot_repository = FdcCandidateSnapshotRepository(
     sql_db, scan_context_repository=nutrition_scan_context_repository)
 fdc_candidate_confirmation_repository = (
@@ -643,6 +635,11 @@ nutrition_enrichment_route_enabled = (
     and sql_db is not None and getattr(sql_db, "dialect", None) == "sqlite"
     and nutrition_authority_service is not None
 )
+nutrition_identity_confirmation_route_enabled = (
+    os.environ.get("NUTRITION_IDENTITY_CONFIRMATION_ROUTE_ENABLED", "false").strip().lower() == "true"
+    and nutrition_identity_confirmation_repository is not None
+    and sql_db is not None and getattr(sql_db, "dialect", None) == "sqlite"
+)
 fdc_confirmation_route_enabled = (
     os.environ.get("FDC_CONFIRMATION_ROUTE_ENABLED", "false").strip().lower() == "true"
     and fdc_candidate_confirmation_repository is not None
@@ -664,6 +661,30 @@ fdc_profile_accept_route_enabled = (
 fdc_candidate_route_enabled = (
     os.environ.get("FDC_CANDIDATE_ROUTE_ENABLED", "false").strip().lower() == "true"
     and sql_db is not None and getattr(sql_db, "dialect", None) == "sqlite"
+)
+fdc_reviewed_selection_route_enabled = (
+    os.environ.get("FDC_REVIEWED_SELECTION_ROUTE_ENABLED", "false").strip().lower() == "true"
+    and sql_db is not None and getattr(sql_db, "dialect", None) == "sqlite"
+)
+_loaded_reviewed_fdc_sources, fdc_reviewed_source_load_report = load_installed_reviewed_fdc_sources(
+    reviewed_sources=PRODUCTION_REVIEWED_FDC_SOURCES,
+    configuration_path=os.environ.get("FDC_REVIEWED_SOURCES_FILE", "").strip() or None,
+    load_installed_policy=lambda source_id: nutrition_profile_repository.get_source_policy(
+        source_id, include_withdrawn=True),
+    sqlite_available=sql_db is not None and getattr(sql_db, "dialect", None) == "sqlite",
+)
+if fdc_reviewed_source_load_report["decision"] != "ready":
+    fdc_reviewed_selection_route_enabled = False
+if fdc_reviewed_source_load_report["decision"] == "blocked":
+    print("[WARN] Reviewed FDC sources are unavailable; reviewed selection remains disabled")
+fdc_reviewed_selection_service = FdcReviewedSelectionService(
+    scan_context_repository=nutrition_scan_context_repository,
+    snapshot_repository=fdc_candidate_snapshot_repository,
+    source_repository=nutrition_profile_repository,
+    local_lookup_factory=lambda user_id: make_local_nutrition_lookup(
+        storage, TFDA_DB, user_id, build_custom_food_search_result),
+    official_health=NUTRITION_DATASET_HEALTH,
+    reviewed_sources=_loaded_reviewed_fdc_sources,
 )
 
 
@@ -813,8 +834,20 @@ print(f"[OK] Restaurant catalog loaded: {len(RESTAURANT_CATALOG)} restaurants")
 # ═══════════════════════════════════════════════════════════════
 
 
-APP_VERSION = "v1.0.2"
+APP_VERSION = "v1.0.3"
 STARTED_AT = app_now().isoformat()
+print("[INFO] FDC preview startup: " + json.dumps({
+    "app_version": APP_VERSION, "started_at": STARTED_AT,
+    "source_load": fdc_reviewed_source_load_report,
+    "reviewed_selection": fdc_reviewed_selection_route_enabled,
+    "confirmation": fdc_confirmation_route_enabled,
+    "preview": fdc_profile_preview_route_enabled,
+    "candidate_search": fdc_candidate_route_enabled,
+    "raw_detail": fdc_detail_route_enabled,
+    "profile_accept": fdc_profile_accept_route_enabled,
+    "enrichment": nutrition_enrichment_route_enabled,
+    "fdc_key_available": bool(os.environ.get("USDA_FDC_API_KEY", "").strip()),
+}, ensure_ascii=True))
 
 
 @app.route("/", methods=["GET"])
@@ -841,11 +874,11 @@ def health():
         "nutrition_contract_versions": [1, 2],
         "nutrition_v2_flows": ["record_preview", "record_save", "record_edit", "records", "history"],
         "nutrition_v2_scanner_enabled": False,
-        "database": sql_db.dialect if sql_db is not None else ("mongo" if USE_MONGO else "memory"),
+        "database": sql_db.dialect if sql_db is not None else "memory",
         # 路徑裡有 Windows 使用者名稱，只給這台電腦自己看
         "database_path": database_path if database_path and is_local_request() else None,
         "cached_restaurant_menus": storage.count_restaurant_menus(),
-        "mongo": USE_MONGO,
+        "mongo": False,  # Compatibility health field; MongoDB is unsupported.
         "recognition_engine": "ai-relay-vision-db-lookup" if get_relay_config() else "gemini-vision-db-lookup",
         "foods_in_db": len(NUTRITION_DB),
         "foods_in_tfda": len(TFDA_DB) - len(USDA_DB),
@@ -855,16 +888,16 @@ def health():
         "disease_rule_review_status": build_disease_rules_response(DISEASE_RULES)["review_status_counts"],
         "restaurants": len(RESTAURANT_CATALOG),
         "places_enabled": bool(os.environ.get("GOOGLE_PLACES_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY")),
-        # 菜單分析先問 ChatGPT、失敗才換 Gemini；沒設就只用 Gemini
+        # 有中轉設定時共用中轉；無中轉時才檢查舊版 OpenAI provider 設定。
         "openai_enabled": bool(get_relay_config() or (os.environ.get("OPENAI_API_KEY") or "").strip()),
         "ai_relay_enabled": bool(get_relay_config()),
         "auth_required": is_auth_required(),
         "auth_provider": f"local-{sql_db.dialect}" if auth_repo.use_sql else "local-memory",
         "custom_foods": storage.count_custom_foods(),
         # 部署後可以直接從 /health 看出線上跑的是哪一版，不用靠路由存不存在來猜。
-        # RENDER_GIT_BRANCH / RENDER_GIT_COMMIT 由 Render 自動注入。
-        "deployed_branch": os.environ.get("RENDER_GIT_BRANCH") or "local",
-        "deployed_commit": (os.environ.get("RENDER_GIT_COMMIT") or "local")[:7],
+        # 可由本機部署流程明確提供；未設定時不猜測工作樹或 commit。
+        "deployed_branch": os.environ.get("NUTRILENS_DEPLOYED_BRANCH") or "local",
+        "deployed_commit": (os.environ.get("NUTRILENS_DEPLOYED_COMMIT") or "local")[:7],
         "app_version": APP_VERSION,
         "started_at": STARTED_AT,
     })
@@ -1130,6 +1163,9 @@ def _enrichment_error_response(error):
         "feature_disabled": 503, "single_flight_timeout": 202,
         "reservation_lost": 409,
         "confirmation_required": 409,
+        "official_nutrition_pending": 409,
+        "identity_confirmation_not_required": 409, "identity_context_incomplete": 409,
+        "invalid_identity": 422, "item_not_found": 404,
         "wrong_actor": 403, "snapshot_mismatch": 409, "snapshot_unavailable": 409,
         "snapshot_conflict": 409, "confirmation_conflict": 409,
         "wrong_confirmation": 409, "revision_conflict": 409,
@@ -1194,6 +1230,63 @@ def _fdc_candidate_reference_response(document):
     }
 
 
+@app.route("/nutrition/identity/confirmation", methods=["POST"])
+def confirm_scan_food_identity():
+    """Record an authenticated food-name decision and issue a new scan revision."""
+    authenticated_user_id = require_authenticated_user()
+    if authenticated_user_id is None:
+        raise AuthError("食材名稱確認需要登入。", 401)
+    if (not nutrition_identity_confirmation_route_enabled
+            or nutrition_identity_confirmation_repository is None):
+        return _enrichment_error_response(
+            NutritionEnrichmentRouteError("feature_disabled", "Food identity confirmation is not enabled"))
+
+    try:
+        _identity_confirmation_limiter.check(f"identity-confirmation:{authenticated_user_id}")
+        data = json_body(MAX_FORM_BYTES)
+        allowed = {"scan_id", "scan_revision", "item_id", "item_revision",
+                   "name_zh", "idempotency_key"}
+        if not isinstance(data, dict) or set(data) != allowed:
+            raise NutritionIdentityConfirmationError(
+                "invalid_request", "Only scan, item, name and idempotency references are accepted")
+        result = nutrition_identity_confirmation_repository.confirm_item_name(
+            authenticated_user_id=authenticated_user_id,
+            actor_id=authenticated_user_id,
+            scan_id=data["scan_id"], scan_revision=data["scan_revision"],
+            item_id=data["item_id"], item_revision=data["item_revision"],
+            confirmed_name=data["name_zh"], idempotency_key=data["idempotency_key"],
+        )
+    except RateLimitExceeded:
+        return _enrichment_error_response(
+            NutritionEnrichmentRouteError("rate_limited", "Identity confirmation is rate limited"))
+    except NutritionIdentityConfirmationError as error:
+        return _enrichment_error_response(error)
+    payload = deepcopy(result["result"])
+    payload["confirmation_id"] = result["confirmation_id"]
+    payload["replayed"] = result["replayed"]
+    try:
+        context = nutrition_scan_context_repository.get_scan_context(
+            user_id=authenticated_user_id, scan_id=result["scan_id"],
+            scan_revision=result["issued_scan_revision"], include_inactive=False)
+        item = next((value for value in context["items"]
+                     if value["item_id"] == result["item_id"]), None) if context else None
+        if item is None:
+            raise NutritionEnrichmentRouteError("stale_revision", "The confirmed scan revision is unavailable")
+        local_lookup = make_local_nutrition_lookup(
+            storage, TFDA_DB, authenticated_user_id, build_custom_food_search_result)
+        local = local_lookup(item)
+        payload["local_lookup"] = {
+            "status": local.get("status"),
+            "item": build_local_nutrition_item_result(item, local),
+        }
+    except (NutritionEnrichmentRouteError, ScanContextRepositoryError) as error:
+        return _enrichment_error_response(error)
+    except Exception:
+        return _enrichment_error_response(
+            NutritionEnrichmentRouteError("local_lookup_unavailable", "Local nutrition lookup is unavailable"))
+    return jsonify(payload), 202
+
+
 @app.route("/nutrition/fdc/candidates", methods=["POST", "GET"])
 def fdc_candidate_references():
     """Search USDA from persisted scan identity or read its owner-bound snapshot."""
@@ -1253,6 +1346,55 @@ def fdc_candidate_references():
     return jsonify(_fdc_candidate_reference_response(document))
 
 
+@app.route("/nutrition/fdc/reviewed-selection", methods=["POST"])
+def fdc_reviewed_selection():
+    """Select reviewed references without Search or an implicit user decision."""
+    authenticated_user_id = require_authenticated_user()
+    if authenticated_user_id is None:
+        raise AuthError("營養來源配對需要登入。", 401)
+    if not fdc_reviewed_selection_route_enabled:
+        return _enrichment_error_response(
+            NutritionEnrichmentRouteError("feature_disabled", "Reviewed source selection is not enabled"))
+    try:
+        data = json_body(MAX_FORM_BYTES)
+        if set(data) != {"scan_id", "scan_revision"}:
+            raise NutritionEnrichmentRouteError(
+                "invalid_request", "Only server scan references are accepted")
+        _fdc_candidate_limiter.check(f"fdc-reviewed-selection:{authenticated_user_id}")
+        document, selection = fdc_reviewed_selection_service.select(
+            authenticated_user_id=authenticated_user_id, **data)
+    except RateLimitExceeded:
+        return _enrichment_error_response(
+            NutritionEnrichmentRouteError("rate_limited", "Reviewed source selection is rate limited"))
+    except (FdcReviewedSelectionError, FdcCandidateSnapshotRepositoryError,
+            ScanContextRepositoryError, NutritionEnrichmentRouteError) as error:
+        return _enrichment_error_response(error)
+    response = _fdc_candidate_reference_response(document)
+    response["selection"] = selection
+    return jsonify(response)
+
+
+def _require_official_nutrition_miss(*, user_id, scan_id, scan_revision, item):
+    if any(NUTRITION_DATASET_HEALTH.get(source, {}).get("status") != "available"
+           for source in ("TFDA", "USDA FNDDS")):
+        raise NutritionEnrichmentRouteError(
+            "local_unavailable", "Official nutrition databases are not available")
+    # A configured reviewed source takes priority even if Search returned zero.
+    if (fdc_reviewed_source_load_report["decision"] == "blocked"
+            or fdc_reviewed_selection_service.registry.compatible(item)):
+        raise NutritionEnrichmentRouteError(
+            "official_nutrition_pending", "Reviewed USDA source selection is required")
+    try:
+        confirmed_miss = fdc_candidate_snapshot_repository.has_confirmed_search_miss(
+            user_id=user_id, scan_id=scan_id, scan_revision=scan_revision, item_id=item["item_id"])
+    except Exception as error:
+        raise NutritionEnrichmentRouteError(
+            "storage_unavailable", "Official lookup evidence could not be read") from error
+    if not confirmed_miss:
+        raise NutritionEnrichmentRouteError(
+            "official_nutrition_pending", "A completed USDA FDC search is required")
+
+
 @app.route("/nutrition/enrichment", methods=["POST"])
 def nutrition_enrichment():
     # This route is intentionally independent from /predict/vision-food.  It
@@ -1275,6 +1417,7 @@ def nutrition_enrichment():
             provider_factory=nutrition_enrichment_provider_factory,
             feature_enabled=nutrition_enrichment_route_enabled,
             authority_service=nutrition_authority_service,
+            require_official_miss=_require_official_nutrition_miss,
         )
     except NutritionEnrichmentRouteError as error:
         return _enrichment_error_response(error)
@@ -2489,10 +2632,9 @@ def bind_host(argv, environ) -> str:
 
     先前一律開在 0.0.0.0，加上防火牆對「公用網路」也放行 python，在咖啡店的 Wi-Fi 上
     同一個網路的人都連得進來。要給同一個 Wi-Fi 或 VPN 的裝置用，才加 --lan。
-    cloudflared 是從本機連進來的，不需要 --lan。
-    Render 會自動設 RENDER，而且只認 0.0.0.0 上的埠；綁 127.0.0.1 部署會失敗。
+    Tailscale Funnel 與 cloudflared 從本機轉入，不需要 --lan。
     """
-    if wants_lan(argv, environ) or environ.get("RENDER"):
+    if wants_lan(argv, environ):
         return "0.0.0.0"
     return "127.0.0.1"
 

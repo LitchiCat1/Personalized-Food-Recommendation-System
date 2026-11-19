@@ -13,6 +13,9 @@ export type NutritionEnrichmentItem = {
   brand: string | null;
   variant: string | null;
   validation_issues: string[];
+  identity_confirmation_required?: boolean;
+  identity_confirmation_source?: 'user';
+  identity_confirmation_id?: string;
 };
 
 /** Server-owned context returned by the vision endpoint.
@@ -139,6 +142,12 @@ function validRequest(request: NutritionEnrichmentRequest): boolean {
         !Number.isSafeInteger(item.item_revision) || item.item_revision < 0 ||
         !text(item.name_zh) || !Array.isArray(item.validation_issues) ||
         item.validation_issues.some((issue) => !text(issue))) return false;
+    if (item.identity_confirmation_required !== undefined &&
+        typeof item.identity_confirmation_required !== 'boolean') return false;
+    if (item.identity_confirmation_source !== undefined && item.identity_confirmation_source !== 'user') return false;
+    if (item.identity_confirmation_id !== undefined && !text(item.identity_confirmation_id)) return false;
+    if ((item.identity_confirmation_source === 'user') !== (item.identity_confirmation_id !== undefined) ||
+        (item.identity_confirmation_source === 'user' && item.identity_confirmation_required !== false)) return false;
     ids.add(item.item_id);
     for (const key of ['confidence', 'weight_confidence', 'estimated_weight_g'] as const) {
       const value = item[key];
@@ -170,7 +179,7 @@ export async function requestNutritionEnrichment(
   apiBaseUrl: string,
   request: NutritionEnrichmentRequest,
   auth?: ApiAuth,
-  options?: { enabled?: boolean },
+  options?: { enabled?: boolean; isCurrentSession?: () => boolean },
 ): Promise<NutritionEnrichmentResponse> {
   if (options?.enabled !== true) {
     throw new NutritionEnrichmentApiError('自動營養補全尚未啟用', 503, 'feature_disabled');
@@ -191,7 +200,7 @@ export async function requestNutritionEnrichment(
   } catch {
     throw new NutritionEnrichmentApiError('無法連線到營養補全服務', 0, 'network_error');
   }
-  reportUnauthorized(response);
+  if (!options.isCurrentSession || options.isCurrentSession()) reportUnauthorized(response);
   let data: unknown;
   try { data = await response.json(); } catch { data = null; }
   if (!response.ok) {

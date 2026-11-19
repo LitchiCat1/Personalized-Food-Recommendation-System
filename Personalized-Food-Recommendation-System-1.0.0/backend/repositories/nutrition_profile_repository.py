@@ -184,7 +184,7 @@ def _row_json(row, field):
 class NutritionProfileSourceRepository:
     """SQLite repository with an explicit non-durable memory mode."""
 
-    def __init__(self, sql=None):
+    def __init__(self, sql=None, *, initialize_schema=True):
         self.sql = sql
         self.durable = sql is not None
         if self.durable and getattr(sql, "dialect", None) != "sqlite":
@@ -192,7 +192,7 @@ class NutritionProfileSourceRepository:
         self._lock = threading.RLock()
         self._sources = {}
         self._profiles = {}
-        if self.durable:
+        if self.durable and initialize_schema:
             self.sql.executescript(SQLITE_TABLES)
 
     def _source_row(self, source_id):
@@ -233,6 +233,36 @@ class NutritionProfileSourceRepository:
                 "food_identity": deepcopy(_row_json(row, "food_identity")),
                 "profile": deepcopy(_row_json(row, "profile")),
                 "created_at": row.get("created_at"), "updated_at": row.get("updated_at")}
+
+    def install_source_policy_if_absent(self, policy):
+        """Insert once in SQLite; never update or reactivate an existing source.
+
+        Admission belongs to the server configuration service. BEGIN IMMEDIATE
+        serializes this check with other installers, CAS updates and withdrawal.
+        """
+        policy, source_id, policy_id = _policy(policy)
+        if not self.durable:
+            raise NutritionRepositoryError("unsupported_database", "Installation requires durable SQLite")
+        with self.sql.transaction():
+            current = self._source_document(self._source_row(source_id))
+            if current is not None:
+                if current["status"] != "active":
+                    raise NutritionRepositoryError("source_withdrawn", "Installation cannot reactivate a source")
+                if current["policy"] != policy or current["policy_id"] != policy_id:
+                    raise NutritionRepositoryError("policy_changed", "Installation cannot replace an existing policy")
+                return {"action": "already_installed", "source": current}
+            now = utc_iso()
+            self.sql.execute(
+                "INSERT INTO nutrition_source_policies "
+                "(source_id, policy_revision, policy_id, status, policy, created_at, updated_at) "
+                "VALUES (?, 0, ?, 'active', ?, ?, ?)",
+                (source_id, policy_id, to_json(policy), now, now))
+            self.sql.execute(
+                "INSERT INTO nutrition_source_policy_versions "
+                "(source_id, policy_revision, policy_id, status, policy, created_at) "
+                "VALUES (?, 0, ?, 'active', ?, ?)",
+                (source_id, policy_id, to_json(policy), now))
+            return {"action": "installed", "source": self.get_source_policy(source_id)}
 
     def save_source_policy(self, policy, *, expected_revision=None):
         policy, source_id, policy_id = _policy(policy)

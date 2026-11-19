@@ -1,6 +1,8 @@
 # 個人化飲食推薦與影像辨識 App
 
-目前版本：**v1.0.2**（2026-11-14）。
+目前開發版本：**v1.0.3**（2026-11-16）；`v1.0.2` 已備份至 GitHub。
+
+本機公開測試服務已更新至v1.0.3，首批僅啟用一般帶皮生蘋果171688的來源選用、明確確認與營養預覽；仍以本機TFDA／USDA優先。Tavily自動補全及FDC profile接受／飲食保存尚未開啟，詳見[發布與回復說明](docs/Local_Server_Deployment.md#單一蘋果來源預覽已發布)。
 
 > 健康飲食管理工具，結合 Gemini Vision 食物辨識、資料庫營養對應、個人化營養分析與附近店家搜尋。
 
@@ -18,7 +20,7 @@ Personalized-Food-Recommendation-System/
 │   │   ├── healthy_food_service.py # 健康餐點與店家推薦整合服務
 │   │   └── ...
 │   ├── repositories/         # 資料庫/記憶體資料訪問層
-│   │   └── storage.py        # 使用者與飲食紀錄存取 (含自動註冊 Fallback)
+│   │   └── storage.py        # SQLite 使用者、紀錄與菜單快取；明確的暫存測試模式
 │   ├── nutrition_db.json     # 手工食物營養素資料庫
 │   ├── nutrition_db_tw.json  # TFDA 台灣食品營養資料庫（主要）
 │   ├── nutrition_db_usda.json # USDA FNDDS 官方資料（備援）
@@ -43,7 +45,7 @@ Personalized-Food-Recommendation-System/
 │   │   └── ...
 │   ├── store/                # Zustand 狀態管理
 │   │   └── useStore.ts       # 全域核心狀態
-│   └── package.json          # 前端依賴與腳本 (v1.0.2)
+│   └── package.json          # 前端依賴與腳本 (v1.0.3)
 └── docs/                     # 專案文件
     ├── PRD.md                # 產品需求文件
     ├── Project_Architecture_and_Status.md # 架構與 Roadmap 稽核表
@@ -106,11 +108,11 @@ npm --prefix frontend install
 三個環境變數若有設定就必須全部填齊；`AI_API_KEYS` 以逗號分隔。
 沒有任何中轉站設定時才沿用舊版 Gemini／OpenAI 設定；中轉站呼叫失敗時不會回退舊金鑰。
 
-目前 v1.0.2 正式部署採 Windows 本機 SQLite + Tailscale，請依 [伺服器操作說明](docs/Local_Server_Deployment.md)。
-`render.yaml` 是仍指向 v1.0.1 的舊版 Render Blueprint，包含 PostgreSQL `DATABASE_URL`，不可用來部署
-SQLite-only 的 v1.0.2。若未來另行支援其他部署平台，需先提供持久化 SQLite 磁碟並移除該設定；
-不得把 `DATABASE_URL` 當作 PostgreSQL 相容模式。Docker 若以 `backend` 為建置目錄，請把完整金鑰檔唯讀掛載到
-`/run/secrets/nutrilens-ai`，並設定 `AI_RELAY_KEYS_FILE=/run/secrets/nutrilens-ai`。
+目前版本採 Windows 本機 SQLite + Tailscale，請依 [伺服器操作說明](docs/Local_Server_Deployment.md)。
+舊 Render Blueprint、GitHub Pages 自動發布與 Procfile 已移除；GitHub 僅作版本備份與 CI。
+非空 `DATABASE_URL` 會拒絕啟動，正式資料只存 SQLite，沒有 MongoDB 備援。
+`backend/Dockerfile` 僅為選用的 API 開發映像範例，非現行部署／驗收方式；需另掛持久化 SQLite 目錄，
+金鑰用環境變數或唯讀 secret 提供，不放進映像。影像不包含專案外層 `key.txt` 或 Expo 網站建置。
 
 `/health` 的 `ai_relay_enabled=true` 表示已載入中轉站設定，不代表已驗證遠端連線。
 管理者可透過原有的 `/health/gemini?generate=1` 診斷路由驗證實際呼叫，回傳不包含金鑰內容。
@@ -125,8 +127,9 @@ SQLite-only 的 v1.0.2。若未來另行支援其他部署平台，需先提供�
 
 專案已內附 2,213 筆 TFDA、5,431 筆 USDA FNDDS 2021–2023 資料及各自的 `.source.json` 來源紀錄。
 伺服器啟動直接讀取這些 JSON，**不需要另申請 USDA API key，也不會在啟動時下載資料**。
-目前新增的 USDA FoodData Central API client 仍是受限、未接正式掃描的 server-side replay；若要做該項測試，請只在 `backend/.env.local` 設 `USDA_FDC_API_KEY`。不要把 `USDA KEY.txt` 放到前端、Expo 變數、提示詞或日誌；未設定時維持使用內附 FNDDS 快照。
-正式部署與專案程式採 SQLite-only。已建立 SQLite 持久化的 server-owned source/profile、scan context、enrichment request、quota、正向快取、可恢復協調器與獨立 `POST /nutrition/enrichment` 入口；另有預設關閉的 `POST/GET /nutrition/fdc/candidates`，只會由 server-owned scan context 重查官方本地資料後搜尋真正未命中的 FDC 候選，回傳 digest-bound reference，不回傳營養值。來源撤回、權利、provenance、revision/CAS、user/global quota、request lease 及 7 日預設 TTL 會先在持久化層拒絕或保存。PostgreSQL 僅保留歷史隔離測試紀錄，程式不再連線或支援它；scanner confirmation UI、mobile bounded E2E、真 provider admission 與自動 fallback 仍未完成，因此所有相關 flags 與 production source registry 維持關閉。
+USDA FoodData Central API 目前支援受審查來源的選用、明確確認與營養預覽；server-only `USDA_FDC_API_KEY` 只放 `backend/.env.local`。不要把 `USDA KEY.txt` 放到前端、Expo 變數、提示詞或日誌；未設定時維持使用內附 FNDDS 快照。
+正式部署與專案程式採 SQLite-only，已保存來源／profile、scan、snapshot、confirmation、preview、quota、lease 與 cache 狀態。第七十八批正式服務已啟用171688一般帶皮生蘋果的系統選用→明確確認→營養預覽；只有真正本機未命中且身分精確相容才會進入，顯示「蘋果」，不推斷富士品種。來源可撤回，每次仍驗 owner／revision／expiry／current policy；預覽會保存流程狀態，並非全程唯讀。新安裝預設旗標仍關閉，須依部署說明明確安裝與配置。
+FDC Search、raw Detail HTTP、profile accept 與自動 enrichment 仍關閉，Tavily registry 仍空；既有飲食紀錄可用，新 FDC 來源接入餐點保存尚未放行。今日／歷史／趨勢／洞察新版營養 UI 依使用者要求延後。真照片的辨識／估重準確率及正式條件式 preview 仍待驗收，不能將固定 fixture 或營養配對率當準確率。
 請將兩份資料與來源紀錄一併交付，不要只複製程式檔。
 
 找不到合適資料的食品會顯示在辨識結果的待確認清單；「已配對項目合計」不代表整餐營養。
@@ -161,7 +164,7 @@ Windows 完成背景排程設定後，也可以雙擊下載內容根目錄的 `s
 1. 在 `backend/.env.local` 設一組邀請碼，例如 `SIGNUP_CODE=nutri-2026`。其他裝置註冊時要輸入它；
    沒設的話其他裝置只能登入已經有的帳號、不能註冊（在這台電腦上永遠可以註冊）。
    要讓所有人不用邀請碼就能註冊，改設 `OPEN_SIGNUP=true`。
-   放在 Render 上時沒設就是開放註冊，要關掉請在 Render 後台設 `OPEN_SIGNUP=false`。
+   外部預設不開放註冊；舊部署平台的環境變數不會改變這項規則。
 2. 依對方在哪裡選一種：
    - **同一個 Wi-Fi 或 VPN（例如 Radmin）**：用 `python backend/app.py --lan` 啟動，
      後端會印出「同一個網路的手機或電腦：http://192.168.x.x:5000」，在對方的瀏覽器打開即可。
@@ -253,7 +256,7 @@ npm --prefix frontend run web         # 網站 http://localhost:8081
 | Frontend | Expo (React Native) + TypeScript |
 | State | Zustand |
 | Navigation | Expo Router (file-based) |
-| Backend | Flask + SQLite（本機檔案）+ MongoDB fallback |
+| Backend | Flask／Waitress + SQLite（單一本機檔案） |
 | AI Model | Gemini Vision API + TFDA/custom food DB lookup |
 | Camera | expo-camera + expo-image-picker |
 

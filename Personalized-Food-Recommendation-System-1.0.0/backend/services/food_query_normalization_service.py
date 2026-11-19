@@ -24,6 +24,7 @@ _PLAN_KEYS = {"schema_version", "item_id", "item_revision", "scan_revision", "id
 # Broad "rice sausage" is intentionally absent because live FDC replay showed
 # it returns unrelated sausage-and-rice dishes and ordinary sausages.
 _ALLOWLIST = {
+    "青江菜": ("bok choy",),
     "糯米腸": ("glutinous rice sausage", "Taiwanese glutinous rice sausage"),
 }
 

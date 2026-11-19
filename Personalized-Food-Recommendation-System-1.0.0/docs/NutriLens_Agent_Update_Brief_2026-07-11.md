@@ -1,5 +1,7 @@
 # NutriLens Agent Update Brief
 
+> **Historical handoff, marked 2026-11-17:** This describes v0.0.3 and is not the current source of truth, implementation queue or authorization. Follow the current conversation, `AGENTS.md`, [architecture/status](Project_Architecture_and_Status.md) and [nutrition plan](plans/2026-11-13-web-nutrition-fallback.md). Retired provider/deployment references below are historical only.
+
 > Audience: future coding agents working inside this repository.
 > Purpose: give a fast, source-of-truth handoff for the current `v0.0.3` workspace without reading the user-facing Word summary first.
 > Date: 2026-07-11

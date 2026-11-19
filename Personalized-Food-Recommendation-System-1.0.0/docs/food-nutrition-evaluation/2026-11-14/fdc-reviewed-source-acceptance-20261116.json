@@ -1,0 +1,53 @@
+{
+  "scope": "captured_real_fdc_replay_into_temporary_sqlite",
+  "fdc_id": "1750340",
+  "replayed_at": "2026-11-16T12:47:05.951147+00:00",
+  "payload_sha256": "4fe45659fb96c5d96202be2b69d39a557ac22cde67dd5c804b8d643e4accf165",
+  "policy_sha256": "4db6b02c42bc333dee0ea789b574023c15e9170afbe0997ac5ea38292ed44639",
+  "provider_mode": "offline replay; no new network retrieval",
+  "detail_replay_count": 1,
+  "recognition": "synthetic explicit Fuji identity, not image recognition",
+  "unknown_variety_and_name_rejections": 3,
+  "reopen_count": 2,
+  "profile_count": 1,
+  "meal_records_written": 0,
+  "per_100g": {
+    "calories": 64.6609,
+    "protein": 0.1484375,
+    "carbs": 15.6511625,
+    "sugar": 13.33,
+    "fat": 0.1625,
+    "saturated_fat": null,
+    "trans_fat": null,
+    "fiber": 2.075,
+    "sodium": 1.013
+  },
+  "portion_150g": {
+    "calories": 96.99135,
+    "protein": 0.22265625,
+    "carbs": 23.47674375,
+    "sugar": 19.995,
+    "fat": 0.24375,
+    "saturated_fat": null,
+    "trans_fat": null,
+    "fiber": 3.1125,
+    "sodium": 1.5195
+  },
+  "profile_hash": "c91b2147e63bd555a388949efcf6291ecd3e5028b6bfefe837cad9c151b2babf",
+  "checks": {
+    "preview_did_not_write_profile": true,
+    "accept_after_reopen": true,
+    "idempotent_replay_after_second_reopen": true,
+    "owner_only_profile": true,
+    "confirmation_did_not_rename_or_infer_variety": true,
+    "withdrawal_blocked_pending_accept_and_current_lookup": true,
+    "historical_owner_snapshot_retained": true
+  },
+  "limitations": [
+    "No live model, USDA or Tavily calls; no credentials loaded",
+    "Replay envelope time is not the original capture time",
+    "SQLite close/reopen, not a process crash or mobile save test",
+    "Generic apple is not authorized by the Fuji-only policy",
+    "No production DB, registry, feature flag or service changed"
+  ]
+}

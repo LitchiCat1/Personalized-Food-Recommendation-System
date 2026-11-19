@@ -1,0 +1,134 @@
+{
+  "batch": 81,
+  "date": "2026-11-17",
+  "branch": "v1.0.3",
+  "outcome": "bounded_real_bento_photo_local_priority_verified_full_formal_photo_gate_incomplete",
+  "scope": "Normal Flask vision and reviewed-selection route handlers through test_client with a real photo, real configured relay, unchanged local nutrition datasets and isolated temporary SQLite. No browser, Android camera, production scan, confirmation, FDC Detail or meal-save acceptance.",
+  "input": {
+    "photo": "food_picture/多種菜色的便當.jpg",
+    "sha256": "1ba15472326f83205c3d2b7f5279808491376021c25622205f3fa33c8d6170ea",
+    "transformation": "none; original JPEG bytes base64 encoded",
+    "independent_weight_or_nutrition_truth": false,
+    "leaf_identity_reference": "User previously identified upper-left greens as 大陸妹 and lower-right greens as 青江菜; no independent botanical ground truth.",
+    "apple_original_available": false
+  },
+  "requests": {
+    "observed_vision_transport": 1,
+    "observed_retries": 0,
+    "tavily": 0,
+    "usda_search": 0,
+    "usda_detail": 0,
+    "earlier_unobserved_attempt": {
+      "vision_transport_min": 0,
+      "vision_transport_max": 3,
+      "outcome": "Initial inline tool run returned no output and no persisted report. No success claim or actual call count can be recovered; excluded from acceptance evidence.",
+      "batch_total_transport_min": 1,
+      "batch_total_transport_max": 4
+    },
+    "configured_model": "[AN]gemini-4-hydrogen-high",
+    "reported_model": "gemini-4-hydrogen",
+    "usage_reported_for_observed_request": {
+      "prompt_tokens": 2152,
+      "completion_tokens": 1212,
+      "total_tokens": 7311,
+      "completion_tokens_details": {"reasoning_tokens": 3947}
+    },
+    "known_price_or_cost": null,
+    "vision_route_elapsed_seconds": 33.061
+  },
+  "isolation": {
+    "database": "dedicated temporary SQLite, closed and directory removed",
+    "authentication": "test-only owner/session verification; not real password-login acceptance",
+    "reviewed_source": "171688 explicitly hash-installed and loaded only in temporary SQLite",
+    "real_local_lookup_preserved": true,
+    "forced_local_miss": false,
+    "synthetic_vision": false,
+    "production_database_directly_opened": false,
+    "production_application_data_written": false,
+    "production_configuration_changed": false,
+    "production_deploy_or_restart_performed": false,
+    "temporary_scan_contexts": 1,
+    "temporary_candidate_snapshots": 1,
+    "temporary_confirmations": 0,
+    "temporary_previews": 0,
+    "temporary_profiles": 0,
+    "meal_or_profile_write_routes_called": false,
+    "fdc_key_available_in_test_process": false,
+    "fdc_preview_live_request": "not attempted; this photo has no reviewed-source candidate"
+  },
+  "results": {
+    "vision_http_status": 200,
+    "reviewed_selection_http_status": 200,
+    "strict_normalized_item_validation_issues": 0,
+    "recognized_items": 7,
+    "matched_items": 4,
+    "unmatched_items": 3,
+    "scan_context": "persisted; seven distinct item IDs preserved",
+    "items": [
+      {"name": "白飯", "food_state": "prepared", "preparation_method": "steamed", "scope": "food_only", "confidence": 0.98, "weight_g": 200, "source": "TFDA", "matched_name": "白飯", "tfda_compatible": 1, "usda_compatible": 0, "selection_reason": "local_priority"},
+      {"name": "滷雞腿", "food_state": "prepared", "preparation_method": "braised", "scope": "food_only", "confidence": 0.95, "weight_g": 110, "source": "USDA FNDDS", "matched_name": "燉雞腿帶皮（USDA參考）", "tfda_compatible": 0, "usda_compatible": 1, "selection_reason": "local_priority"},
+      {"name": "葉菜", "region": "upper-left", "food_state": "prepared", "preparation_method": "stir_fried", "scope": "food_only", "confidence": 0.72, "weight_g": 45, "source": null, "local_lookup": "no_local_mapping", "selection_reason": "identity_required"},
+      {"name": "茄子", "food_state": "prepared", "preparation_method": "unknown", "scope": "food_only", "confidence": 0.85, "weight_g": 50, "source": "USDA FNDDS", "matched_name": "熟茄子加油（USDA參考）", "tfda_compatible": 0, "usda_compatible": 1, "selection_reason": "local_priority"},
+      {"name": "豆干", "food_state": "prepared", "preparation_method": "unknown", "scope": "food_only", "confidence": 0.92, "weight_g": 55, "source": "TFDA", "matched_name": "小方豆干", "tfda_compatible": 1, "usda_compatible": 0, "selection_reason": "local_priority"},
+      {"name": "毛豆", "food_state": "prepared", "preparation_method": "unknown", "scope": "food_only", "confidence": 0.9, "weight_g": 10, "source": null, "local_lookup": "incompatible", "tfda_candidates": 1, "tfda_compatible": 0, "usda_compatible": 0, "selection_reason": "local_priority"},
+      {"name": "葉菜", "region": "lower-right", "food_state": "prepared", "preparation_method": "stir_fried", "scope": "food_only", "confidence": 0.75, "weight_g": 60, "source": null, "local_lookup": "no_local_mapping", "selection_reason": "identity_required"}
+    ],
+    "matched_items_require_confirmation": true,
+    "matched_only_calories_kcal": 713,
+    "matched_only_sodium_mg": 570,
+    "nutrition_complete": false,
+    "optional_nutrients_complete": false,
+    "fdc_candidate_count": 0,
+    "photo_confidence_changed": false
+  },
+  "offline_verification": {
+    "original_image_hash": "passed",
+    "strict_schema_unique_ids_and_complete_context": "passed",
+    "per_layer_lookup_replay_without_new_model_calls": "passed; TFDA matched rice/tofu, USDA matched chicken/eggplant only where TFDA had no compatible match",
+    "core_nutrient_original_cell_portion_math_and_matched_only_totals": "passed",
+    "generic_leaf_rejection_and_no_unrelated_source_adoption": "passed",
+    "both_layers_competing_for_the_same_compatible_item": "not exercised by this photo",
+    "nine_batch79_source_hashes": "unchanged",
+    "raw_and_public_evidence_consistency": "passed",
+    "markdown_documents": 8,
+    "local_links": 281,
+    "balanced_fences": "passed",
+    "git_diff_whitespace": "passed",
+    "temporary_raw_and_probe_git_ignore": "passed",
+    "full_regression_repeated": false,
+    "latest_full_regression": "batch79, not batch81"
+  },
+  "runtime_read_only_observation": {
+    "scheduled_task": "NutriLens Backend, Running",
+    "listener": {"host": "127.0.0.1", "port": 5000, "pid": 14912},
+    "process_created_at": "2026-11-17T17:24:03.549843+08:00",
+    "local_and_public_health": {"status": "ok", "app_version": "v1.0.3", "database": "sqlite", "auth_required": true, "automatic_web_fallback_enabled": false, "started_at": "2026-11-17T17:24:35.717018+08:00"},
+    "differs_from_batch80": "PID and started_at changed before this test; cause not inspected or inferred",
+    "scanner_and_entry_http_status": 200,
+    "entry": "/_expo/static/js/web/entry-5115ba442ac55ef3887c0fae59bdaf53.js",
+    "local_and_public_entry_sha256": "8c1840d3f1d52dcf85f1b26cab3d98da7e277d7f0eafda79b5981c6909695bca",
+    "entry_matches_batch78_release": true,
+    "current_private_runtime_flags_key_and_policy_re_attested": false,
+    "batch79_code_loaded_by_current_process": "unverified; a restart plus unchanged frontend hash does not attest backend code",
+    "health_read_scope": "Existing handlers read DB counts and relay configuration. Audit itself did not directly open production DB or private settings."
+  },
+  "evidence_integrity": {
+    "ignored_raw_result": "tmp/scanner-real-photo-b81.json",
+    "ignored_raw_result_sha256": "4d1019bb2b9f299410224b4de5b9c6c60082f393c3c0a6ce7ce9aa9d3dabce7a",
+    "ignored_probe_script_sha256": "afa2ec0bc647a4698c0055d797bbafa7fcc20262eb621bd5bc5ce22b62c3e4d7",
+    "source_sha256": {
+      "backend/app.py": "0b03b9862594cd5ee68639763731f6f52520a579522aa987a6096025a64e02dc",
+      "backend/services/vision_food_service.py": "207be50d0044e674da027b9951b0e76cdccf325cff8b7fb696a43bacaa74f605",
+      "backend/services/vision_nutrition_service.py": "4be4939a75a0b355ecb2a99f33ef9e32d1bdf2a8ec6996e8bfc826445b00bb07",
+      "backend/services/fdc_reviewed_selection_service.py": "4238e3ed62df3f124cd2f05805f61353570a62fbe3dab4846760c2d8817c33ae"
+    }
+  },
+  "limitations_and_next": [
+    "One observed bento response is not a recognition accuracy, stability, weighed nutrition accuracy, generic apple/skin prompt compliance or deployed scanner acceptance claim.",
+    "Leaves remain generic despite the real model call; Tavily cannot recover food identity from nutrition search results. Do not raise confidence or infer species.",
+    "The rejected cooked edamame is a preparation incompatibility, not evidence that both official datasets are absent or failed.",
+    "Legacy numerical optional-field placeholders remain accompanied by missing_nutrition_fields and incomplete coverage; they are not measured zeros or a complete nine-nutrient validation.",
+    "Formal scanner photo acceptance remains incomplete. Obtain a real raw-with-skin generic apple photo through the normal deployed scanner. Preserve any real TFDA/USDA local hit; only a genuinely compatible local miss can exercise 171688 explicit confirmation and preview.",
+    "No new workstream, repeated fixed Android fixture, unrestricted Tavily, new-source accept/save or cross-user cache activation."
+  ]
+}

@@ -18,7 +18,7 @@ from test_api_routes import ApiTestBase
 
 
 def sqlite_storage(path=":memory:"):
-    return StorageRepository(None, False, {}, [], [], sql=SqliteDatabase(path))
+    return StorageRepository({}, [], [], sql=SqliteDatabase(path))
 
 
 def meal(client_record_id, day_offset=0, calories=500, name="滷肉飯"):
@@ -162,7 +162,7 @@ class SqliteStorageTests(unittest.TestCase):
             """
         )
         with self.assertRaises(RuntimeError) as ctx:
-            StorageRepository(None, False, {}, [], [], sql=db)
+            StorageRepository({}, [], [], sql=db)
         self.assertIn("唯一索引", str(ctx.exception))
 
     def test_two_saves_of_the_same_record_at_once_do_not_fail(self):
@@ -263,7 +263,7 @@ class SqliteApiTests(ApiTestBase):
 
     def test_signup_then_record_and_read_back(self):
         sql = SqliteDatabase(":memory:")
-        with patch.object(self.app_module, "storage", StorageRepository(None, False, {}, [], [], sql=sql)), \
+        with patch.object(self.app_module, "storage", StorageRepository({}, [], [], sql=sql)), \
                 patch.object(self.app_module, "auth_repo", AuthRepository(sql)):
             self.app_module._auth_limiter.reset()
             session = self.client.post(

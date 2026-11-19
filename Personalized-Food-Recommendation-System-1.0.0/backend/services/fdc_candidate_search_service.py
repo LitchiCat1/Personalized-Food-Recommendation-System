@@ -8,7 +8,7 @@ from contextlib import contextmanager, nullcontext
 
 from repositories.fdc_candidate_snapshot_repository import FdcCandidateSnapshotRepositoryError
 from repositories.scan_context_repository import ScanContextRepositoryError
-from services.food_identity_service import requires_food_identity_confirmation
+from services.food_identity_service import requires_food_identity_confirmation, web_identity_ready
 from services.food_query_normalization_service import (
     FoodQueryNormalizationError,
     build_fdc_search_query_plan,
@@ -41,6 +41,8 @@ def _fail(code, message):
 
 
 def _eligible_for_search(item):
+    if item.get("identity_confirmation_source") is not None or "identity_confirmation_id" in item:
+        return web_identity_ready(item, minimum_confidence=VISION_FOOD_MIN_CONFIDENCE)
     confidence = item.get("confidence")
     return (not isinstance(confidence, bool) and isinstance(confidence, (int, float))
             and math.isfinite(confidence) and confidence >= VISION_FOOD_MIN_CONFIDENCE
@@ -213,6 +215,7 @@ class FdcCandidateSearchService:
 
         items = context["items"]
         candidates_by_item = {item["item_id"]: [] for item in items}
+        no_hit_item_ids = []
         try:
             local_lookup = self.local_lookup_factory(authenticated_user_id)
         except Exception as error:
@@ -248,12 +251,14 @@ class FdcCandidateSearchService:
                 for item in search_items:
                     plan = build_fdc_search_query_plan(item, scan_revision=scan_revision)
                     by_id = {}
+                    confirmed_no_hits = bool(plan["queries"])
                     for query in plan["queries"]:
                         if calls >= MAX_SEARCH_REQUESTS:
                             _fail("search_budget_exceeded", "FDC search request budget was exceeded")
                         calls += 1
                         result = client.search_foods(
                             query, deadline=deadline, page_size=SEARCH_PAGE_SIZE)
+                        confirmed_no_hits = confirmed_no_hits and result.get("confirmed_no_hits") is True
                         for candidate in result["candidates"]:
                             prior = by_id.get(candidate["fdcId"])
                             if prior is not None and prior != candidate:
@@ -262,6 +267,8 @@ class FdcCandidateSearchService:
                     candidates_by_item[item["item_id"]] = sorted(
                         by_id.values(), key=lambda candidate: candidate["fdcId"]
                     )[:MAX_SEARCH_CANDIDATES_PER_ITEM]
+                    if confirmed_no_hits and not by_id:
+                        no_hit_item_ids.append(item["item_id"])
             except (FoodQueryNormalizationError, FoodDataCentralClientError,
                     FdcCandidateSelectionError) as error:
                 raise FdcCandidateSearchError(
@@ -281,6 +288,8 @@ class FdcCandidateSearchService:
                 scan_revision=scan_revision,
                 candidates_by_item=candidates_by_item,
             )
+            if no_hit_item_ids:
+                save_arguments["no_hit_item_ids"] = no_hit_item_ids
             if reservation_owner is not None:
                 save_arguments["reservation_owner"] = reservation_owner
             return self.snapshot_repository.save_candidates(**save_arguments)

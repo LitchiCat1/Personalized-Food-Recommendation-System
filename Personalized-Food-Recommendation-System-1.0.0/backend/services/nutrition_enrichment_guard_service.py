@@ -75,9 +75,21 @@ def _item(item):
         _fail("invalid_request", "Each enrichment item must be an object")
     allowed = {"item_id", "item_revision", "name_zh", "confidence", "weight_confidence",
                "estimated_weight_g", "food_state", "preparation_method", "components_scope",
-               "brand", "variant", "validation_issues"}
+               "brand", "variant", "validation_issues", "identity_confirmation_required",
+               "identity_confirmation_source", "identity_confirmation_id"}
     if set(item) - allowed:
         _fail("invalid_request", "Enrichment item contains unsupported fields")
+    if "identity_confirmation_required" in item and type(item["identity_confirmation_required"]) is not bool:
+        _fail("invalid_request", "identity_confirmation_required must be a boolean")
+    confirmation_source = item.get("identity_confirmation_source")
+    confirmation_id = item.get("identity_confirmation_id")
+    if confirmation_source is not None and confirmation_source != "user":
+        _fail("invalid_request", "identity_confirmation_source is invalid")
+    if confirmation_id is not None:
+        _text(confirmation_id, "identity_confirmation_id")
+    if ((confirmation_source == "user") != (confirmation_id is not None)
+            or (confirmation_source == "user" and item.get("identity_confirmation_required") is not False)):
+        _fail("invalid_request", "User identity confirmation provenance is incomplete")
     _text(item.get("item_id"), "item_id")
     revision = item.get("item_revision")
     if isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:

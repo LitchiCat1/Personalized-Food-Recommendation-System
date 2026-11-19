@@ -2,6 +2,7 @@ import type { DetectedFood } from '@/constants/mock-data';
 import type { ApiAuth } from '@/lib/api';
 import type { MealType } from '@/lib/meal';
 import type { NutritionEnrichmentItem, NutritionEnrichmentResponse, NutritionScanContext } from '@/lib/nutrition-enrichment-api';
+import type { NutritionFdcCandidateSnapshotResponse } from '@/lib/nutrition-fdc-candidate-api';
 
 
 // 後端回 401 時通知 AuthGate 帶回登入畫面（事件名稱見 lib/auth.ts 的 UNAUTHORIZED_EVENT）。
@@ -52,6 +53,19 @@ export type RejectedDetection = {
   nutrition_status?: 'unmatched';
 };
 
+export function formatReviewedPendingFoods(
+  items: RejectedDetection[], snapshot: NutritionFdcCandidateSnapshotResponse | null,
+): RejectedDetection[] {
+  if (!snapshot?.selection) return items;
+  const matched = new Set(snapshot.selection.items
+    .filter((item) => item.reason === 'reviewed_match')
+    .map((item) => item.item_id));
+  return items.map((item) => item.item_id && matched.has(item.item_id) &&
+    item.recognition_status === 'recognized' && item.nutrition_status === 'unmatched'
+    ? { ...item, reason: '已找到相容的 USDA 參考營養；請在下方確認名稱與估計份量，尚未計入營養合計。', search_hints: [] }
+    : item);
+}
+
 export function formatScannerSourceBadge(sources: Array<string | undefined>, pendingCount = 0): string {
   const labels = new Set<string>();
   for (const value of sources) {
@@ -83,6 +97,32 @@ export function hasReviewableNutritionMiss(
     .map((item) => item.item_id));
   return rejectedDetections.some((item) => item.recognition_status === 'recognized' &&
     item.nutrition_status === 'unmatched' && typeof item.item_id === 'string' && validItemIds.has(item.item_id));
+}
+
+export function getUserConfirmableIdentityItems(
+  rejectedDetections: RejectedDetection[],
+  scanContext: NutritionScanContext | null,
+): NutritionEnrichmentItem[] {
+  if (!scanContext) return [];
+  const rejectedIds = new Set(rejectedDetections
+    .map((item) => item.item_id).filter((value): value is string => typeof value === 'string'));
+  const knownValues = {
+    food_state: new Set(['prepared', 'raw', 'dry']),
+    preparation_method: new Set(['boiled', 'stir_fried', 'pan_fried', 'deep_fried', 'roasted', 'braised', 'steamed', 'mixed']),
+    components_scope: new Set(['food_only', 'noodles_only', 'whole_dish_with_broth', 'with_sides']),
+  };
+  return scanContext.items.filter((item) => item.identity_confirmation_required === true &&
+    rejectedIds.has(item.item_id) && item.validation_issues.length === 0 &&
+    knownValues.food_state.has(item.food_state || '') &&
+    knownValues.preparation_method.has(item.preparation_method || '') &&
+    knownValues.components_scope.has(item.components_scope || ''));
+}
+
+export function hasUserConfirmableIdentity(
+  rejectedDetections: RejectedDetection[],
+  scanContext: NutritionScanContext | null,
+): boolean {
+  return getUserConfirmableIdentityItems(rejectedDetections, scanContext).length > 0;
 }
 
 export type OCRDraft = {
@@ -167,6 +207,13 @@ function mapScanContext(value: any): NutritionScanContext | null {
         || typeof item.name_zh !== 'string' || !Array.isArray(item.validation_issues)) {
       return null;
     }
+    if (item.identity_confirmation_required !== undefined
+        && typeof item.identity_confirmation_required !== 'boolean') return null;
+    if (item.identity_confirmation_source !== undefined && item.identity_confirmation_source !== 'user') return null;
+    if (item.identity_confirmation_id !== undefined &&
+        (typeof item.identity_confirmation_id !== 'string' || !item.identity_confirmation_id.trim())) return null;
+    if ((item.identity_confirmation_source === 'user') !== (item.identity_confirmation_id !== undefined) ||
+        (item.identity_confirmation_source === 'user' && item.identity_confirmation_required !== false)) return null;
     const numeric = (candidate: unknown): number | null =>
       candidate === null || candidate === undefined
         ? null
@@ -190,6 +237,12 @@ function mapScanContext(value: any): NutritionScanContext | null {
       brand: typeof item.brand === 'string' ? item.brand : null,
       variant: typeof item.variant === 'string' ? item.variant : null,
       validation_issues: item.validation_issues.filter((issue: unknown): issue is string => typeof issue === 'string'),
+      ...(typeof item.identity_confirmation_required === 'boolean'
+        ? { identity_confirmation_required: item.identity_confirmation_required } : {}),
+      ...(item.identity_confirmation_source === 'user'
+        ? { identity_confirmation_source: 'user' as const } : {}),
+      ...(typeof item.identity_confirmation_id === 'string'
+        ? { identity_confirmation_id: item.identity_confirmation_id } : {}),
     });
   }
   return {
@@ -236,7 +289,10 @@ function enrichedFood(item: any, existing?: DetectedFood): DetectedFood | null {
   const sourceDetails = item.nutrition_profile?.source_details;
   const sourceId = sourceDetails && typeof sourceDetails.source_id === 'string'
     ? sourceDetails.source_id : null;
-  const source = item.origin === 'web' ? `web:${sourceId || 'reviewed-source'}` : (existing?.source || 'nutrition-enrichment');
+  const localSource = sourceDetails && typeof sourceDetails.source === 'string' ? sourceDetails.source : null;
+  const source = item.origin === 'web' ? `web:${sourceId || 'reviewed-source'}`
+    : item.origin === 'local' ? (localSource || existing?.source || 'local-nutrition')
+      : (existing?.source || 'nutrition-enrichment');
   const nutrition = {
     calories: values.calories,
     protein: values.protein,

@@ -1,0 +1,93 @@
+{
+  "batch": 86,
+  "date": "2026-11-17",
+  "branch": "v1.0.3",
+  "scope": "bok_choy_source_scope_clarification_and_official_afcd_record_review",
+  "user_scope_preference": {
+    "requested_scope": "Use bok choy ingredient nutrition directly; added cooking oil does not need to be included.",
+    "explicitly_excluded": ["added cooking oil"],
+    "not_explicitly_confirmed": ["salt handling", "sauce handling"],
+    "display_boundary": "Ingredient reference only; do not represent it as complete stir-fried dish nutrition.",
+    "portion_boundary": "A raw per-100-g record is not an exact scaling basis for image-estimated cooked grams."
+  },
+  "official_source_review": {
+    "publisher": "Food Standards Australia New Zealand (FSANZ)",
+    "database": "Australian Food Composition Database Release 3",
+    "records": [
+      {
+        "food_key": "F001301",
+        "name": "Bok choy, raw",
+        "url": "https://www.foodstandards.gov.au/science-data/food-nutrient-databases/afcd/search/food/F001301",
+        "verified_fields": {
+          "basis": "per 100 g",
+          "preparation": "raw / uncooked",
+          "description": "White to pale green stems and rounded dark-green leaves",
+          "derivation": "Analysed",
+          "analysed_portion": "80% leaf and stem",
+          "unanalysed_portion": "20% end of stem"
+        },
+        "data_lineage_observations": [
+          "Nutrient data combine multiple sample sets / references from 1997, 2001, 2005 and 2021.",
+          "Tryptophan is imputed from savoy cabbage.",
+          "The record marks alcohol, selected vitamins, cholesterol, fatty acids and caffeine as imputed zero; this must not be conflated with a missing value or an analytical zero."
+        ],
+        "decision": "Best current candidate for a clearly labelled raw bok choy per-100-g reference, not an admitted application source and not a cooked-portion conversion basis."
+      },
+      {
+        "food_key": "F001300",
+        "name": "Bok choy, fried, no added fat",
+        "url": "https://www.foodstandards.gov.au/science-data/food-nutrient-databases/afcd/search/food/F001300",
+        "verified_fields": {
+          "preparation": "fried without added fat",
+          "derivation": "Recipe",
+          "description": "White to pale green stems and rounded dark-green leaves"
+        },
+        "decision": "Cooked-state comparison candidate only; recipe-derived values do not establish equivalence to the photographed dish or its ingredient recipe."
+      }
+    ],
+    "licence": {
+      "name": "FSANZ Data User Licence Agreement based on Creative Commons Attribution-ShareAlike 3.0 Australia",
+      "url": "https://www.foodstandards.gov.au/science-data/monitoringnutrients/afcd/datauserlicenceagreement",
+      "observed_conditions": [
+        "Attribution to FSANZ and required copyright notices",
+        "Distributed derivative works must use the same licence",
+        "Distributions must include the data limitation statement and a notice that Australian data may not be appropriate for other countries",
+        "The page says the licence must be read and accepted before downloading the data files"
+      ],
+      "acceptance_or_download_performed": false,
+      "application_and_profile_reuse_scope_resolved": false
+    }
+  },
+  "admission_decision": {
+    "production_web_registry_count": 0,
+    "automatic_web_fallback_enabled": false,
+    "source_admitted": false,
+    "next_gate": [
+      "Review whether the AFCD licence permits this project's public application, durable storage of nutrient profiles and distribution of model-extracted derivatives under the required terms; do not accept the licence on the user's behalf.",
+      "Define source-field semantics for analytical values, derived values, imputed zero and missing values before extraction; preserve unknown values rather than inventing them.",
+      "If reuse is permitted and approved, run a bounded single-source Tavily/model schema and adapter test, labelled source-format testing rather than photo-pipeline validation.",
+      "Use raw F001301 only as an explicitly labelled per-100-g reference unless a reviewed raw-equivalent portion conversion is available."
+    ]
+  },
+  "side_effects": {
+    "official_web_search_or_page_review_calls": 4,
+    "live_tavily_api_search_requests": 0,
+    "live_tavily_api_extract_requests": 0,
+    "model_calls": 0,
+    "credentials_or_account_pages_read": 0,
+    "dataset_files_downloaded": 0,
+    "licence_acceptance_actions": 0,
+    "nutrition_values_copied_into_evidence": false,
+    "production_database_operations": 0,
+    "production_flags_changed": false,
+    "application_code_changed": false,
+    "deployed_or_restarted": false,
+    "committed_or_pushed": false
+  },
+  "review_limits": [
+    "The user explicitly excluded added cooking oil only; salt and sauce treatment were not separately confirmed.",
+    "This is an official record and licence review, not legal advice or acceptance of the licence.",
+    "The source page does not verify the identity or cooked weight of a specific photographed portion.",
+    "No nutrient cells are stored in this evidence artifact."
+  ]
+}

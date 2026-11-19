@@ -1,5 +1,7 @@
 # Render 用 Supabase、本機用 SQLite：設計
 
+> **歷史封存（2026-11-17）：**此設計已由 SQLite-only 決策取代，不是待實作規格。不得按本文建立 Render／Supabase 或 PostgreSQL 路徑；現行部署見 [Windows 操作說明](../../Local_Server_Deployment.md)，現行架構見 [架構與狀態](../../Project_Architecture_and_Status.md)。
+
 日期：2026-10-15　分支：v0.0.9
 
 ## 目標

@@ -43,7 +43,7 @@ class ConcurrencyProbe:
 
 class VenueIndexTests(unittest.TestCase):
     def setUp(self):
-        self.storage = StorageRepository(None, False, {}, [], [])
+        self.storage = StorageRepository({}, [], [])
         reset_venue_index_state()
         self.addCleanup(reset_venue_index_state)
 
@@ -229,7 +229,7 @@ class VenueIndexTests(unittest.TestCase):
         self.assertEqual(second["unbuildable"], 2)
 
     def test_the_cooldown_is_kept_in_storage(self):
-        """Render 閒置會休眠，冷卻名單放在記憶體的話，重啟就沒了。"""
+        """冷卻名單須保存在 SQLite，後端重啟後仍可避免重複付費呼叫。"""
         self.run_index(places("甲"), lambda *a, **k: {"items": [], "failure": "no_items"})
 
         # 模擬重啟：行程裡的狀態清空，資料庫還在

@@ -1,0 +1,128 @@
+{
+  "review_date": "2026-11-16",
+  "observed_at": "2026-11-16T23:17:24+08:00",
+  "batch": 77,
+  "branch": "v1.0.3",
+  "scope": "single_171688_controlled_rollout_preflight_and_admission_policy_id_fix",
+  "outcome": "review_complete_deployment_prerequisites_not_configured",
+  "source": {
+    "source_id": "usda-fdc-171688",
+    "policy_sha256": "14152c86f9f718ee7057d65b038d6b9be65d3a7197995308f29ef91f5876b85f",
+    "installed_in_production_sqlite": false,
+    "production_reviewed_source_configuration": "empty_tuple",
+    "candidate_artifact_activated": false
+  },
+  "production_observations": {
+    "scheduled_task": "NutriLens Backend",
+    "task_state": "Running",
+    "task_targets_current_checkout": true,
+    "listener_5000_address": "127.0.0.1",
+    "listener_5000_pid": 16352,
+    "listener_8090": "absent",
+    "health": {
+      "status": "ok",
+      "app_version": "v1.0.2",
+      "started_at": "2026-11-16T17:27:22.551553+08:00",
+      "database": "sqlite",
+      "auth_provider": "local-sqlite",
+      "auth_required": true,
+      "automatic_web_fallback_enabled": false,
+      "official_layers_available": true
+    },
+    "sqlite": {
+      "path_matches_local_health": true,
+      "appdata_virtualization_block": false,
+      "access": "explicit_existing_file_mode_ro_query_only_stable_read_transaction",
+      "quick_check": "ok",
+      "source_policy_table_present": true,
+      "rows_for_171688": 0,
+      "application_sql_writes": 0,
+      "database_copied_or_backed_up_this_batch": false
+    },
+    "fresh_helper_plus_current_dotenv_not_running_process": {
+      "authentication_required": true,
+      "usda_fdc_api_key_nonempty": false,
+      "frontend_dist_override_present": false,
+      "unsupported_database_url_present": false,
+      "backend_flags": {
+        "FDC_REVIEWED_SELECTION_ROUTE_ENABLED": false,
+        "FDC_CONFIRMATION_ROUTE_ENABLED": false,
+        "FDC_PROFILE_PREVIEW_ROUTE_ENABLED": false,
+        "FDC_CANDIDATE_ROUTE_ENABLED": false,
+        "FDC_DETAIL_ROUTE_ENABLED": false,
+        "FDC_PROFILE_ACCEPT_ROUTE_ENABLED": false,
+        "NUTRITION_ENRICHMENT_ROUTE_ENABLED": false
+      }
+    },
+    "private_key_file": {
+      "name": "USDA KEY.txt",
+      "exists_and_is_git_ignored": true,
+      "exactly_one_valid_format_key": true,
+      "key_value_printed_or_published": false,
+      "live_key_validity_tested_this_batch": false,
+      "copied_into_server_environment_this_batch": false
+    },
+    "running_fdc_key_and_route_flags": "not_exposed_by_existing_health_not_inferred_from_current_files",
+    "frontend": {
+      "local_scanner_status": 200,
+      "existing_public_funnel_scanner_status": 200,
+      "local_entry_status": 200,
+      "existing_public_funnel_entry_status": 200,
+      "entry_path": "/_expo/static/js/web/entry-1f6092bb99a270e6690fa9dbf1f79ffe.js",
+      "entry_sha256": "96d9b41d6578ad5327b71f974b9c797f9f3b1505cbe290ba3a181a951049f7ae",
+      "local_public_and_disk_entry_match": true,
+      "current_frontend_dotenv_files": [],
+      "baked_frontend_fdc_flags": "unverified_not_inferred_from_entry_hash_or_missing_dotenv",
+      "new_build_or_browser_interaction_this_batch": false
+    }
+  },
+  "admission_checks": {
+    "actual_repository_configuration": "blocked",
+    "prospective_171688_entry_with_actual_sqlite": "blocked",
+    "known_missing_configuration": ["server_usda_key_environment", "explicit_production_reviewed_source_entry", "installed_171688_source_policy", "three_required_backend_flags"],
+    "unverified": ["five_frontend_build_flags", "running_fdc_key_and_route_flags"],
+    "required_backend_flags": ["FDC_REVIEWED_SELECTION_ROUTE_ENABLED", "FDC_CONFIRMATION_ROUTE_ENABLED", "FDC_PROFILE_PREVIEW_ROUTE_ENABLED"],
+    "required_frontend_flags": ["EXPO_PUBLIC_FDC_REVIEWED_SELECTION_ENABLED", "EXPO_PUBLIC_FDC_CONFIRMATION_ENABLED", "EXPO_PUBLIC_FDC_PROFILE_PREVIEW_ENABLED"],
+    "excluded_routes_and_operations": ["raw_search", "raw_detail_http", "profile_accept", "meal_record", "tavily_enrichment", "cross_user_cache"],
+    "preview_state_writes_expected_when_eventually_enabled": true
+  },
+  "fixed_defect": {
+    "trigger": "installed_row_policy_id_differs_from_exact_policy_json",
+    "before": {"configuration_review": "configuration_ready", "startup_loader": "blocked"},
+    "after": {"configuration_review": "blocked", "startup_loader": "blocked"},
+    "regression": "real_temporary_sqlite_policy_id_drift_read_only_review_and_startup_database_bytes_unchanged",
+    "negative_revision": "already_rejected_before_this_fix"
+  },
+  "verification": {
+    "command": "python -m pytest backend/tests/test_fdc_preview_admission.py backend/tests/test_fdc_reviewed_source_lifecycle.py backend/tests/test_fdc_reviewed_selection.py -q --disable-warnings",
+    "passed": 36,
+    "subtests_passed": 64,
+    "failed": 0,
+    "skipped": 0,
+    "elapsed_seconds": 13.14,
+    "full_backend_repeated": false,
+    "isolation": ["NUTRILENS_SKIP_LOCAL_ENV=1", "DATABASE_PATH empty", "external_database_and_provider_environment_cleared", "socket_blocked_tests_and_temp_sqlite_only"],
+    "changed_file_sha256": {
+      "backend/services/fdc_preview_admission_service.py": "6da52009282d96f9ca55bde208781f2620f097e4061d51e30a6a19478b8dc1ab",
+      "backend/tests/test_fdc_preview_admission.py": "3ec2207e4a4d914996d3f897d16a449300928d685ea2115f464c99906d4adbc9"
+    }
+  },
+  "boundaries": {
+    "provider_requests": {"model": 0, "usda": 0, "tavily": 0},
+    "production_database_reads": true,
+    "production_database_application_sql_writes": 0,
+    "private_configuration_and_key_file_reads": true,
+    "credentials_printed_or_published": false,
+    "production_configuration_or_flags_changed": false,
+    "production_service_restarted_or_deployed": false,
+    "commit_or_push": false,
+    "new_workstreams_or_repeated_android_fixture": false,
+    "new_photo_accuracy_or_prompt_compliance_evidence": false,
+    "tavily_rights_newly_granted": false,
+    "database_policy": "sqlite_only",
+    "same_agent_self_review": true,
+    "subagents": 0
+  },
+  "next_existing_item": "prepare_the_single_171688_preview_release_using_existing_backup_server_only_key_explicit_configuration_installer_six_required_flags_same_origin_build_restart_and_local_public_smoke_sequence_no_new_planning_round",
+  "deployment_authorized": false
+}

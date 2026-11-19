@@ -235,7 +235,7 @@ export default function ProfileScreen() {
    * 安全條件的儲存必須排隊，而且要送出當下 store 的最新狀態。
    *
    * 先前是 `void syncProfile({ ...user, ... })`：連續勾兩個病症會同時發出兩個
-   * 寫入，誰先到後端不一定（Render 冷啟動延遲差到幾秒），晚到的舊 payload 會
+   * 寫入，誰先到後端不一定（連線延遲可能不同），晚到的舊 payload 會
    * 把後來勾的那個蓋掉；而且 payload 是用當次 render 的 user 算的，不是 store
    * 的最新值。畫面永遠顯示兩個都勾了，後端卻少一個——少一個病症就等於那整組
    * 禁忌規則沒套用。

@@ -13,7 +13,7 @@ from copy import deepcopy
 import math
 import time
 
-from services.food_identity_service import requires_food_identity_confirmation
+from services.food_identity_service import web_identity_ready
 from services.nutrition_enrichment_coordinator import (
     NutritionEnrichmentCoordinator,
     NutritionEnrichmentCoordinatorError,
@@ -73,16 +73,14 @@ def _web_enrichment_eligible(item):
     look more certain by a nutrition lookup.  A later user-confirmation flow
     can create a new server-owned scan revision with corrected identity data.
     """
-    confidence = item.get("confidence")
-    return (not isinstance(confidence, bool) and isinstance(confidence, (int, float))
-            and math.isfinite(confidence) and confidence >= VISION_FOOD_MIN_CONFIDENCE
-            and not item.get("validation_issues")
-            and not requires_food_identity_confirmation(item.get("name_zh")))
+    return web_identity_ready(item, minimum_confidence=VISION_FOOD_MIN_CONFIDENCE)
 
 
 def _recognition_context(item):
     return {field: deepcopy(item.get(field)) for field in
-            ("name_zh", "confidence", "weight_confidence", "estimated_weight_g", *_IDENTITY_FIELDS)}
+            ("name_zh", "confidence", "weight_confidence", "estimated_weight_g",
+             "identity_confirmation_required", "identity_confirmation_source",
+             "identity_confirmation_id", *_IDENTITY_FIELDS)}
 
 
 def _item_result(item, *, status, origin, profile, portion=None, diagnostics=None):
@@ -98,6 +96,22 @@ def _item_result(item, *, status, origin, profile, portion=None, diagnostics=Non
     if diagnostics is not None:
         result["local_lookup"] = deepcopy(diagnostics)
     return result
+
+
+def build_local_nutrition_item_result(item, local_result):
+    """Project a corrected identity's local hit through the established preview contract."""
+    if not isinstance(local_result, dict):
+        _fail("invalid_local_result", "The local lookup returned an invalid result")
+    if local_result.get("status") != "matched":
+        return None
+    profile = local_result.get("nutrition_profile")
+    if not isinstance(profile, dict):
+        _fail("invalid_local_result", "The local nutrition profile is unavailable")
+    try:
+        return _item_result(item, status="accepted", origin="local", profile=profile,
+                            diagnostics=local_result.get("diagnostics"))
+    except NutritionProfileError as error:
+        _fail(getattr(error, "code", "invalid_local_result"), str(error))
 
 
 def _validate_body(body):
@@ -348,7 +362,7 @@ def process_enrichment_request(body, *, authenticated_user_id, scan_context_repo
                                profile_repository, request_repository, quota_repository,
                                cache_repository, local_lookup, provider_factory=None,
                                feature_enabled=False, clock=time.monotonic,
-                               authority_service=None):
+                               authority_service=None, require_official_miss=None):
     """Process one authenticated request using server-owned dependencies.
 
     ``provider_factory`` is called only when at least one item misses both
@@ -409,6 +423,12 @@ def process_enrichment_request(body, *, authenticated_user_id, scan_context_repo
             # confirmation must create a new scan revision.
             ineligible.append(item)
             continue
+        if require_official_miss is not None:
+            if local.get("status") != "no_local_mapping":
+                _fail("official_nutrition_pending", "Official nutrition lookup did not establish a local miss")
+            require_official_miss(
+                user_id=user_id, scan_id=body["scan_id"],
+                scan_revision=body["scan_revision"], item=item)
         cached = None
         if cache_repository is not None:
             if resolved_source is None and profile_repository is not None:

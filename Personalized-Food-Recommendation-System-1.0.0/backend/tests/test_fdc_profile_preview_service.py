@@ -134,6 +134,49 @@ class FdcProfilePreviewServiceTests(unittest.TestCase):
             monotonic=lambda: 20.0,
         )
 
+    def configure_bok_choy(self, *, source_state, source_preparation):
+        source_name = "Cabbage, chinese (pak-choi)"
+        source_identity = {
+            "name": source_name, "food_state": source_state,
+            "preparation_method": source_preparation, "components_scope": "food_only",
+            "brand": None, "variant": None,
+        }
+        policy = reviewed_policy()
+        policy["policy_id"] = "policy-usda-fdc-170390"
+        policy["accepted_names"] = ["青江菜", source_name]
+        policy["target_identity"] = {key: source_identity[key] for key in
+                                      ("food_state", "preparation_method", "components_scope", "brand", "variant")}
+        policy["source_spec"].update({
+            "source_id": "usda-fdc-170390", "fdc_id": "170390",
+            "source_url": "https://api.nal.usda.gov/fdc/v1/food/170390",
+            "table_id": "fdc-170390-per-100g", "food_identity": source_identity,
+        })
+        self.source.save_source_policy(policy)
+        self.confirmation.confirmation["confirmed_items"][0]["confirmed_fdc_id"] = "170390"
+        self.context.context["items"][0].update({
+            "name_zh": "青江菜", "food_state": "prepared",
+            "preparation_method": "stir_fried", "components_scope": "food_only",
+        })
+
+    def test_raw_bok_choy_reference_cannot_preview_stir_fried_estimated_portion(self):
+        self.configure_bok_choy(source_state="raw", source_preparation="mixed")
+        with self.assertRaises(FdcProfilePreviewError) as caught:
+            self.service().preview(
+                authenticated_user_id="user-1", confirmation_id="confirm-1",
+                scan_id="scan-1", issued_scan_revision=1, item_id="scan-1:0")
+        self.assertEqual(caught.exception.code, "identity_mismatch")
+        self.assertEqual(self.clients, [])
+        self.assertIsNone(self.source.get_profile_for_user("user-1", "preview-profile"))
+
+    def test_boiled_bok_choy_reference_cannot_preview_stir_fried_scan(self):
+        self.configure_bok_choy(source_state="prepared", source_preparation="boiled")
+        with self.assertRaises(FdcProfilePreviewError) as caught:
+            self.service().preview(
+                authenticated_user_id="user-1", confirmation_id="confirm-1",
+                scan_id="scan-1", issued_scan_revision=1, item_id="scan-1:0")
+        self.assertEqual(caught.exception.code, "identity_mismatch")
+        self.assertEqual(self.clients, [])
+
     def test_success_uses_server_owned_id_policy_identity_and_weight(self):
         result = self.service().preview(
             authenticated_user_id="user-1", confirmation_id="confirm-1",

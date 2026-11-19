@@ -1,0 +1,80 @@
+{
+  "batch": 83,
+  "date": "2026-11-17",
+  "branch": "v1.0.3",
+  "outcome": "user_attested_android_gallery_confirmation_and_read_only_preview_screenshots_reviewed",
+  "scope": "Visual review of four user-provided Android screenshots from the ordinary HTTPS scanner after selecting food_picture/蘋果.jpg. No browser, network, server, or database was accessed in this review.",
+  "input": {
+    "photo": "food_picture/蘋果.jpg",
+    "flow": "Gallery selection; not camera-shutter verification",
+    "model_observation": "The prior isolated real-model test returned generic apple, raw, with skin, confidence 0.98, estimated weight 180 g, weight confidence 0.5. This screenshot review does not independently revalidate the model response."
+  },
+  "screenshots": [
+    {
+      "file": "food_picture/蘋果辨識結果1.jpg",
+      "sha256": "ae4d815c824ceb41309b024c40ae9b7b51ce3ff08252f9ffd6653ec1f028f58e",
+      "observed": "Album tab selected. One pending food, named 蘋果 at 98%. The page summary says no matched nutrition while the item notice says compatible USDA reference nutrition was found and awaits confirmation."
+    },
+    {
+      "file": "food_picture/蘋果辨識結果2.jpg",
+      "sha256": "53e49c08ffdbb1ce30509c23f6d069c09c3a4204c7088433d0ce44728b1ec534",
+      "observed": "Pending confirmation panel shows generic 蘋果, estimated 180 g, and USDA reference Apples, raw, with skin; USDA FDC 171688; SR Legacy. No cultivar is shown."
+    },
+    {
+      "file": "food_picture/蘋果辨識結果3.jpg",
+      "sha256": "7b3dff2e271d1f3105475b371fe2b67fefbd33c31cca9d48f5acf0f300c1b265",
+      "observed": "The UI shows name and portion confirmed, offers a fixed-data nutrition preview, and states the preview is for checking only and has not been applied to scan results or a food log."
+    },
+    {
+      "file": "food_picture/蘋果辨識結果4.jpg",
+      "sha256": "9a85a978762977e899e9131b90e4991111c91289a9e374d1fb58004675745497",
+      "observed": "Read-only nutrition preview for USDA FDC 171688 at 100 g and estimated 180 g. The UI states image confidence is unchanged and no scan-result or food-log write has occurred."
+    }
+  ],
+  "preview_values_visible": {
+    "per_100g": {
+      "energy_kcal": 52,
+      "protein_g": 0.26,
+      "carbohydrate_g": 13.81,
+      "fat_g": 0.17,
+      "sodium_mg": 1,
+      "fiber_g": 2.4,
+      "sugars_g": 10.39,
+      "saturated_fat_g": 0.03,
+      "trans_fat_g": 0
+    },
+    "estimated_portion_g": 180,
+    "portion_displayed": {
+      "energy_kcal": 93.6,
+      "protein_g": 0.47,
+      "carbohydrate_g": 24.86,
+      "fat_g": 0.31,
+      "sodium_mg": 1.8,
+      "fiber_g": 4.32,
+      "sugars_g": 18.7,
+      "saturated_fat_g": 0.05,
+      "trans_fat_g": 0
+    },
+    "arithmetic_review": "Displayed portion values agree with per-100-g values multiplied by 1.8, subject to displayed rounding."
+  },
+  "pipeline_assessment": {
+    "visible_source": "USDA FDC 171688, SR Legacy",
+    "tavily_validation": "Not exercised by this result: the UI shows a USDA reference source. No request trace was collected, so this screenshot review cannot establish a Tavily request count.",
+    "identity": "Generic 蘋果 is retained; no Fuji or other cultivar is inferred.",
+    "nutrition_status": "Preview only; the screenshot explicitly says it has not been applied to scan results or a food log."
+  },
+  "review_findings": [
+    "The first screenshot's summary wording '目前沒有配對營養資料' is confusing beside the item's compatible USDA reference notice. Prefer wording that says there is no confirmed nutrition included in the total yet, while one item awaits confirmation.",
+    "The preview clearly marks 180 g as an image estimate rather than a scale measurement. The prior model response reported weight confidence 0.5; these screenshots do not establish weight accuracy, and no weight-edit control is visible in the captured screens."
+  ],
+  "not_observed": {
+    "provider_request_trace": false,
+    "tavily_request_count": null,
+    "live_usda_request_count": null,
+    "backend_runtime_version_or_private_flags": false,
+    "profile_accept": false,
+    "meal_record_write": false,
+    "nutrition_accuracy_ground_truth": false
+  },
+  "next": "Keep the local-first gate. Do not use this USDA-matched apple to force Tavily. Before enabling Web fallback, continue the existing source-admission work for a permitted publisher/source and test a genuine eligible local miss; keep registry and automatic fallback closed until those gates pass."
+}

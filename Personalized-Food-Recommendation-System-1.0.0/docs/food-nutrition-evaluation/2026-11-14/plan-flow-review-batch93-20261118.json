@@ -1,0 +1,97 @@
+{
+  "batch": 93,
+  "date": "2026-11-18",
+  "branch": "v1.0.3",
+  "scope": "review_current_plan_flow_and_reconcile_next_gate",
+  "documents_reviewed": [
+    "docs/plans/2026-11-13-web-nutrition-fallback.md",
+    "docs/plans/2026-11-13-web-nutrition-fallback-review.md",
+    "docs/food-nutrition-evaluation/2026-11-14/README.md"
+  ],
+  "code_paths_statically_reviewed": [
+    "backend/services/nutrition_scan_context_adapter.py",
+    "backend/services/nutrition_enrichment_route_service.py",
+    "backend/services/web_nutrition_service.py",
+    "backend/services/fdc_candidate_search_service.py",
+    "backend/services/food_query_normalization_service.py",
+    "backend/app.py",
+    "frontend/app/(tabs)/scanner.tsx",
+    "frontend/lib/nutrition-enrichment-api.ts"
+  ],
+  "findings": [
+    {
+      "severity": "P1",
+      "id": "unconfirmed_identity_can_reach_web_enrichment",
+      "evidence": "Vision emits needs_confirmation for confidence below 0.75 or ambiguity. The server-owned nutrition scan-context allowlist omits this state, while web enrichment eligibility primarily uses the 0.45 minimum recognition confidence, validation issues and generic-name rejection.",
+      "risk": "A specific but unresolved visual identity may spend provider quota and receive an automatically merged nutrition profile before the user confirms the food name.",
+      "required_action": "Carry server-owned identity confirmation state and confirmation revision in authority context. Reject unresolved items before any provider call; after user confirmation, create a new revision and rerun TFDA/USDA lookup.",
+      "acceptance": "Tests prove unresolved/generic/validation-flagged items cause zero Tavily Search, Extract and model calls; client-supplied confirmed flags cannot bypass the gate."
+    },
+    {
+      "severity": "P1",
+      "id": "stale_plan_status_for_authority_and_quota",
+      "evidence": "The codebase contains a server-signed authority service, authenticated enrichment route, scanner conditional request/merge, and SQLite-backed request, quota, lease and cache paths with prior isolated validation.",
+      "risk": "The plan incorrectly describes these implemented paths as absent, which could cause duplicate work and obscure the actual missing live-source acceptance.",
+      "required_action": "Update current status to distinguish code wiring/isolation tests from unverified production flags and missing rights-cleared real Tavily positive acceptance."
+    },
+    {
+      "severity": "P1",
+      "id": "raw_prepared_portion_mismatch",
+      "evidence": "The bok-choy USDA FDC candidates include raw and cooked records; the intended photographed ingredient is cooked, and the user excludes added oil but did not request whole-dish nutrition.",
+      "risk": "Multiplying raw per-100-g values by estimated cooked grams would imply unsupported cooked-serving precision.",
+      "required_action": "Keep raw and prepared identities distinct. If only raw data exists, present only an explicitly labeled raw per-100-g reference without cooked portion calculation, or leave unmatched if UI cannot represent reference-only safely."
+    },
+    {
+      "severity": "P2",
+      "id": "authorization_gates_need_separation",
+      "evidence": "FSANZ public terms do not support the supplied claim that acceptance only occurs at a checkbox or that attribution alone settles reuse. User direction is not to contact FSANZ; Tavily Help Center and Platform Terms scope remains to be documented for public enablement.",
+      "required_action": "Keep AFCD excluded without contacting FSANZ. Separate isolated technical testing, source-policy admission and production enablement; document Tavily and publisher rights before public use."
+    },
+    {
+      "severity": "P2",
+      "id": "confidence_thresholds_are_not_calibrated_accuracy",
+      "evidence": "0.45 is the minimum recognition threshold and 0.75 is a confirmation heuristic; neither is supported by an independent calibration set. Existing photos/screenshots do not provide independent identity, weight or nutrition ground truth.",
+      "required_action": "Do not claim high confidence from model scores. Report identity accuracy, source compatibility, portion error, coverage and abstention separately against human-labeled and weighed data; treat 30 samples as exploratory only."
+    },
+    {
+      "severity": "P2",
+      "id": "scanner_summary_copy_conflict",
+      "evidence": "The batch 83 screenshot summary says no nutrition data is matched while an item displays a USDA reference candidate awaiting confirmation.",
+      "required_action": "Before user-facing rollout, distinguish candidate found, awaiting confirmation, not included in totals, and no source found."
+    }
+  ],
+  "current_next_sequence": [
+    "Persist server-owned needs_confirmation/identity status and confirmed revision; fail closed before provider calls and add zero-call tests.",
+    "For a specifically confirmed bok choy item, add a server-allowlisted English FDC query alias; preserve generic-name rejection and user candidate confirmation.",
+    "Validate raw/boiled/stir-fried compatibility and reference-only presentation; never calculate cooked portions from raw per-100-g data.",
+    "Select a true TFDA/USDA-compatible miss with documented Tavily applicability and publisher rights, then run isolated Tavily/model extraction acceptance.",
+    "Only after rights, live positive acceptance, runtime flags, cost/capacity, UI semantics and SQLite retention gates pass, consider production enablement."
+  ],
+  "architecture_decision": {
+    "pipeline_rewrite_required": false,
+    "cnf_is_independent_third_source": false,
+    "fdc_is_usda_second_layer": true,
+    "afcd_admitted": false,
+    "fsanz_contact_requested_or_sent": false,
+    "production_web_registry_count": 0,
+    "automatic_web_fallback_enabled": false,
+    "today_history_trends_insights_rework_required_before_backend_alias_tests": false
+  },
+  "side_effects": {
+    "application_code_changed": false,
+    "tests_executed": false,
+    "usda_api_requests": 0,
+    "tavily_api_requests": 0,
+    "model_calls": 0,
+    "credentials_or_private_runtime_flags_read": 0,
+    "database_operations": 0,
+    "deployed_or_restarted": false,
+    "fsanz_contact_or_email_sent": false,
+    "committed_or_pushed": false
+  },
+  "limitations": [
+    "This was document and static code review, not runtime or nutritional validation.",
+    "Private production feature flags were not inspected.",
+    "No legal opinion was provided and no source was admitted."
+  ]
+}

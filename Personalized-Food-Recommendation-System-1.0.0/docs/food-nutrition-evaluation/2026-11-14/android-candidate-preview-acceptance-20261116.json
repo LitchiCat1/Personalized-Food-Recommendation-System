@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-16",
+  "timezone": "Asia/Taipei",
+  "batch": 70,
+  "branch": "v1.0.3",
+  "preparation_evidence": "scanner-phone-preview-gateway-20261116.json",
+  "scope": "User-attested Android acceptance of fixed-apple candidate confirmation and read-only nutrition preview, supported by gateway HTTP and temporary database-count deltas.",
+  "user_acceptance": {
+    "status": "passed",
+    "statement": "我已按照你說的三項步驟進行驗收，確認都沒問題，都是正確的",
+    "device": "Android phone established in prior user context",
+    "steps": [
+      "Start test and take or select a photo",
+      "Choose apple candidate and submit per-item decision",
+      "Open fixed-data nutrition preview and check 150g / 78kcal"
+    ],
+    "fixture_weight_g": 150,
+    "fixture_energy_kcal": 78,
+    "fresh_screenshot_or_raw_response_provided": false,
+    "camera_or_gallery_mode": "not specified in this acceptance reply"
+  },
+  "server_corroboration": {
+    "state_access": "authenticated test-only gateway state",
+    "log_source": "temporary gateway access log",
+    "additional_successful_sequence": [
+      {"time": "2026-11-16T20:02:01+08:00", "method": "POST", "path": "/predict/vision-food", "http": 200},
+      {"time": "2026-11-16T20:02:01+08:00", "method": "POST", "path": "/nutrition/fdc/candidates", "http": 200},
+      {"time": "2026-11-16T20:02:13+08:00", "method": "POST", "path": "/nutrition/fdc/confirmation", "http": 202},
+      {"time": "2026-11-16T20:02:21+08:00", "method": "POST", "path": "/nutrition/fdc/profile-preview", "http": 200}
+    ],
+    "counts_before": {"scan_contexts": 2, "candidate_snapshots": 1, "confirmations": 1, "previews": 1, "nutrition_profiles": 0, "meal_records": 0},
+    "counts_after": {"scan_contexts": 4, "candidate_snapshots": 2, "confirmations": 2, "previews": 2, "nutrition_profiles": 0, "meal_records": 0},
+    "fake_provider_calls_before": {"search": 1, "detail": 1},
+    "fake_provider_calls_after": {"search": 2, "detail": 2},
+    "unattributed_bootstrap_session_401": 2,
+    "bootstrap_failure_cause": "not independently established; complete successful API sequence followed",
+    "device_attribution": "shared test session; Android attribution relies on user report"
+  },
+  "cleanup": {
+    "reason": "user completed acceptance",
+    "process_identities_checked_against_temporary_run_metadata": true,
+    "action": "stop only synthetic child; allow gateway to exit and clean its own Funnel",
+    "gateway_and_child_exited": true,
+    "test_listeners_closed": true,
+    "dedicated_8443_funnel_removed": true,
+    "normal_443_funnel_retained": true,
+    "actual_child_exit_cleanup_observed": true,
+    "deadline_triggered_cleanup_observed": false,
+    "temporary_database_deleted": false
+  },
+  "normal_site": {
+    "health_status": "ok",
+    "app_version": "v1.0.2",
+    "database": "sqlite",
+    "started_at": "2026-11-16T17:27:22.551553+08:00",
+    "restart_performed": false,
+    "automatic_web_fallback_enabled": false,
+    "other_runtime_flags": "not exposed by health; not independently verified",
+    "production_registry": "empty; unchanged"
+  },
+  "side_effects": {
+    "application_code_changes": false,
+    "test_suite_rerun": false,
+    "live_model_calls": 0,
+    "live_usda_calls": 0,
+    "live_tavily_calls": 0,
+    "production_database_reads_or_writes": 0,
+    "production_flag_changes": false,
+    "deployment_or_commit_or_push": false,
+    "temporary_test_services_stopped": true
+  },
+  "remaining_boundaries": [
+    "Live arbitrary-food recognition and nutrition accuracy are not established by a fixed fixture",
+    "Source admission, rights, withdrawal/deletion and production registry remain gated",
+    "Profile accept and meal record persistence were excluded from this gateway",
+    "Final production flag review remains pending within existing workstreams"
+  ]
+}

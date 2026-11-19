@@ -23,9 +23,9 @@ RECORD_SELECT = ", ".join(RECORD_COLUMNS)
 
 
 class StorageRepository:
-    def __init__(self, db, use_mongo: bool, mem_users: dict, mem_records: list, mem_custom_foods: list, sql: SqliteDatabase | None = None):
-        self.db = db
-        self.use_mongo = use_mongo
+    """SQLite persistence, with explicit temporary dictionaries for isolated tests/demo."""
+
+    def __init__(self, mem_users: dict, mem_records: list, mem_custom_foods: list, *, sql: SqliteDatabase | None = None):
         self.sql = sql
         self.use_sql = sql is not None
         self.mem_users = mem_users
@@ -151,12 +151,10 @@ class StorageRepository:
         user_doc = None
         if self.use_sql:
             user_doc = self._fetch_json_doc("users", "user_id", user_id)
-        elif self.use_mongo:
-            user_doc = self.db.users.find_one({"user_id": user_id}, {"_id": 0})
         else:
             user_doc = self.mem_users.get(user_id)
 
-        # Developer auto-fallback: auto-create default user profile for demo_user if missing
+        # Only the explicit demo identity gets a generated profile; real users must sign up.
         if not user_doc and user_id == "demo_user":
             user_doc = {
                 "user_id": "demo_user",
@@ -194,10 +192,7 @@ class StorageRepository:
                 (user_doc["user_id"], to_json(user_doc), utc_iso()),
             )
             return user_doc
-        if self.use_mongo:
-            self.db.users.update_one({"user_id": user_doc["user_id"]}, {"$set": user_doc}, upsert=True)
-        else:
-            self.mem_users[user_doc["user_id"]] = user_doc
+        self.mem_users[user_doc["user_id"]] = user_doc
         return user_doc
 
     def _enrich_record_totals(self, record: dict) -> dict:
@@ -241,14 +236,11 @@ class StorageRepository:
                 existing = self.get_record_by_client_record_id(record.get("user_id"), record.get("client_record_id"))
                 return {**existing, "_deduplicated": True}
             return self._enrich_record_totals(record)
-        if self.use_mongo:
-            self.db.records.insert_one(deepcopy(record))
-        else:
-            with self._record_lock:
-                existing = self.get_record_by_client_record_id(record.get("user_id"), record.get("client_record_id"))
-                if existing:
-                    return {**existing, "_deduplicated": True}
-                self.mem_records.append(record)
+        with self._record_lock:
+            existing = self.get_record_by_client_record_id(record.get("user_id"), record.get("client_record_id"))
+            if existing:
+                return {**existing, "_deduplicated": True}
+            self.mem_records.append(record)
         return self._enrich_record_totals(record)
 
     def upsert_record(self, record: dict):
@@ -263,9 +255,6 @@ class StorageRepository:
                 (user_id, client_record_id),
             )
             return self._record_from_row(row)
-        if self.use_mongo:
-            res = self.db.records.find_one({"user_id": user_id, "client_record_id": client_record_id}, {"_id": 0})
-            return self._enrich_record_totals(res) if res else None
         for record in self.mem_records:
             if record.get("user_id") == user_id and record.get("client_record_id") == client_record_id:
                 return self._enrich_record_totals(record)
@@ -306,23 +295,6 @@ class StorageRepository:
                     return None
                 return self.get_record_by_client_record_id(user_id, client_record_id)
 
-        if self.use_mongo:
-            query = {"user_id": user_id, "client_record_id": client_record_id}
-            if expected_revision is not None:
-                query.update({"nutrition_contract_version": 2, "nutrition_context.revision": expected_revision})
-            if legacy_client:
-                query["nutrition_contract_version"] = {"$ne": 2}
-            result = self.db.records.update_one(
-                query,
-                {"$set": record},
-            )
-            if result.matched_count == 0:
-                current = self.get_record_by_client_record_id(user_id, client_record_id)
-                if legacy_client and current and current.get("nutrition_contract_version") == 2:
-                    raise NutritionProfileError("upgrade_required", "Nutrition contract version 2 is required")
-                return None
-            return self.get_record_by_client_record_id(user_id, client_record_id)
-
         with self._record_lock:
             for index, existing in enumerate(self.mem_records):
                 if existing.get("user_id") == user_id and existing.get("client_record_id") == client_record_id:
@@ -361,17 +333,6 @@ class StorageRepository:
                         return None
             return existing
 
-        if self.use_mongo:
-            query = {"user_id": user_id, "client_record_id": client_record_id}
-            if legacy_client:
-                query["nutrition_contract_version"] = {"$ne": 2}
-            record = self.db.records.find_one_and_delete(query)
-            if record is None:
-                check_legacy_access(self.get_record_by_client_record_id(user_id, client_record_id))
-            if record:
-                record.pop("_id", None)
-            return self._enrich_record_totals(record) if record else None
-
         with self._record_lock:
             for index, record in enumerate(self.mem_records):
                 if record.get("user_id") == user_id and record.get("client_record_id") == client_record_id:
@@ -390,13 +351,6 @@ class StorageRepository:
             params.extend([limit, offset])
             return [self._record_from_row(row) for row in self.sql.query_all(sql, params)]
 
-        if self.use_mongo:
-            query = {"user_id": user_id}
-            if date_str:
-                query["timestamp"] = {"$regex": f"^{date_str}"}
-            res_list = list(self.db.records.find(query, {"_id": 0}).sort("timestamp", -1).skip(offset).limit(limit))
-            return [self._enrich_record_totals(r) for r in res_list]
-
         records = [r for r in self.mem_records if r.get("user_id") == user_id]
         if date_str:
             records = [r for r in records if str(r.get("timestamp", "")).startswith(date_str)]
@@ -414,12 +368,6 @@ class StorageRepository:
                 params.append(f"{date_str}%")
             query += " ORDER BY timestamp DESC"
             return [self._record_from_row(row) for row in self.sql.query_all(query, params)]
-        if self.use_mongo:
-            query = {"user_id": user_id}
-            if date_str:
-                query["timestamp"] = {"$regex": f"^{date_str}"}
-            return [self._enrich_record_totals(row)
-                    for row in self.db.records.find(query, {"_id": 0}).sort("timestamp", -1)]
         records = [row for row in self.mem_records if row.get("user_id") == user_id
                    and (not date_str or str(row.get("timestamp", "")).startswith(date_str))]
         return [self._enrich_record_totals(row) for row in sorted(
@@ -440,10 +388,6 @@ class StorageRepository:
             records = [self._record_from_row(row) for row in self.sql.query_all(
                 f"SELECT {RECORD_SELECT} FROM records WHERE user_id = ? AND timestamp >= ? AND timestamp < ?",
                 (user_id, start_key, end_key),
-            )]
-        elif self.use_mongo:
-            records = [self._enrich_record_totals(row) for row in self.db.records.find(
-                {"user_id": user_id, "timestamp": {"$gte": start_key, "$lt": end_key}}, {"_id": 0},
             )]
         else:
             records = [self._enrich_record_totals(row) for row in self.mem_records
@@ -482,10 +426,6 @@ class StorageRepository:
             sql += " ORDER BY updated_at DESC"
             return [from_json(row["doc"]) for row in self.sql.query_all(sql, params)]
 
-        if self.use_mongo:
-            query = {"user_id": user_id} if user_id else {}
-            return list(self.db.custom_foods.find(query, {"_id": 0}).sort("updated_at", -1))
-
         docs = list(self.mem_custom_foods)
         if user_id:
             docs = [doc for doc in docs if doc.get("user_id") == user_id]
@@ -495,8 +435,6 @@ class StorageRepository:
         """/health 用。只要筆數，不必把每個人的自訂食品整份讀出來再解析。"""
         if self.use_sql:
             return int(self.sql.query_one("SELECT COUNT(*) AS n FROM custom_foods")["n"])
-        if self.use_mongo:
-            return self.db.custom_foods.count_documents({})
         return len(self.mem_custom_foods)
 
     def _custom_food_owner_key(self, user_id: str | None, food_id: str) -> str:
@@ -536,10 +474,6 @@ class StorageRepository:
                 (*keys, name_key),
             )
             return from_json(row["doc"]) if row else None
-        if self.use_mongo:
-            return self.db.restaurant_menus.find_one(
-                {"$or": [{"venue_key": {"$in": keys}}, {"name_key": name_key}]}, {"_id": 0}
-            )
         for key in keys:
             if key in self.mem_restaurant_menus:
                 return self.mem_restaurant_menus[key]
@@ -576,15 +510,11 @@ class StorageRepository:
         if self.use_sql:
             rows = self.sql.query_all("SELECT doc FROM restaurant_menus ORDER BY updated_at DESC LIMIT ?", (limit,))
             return [from_json(row["doc"]) for row in rows]
-        if self.use_mongo:
-            return list(self.db.restaurant_menus.find({}, {"_id": 0}).limit(limit))
         return list(self.mem_restaurant_menus.values())[:limit]
 
     def count_restaurant_menus(self) -> int:
         if self.use_sql:
             return int(self.sql.query_one("SELECT COUNT(*) AS n FROM restaurant_menus")["n"])
-        if self.use_mongo:
-            return self.db.restaurant_menus.count_documents({})
         return len(self.mem_restaurant_menus)
 
     def clear_restaurant_menus(self) -> int:
@@ -593,8 +523,6 @@ class StorageRepository:
         removed = self.count_restaurant_menus()
         if self.use_sql:
             self.sql.execute("DELETE FROM restaurant_menus")
-        elif self.use_mongo:
-            self.db.restaurant_menus.delete_many({})
         else:
             self.mem_restaurant_menus.clear()
         return removed
@@ -623,9 +551,6 @@ class StorageRepository:
                 (key, name, name_key, to_json(doc), utc_iso()),
             )
             return
-        if self.use_mongo:
-            self.db.restaurant_menus.update_one({"venue_key": key}, {"$set": doc}, upsert=True)
-            return
         self.mem_restaurant_menus[key] = doc
 
     # ─── 問不出菜單的店家 ────────────────────────────────────
@@ -645,11 +570,6 @@ class StorageRepository:
                 (*keys, utc_iso(now)),
             )
             return {row["venue_key"] for row in rows}
-        if self.use_mongo:
-            docs = self.db.restaurant_menu_failures.find(
-                {"venue_key": {"$in": keys}, "failed_until": {"$gt": now}}, {"_id": 0, "venue_key": 1}
-            )
-            return {doc["venue_key"] for doc in docs}
         return {
             key for key in keys
             if key in self.mem_restaurant_menu_failures
@@ -675,14 +595,6 @@ class StorageRepository:
                     (key, reason, utc_iso(failed_until)),
                 )
             return
-        if self.use_mongo:
-            self.db.restaurant_menu_failures.delete_many({"failed_until": {"$lte": now}})
-            self.db.restaurant_menu_failures.update_one(
-                {"venue_key": key},
-                {"$set": {"venue_key": key, "reason": reason, "failed_until": failed_until}},
-                upsert=True,
-            )
-            return
         for expired in [k for k, v in self.mem_restaurant_menu_failures.items() if v["failed_until"] <= now]:
             del self.mem_restaurant_menu_failures[expired]
         self.mem_restaurant_menu_failures[key] = {"reason": reason, "failed_until": failed_until}
@@ -691,8 +603,6 @@ class StorageRepository:
         """清除菜單檔案重建時一起清，先前問不出菜單的店也要照新規則再問一次。"""
         if self.use_sql:
             self.sql.execute("DELETE FROM restaurant_menu_failures")
-        elif self.use_mongo:
-            self.db.restaurant_menu_failures.delete_many({})
         else:
             self.mem_restaurant_menu_failures.clear()
 
@@ -701,8 +611,6 @@ class StorageRepository:
             return None
         if self.use_sql:
             return self._fetch_json_doc("custom_foods", "owner_key", self._custom_food_owner_key(user_id, food_id))
-        if self.use_mongo:
-            return self.db.custom_foods.find_one({"food_id": food_id, "user_id": user_id}, {"_id": 0})
         for doc in self.mem_custom_foods:
             if doc.get("food_id") == food_id and doc.get("user_id") == user_id:
                 return doc
@@ -723,13 +631,10 @@ class StorageRepository:
                 (owner_key, stored_doc["food_id"], stored_doc.get("user_id"), to_json(stored_doc), utc_iso()),
             )
             return stored_doc
-        if self.use_mongo:
-            self.db.custom_foods.update_one({"owner_key": owner_key}, {"$set": stored_doc}, upsert=True)
+        for idx, existing in enumerate(self.mem_custom_foods):
+            if existing.get("owner_key") == owner_key:
+                self.mem_custom_foods[idx] = stored_doc
+                break
         else:
-            for idx, existing in enumerate(self.mem_custom_foods):
-                if existing.get("owner_key") == owner_key:
-                    self.mem_custom_foods[idx] = stored_doc
-                    break
-            else:
-                self.mem_custom_foods.append(stored_doc)
+            self.mem_custom_foods.append(stored_doc)
         return stored_doc

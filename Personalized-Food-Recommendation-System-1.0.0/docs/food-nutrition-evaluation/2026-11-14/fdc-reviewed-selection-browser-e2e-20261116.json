@@ -1,0 +1,143 @@
+{
+  "schema_version": "ReviewedFdcSelectionBrowserEvidenceV1",
+  "batch": 74,
+  "date": "2026-11-16",
+  "timezone": "Asia/Taipei",
+  "branch": "v1.0.3",
+  "result": "passed_with_bounded_scope",
+  "implementation": {
+    "route": "POST /nutrition/fdc/reviewed-selection",
+    "request_fields": ["scan_id", "scan_revision"],
+    "reviewed_source_configuration_default": "empty",
+    "route_and_frontend_flags_default": false,
+    "requires_healthy_official_local_datasets": true,
+    "requires_true_local_no_mapping": true,
+    "requires_unique_exact_compatible_installed_active_admitted_policy": true,
+    "creates_user_confirmation": false,
+    "changes_photo_confidence": false,
+    "fetches_provider_data": false,
+    "writes_profiles_or_meal_records": false
+  },
+  "environment": {
+    "origin": "http://127.0.0.1:8090",
+    "route": "/scanner",
+    "page_title": "NutriLens 個人化飲食推薦",
+    "driver": "Playwright CLI",
+    "browser_plugin": "not_available",
+    "render_mode": "hydrated_static_Expo_web_export",
+    "database": "dedicated_system_temp_SQLite",
+    "authentication": "seeded_test_session_restored_by_real_AuthGate_and_test_token_verifier",
+    "vision": "synthetic_apple_150g_fixture",
+    "upload": "application_icon_not_a_food_accuracy_sample",
+    "official_local_miss": "forced_fixture_not_actual_dataset_coverage",
+    "detail": "offline_replay_of_hash_verified_real_FDC_171688_capture",
+    "source_evidence": "fdc-generic-apple-source-20261116.json",
+    "api_interception": false
+  },
+  "final_http_sequence": [
+    {"method": "POST", "path": "/predict/vision-food", "status": 200},
+    {"method": "POST", "path": "/nutrition/fdc/reviewed-selection", "status": 200},
+    {"method": "POST", "path": "/nutrition/fdc/confirmation", "status": 202},
+    {"method": "POST", "path": "/nutrition/fdc/profile-preview", "status": 200}
+  ],
+  "interaction": {
+    "primary_display_name": "蘋果",
+    "estimated_weight_g": 150,
+    "source_name": "Apples, raw, with skin (Includes foods for USDA's Food Distribution Program)",
+    "fdc_id": "171688",
+    "cultivar_inferred_from_source": false,
+    "source_details_expand_and_collapse": "passed",
+    "confirmation_disabled_before_explicit_choice": true,
+    "no_nutrition_shown_before_confirmation": true,
+    "issued_scan_revision": 1,
+    "confirmed_radio_remains_checked": true,
+    "confirmed_radio_aria_checked": true,
+    "photo_confidence_changed": false,
+    "remaining_candidate_wording_in_primary_flow": false
+  },
+  "nutrition": {
+    "per_100g": {"calories": 52, "protein": 0.26, "carbs": 13.81, "fat": 0.17,
+      "sodium": 1, "fiber": 2.4, "sugar": 10.39, "saturated_fat": 0.028, "trans_fat": 0},
+    "portion_150g": {"calories": 78, "protein": 0.39, "carbs": 20.715, "fat": 0.255,
+      "sodium": 1.5, "fiber": 3.6, "sugar": 15.585, "saturated_fat": 0.042, "trans_fat": 0},
+    "units": {"calories": "kcal", "sodium": "mg", "other_nutrients": "g"},
+    "portion_source": "vision_estimate",
+    "missing_nutrition_fields": []
+  },
+  "final_confirmation_and_preview_side_effects": {
+    "before": {"scan_contexts": 7, "candidate_snapshots": 5, "confirmations": 2,
+      "previews": 2, "nutrition_profiles": 0, "meal_records": 0, "offline_detail_calls": 2},
+    "after": {"scan_contexts": 8, "candidate_snapshots": 5, "confirmations": 3,
+      "previews": 3, "nutrition_profiles": 0, "meal_records": 0, "offline_detail_calls": 3},
+    "baseline_note": "Before was captured after the final vision and selection; totals include prior isolated attempts.",
+    "usda_search_calls": 0,
+    "real_usda_detail_calls": 0,
+    "real_model_calls": 0,
+    "tavily_calls": 0
+  },
+  "rendered_checks": {
+    "page_identity": "passed",
+    "meaningful_nonblank_content": "passed",
+    "framework_error_overlay": false,
+    "final_clean_session_console_errors": 0,
+    "final_clean_session_console_warnings": 0,
+    "screenshot_visual_review": "passed_mobile_and_desktop",
+    "widths_without_horizontal_overflow": [375, 390, 430, 768, 1440],
+    "screenshot_height": 1000
+  },
+  "artifacts": {
+    "system_temp_directory_basename": "nutrilens-scanner-browser-e2e-batch74-01",
+    "test_bundle": "entry-f2000e01485adce8e8adc2132c1d58c0.js",
+    "test_bundle_sha256": "dcee533fa7f81ae3a1ea11b32db0ca1f7c769cf6a0389d554a508bfe1a83ace7",
+    "screenshots": [
+      {"file": "selection-mobile-final.png", "sha256": "e1e85888c4ab6c24284bc08c1ebf5d032caf09b5e1eebc48c87221754fbf3d7b"},
+      {"file": "preview-mobile-final.png", "sha256": "98244a9f285d6cade4d6f68817d71172d6023008cdcce15b420af19357ab2bfc"},
+      {"file": "preview-desktop-final.png", "sha256": "b7f5cc3aa57cbfd80a67c0644abf2ec25e1b7b1d1e8c952244cc5236a73585bd"}
+    ]
+  },
+  "verification": {
+    "focused_backend_final": {"passed": 17, "subtests_passed": 27},
+    "full_backend_earlier_in_same_batch": {"passed": 1120, "subtests_passed": 1224,
+      "seconds": 180.49, "source": "retained_same_batch_progress_log", "rerun_after_UI_only_fixes": false},
+    "frontend_nutrition_passed": 145,
+    "frontend_scanner_passed": 25,
+    "typecheck": "passed",
+    "lint": "passed",
+    "isolated_enabled_static_export": "passed",
+    "npm_build_web_disabled_flags_temp_output": "passed",
+    "normal_export_contains_loopback_test_origin_or_test_token": false
+  },
+  "corrected_findings": [
+    "Remaining raw candidate wording in panel and recovery messages replaced with reference-nutrition wording.",
+    "Confirmed radio selection now derives from the server-confirmed item after transient choices reset.",
+    "Explicit aria-checked supplements native accessibilityState because React Native Web omitted the attribute.",
+    "Post-confirmation notice no longer claims Detail is still pending after a successful preview."
+  ],
+  "earlier_test_limitations": [
+    "Expo dev-server launch was automatically rejected before execution despite standing user authorization; no equivalent dev-server retry was used.",
+    "The allowed static-export and dedicated test-harness path exercised actual hydration, HTTP and interaction.",
+    "One combined filechooser listener and CLI upload caused duplicate input handling/removeChild error; the final clean session used one CLI upload and had no console errors.",
+    "A stale CLI locator failed before any click; the observed current locator was then used."
+  ],
+  "boundaries": {
+    "production_policy_installed": false,
+    "production_registry_changed": false,
+    "production_flags_changed": false,
+    "production_database_modified": false,
+    "production_server_restarted": false,
+    "deployed_frontend_replaced": false,
+    "commit_or_push": false,
+    "real_photo_or_camera_accuracy_acceptance": false,
+    "new_phone_acceptance": false,
+    "profile_accept_or_meal_save_in_this_browser_test": false,
+    "new_Tavily_publisher_or_account_rights_approval": false
+  },
+  "cleanup": {
+    "dedicated_playwright_session_closed": true,
+    "dedicated_test_server_stopped_after_process_identity_check": true,
+    "test_port_8090_listening": false,
+    "normal_port_5000_process_unchanged": true
+  },
+  "review": "Self-review by the same agent; no independent-agent audit and no zero-defect claim.",
+  "next_existing_gate": "Final production reviewed-source installation/registry/flag admission review within the existing six workstreams; unresolved Tavily sources remain excluded."
+}

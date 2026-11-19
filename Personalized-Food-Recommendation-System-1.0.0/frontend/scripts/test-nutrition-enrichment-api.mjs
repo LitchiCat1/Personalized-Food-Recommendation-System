@@ -21,7 +21,7 @@ const ITEM = {
   item_id: 'scan-1:0', item_revision: 0, name_zh: '糯米腸', confidence: 0.92,
   weight_confidence: 0.8, estimated_weight_g: 120, food_state: 'prepared',
   preparation_method: 'roasted', components_scope: 'food_only', brand: null, variant: null,
-  validation_issues: [],
+  validation_issues: [], identity_confirmation_required: false,
 };
 const REQUEST = {
   user_id: 'u1', scan_id: 'scan-1', scan_revision: 0, items: [ITEM],
@@ -150,5 +150,23 @@ test('malformed success response is rejected instead of cast into a result', asy
     await assert.rejects(api.requestNutritionEnrichment('https://example.test', REQUEST, undefined, { enabled: true }),
       (error) => error.code === 'invalid_response');
   });
+});
+
+test('a late 401 from an obsolete scan does not invalidate the current login', async () => {
+  const oldWindow = globalThis.window;
+  const events = [];
+  globalThis.window = { dispatchEvent: (event) => events.push(event.type) };
+  try {
+    await withFetch(() => new Response(null, { status: 401 }), async () => {
+      for (const active of [false, true]) {
+        await assert.rejects(api.requestNutritionEnrichment('https://example.test', REQUEST, undefined,
+          { enabled: true, isCurrentSession: () => active }), (error) => error.status === 401);
+        assert.deepEqual(events, active ? ['nutrilens:unauthorized'] : []);
+      }
+    });
+  } finally {
+    if (oldWindow === undefined) delete globalThis.window;
+    else globalThis.window = oldWindow;
+  }
 });
 

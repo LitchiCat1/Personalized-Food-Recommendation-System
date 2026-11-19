@@ -2,6 +2,8 @@
 
 本目錄是 NutriLens 的 Expo React Native 前端。
 
+更新：2026-11-17；目前 `v1.0.3`。正式網站由 Windows 後端同源提供，手機經 Tailscale Funnel 的 HTTPS 網址使用。帳號與 session 存於該後端的 SQLite；已移除舊雲端備援網址與 Pages 自動發布。部署見 [本機伺服器說明](../docs/Local_Server_Deployment.md)。
+
 ## 主要結構
 
 - `app/(tabs)/index.tsx`：首頁 Dashboard
@@ -23,7 +25,7 @@ npx expo start
 若要用手機上的 Expo Go 測試，後端也必須另外啟動：
 
 ```bash
-python ../backend/app.py
+python ../backend/app.py --lan
 ```
 
 ## Expo Go 連線說明
@@ -41,7 +43,9 @@ python ../backend/app.py
 EXPO_PUBLIC_API_BASE_URL=http://你的電腦IP:5000
 ```
 
-如果沒有設定，系統會嘗試自動推導 Expo 開發主機的 IP。
+如果沒有設定，系統會嘗試自動推導 Expo 開發主機的 IP。`--lan` 僅供需要區網連入的 Expo Go 測試；正式 Funnel 仍使用預設 loopback。
+
+正式網站使用 `npm run build:local` 或 `EXPO_PUBLIC_API_BASE_URL=same-origin`，不自動把失敗請求送到另一台伺服器。`EXPO_PUBLIC_*` 會進入公開 JS，不能放模型／Tavily／USDA server key。
 
 ## 登入
 
@@ -77,9 +81,11 @@ EXPO_PUBLIC_AUTH_REQUIRED=false
 2. 手機定位
 3. 依距離、預算與店家類型搜尋附近店家
 
-目前此功能為 **Foodpanda-like MVP**，使用專案內建的店家/餐點候選資料做排序，尚未直接串接 Foodpanda 官方 API。
+店家搜尋使用 Google Places，網頁地圖使用獨立的 Maps browser key；既有菜單快取與本地候選可作已標示的備援，未串接 Foodpanda 官方 API。店家菜單模型估算不能冒充實測營養。
 
 ## 後續優化方向
+
+以下為一般背景方向，不是本輪新增待辦。目前先依 [營養企劃](../docs/plans/2026-11-13-web-nutrition-fallback.md)驗證一般 scanner 真照片；今日／歷史／趨勢／洞察新版營養 UI 仍延後。171688已審查來源選用／確認／preview在現有服務啟用，Search／enrichment／新來源保存仍關閉；新安裝預設 flags 為 false。
 
 1. 補 session 過期提示、重新登入導引與使用者管理 UI
 2. 讓待同步佇列支援網路恢復事件自動重送與詳情頁管理

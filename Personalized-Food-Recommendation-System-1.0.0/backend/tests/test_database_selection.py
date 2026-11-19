@@ -139,11 +139,19 @@ class AppStartupTests(unittest.TestCase):
 
     def test_an_explicitly_empty_path_still_means_memory_only(self):
         output = io.StringIO()
-        with patch.dict(os.environ, {"DATABASE_PATH": "", "NUTRILENS_SKIP_LOCAL_ENV": "1"}, clear=True), \
+        with patch.dict(os.environ, {
+            "DATABASE_PATH": "", "NUTRILENS_SKIP_LOCAL_ENV": "1",
+            "MONGO_URI": "mongodb://obsolete.invalid/app",
+        }, clear=True), patch("builtins.__import__", wraps=__import__) as importing, \
                 contextlib.redirect_stdout(output):
             sys.modules.pop("app", None)
             app_module = importlib.import_module("app")
         self.assertIsNone(app_module.sql_db)
+        health = app_module.app.test_client().get("/health").get_json()
+        self.assertEqual(health["database"], "memory")
+        self.assertFalse(health["mongo"])
+        self.assertNotIn("MongoDB", output.getvalue())
+        self.assertNotIn("pymongo", [call.args[0] for call in importing.call_args_list])
 
 
 if __name__ == "__main__":

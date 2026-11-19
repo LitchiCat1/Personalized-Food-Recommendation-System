@@ -44,13 +44,33 @@ class FoodQueryNormalizationTests(unittest.TestCase):
                 self.assertEqual(error.exception.code, "confirmation_required")
 
     def test_specific_vegetables_preserve_original_name_and_identity(self):
-        for name in ("大陸妹", "青江菜", "小白菜", "清炒青江菜"):
+        for name in ("大陸妹", "小白菜", "清炒青江菜"):
             with self.subTest(name=name):
                 item = {**ITEM, "name_zh": name}
                 plan = build_fdc_search_query_plan(item, scan_revision=7)
                 self.assertEqual(plan["queries"], [name])
                 self.assertEqual(plan["original_name_zh"], name)
                 self.assertEqual(validate_fdc_search_query_plan(plan, item=item, scan_revision=7), plan)
+
+    def test_confirmed_bok_choy_uses_one_controlled_alias_and_keeps_display_name(self):
+        item = {**ITEM, "name_zh": "青江菜", "brand": None}
+        plan = build_fdc_search_query_plan(item, scan_revision=7)
+        self.assertEqual(plan["queries"], ["青江菜", "bok choy"])
+        self.assertEqual(plan["query_source"], ["original_name", "server_allowlisted_alias"])
+        self.assertEqual(plan["original_name_zh"], "青江菜")
+        self.assertEqual(validate_fdc_search_query_plan(plan, item=item, scan_revision=7), plan)
+
+        for alias in ("pak choi", "chinese cabbage", "bok choy cooked", "possibly bok choy"):
+            with self.subTest(alias=alias):
+                with self.assertRaises(FoodQueryNormalizationError) as error:
+                    build_fdc_search_query_plan(item, scan_revision=7, english_aliases=(alias,))
+                self.assertEqual(error.exception.code, "invalid_request")
+
+    def test_bok_choy_alias_is_not_expanded_when_identity_context_is_incomplete(self):
+        item = {**ITEM, "name_zh": "青江菜", "preparation_method": "unknown", "brand": None}
+        result = build_fdc_search_query_plan(item, scan_revision=7)
+        self.assertEqual(result["queries"], ["青江菜"])
+        self.assertFalse(result["identity_expansion_allowed"])
 
     def test_unknown_identity_disables_alias_expansion(self):
         item = {**ITEM, "preparation_method": "unknown"}

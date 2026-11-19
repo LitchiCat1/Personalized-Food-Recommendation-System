@@ -1,0 +1,83 @@
+{
+  "status": "reviewed_candidate_not_deployed",
+  "policy": {
+    "policy_id": "reviewed-fdc-1750340-v1",
+    "accepted_names": ["生鮮帶皮富士蘋果", "Apples, fuji, with skin, raw"],
+    "target_identity": {
+      "food_state": "raw",
+      "preparation_method": "mixed",
+      "components_scope": "food_only",
+      "brand": null,
+      "variant": "fuji_with_skin"
+    },
+    "source_spec": {
+      "provider_kind": "usda_fdc_api",
+      "source_id": "usda-fdc-1750340",
+      "fdc_id": "1750340",
+      "source_url": "https://api.nal.usda.gov/fdc/v1/food/1750340",
+      "adapter_version": "usda-fdc-json-v1",
+      "retrieval_version": "usda-fdc-api-v1",
+      "table_id": "fdc-1750340-per-100g",
+      "food_identity": {
+        "name": "Apples, fuji, with skin, raw",
+        "food_state": "raw",
+        "preparation_method": "mixed",
+        "components_scope": "food_only",
+        "brand": null,
+        "variant": "fuji_with_skin"
+      },
+      "preferred_nutrient_numbers": {
+        "calories": "957",
+        "protein": "203",
+        "fat": "204",
+        "carbs": "205",
+        "fiber": "291",
+        "sugar": "269",
+        "sodium": "307"
+      }
+    },
+    "match_policy": "reference_only",
+    "compatibility_review": "Reviewed against usda-fdc-detail-replay-20261115.json: Foundation record 1750340, raw Fuji apple with skin only. Generic apple, peeled/cooked apple, unknown variety and brand-specific foods are excluded. The legacy mixed preparation enum is an explicit raw/unheated compatibility convention, not evidence of cooking. Keep food_state=raw and variant=fuji_with_skin exact. Review does not identify a photographed food or approve its estimated weight. Seven nutrient values are present; saturated/trans fat remain unknown. Use nutrient 957 rather than choosing between Atwater methods. Retrieval hashes identify individual responses and are not permanent content pins.",
+    "rights": {
+      "reference": "Official FDC API Guide and dataset CC0 statement reviewed in source-rights-recheck-20261115.json; limited to the FDC API data record, not third-party website content or imagery.",
+      "reviewed_at": "2026-11-16T00:00:00+08:00",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "license_name": "CC0 1.0 Universal (USDA FoodData Central data)",
+      "attribution": "USDA Agricultural Research Service, FoodData Central, FDC ID 1750340",
+      "reuse_scope": "server_internal",
+      "provider_cache_scope": "server_internal",
+      "retention_policy": "Retain selected nutrient cell evidence, normalized profiles, portions and hashes with source attribution and owner binding. Existing request, preview, cache and policy snapshots may persist; this is not a hash-only retention policy. No cross-user cache approval is made.",
+      "withdrawal_policy": "Revoke future retrieval, authority, reuse and cache access using the existing source withdrawal transaction. Historical owner snapshots, policy versions and backups remain. CC0 data has no identified purge-on-withdrawal condition; if a new deletion obligation is established, exclude the source pending a complete purge capability.",
+      "reviewer": "Codex technical source review (existing official evidence)",
+      "evidence_urls": [
+        "https://fdc.nal.usda.gov/api-guide/",
+        "https://fdc.nal.usda.gov/download-datasets/"
+      ],
+      "search_allowed": true,
+      "extract_allowed": true,
+      "snapshot_allowed": true,
+      "reuse_allowed": true
+    },
+    "server_review": {
+      "status": "approved",
+      "provider_kind": "usda_fdc_api",
+      "reviewer": "Codex technical review of fixed-ID replay; candidate only",
+      "reviewed_at": "2026-11-16T00:00:00+08:00"
+    }
+  },
+  "admission_review": {
+    "source_id": "usda-fdc-1750340",
+    "policy_sha256": "4db6b02c42bc333dee0ea789b574023c15e9170afbe0997ac5ea38292ed44639",
+    "provider_kind": "usda_fdc_api",
+    "publisher_rights_approved": true,
+    "provider_terms_approved": true,
+    "deletion_requirement": "not_required",
+    "cross_user_cache_approved": false,
+    "reviewer": "Codex technical review; no production activation",
+    "reviewed_at": "2026-11-16T00:00:00+08:00",
+    "evidence_urls": [
+      "https://fdc.nal.usda.gov/api-guide/",
+      "https://fdc.nal.usda.gov/download-datasets/"
+    ]
+  }
+}

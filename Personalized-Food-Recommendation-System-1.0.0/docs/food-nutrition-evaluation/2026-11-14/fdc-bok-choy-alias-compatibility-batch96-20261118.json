@@ -1,0 +1,89 @@
+{
+  "batch": 96,
+  "date": "2026-11-18",
+  "branch": "v1.0.3",
+  "scope": "add_controlled_bok_choy_fdc_alias_and_verify_preparation_compatibility",
+  "implementation": {
+    "allowlist": {
+      "name_zh": "青江菜",
+      "aliases": ["bok choy"],
+      "server_owned": true,
+      "original_chinese_name_preserved": true,
+      "other_vegetable_names_expanded": false,
+      "generic_names_still_rejected": true,
+      "identity_context_required": true,
+      "user_confirmation_required_for_candidate": true
+    },
+    "files": [
+      "backend/services/food_query_normalization_service.py",
+      "backend/tests/test_food_query_normalization.py",
+      "backend/tests/test_fdc_candidate_search_service.py",
+      "backend/tests/test_fdc_detail_profile_service.py",
+      "backend/tests/test_fdc_profile_preview_service.py"
+    ]
+  },
+  "live_usda_fdc_api_check": {
+    "api_key": "public DEMO_KEY; no private key read",
+    "valid_requests": 7,
+    "search_endpoint": "https://api.nal.usda.gov/fdc/v1/foods/search",
+    "search_query_unicode_escape": "\\u9752\\u6c5f\\u83dc",
+    "exact_chinese_query_result_count": 0,
+    "english_query": "bok choy",
+    "english_query_candidates_returned": 5,
+    "candidate_records": [
+      {"fdc_id": "2685572", "description": "Cabbage, bok choy, raw", "data_type": "Foundation"},
+      {"fdc_id": "170390", "description": "Cabbage, chinese (pak-choi), raw", "data_type": "SR Legacy"},
+      {"fdc_id": "168517", "description": "Cabbage, chinese (pak-choi), cooked, boiled, drained, with salt", "data_type": "SR Legacy"},
+      {"fdc_id": "170391", "description": "Cabbage, chinese (pak-choi), cooked, boiled, drained, without salt", "data_type": "SR Legacy"},
+      {"fdc_id": "2709774", "description": "Cabbage, Chinese, raw", "data_type": "Survey (FNDDS)"}
+    ],
+    "detail_metadata_checked": ["2685572", "170390", "168517", "170391"],
+    "detail_nutrient_values_saved": false,
+    "interpretation": "English alias retrieves raw and boiled FDC records. The generic FNDDS cabbage description is not evidence that the record is bok choy. The search call is recall evidence only, not identity confirmation, source admission, compatibility approval, or nutrition acceptance."
+  },
+  "compatibility_tests": {
+    "raw_source_to_prepared_stir_fried_scan": "rejected_before_detail_request_or_profile",
+    "boiled_source_to_prepared_stir_fried_scan": "rejected_before_detail_request_or_profile",
+    "added_oil": "excluded_from ingredient scope; this does not make cooking methods equivalent",
+    "raw_reference_calculated_from_cooked_estimated_weight": false,
+    "user_confirmed_identity_and_local_miss": "existing local lookup runs first; FDC search then issues only the Chinese name and the one allowlisted English alias",
+    "generic_leaf_name": "remains blocked"
+  },
+  "tests": {
+    "command": "python -m pytest tests/test_food_query_normalization.py tests/test_fdc_candidate_search_service.py tests/test_fdc_detail_profile_service.py tests/test_fdc_profile_preview_service.py -q",
+    "passed": 41,
+    "subtests_passed": 22,
+    "failed": 0,
+    "full_backend_suite": {
+      "command": "python -m pytest -q",
+      "passed": 1179,
+      "subtests_passed": 1282,
+      "failed": 0,
+      "duration_seconds": 83
+    }
+  },
+  "decisions": {
+    "fdc_layer": "USDA second layer, not an independent third source",
+    "tavily_registry_count": 0,
+    "automatic_web_fallback_enabled": false,
+    "fdc_bok_choy_source_policy_installed": false,
+    "nutrition_profile_or_meal_saved": false,
+    "next_gate": "Review a fixed bok-choy FDC detail record and source-specific identity/nutrient semantics; if only raw data is usable, support an explicitly labelled per-100-g reference without multiplying cooked image-estimated weight, or retain no-match. Do not substitute a boiled record for stir-fried food."
+  },
+  "side_effects": {
+    "tavily_requests": 0,
+    "model_calls": 0,
+    "private_credentials_read": 0,
+    "production_db_operations": 0,
+    "runtime_flags_changed": false,
+    "deployed_or_restarted": false,
+    "committed_or_pushed": false
+  },
+  "review_limits": [
+    "The live FDC requests retrieved search candidate metadata and detail identity metadata only; no bok choy nutrient values were captured or stored.",
+    "Exact source/scan state and preparation rejection was verified through service regression fixtures, not Android or a live nutrition preview.",
+    "No raw reference-only UI flow currently permits a bok-choy profile to be presented separately from a portion calculation; that capability remains a design/implementation gate.",
+    "Search matching does not independently establish botanical identity; the generic FNDDS Cabbage, Chinese record must not be assumed to mean bok choy.",
+    "No photo identity accuracy, portion weight accuracy, nutritional accuracy, FDC source-policy admission, or production runtime state was measured."
+  ]
+}

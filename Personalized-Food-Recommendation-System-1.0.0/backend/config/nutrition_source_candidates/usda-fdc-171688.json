@@ -1,0 +1,66 @@
+{
+  "status": "reviewed_candidate_not_deployed",
+  "policy": {
+    "policy_id": "reviewed-fdc-171688-v1",
+    "accepted_names": ["蘋果", "帶皮蘋果", "生鮮帶皮蘋果", "Apples, raw, with skin (Includes foods for USDA's Food Distribution Program)"],
+    "target_identity": {
+      "food_state": "raw",
+      "preparation_method": "mixed",
+      "components_scope": "food_only",
+      "brand": null,
+      "variant": "with_skin"
+    },
+    "source_spec": {
+      "provider_kind": "usda_fdc_api",
+      "source_id": "usda-fdc-171688",
+      "fdc_id": "171688",
+      "source_url": "https://api.nal.usda.gov/fdc/v1/food/171688",
+      "adapter_version": "usda-fdc-json-v1",
+      "retrieval_version": "usda-fdc-api-v1",
+      "table_id": "fdc-171688-per-100g",
+      "food_identity": {
+        "name": "Apples, raw, with skin (Includes foods for USDA's Food Distribution Program)",
+        "food_state": "raw",
+        "preparation_method": "mixed",
+        "components_scope": "food_only",
+        "brand": null,
+        "variant": "with_skin"
+      },
+      "preferred_nutrient_numbers": {
+        "calories": "208", "protein": "203", "fat": "204", "carbs": "205",
+        "fiber": "291", "sugar": "269", "sodium": "307",
+        "saturated_fat": "606", "trans_fat": "605"
+      }
+    },
+    "match_policy": "reference_only",
+    "compatibility_review": "Reviewed actual USDA Detail capture on 2026-11-16: SR Legacy record 171688, NDB9003, generic raw apple with skin, with no named cultivar. The photographed display name may remain apple. Existing variant=with_skin records visible edible skin, not a cultivar; unknown cultivar requires no Fuji inference. Missing skin evidence (variant=null), peeled/cooked/dried foods, juice, whole dishes and branded products are excluded. raw+mixed is the explicit legacy encoding for visibly unheated whole apple, not a claim of mixed cooking; unknown preparation is not a wildcard. The USDA Food Distribution Program annotation is part of the original source name, not a brand or photographed identity. All nine selected nutrients are present; trans fat zero is a reported source value, never an imputed missing value. This is a reference for the food class, not a measurement of the photographed apple or its weight.",
+    "rights": {
+      "reference": "Official USDA FDC API Guide and dataset CC0 evidence; limited to this API data record, not third-party imagery or website material.",
+      "reviewed_at": "2026-11-16T21:05:29+08:00",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "license_name": "CC0 1.0 Universal (USDA FoodData Central data)",
+      "attribution": "USDA Agricultural Research Service, FoodData Central, FDC ID 171688, NDB 9003",
+      "reuse_scope": "server_internal",
+      "provider_cache_scope": "server_internal",
+      "retention_policy": "Retain selected nutrient cells, normalized profiles, portions and hashes with attribution and owner binding. Request, preview, cache and policy snapshots may persist. No cross-user cache approval is made.",
+      "withdrawal_policy": "Revoke future retrieval, authority, reuse and cache access using the existing source withdrawal transaction. Historical owner snapshots, policy versions and backups remain. No purge-on-withdrawal condition identified for CC0 data; exclude the source if a new deletion obligation is established.",
+      "reviewer": "Codex technical source review",
+      "evidence_urls": ["https://fdc.nal.usda.gov/api-guide/", "https://fdc.nal.usda.gov/download-datasets/"],
+      "search_allowed": true, "extract_allowed": true, "snapshot_allowed": true, "reuse_allowed": true
+    },
+    "server_review": {
+      "status": "approved", "provider_kind": "usda_fdc_api",
+      "reviewer": "Codex technical review of real generic-apple Detail; candidate only",
+      "reviewed_at": "2026-11-16T21:05:29+08:00"
+    }
+  },
+  "admission_review": {
+    "source_id": "usda-fdc-171688", "policy_sha256": "14152c86f9f718ee7057d65b038d6b9be65d3a7197995308f29ef91f5876b85f",
+    "provider_kind": "usda_fdc_api", "publisher_rights_approved": true,
+    "provider_terms_approved": true, "deletion_requirement": "not_required",
+    "cross_user_cache_approved": false,
+    "reviewer": "Codex technical source review; no production activation",
+    "reviewed_at": "2026-11-16T21:05:29+08:00",
+    "evidence_urls": ["https://fdc.nal.usda.gov/api-guide/", "https://fdc.nal.usda.gov/download-datasets/"]
+  }
+}

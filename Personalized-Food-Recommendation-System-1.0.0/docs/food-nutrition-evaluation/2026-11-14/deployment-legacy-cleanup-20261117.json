@@ -1,0 +1,88 @@
+{
+  "batch": 79,
+  "date": "2026-11-17",
+  "branch": "v1.0.3",
+  "scope": "current_documentation_comments_and_retired_deployment_code",
+  "outcome": "cleanup_complete_regressions_and_closeout_audit_passed_not_deployed",
+  "removed": [
+    "render.yaml",
+    ".github/workflows/pages.yml",
+    "backend/Procfile",
+    "Render-specific signup, bind host and health environment handling",
+    "MongoDB startup, repository branches, pymongo requirement and fake Mongo fixtures",
+    "frontend recommendation remote fallback and its environment variable consumer"
+  ],
+  "retained": [
+    "SQLite runtime and schema; explicit temporary memory mode for tests/demo",
+    "DATABASE_URL rejection before SQLite creation",
+    "health.mongo=false compatibility field",
+    "legacy record contracts, alias migration and direct-provider paths still referenced by current code",
+    "optional API-only Docker development sample with explicit container binding",
+    "original historical test reports, machine evidence, Word/Excel and architecture snapshots"
+  ],
+  "documentation": {
+    "current": ["README.md", "docs/README.md", "docs/Operations_Runbook.md", "docs/Project_Architecture_and_Status.md", "docs/Local_Server_Deployment.md", "docs/PRD.md", "frontend/README.md"],
+    "archived_without_changing_results": ["docs/Operations_Runbook.historical.md", "docs/Project_Architecture_and_Status.historical.md"],
+    "marked_historical": ["cloud design/implementation plans", "old multi-agent directives and reports", "2026-07-11 handoff", "architecture diagram snapshots"],
+    "proposal_generators_updated": true,
+    "existing_binary_documents_regenerated": false
+  },
+  "verification": {
+    "focused_backend": {"passed": 171, "subtests_passed": 86, "duration_seconds": 17.86},
+    "final_full_backend": {"passed": 1143, "subtests_passed": 1273, "failed": 0, "skipped": 0, "duration_seconds": 69.89},
+    "frontend_config_and_backend_target": {"passed": 11, "failed": 0, "skipped": 0},
+    "frontend_typecheck": "passed",
+    "frontend_lint": "passed",
+    "frontend_scanner": {"passed": 25, "failed": 0, "skipped": 0},
+    "frontend_nutrition": {"passed": 145, "failed": 0, "skipped": 0},
+    "temporary_same_origin_export": "passed; tmp/batch79-web; served frontend/dist untouched",
+    "rendered_ui_repeated": false,
+    "docker_build_run": false,
+    "documentation_reference_and_credential_audit": {
+      "result": "passed",
+      "markdown_documents": 20,
+      "local_links": 290,
+      "local_links_and_balanced_fences": "passed",
+      "python_ast_files": 191,
+      "storage_repository_callers": 22,
+      "retired_runtime_consumers": "absent_in_audited_active_paths",
+      "credential_scan_files": 44,
+      "known_private_values_checked": 7,
+      "credential_matches": 0,
+      "source_hashes": "matched",
+      "git_diff_whitespace": "passed"
+    }
+  },
+  "corrected_validation_failures": [
+    "Test-only sys.modules restoration evicted bcrypt wrapper after cold app import; replaced with recording __import__ without evicting modules. Original Python 3.14 environment then passed.",
+    "First full regression had one missing-key message assertion failure; restored API key wording and final full regression passed.",
+    "Initial audit using urllib failed certificate-chain validation. Windows Invoke-RestMethod and requests both succeeded with normal verified TLS; final audit uses requests without disabling verification.",
+    "Initial whitespace check found four added PRD lines with trailing spaces; corrected and final check passed."
+  ],
+  "runtime": {
+    "restarted_or_deployed": false,
+    "production_db_modified_by_this_batch": false,
+    "production_env_or_feature_flags_modified": false,
+    "provider_calls": {"model": 0, "usda": 0, "tavily": 0},
+    "local_health": {"status": "ok", "app_version": "v1.0.3", "started_at": "2026-11-16T23:42:59.209397+08:00", "database": "sqlite", "auth_required": true, "automatic_web_fallback_enabled": false},
+    "public_health_matches_local": true,
+    "public_database_path_hidden": true,
+    "served_scanner_entry": "/_expo/static/js/web/entry-5115ba442ac55ef3887c0fae59bdaf53.js",
+    "local_public_disk_entry_sha256": "8c1840d3f1d52dcf85f1b26cab3d98da7e277d7f0eafda79b5981c6909695bca",
+    "original_started_at_and_served_entry_unchanged": true,
+    "listener": {"host": "127.0.0.1", "port": 5000, "pid": 32084}
+  },
+  "source_sha256": {
+    "backend/app.py": "0b03b9862594cd5ee68639763731f6f52520a579522aa987a6096025a64e02dc",
+    "backend/repositories/storage.py": "94c2aa5c1a523c6cf763a2ca05d9bd03552719b9be76ac3d8dbde049da79b560",
+    "backend/requirements.txt": "1ece9835ab4dc032ef35ec1734abb63199aa16fe57b0c4fe6e6f9842f55691eb",
+    "backend/services/robust_restaurant_scraper_service.py": "f4e7b63f3c04016e0969a5601d30ebb27070bf0dc44dc6fd7e307aa8efbaaf8b",
+    "frontend/lib/api.ts": "4f7c4d2c150fb95d1e87faef757e78c8b1ed9a8d6f64cad8db16cd90f5002158",
+    "backend/tests/test_database_selection.py": "88159997c8dd8a736defeb84f57ab8241dbb4cb17201b45462784bfec0aaefc5",
+    "backend/tests/test_security.py": "815822e25ad456dc19d2376237a59cfc136860096c6bdeb3be552d9759c85917",
+    "backend/tests/test_api_routes.py": "036c08ce62bd166c2106092220c363aac2b26c71ec820a1160930aeb194d6f52",
+    "frontend/scripts/test-api-backend-target.mjs": "750ec41541bf4e3c6639d967a070b1e0374c273cee43b2123688a323146d38f7"
+  },
+  "next_existing_item": "normal_scanner_real_photo_local_priority_identity_and_conditional_171688_preview_acceptance",
+  "constraints": ["never force a local miss", "do not infer skin/state/brand/cultivar or raise photo confidence from nutrition", "no repeated fixed phone fixture", "Tavily, FDC profile accept, new-source meal integration and cross-user cache remain off", "no commit or push"]
+}

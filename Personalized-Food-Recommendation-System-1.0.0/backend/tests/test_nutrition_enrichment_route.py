@@ -3,7 +3,7 @@ import unittest
 from repositories.nutrition_enrichment_repository import NutritionEnrichmentRequestRepository
 from repositories.nutrition_quota_repository import NutritionQuotaRepository
 from repositories.scan_context_repository import NutritionScanContextRepository
-from services.nutrition_authority_service import NutritionAuthorityService
+from services.nutrition_authority_service import NutritionAuthorityService, SCAN_TOKEN_TYPE
 from services.nutrition_enrichment_route_service import (
     NutritionEnrichmentRouteError,
     process_enrichment_request,
@@ -16,7 +16,7 @@ ITEM = {
     "confidence": 0.94, "weight_confidence": 0.8, "estimated_weight_g": 100,
     "food_state": "prepared", "preparation_method": "steamed",
     "components_scope": "food_only", "brand": None, "variant": None,
-    "validation_issues": [],
+    "validation_issues": [], "identity_confirmation_required": False,
 }
 
 
@@ -311,6 +311,96 @@ class NutritionEnrichmentRouteTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "confirmation_required")
         self.assertFalse(calls)
         self.assertEqual(self.quota.quota_snapshot("u1")["user_reserved"], 0)
+
+    def test_mid_confidence_identity_requires_confirmation_before_cache_or_provider(self):
+        item = dict(ITEM, item_id="scan-mid:0", confidence=0.74)
+        self.scan.save_scan_context(user_id="u1", scan_id="scan-mid", scan_revision=0,
+                                    items=[item], ttl_seconds=120, issued_at=self.clock[0])
+        calls = []
+
+        class Cache:
+            def get(self, **kwargs):
+                calls.append("cache")
+                return None
+
+        with self.assertRaises(NutritionEnrichmentRouteError) as raised:
+            self._run(self._body(scan_id="scan-mid", items=[item]), cache=Cache(),
+                      provider_factory=lambda *_: calls.append("provider"))
+        self.assertEqual(raised.exception.code, "confirmation_required")
+        self.assertEqual(calls, [])
+        snapshot = self.quota.quota_snapshot("u1")
+        self.assertEqual(snapshot["user_reserved"], 0)
+        self.assertEqual(snapshot["user_consumed"], 0)
+
+    def test_client_cannot_clear_server_identity_gate(self):
+        item = dict(ITEM, item_id="scan-unconfirmed:0", name_zh="青江菜",
+                    identity_confirmation_required=True)
+        self.scan.save_scan_context(user_id="u1", scan_id="scan-unconfirmed", scan_revision=0,
+                                    items=[item], ttl_seconds=120, issued_at=self.clock[0])
+        forged = dict(item, identity_confirmation_required=False)
+        with self.assertRaises(NutritionEnrichmentRouteError) as changed:
+            self._run(self._body(scan_id="scan-unconfirmed", items=[forged]),
+                      provider_factory=lambda *_: self.fail("provider called"))
+        self.assertEqual(changed.exception.code, "item_set_mismatch")
+
+        class Cache:
+            def get(self, **kwargs):
+                self.fail("web cache read for unconfirmed identity")
+
+            def fail(self, message):
+                raise AssertionError(message)
+
+        with self.assertRaises(NutritionEnrichmentRouteError) as blocked:
+            self._run(self._body(scan_id="scan-unconfirmed", items=[item]), cache=Cache(),
+                      provider_factory=lambda *_: self.fail("provider called"))
+        self.assertEqual(blocked.exception.code, "confirmation_required")
+
+    def test_unconfirmed_identity_does_not_consume_scan_authority(self):
+        item = dict(ITEM, item_id="scan-authority-blocked:0",
+                    identity_confirmation_required=True)
+        self.scan.save_scan_context(user_id="u1", scan_id="scan-authority-blocked",
+                                    scan_revision=0, items=[item], ttl_seconds=120,
+                                    issued_at=self.clock[0])
+        token = self.authority.issue_scan_context(
+            user_id="u1", scan_id="scan-authority-blocked", scan_revision=0, items=[item])
+        with self.assertRaises(NutritionEnrichmentRouteError) as blocked:
+            self._run(self._body(scan_id="scan-authority-blocked", items=[item],
+                                 scan_authority_token=token),
+                      provider_factory=lambda *_: self.fail("provider called"),
+                      authority_service=self.authority)
+        self.assertEqual(blocked.exception.code, "confirmation_required")
+        self.assertEqual(self.authority.verify(
+            token, expected_type=SCAN_TOKEN_TYPE, user_id="u1", consume=True)["scan_id"],
+            "scan-authority-blocked")
+        self.assertEqual(self.scan.get_scan_context(
+            user_id="u1", scan_id="scan-authority-blocked", scan_revision=0)["status"], "active")
+
+    def test_legacy_snapshot_without_identity_decision_fails_closed(self):
+        legacy = {key: value for key, value in ITEM.items()
+                  if key != "identity_confirmation_required"}
+        self.scan.save_scan_context(user_id="u1", scan_id="scan-legacy", scan_revision=0,
+                                    items=[legacy], ttl_seconds=120, issued_at=self.clock[0])
+        with self.assertRaises(NutritionEnrichmentRouteError) as blocked:
+            self._run(self._body(scan_id="scan-legacy", items=[legacy]),
+                      provider_factory=lambda *_: self.fail("provider called"))
+        self.assertEqual(blocked.exception.code, "confirmation_required")
+
+    def test_uncertain_weight_does_not_block_per_100g_web_eligibility(self):
+        item = dict(ITEM, item_id="scan-weight:0", weight_confidence=0.2, estimated_weight_g=None)
+        self.scan.save_scan_context(user_id="u1", scan_id="scan-weight", scan_revision=0,
+                                    items=[item], ttl_seconds=120, issued_at=self.clock[0])
+        seen = []
+
+        def factory(missing, known):
+            seen.extend(missing)
+            return lambda payload: {"status": "complete", "result": {
+                "items": [_provider_item(payload["items"][0])]}}
+
+        output = self._run(self._body(scan_id="scan-weight", items=[item],
+                                      idempotency_key="uncertain-weight"), provider_factory=factory)
+        self.assertEqual(output["status"], "complete")
+        self.assertEqual(len(seen), 1)
+        self.assertIsNone(output["result"]["items"][0]["portion"]["weight_g"])
 
     def test_validation_flag_requires_confirmation_before_web_provider(self):
         item = dict(ITEM, item_id="scan-flagged:0", validation_issues=["ambiguous_name"])

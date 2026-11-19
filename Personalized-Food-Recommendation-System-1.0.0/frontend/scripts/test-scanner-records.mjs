@@ -4,8 +4,10 @@ import {
   buildOCRDetectedFood,
   formatScannerResultTitle,
   formatScannerSourceBadge,
+  formatReviewedPendingFoods,
   FOOD_NAME_REQUIRED_MESSAGE,
   hasReviewableNutritionMiss,
+  hasUserConfirmableIdentity,
   manualSearchFood,
   normalizeFoodName,
   runNutritionLabelOCR,
@@ -26,6 +28,25 @@ test('scanner source badge reflects matched nutrient sources without guessing th
   assert.equal(formatScannerSourceBadge(['custom-food']), '自訂');
   assert.equal(formatScannerSourceBadge([], 5), '待營養配對');
   assert.equal(formatScannerSourceBadge([]), '資料來源');
+});
+
+test('reviewed source availability changes only matching pending wording, never identity or confidence', () => {
+  const items = [
+    { item_id: 'apple-1', label: '蘋果', confidence: 0.95, reason: 'missing',
+      recognition_status: 'recognized', nutrition_status: 'unmatched', search_hints: ['蘋果'] },
+    { item_id: 'apple-2', label: '蘋果', confidence: 0.3, reason: 'low-confidence' },
+  ];
+  assert.equal(formatReviewedPendingFoods(items, null), items);
+  const result = formatReviewedPendingFoods(items, { selection: { items: [
+    { item_id: 'apple-1', reason: 'reviewed_match', weight_g: 150 },
+  ] } });
+  assert.match(result[0].reason, /已找到相容/);
+  assert.match(result[0].reason, /尚未計入/);
+  assert.equal(result[0].label, items[0].label);
+  assert.equal(result[0].confidence, items[0].confidence);
+  assert.deepEqual(result[0].search_hints, []);
+  assert.equal(items[0].reason, 'missing');
+  assert.equal(result[1], items[1]);
 });
 
 function detectedFood(name = '原始名稱') {
@@ -90,6 +111,7 @@ test('vision mapping preserves server item IDs and persisted scan context', asyn
         authority_token: 'authority-token', items: [{
           item_id: 'scan-42:0', item_revision: 0, name_zh: '糯米腸', confidence: 0.95,
           weight_confidence: 0.8, estimated_weight_g: 120, food_state: 'prepared',
+          identity_confirmation_required: false,
           preparation_method: null, components_scope: 'food_only', brand: null, variant: null,
           validation_issues: [],
         }],
@@ -104,6 +126,7 @@ test('vision mapping preserves server item IDs and persisted scan context', asyn
     assert.equal(result.scanContext.scan_id, 'scan-42');
     assert.equal(result.scanContext.items[0].item_id, 'scan-42:0');
     assert.equal(result.scanContext.authority_token, 'authority-token');
+    assert.equal(result.scanContext.items[0].identity_confirmation_required, false);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -118,6 +141,24 @@ test('a high-confidence local nutrition miss can continue to FDC candidate revie
     item_id: 'scan-miss:0', label: '蘋果', confidence: 0.95, reason: 'no local nutrition',
     recognition_status: 'recognized', nutrition_status: 'unmatched',
   }], context), true);
+});
+
+test('a rejected scan item can be name-confirmed only with complete server context', () => {
+  const context = {
+    status: 'persisted', scan_id: 'scan-identity', scan_revision: 0,
+    items: [{ item_id: 'scan-identity:0', item_revision: 0, name_zh: '炒菜葉',
+      identity_confirmation_required: true, validation_issues: [], food_state: 'prepared',
+      preparation_method: 'stir_fried', components_scope: 'food_only' }],
+  };
+  const rejected = [{ item_id: 'scan-identity:0', label: '炒菜葉', confidence: 0.4, reason: 'needs confirmation' }];
+  assert.equal(hasUserConfirmableIdentity(rejected, context), true);
+  assert.equal(hasUserConfirmableIdentity(rejected, {
+    ...context, items: [{ ...context.items[0], preparation_method: 'unknown' }],
+  }), false);
+  assert.equal(hasUserConfirmableIdentity(rejected, {
+    ...context, items: [{ ...context.items[0], validation_issues: ['invalid_state'] }],
+  }), false);
+  assert.equal(hasUserConfirmableIdentity([], context), false);
 });
 
 test('FDC candidate review stays closed for low-confidence or invalid recognition', () => {

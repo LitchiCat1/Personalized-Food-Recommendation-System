@@ -58,6 +58,76 @@ async function withFetch(handler, run) {
   try { return await run(() => calls); } finally { globalThis.fetch = original; }
 }
 
+function reviewedResponse() {
+  const value = response();
+  value.selection = {
+    schema_version: 'ReviewedFdcSelectionV1',
+    items: [{ item_id: 'scan-1:0', weight_g: 150, reason: 'reviewed_match' }],
+    user_confirmation_required: true,
+    photo_confidence_changed: false,
+  };
+  return value;
+}
+
+test('reviewed source selection is opt in and sends only authenticated scan references', async () => {
+  await withFetch((url, init) => {
+    assert.equal(url, 'https://example.test/nutrition/fdc/reviewed-selection');
+    assert.deepEqual(JSON.parse(init.body), REQUEST);
+    assert.equal(init.headers.Authorization, 'Bearer test-token');
+    return new Response(JSON.stringify(reviewedResponse()), { status: 200 });
+  }, async (calls) => {
+    await assert.rejects(api.selectReviewedNutritionFdcSource('https://example.test', REQUEST),
+      (error) => error.code === 'feature_disabled');
+    assert.equal(calls(), 0);
+    const value = await api.selectReviewedNutritionFdcSource('https://example.test/', REQUEST,
+      { accessToken: 'test-token' }, { enabled: true });
+    assert.equal(value.selection.items[0].weight_g, 150);
+    assert.equal(value.selection.user_confirmation_required, true);
+    assert.equal(calls(), 1);
+  });
+});
+
+test('reviewed response rejects ambiguity, fabricated confidence and weight or item bindings', async () => {
+  const mutations = [
+    (v) => { delete v.selection; },
+    (v) => { v.selection.user_confirmation_required = false; },
+    (v) => { v.selection.photo_confidence_changed = true; },
+    (v) => { v.selection.items[0].weight_g = null; },
+    (v) => { v.selection.items[0].weight_g = 2001; },
+    (v) => { v.selection.items[0].item_id = 'wrong'; },
+    (v) => { v.selection.items[0].reason = 'local_priority'; },
+    (v) => { v.selection.items[0].fdc_id = '123456'; },
+    (v) => { v.selection.items.push({ ...v.selection.items[0] }); },
+    (v) => { v.snapshot.snapshot.items[0].candidates.push({ ...v.snapshot.snapshot.items[0].candidates[0], fdcId: '456789' }); },
+  ];
+  for (const mutate of mutations) {
+    const value = reviewedResponse();
+    mutate(value);
+    await withFetch(() => new Response(JSON.stringify(value), { status: 200 }), async () => {
+      await assert.rejects(api.selectReviewedNutritionFdcSource('https://example.test', REQUEST,
+        undefined, { enabled: true }), (error) => error.code === 'invalid_response');
+    });
+  }
+});
+
+test('reviewed no match is explicit and provider failure does not fall through to raw Search', async () => {
+  const value = reviewedResponse();
+  value.status = 'empty';
+  value.snapshot.snapshot.items[0].candidates = [];
+  value.selection.items[0].reason = 'no_reviewed_source';
+  await withFetch(() => new Response(JSON.stringify(value), { status: 200 }), async () => {
+    const parsed = await api.selectReviewedNutritionFdcSource('https://example.test', REQUEST,
+      undefined, { enabled: true });
+    assert.equal(parsed.status, 'empty');
+  });
+  await withFetch(() => new Response(JSON.stringify({ error: { code: 'local_unavailable' } }),
+    { status: 503 }), async (calls) => {
+    await assert.rejects(api.selectReviewedNutritionFdcSource('https://example.test', REQUEST,
+      undefined, { enabled: true }), (error) => error.code === 'local_unavailable');
+    assert.equal(calls(), 1);
+  });
+});
+
 test('candidate search and read stay disabled before any network request', async () => {
   await withFetch(() => { throw new Error('must not fetch'); }, async (calls) => {
     await assert.rejects(api.createNutritionFdcCandidateSnapshot('https://example.test', REQUEST),

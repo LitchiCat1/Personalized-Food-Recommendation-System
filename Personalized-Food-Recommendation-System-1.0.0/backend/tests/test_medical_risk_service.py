@@ -646,7 +646,7 @@ class GoutIndexedMenuTests(unittest.TestCase):
         import services.healthy_food_service as healthy_food_service_module
         from repositories.storage import StorageRepository
 
-        storage = StorageRepository(None, False, {}, [], [])
+        storage = StorageRepository({}, [], [])
         storage.upsert_user({
             "user_id": "u1", "name": "U", "height": 170, "weight": 65, "age": 30,
             "health_conditions": ["痛風"], "allergens": [],

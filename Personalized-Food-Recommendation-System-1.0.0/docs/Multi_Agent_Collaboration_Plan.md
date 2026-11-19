@@ -1,5 +1,7 @@
 # NutriLens 多 Agent 協作規劃（Codex / GPT-5.5）
 
+> **歷史封存（2026-11-17）：**本文角色、舊 skill 名、Render／Supabase 路徑及調度規則不再作為現行開發指示，也不授權啟用子代理。以當前會話指示、`AGENTS.md`、[現行架構](Project_Architecture_and_Status.md)及 [營養企劃](plans/2026-11-13-web-nutrition-fallback.md)為準。保留原文僅供追溯。
+
 > 最後更新：2026-06-19
 > 專案：NutriLens / Personalized Food Recommendation System
 > 用途：供 Codex（GPT-5.5）以多子 Agent 協作方式開發本專案使用。

@@ -1,0 +1,83 @@
+{
+  "date": "2026-11-16",
+  "batch": 71,
+  "branch": "v1.0.3",
+  "scope": "server-owned source admission boundary and undeployed FDC candidate review",
+  "official_evidence_reused": "source-rights-recheck-20261115.json",
+  "live_detail_evidence_reused": "usda-fdc-detail-replay-20261115.json",
+  "new_official_document_fetches": 0,
+  "admission_boundary": {
+    "policy_binding": "SHA-256 of complete canonical finite policy JSON; not a digital signature or permission proof",
+    "required_decisions": ["original publisher rights", "actual provider application terms", "deletion requirement", "cross-user cache scope"],
+    "unknown_or_deletion_required_sources": "excluded; no physical purge capability is claimed",
+    "withdrawal_semantics": "future access revocation; historical rows, SQLite pages/WAL and backups may remain",
+    "production_web_registry_builder": "build_production_web_registry",
+    "fdc_json_in_tavily_registry": "rejected; dedicated fixed-ID API flow required",
+    "review_changes": "aliases, rights, identity, adapters and nutrient choices change the digest and require review"
+  },
+  "fdc_candidate": {
+    "config": "backend/config/nutrition_source_candidates/usda-fdc-1750340.json",
+    "status": "reviewed_candidate_not_deployed",
+    "fdc_id": "1750340",
+    "description": "Apples, fuji, with skin, raw",
+    "policy_sha256": "4db6b02c42bc333dee0ea789b574023c15e9170afbe0997ac5ea38292ed44639",
+    "data_type_from_prior_replay": "Foundation",
+    "identity_scope": "raw Fuji with skin only; explicit fuji_with_skin variant; no generic apple, peeled/cooked or branded substitution",
+    "preparation_enum_convention": "mixed + raw denotes unheated whole-food compatibility in the existing enum; not a cooking claim",
+    "selected_energy_number": "957",
+    "known_nutrients_from_prior_replay": ["calories", "protein", "carbs", "fat", "fiber", "sugar", "sodium"],
+    "unknown_nutrients": ["saturated_fat", "trans_fat"],
+    "reuse_scope": "server_internal; owner-bound; no cross-user cache approval",
+    "retention": "selected nutrient evidence, normalized profiles/portions/hashes and existing durable snapshots; not hash-only",
+    "automatically_loaded": false,
+    "production_installed": false,
+    "phone_fixture_171688_is_source_evidence": false
+  },
+  "validation": {
+    "admission_unittest": {"passed": 14, "failed": 0},
+    "focused_pytest": {"passed": 74, "subtests_passed": 69, "failed": 0, "elapsed_seconds": 1.17},
+    "full_backend_pytest": {"passed": 1098, "subtests_passed": 1185, "failed": 0, "skipped": 0, "elapsed_seconds": 133.41},
+    "new_admission_test_network": "socket.socket.connect forbidden",
+    "sqlite_acceptance": "temporary DB policy save, close/reopen, digest equality, withdrawal blocks current lookup, retained withdrawn policy explicit, zero nutrition profiles",
+    "negative_cases": [
+      "missing, duplicate and orphan reviews",
+      "policy/source/hash drift",
+      "publisher approval separate from provider approval",
+      "unknown deletion requirement and purge-on-withdrawal obligation",
+      "cross-user scope without separate provider approval",
+      "single-request or no-provider-storage scope entering durable pipeline",
+      "disabled retrieval/storage rights",
+      "invalid review shape, reviewer, timestamps and evidence URLs",
+      "FDC relabelled as Tavily or placed in the Web registry"
+    ]
+  },
+  "execution_notes": [
+    "Initial unittest import failed because PYTHONPATH did not include backend; corrected before the successful run",
+    "First full pytest run was interrupted and not counted; restarted with explicit skip-local-env, empty DATABASE_PATH and cleared provider/external-database variables",
+    "Existing API tests already set skip-local-env and empty DATABASE_PATH during collection; no production operation was part of this work"
+  ],
+  "side_effects": {
+    "live_model_calls": 0,
+    "live_tavily_calls": 0,
+    "live_usda_calls": 0,
+    "credential_files_read": 0,
+    "production_database_operations_requested": 0,
+    "production_source_registry_count": 0,
+    "production_flags_changed": false,
+    "production_service_restarted": false,
+    "deployment": false,
+    "commit_or_push": false
+  },
+  "review_limits": [
+    "Technical self-review based on previously captured official evidence; not a new publisher permission or legal opinion",
+    "Admission validator and Web builder do not replace food identity, nutrient cell, profile provenance, authority or route checks",
+    "The low-level SQLite policy repository remains a server-owned primitive; the FDC review is not installed there in production",
+    "Candidate variety/skin must match server-owned identity; no new identity correction or normalization rule was added",
+    "No new live Detail retrieval, full real-source photo pipeline, accept/meal-save browser/mobile acceptance or production activation"
+  ],
+  "remaining_gates": [
+    "Tavily actual plan/application scope and each original publisher permission/adapter; unqualified sources stay excluded",
+    "Isolated real-source preview/accept/save acceptance within existing workflow; no repeat of completed phone fixture",
+    "Final registry/flag/deployment review before any activation"
+  ]
+}

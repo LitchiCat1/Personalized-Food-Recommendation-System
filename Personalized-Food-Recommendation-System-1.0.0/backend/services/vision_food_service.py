@@ -16,6 +16,7 @@ from services.nutrient_service import is_fried_food_name
 from services.ai_relay_service import get_relay_config, relay_chat
 from services.vision_nutrition_service import find_vision_food_matches
 from services.strict_json_service import parse_strict_model_json
+from services.food_identity_service import vision_identity_needs_confirmation
 
 
 VISION_FOOD_MIN_CONFIDENCE = float(os.environ.get("VISION_FOOD_MIN_CONFIDENCE", "0.45"))
@@ -76,6 +77,12 @@ def build_food_recognition_prompt():
         "水餃、包子、蛋糕、香腸、地瓜球等本身是一項食品，不拆成不可見的餡料或原料。"
         "沖泡泡麵可整杯列為泡麵（含湯），不可再重複列其麵與湯。大腸包小腸可分香腸與糯米腸。"
         "只能根據照片可見證據，不能因典型配方就加蛋、肉或醬料；不要猜隱藏餡料、品牌口味或蛋糕內餡。"
+        "食材名稱採用照片能支持的常見名稱；無清楚可讀的標籤證據時，不要只憑外觀猜品種或品牌。"
+        "例如一般蘋果照片的 name_zh 寫蘋果、name_en 寫 apple，不因資料庫有富士蘋果就寫富士。"
+        "品種不明不等於食材不明；能確定是蘋果時，不要只因無法確認品種而降低食材辨識 confidence。"
+        "brand與variant無證據時填null，不能由資料庫反推。一般蘋果不猜品種；"
+        "照片清楚可見未去皮的生鮮蘋果時，name_zh仍寫蘋果，variant寫with_skin；"
+        "清楚去皮時variant寫without_skin，無法確認是否帶皮則填null。這兩值表示食用狀態，不是品種。"
         "不確定菜種時使用較保守的名稱（如葉菜、黃色瓜類），降低 confidence 並說明可能名稱。"
         "不要把看不清楚的背景餐盤加入已確認項目；若背景有部分小菜，請在 uncertainty_notes 註明未納入。"
         "每種食品多個相同個體只列一項，count 寫可見數量，estimated_weight_g 是全部個體的總可食重量。"
@@ -85,6 +92,8 @@ def build_food_recognition_prompt():
         "無法判斷食用狀態填 unknown。preparation_method 只能填以下英文值："
         "boiled（水煮或汆燙）、stir_fried（拌炒）、pan_fried（平底煎）、deep_fried（油炸）、"
         "roasted（烘烤）、braised（滷或燉）、steamed（蒸）、mixed（可見多種烹調混合）、unknown。"
+        "舊欄位沒有未加熱列舉：只對清楚未加熱的生鮮蘋果，以food_state=raw、"
+        "preparation_method=mixed記錄合約相容狀態；這不表示混合烹調，不能套用到狀態不明的食品。"
         "components_scope 只能填以下英文值：food_only（食品本體，不含另列的湯及配菜）、"
         "noodles_only（只有麵條，不含湯或另列配料）、whole_dish_with_broth（含湯整份）、"
         "with_sides（食品連同配菜）、unknown。以上欄位只依可見證據判斷，不可因典型食譜猜測；"
@@ -95,6 +104,7 @@ def build_food_recognition_prompt():
         '{"meal_guess":"","items":[{"name_zh":"","name_en":"",'
         '"confidence":0.0,"estimated_weight_g":null,"weight_confidence":0.0,'
         '"food_state":"unknown","preparation_method":"unknown","components_scope":"unknown",'
+        '"brand":null,"variant":null,'
         '"count":null,"portion_description":"",'
         '"visual_evidence":"","alternatives":[]}],"uncertainty_notes":[]}'
     )
@@ -129,6 +139,16 @@ def normalize_vision_result(parsed):
             else:
                 normalized[field] = "unknown"
                 item_issues.append(f"invalid_{field}" if field in item else f"missing_{field}")
+        for field in ("brand", "variant"):
+            value = item.get(field)
+            if value is None:
+                normalized[field] = None
+            elif (isinstance(value, str) and 0 < len(value.strip()) <= 300
+                  and not any(ord(character) < 32 or ord(character) == 127 for character in value)):
+                normalized[field] = value.strip()
+            else:
+                normalized[field] = None
+                item_issues.append(f"invalid_{field}")
         normalized["validation_issues"] = list(dict.fromkeys(item_issues))
         alternatives = item.get("alternatives") or []
         normalized["alternatives"] = alternatives if isinstance(alternatives, list) else [alternatives]
@@ -152,6 +172,8 @@ def _recognition_item_context(item, item_id):
         "food_state": item.get("food_state") or "unknown",
         "preparation_method": context["preparation_method"] or "unknown",
         "components_scope": context["components_scope"] or "unknown",
+        "brand": item.get("brand"),
+        "variant": item.get("variant"),
         "estimated_weight_g": normalize_weight(item.get("estimated_weight_g")),
         "confidence": normalize_confidence(item.get("confidence")),
         "weight_confidence": normalize_confidence(item.get("weight_confidence")),
@@ -160,6 +182,8 @@ def _recognition_item_context(item, item_id):
         "alternatives": item.get("alternatives", []),
         "validation_issues": item.get("validation_issues", []),
     })
+    context["identity_confirmation_required"] = vision_identity_needs_confirmation(
+        context, minimum_confidence=VISION_FOOD_MIN_CONFIDENCE)
     return context
 
 
@@ -205,6 +229,8 @@ def build_vision_food_response(
             continue
         item_id = f"{scan_id}:{index}"
         recognition_context = _recognition_item_context(item, item_id)
+        if parsed.get("validation_issues"):
+            recognition_context["identity_confirmation_required"] = True
         recognition_items.append(recognition_context)
 
         confidence = normalize_confidence(item.get("confidence"))

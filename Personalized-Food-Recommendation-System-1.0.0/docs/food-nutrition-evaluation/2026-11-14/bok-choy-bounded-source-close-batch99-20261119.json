@@ -1,0 +1,97 @@
+{
+  "batch": 99,
+  "date": "2026-11-19",
+  "branch": "v1.0.3",
+  "scope": "bounded_close_existing_official_bok_choy_source_candidates",
+  "review_boundary": {
+    "target": "explicitly identified bok choy ingredient; candidate standard is a defensible raw per-100-g reference without added-oil values or cooked-photo portion conversion",
+    "candidate_pool_expanded": false,
+    "future_reopen_triggers": [
+      "user supplies or explicitly selects a new source candidate",
+      "an existing candidate publishes a new record or rights evidence that materially changes this review"
+    ]
+  },
+  "candidate_findings": [
+    {
+      "publisher": "USDA Agricultural Research Service",
+      "records": ["FDC 2685572 Foundation raw", "FDC 170390 SR Legacy raw", "FDC 170391 SR Legacy boiled"],
+      "decision": "not admitted; batch 98 lineage and coverage review found insufficient evidence to select one raw row, and the boiled row is not compatible with stir-fried photo weight"
+    },
+    {
+      "publisher": "Japan MEXT",
+      "records": [
+        {"food_number": "06160", "scope": "green bok choy leaves, raw"},
+        {"food_number": "06161", "scope": "green bok choy leaves, boiled"},
+        {"food_number": "06338", "scope": "green bok choy leaves, sauteed"}
+      ],
+      "decision": "not admitted for this target; published record labels specify leaves, and available notes do not establish equivalent raw ingredient scope. The sauteed record includes cooking-oil-derived nutrition.",
+      "official_records": [
+        "https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=6_06160_7",
+        "https://fooddb.mext.go.jp/details/foodInfo.pl?ITEM_NO=6_06161_7",
+        "https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=6_06338_7"
+      ]
+    },
+    {
+      "publisher": "GOV.UK / Public Health England CoFID",
+      "workbooks": ["CoFID 2021 main workbook", "CoFID old foods workbook"],
+      "screened_columns": ["Food Code", "Food Name", "Description", "Group", "Previous", "Main data references"],
+      "name_screen": "Case-insensitive search for pak choi and bok choy with common separators, plus Chinese cabbage, Chinese leaf and Chinese greens",
+      "matched_record": {
+        "food_code": "13-516",
+        "food_name": "Pak choi, steamed",
+        "description": "16 samples, autumn and winter, UK grown and imported",
+        "main_data_reference": "DH, Nutrient analysis of fruit and vegetables, 2013"
+      },
+      "old_foods_workbook_match": false,
+      "decision": "not admitted; the only matching main-workbook record is steamed rather than raw or stir-fried; no matching row was found in the old foods workbook",
+      "official_page": "https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid"
+    },
+    {
+      "publisher": "Health Canada Canadian Nutrient File 2026",
+      "record": "food code 2038, Bok choy, pak-choi, raw",
+      "decision": "excluded as an independent candidate because batch 92 established that the row is unchanged USDA-derived data sharing NDB 11116 with SR Legacy"
+    },
+    {
+      "publisher": "FSANZ Australian Food Composition Database",
+      "decision": "excluded by user direction; no contact, download, license acceptance, or further review"
+    }
+  ],
+  "decision": {
+    "selected_source": false,
+    "raw_reference_only_ui_or_api_authorized": false,
+    "bok_choy_result": "remain_no_match",
+    "candidate_discovery_for_this_scope": "closed",
+    "reason": "The existing finite candidate set has no record that satisfies the target food scope and supports the required source quality. Do not choose by field coverage, combine rows, infer nutrients, or expand source discovery without a reopen trigger.",
+    "third_layer_status": "Implemented and tested in isolation. Live positive adoption is pending a confirmed food and source with no compatible TFDA/USDA match. Production registry is empty and automatic fallback is disabled."
+  },
+  "focused_regression": {
+    "backend_tests_passed": 83,
+    "backend_subtests_passed": 105,
+    "backend_runtime": "Local environment file skipped. Test storage used memory or temporary SQLite fixtures.",
+    "frontend_scanner_tests_passed": 26,
+    "frontend_warning": "Node emitted MODULE_TYPELESS_PACKAGE_JSON for existing TypeScript imports."
+  },
+  "observations_and_side_effects": {
+    "cofid_workbooks_downloaded_to_temp": 2,
+    "cofid_project_files_created": false,
+    "cofid_matching_rows_printed_with_nutrient_amounts": false,
+    "mext_search_result_exposed_nutrient_amounts": true,
+    "mext_nutrient_amounts_persisted_to_project": false,
+    "mext_nutrient_amounts_used_for_source_selection": false,
+    "tavily_requests": 0,
+    "model_calls": 0,
+    "private_credentials_read": 0,
+    "production_database_accessed_or_changed": false,
+    "profiles_or_meals_written": false,
+    "application_code_changed": false,
+    "tests_run": true,
+    "runtime_flags_changed": false,
+    "deployed_or_restarted": false,
+    "committed_or_pushed": false
+  },
+  "limitations": [
+    "This closes only the already identified candidate search for this bok choy use scope; it does not prove that no suitable record exists anywhere.",
+    "This is a technical source-scope review, not legal advice or a nutritional-accuracy validation.",
+    "No nutrition values are retained in this evidence record."
+  ]
+}

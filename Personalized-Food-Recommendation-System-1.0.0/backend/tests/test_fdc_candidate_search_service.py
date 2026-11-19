@@ -1,5 +1,6 @@
 from copy import deepcopy
 import unittest
+from unittest.mock import Mock
 
 from services.fdc_candidate_search_service import (
     FdcCandidateSearchError,
@@ -147,6 +148,21 @@ class FdcCandidateSearchServiceTests(unittest.TestCase):
         self.assertEqual(len(result["snapshot"]["items"]), len(statuses))
         self.assertEqual(result["snapshot"]["items"][0]["candidates"], [])
         self.assertEqual(len(self.snapshots.save_calls), 1)
+        self.assertNotIn("no_hit_item_ids", self.snapshots.save_calls[0])
+
+    def test_every_query_must_confirm_zero_hits(self):
+        zero = {"candidates": [], "confirmed_no_hits": True}
+        for responses, expected in (
+            ([zero, zero, zero], ["scan-1:0"]),
+            ([zero, {"candidates": []}, zero], None),
+            ([zero, zero, {"candidates": self.client.candidates}], None),
+        ):
+            with self.subTest(responses=responses):
+                self.service.snapshot_repository = snapshots = _SnapshotRepository()
+                self.client.search_foods = Mock(side_effect=responses)
+                self._create()
+                self.assertEqual(self.client.search_foods.call_count, 3)
+                self.assertEqual(snapshots.save_calls[0].get("no_hit_item_ids"), expected)
 
     def test_low_confidence_and_validation_issues_do_not_enter_local_or_remote_search(self):
         self.scan.context["items"] = [
@@ -158,6 +174,43 @@ class FdcCandidateSearchServiceTests(unittest.TestCase):
         self.assertEqual(self.lookup_calls, [])
         self.assertEqual(self.client.calls, [])
         self.assertEqual([item["candidates"] for item in result["snapshot"]["items"]], [[], []])
+
+    def test_user_confirmed_specific_name_reruns_local_lookup_before_search(self):
+        self.scan.context["items"] = [_item(
+            0, name_zh="青江菜", confidence=0.42, identity_confirmation_required=False,
+            identity_confirmation_source="user", identity_confirmation_id="server-confirmation",
+        )]
+        looked_up = []
+        self.service.local_lookup_factory = lambda _user_id: lambda item: (
+            looked_up.append(item["item_id"]) or {"status": "matched"})
+        self.service.client_factory = lambda: self.fail("local hit must not create FDC client")
+
+        result = self._create()
+
+        self.assertEqual(looked_up, ["scan-1:0"])
+        self.assertEqual(result["snapshot"]["items"][0]["candidates"], [])
+        self.assertEqual(len(self.snapshots.save_calls), 1)
+
+    def test_user_confirmed_bok_choy_local_miss_searches_only_bounded_alias_queries(self):
+        self.scan.context["items"] = [_item(
+            0, name_zh="青江菜", confidence=0.42, identity_confirmation_required=False,
+            identity_confirmation_source="user", identity_confirmation_id="server-confirmation",
+            brand=None,
+        )]
+        self.client.candidates = [{
+            "fdcId": "2685572", "description": "Cabbage, bok choy, raw",
+            "dataType": "Foundation", "brandOwner": None, "foodCategory": "Vegetables",
+        }]
+        looked_up = []
+        self.service.local_lookup_factory = lambda _user_id: lambda item: (
+            looked_up.append(item["item_id"]) or {"status": "no_local_mapping"})
+
+        result = self._create()
+
+        self.assertEqual(looked_up, ["scan-1:0"])
+        self.assertEqual([call["query"] for call in self.client.calls], ["青江菜", "bok choy"])
+        self.assertEqual(result["snapshot"]["items"][0]["candidates"], self.client.candidates)
+        self.assertTrue(self.client.closed)
 
     def test_search_budget_overflow_fails_before_constructing_client(self):
         self.scan.context["items"] = [_item(index, name_zh=f"食物{index}")
@@ -194,7 +247,7 @@ class FdcCandidateSearchServiceTests(unittest.TestCase):
         original = deepcopy(self.scan.context["items"])
         result = self._create()
         self.assertEqual(self.lookup_calls, ["scan-1:2"])
-        self.assertEqual([call["query"] for call in self.client.calls], ["青江菜"])
+        self.assertEqual([call["query"] for call in self.client.calls], ["青江菜", "bok choy"])
         self.assertEqual(self.scan.context["items"], original)
         rows = result["snapshot"]["items"]
         self.assertEqual([row["item_id"] for row in rows], ["scan-1:0", "scan-1:1", "scan-1:2"])
@@ -205,7 +258,9 @@ class FdcCandidateSearchServiceTests(unittest.TestCase):
         names = ("大陸妹", "青江菜", "小白菜", "清炒青江菜")
         self.scan.context["items"] = [_item(index, name_zh=name) for index, name in enumerate(names)]
         self._create()
-        self.assertEqual([call["query"] for call in self.client.calls], list(names))
+        expected = [query for name in names for query in
+                    ([name, "bok choy"] if name == "青江菜" else [name])]
+        self.assertEqual([call["query"] for call in self.client.calls], expected)
 
     def test_completed_snapshot_replay_skips_local_lookup_and_provider(self):
         first = self._create()

@@ -16,6 +16,7 @@ type Props = {
   onWeightChange: (foodId: string, nextWeight: number) => void;
   submitting?: boolean;
   disabled?: boolean;
+  addDisabled?: boolean;
   /**
    * 使用者的每日鈉上限（後端已依疾病調整）。之前這裡寫死 800/1200mg，
    * 跟疾病無關——腎臟病每日上限 1500mg、單餐 500mg，掃到 700mg 的餐點
@@ -27,7 +28,7 @@ type Props = {
   hasUnmatchedFoods?: boolean;
 };
 
-export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightChange, submitting = false, disabled = false, sodiumDailyTarget, mealWarnings = [], hasUnmatchedFoods = false }: Props) {
+export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightChange, submitting = false, disabled = false, addDisabled = false, sodiumDailyTarget, mealWarnings = [], hasUnmatchedFoods = false }: Props) {
   const controlsDisabled = submitting || disabled;
   const sodiumMealBudget = perMealBudget(sodiumDailyTarget, 2000);
   const [weightDrafts, setWeightDrafts] = useState<Record<string, string>>({});
@@ -223,7 +224,7 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
         <PrimaryButton
           label={submitting ? '儲存中' : '加入今日紀錄'}
           onPress={onAddRecord}
-          disabled={controlsDisabled}
+          disabled={controlsDisabled || addDisabled}
           icon={submitting
             ? <ActivityIndicator size="small" color={Palette.text.inverse} />
             : <Ionicons name="add-circle-outline" size={18} color={Palette.text.inverse} />}

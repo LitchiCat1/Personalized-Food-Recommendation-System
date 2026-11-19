@@ -6,8 +6,8 @@ or calling a provider: the user, scan revision, and complete item set are
 checked against the durable row rather than request JSON alone.
 
 This module intentionally has no HTTP or provider dependency. It supports
-SQLite plus an explicit in-memory mode for unit tests. Mongo is not supported
-because the enrichment path requires SQLite transaction/unique constraints.
+SQLite plus an explicit in-memory mode for unit tests. The durable enrichment
+path requires SQLite transactions and unique constraints.
 """
 
 from copy import deepcopy
@@ -111,9 +111,21 @@ def _item(item):
         _fail("invalid_items", "Each scan item must be an object")
     allowed = {"item_id", "item_revision", "name_zh", "confidence", "weight_confidence",
                "estimated_weight_g", "food_state", "preparation_method", "components_scope",
-               "brand", "variant", "validation_issues"}
+               "brand", "variant", "validation_issues", "identity_confirmation_required",
+               "identity_confirmation_source", "identity_confirmation_id"}
     if set(item) - allowed:
         _fail("invalid_items", "Scan item contains unsupported fields")
+    if "identity_confirmation_required" in item and type(item["identity_confirmation_required"]) is not bool:
+        _fail("invalid_items", "identity_confirmation_required must be a boolean")
+    confirmation_source = item.get("identity_confirmation_source")
+    confirmation_id = item.get("identity_confirmation_id")
+    if confirmation_source is not None and confirmation_source != "user":
+        _fail("invalid_items", "identity_confirmation_source is invalid")
+    if confirmation_id is not None:
+        _id(confirmation_id, "identity_confirmation_id")
+    if ((confirmation_source == "user") != (confirmation_id is not None)
+            or (confirmation_source == "user" and item.get("identity_confirmation_required") is not False)):
+        _fail("invalid_items", "User identity confirmation provenance is incomplete")
     _id(item.get("item_id"), "item_id")
     if type(item.get("item_revision")) is not int or item["item_revision"] < 0:
         _fail("invalid_items", "item_revision is invalid")
@@ -360,6 +372,86 @@ class NutritionScanContextRepository:
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (scan_id, next_revision, user_id, expected_hash, to_json(checked),
                  float(issued_at), float(expires_at), "active", None, now_text, now_text),
+            )
+            if inserted != 1:
+                _fail("revision_conflict", "Next scan revision could not be recorded")
+            return self._document(self._row(scan_id, next_revision))
+
+    def create_identity_revision_in_transaction(self, *, user_id, scan_id, from_revision,
+                                                item_id, item_revision, confirmed_name,
+                                                confirmation_id, issued_at, expires_at):
+        """Issue one user-confirmed name while the caller owns a SQLite transaction."""
+        if not self.durable:
+            _fail("unsupported_database", "Identity revisions require SQLite")
+        user_id = _id(user_id, "user_id")
+        scan_id = _id(scan_id, "scan_id")
+        from_revision = _revision(from_revision, "from_revision")
+        item_id = _id(item_id, "item_id")
+        item_revision = _revision(item_revision, "item_revision")
+        confirmation_id = _id(confirmation_id, "identity_confirmation_id")
+        if (not isinstance(confirmed_name, str) or not confirmed_name
+                or len(confirmed_name) > 120 or confirmed_name.strip() != confirmed_name
+                or any(ord(char) < 32 or ord(char) == 127 for char in confirmed_name)):
+            _fail("invalid_items", "confirmed_name is invalid")
+        for value, field in ((issued_at, "issued_at"), (expires_at, "expires_at")):
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                _fail("invalid_expiry", f"{field} is invalid")
+        if expires_at <= issued_at or expires_at - issued_at > 15 * 60:
+            _fail("invalid_expiry", "expires_at is invalid")
+
+        with self._lock:
+            current = self._document(self._row(scan_id, from_revision))
+            if current is None:
+                _fail("scan_not_found", "Source scan context does not exist")
+            if current["user_id"] != user_id:
+                _fail("wrong_user", "Source scan context belongs to another user")
+            if current["status"] != "active":
+                _fail("stale_revision", "Source scan context is no longer current")
+            if _clock_value(self.clock) >= current["expires_at"]:
+                self._expire_locked(current)
+                _fail("expired", "Source scan context has expired")
+            latest = self.sql.query_one(
+                "SELECT MAX(scan_revision) AS revision FROM nutrition_scan_contexts WHERE scan_id = ?",
+                (scan_id,),
+            )
+            if latest is None or int(latest["revision"]) != from_revision:
+                _fail("stale_revision", "Source scan context is no longer current")
+
+            items = deepcopy(current["items"])
+            target = next((value for value in items if value["item_id"] == item_id), None)
+            if target is None:
+                _fail("item_not_found", "The scan item is unavailable")
+            if target["item_revision"] != item_revision:
+                _fail("stale_revision", "The scan item revision is no longer current")
+            if (target.get("identity_confirmation_required") is not True
+                    or target.get("identity_confirmation_source") == "user"):
+                _fail("identity_confirmation_not_required", "This item is not awaiting identity confirmation")
+            original_name = target["name_zh"]
+            target["item_revision"] += 1
+            target["name_zh"] = confirmed_name
+            if confirmed_name != original_name:
+                target["brand"] = None
+                target["variant"] = None
+            target["identity_confirmation_required"] = False
+            target["identity_confirmation_source"] = "user"
+            target["identity_confirmation_id"] = confirmation_id
+            checked = _items(items)
+            digest = item_set_hash(checked)
+            next_revision = from_revision + 1
+            if self._row(scan_id, next_revision) is not None:
+                _fail("revision_conflict", "Next scan revision already exists")
+            now_text = utc_iso()
+            self.sql.execute(
+                "UPDATE nutrition_scan_contexts SET status = ?, updated_at = ? "
+                "WHERE scan_id = ? AND scan_revision = ? AND status = ?",
+                ("superseded", now_text, scan_id, from_revision, "active"),
+            )
+            inserted = self.sql.execute(
+                "INSERT INTO nutrition_scan_contexts "
+                "(scan_id, scan_revision, user_id, item_set_hash, items, issued_at, expires_at, status, consumed_at, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (scan_id, next_revision, user_id, digest, to_json(checked), float(issued_at),
+                 float(expires_at), "active", None, now_text, now_text),
             )
             if inserted != 1:
                 _fail("revision_conflict", "Next scan revision could not be recorded")

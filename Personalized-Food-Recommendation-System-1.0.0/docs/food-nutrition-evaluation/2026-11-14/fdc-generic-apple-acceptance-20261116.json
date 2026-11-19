@@ -1,0 +1,71 @@
+{
+  "scope": "captured_real_fdc_replay_into_temporary_sqlite",
+  "fdc_id": "171688",
+  "replayed_at": "2026-11-16T13:06:45.763453+00:00",
+  "retrieved_at": "2026-11-16T13:00:45.505513+00:00",
+  "original_capture_envelope": true,
+  "payload_sha256": "5d271bb2cc8ba2e7f7c96425e341e06268951b82f3c17d24c5e8e82c9799bd1c",
+  "policy_sha256": "14152c86f9f718ee7057d65b038d6b9be65d3a7197995308f29ef91f5876b85f",
+  "provider_mode": "offline replay; no new network retrieval",
+  "detail_replay_count": 1,
+  "recognition": "synthetic explicit compatible identity, not image recognition",
+  "recognition_identity": {
+    "name_zh": "\u860b\u679c",
+    "food_state": "raw",
+    "preparation_method": "mixed",
+    "components_scope": "food_only",
+    "brand": null,
+    "variant": "with_skin"
+  },
+  "source_identity": {
+    "name": "Apples, raw, with skin (Includes foods for USDA's Food Distribution Program)",
+    "food_state": "raw",
+    "preparation_method": "mixed",
+    "components_scope": "food_only",
+    "brand": null,
+    "variant": "with_skin"
+  },
+  "identity_rejections": 3,
+  "reopen_count": 2,
+  "profile_count": 1,
+  "meal_records_written": 0,
+  "per_100g": {
+    "calories": 52.0,
+    "protein": 0.26,
+    "carbs": 13.81,
+    "sugar": 10.39,
+    "fat": 0.17,
+    "saturated_fat": 0.028,
+    "trans_fat": 0.0,
+    "fiber": 2.4,
+    "sodium": 1.0
+  },
+  "portion_150g": {
+    "calories": 78.0,
+    "protein": 0.39,
+    "carbs": 20.715,
+    "sugar": 15.585,
+    "fat": 0.255,
+    "saturated_fat": 0.042,
+    "trans_fat": 0.0,
+    "fiber": 3.6,
+    "sodium": 1.5
+  },
+  "profile_hash": "0bc077ea4849cd176de15cece1c0d33500b4a61dd691e91ad4176692ba3b2fe9",
+  "checks": {
+    "preview_did_not_write_profile": true,
+    "accept_after_reopen": true,
+    "idempotent_replay_after_second_reopen": true,
+    "owner_only_profile": true,
+    "confirmation_did_not_rename_or_infer_variety": true,
+    "withdrawal_blocked_pending_accept_and_current_lookup": true,
+    "historical_owner_snapshot_retained": true
+  },
+  "limitations": [
+    "No live model, USDA or Tavily calls; no credentials loaded",
+    "For a bare payload only, retrieval time is the replay time, not original capture time",
+    "SQLite close/reopen, not a process crash or mobile save test",
+    "Identity compatibility follows the selected policy, not candidate confirmation",
+    "No production DB, registry, feature flag or service changed"
+  ]
+}

@@ -1,0 +1,158 @@
+{
+  "batch": 78,
+  "date": "2026-11-16",
+  "branch": "v1.0.3",
+  "outcome": "single_171688_preview_deployed_and_verified",
+  "scope": "reviewed_selection_explicit_confirmation_nutrition_preview_only",
+  "implementation": {
+    "optional_server_environment": "FDC_REVIEWED_SOURCES_FILE",
+    "configuration": "explicit_absolute_server_owned_file_with_exact_reviewed_sources_field",
+    "default_python_source_tuple": "empty",
+    "candidate_directory_discovery": false,
+    "startup_installs_or_reactivates_sources": false,
+    "invalid_configuration_behavior": "sanitized_blocked_report_and_selection_disabled",
+    "installed_policy_owner_revision_expiry_checks": "existing_contracts_retained",
+    "startup_runtime_diagnostic": "private_log_booleans_and_source_status_bound_to_started_at_no_credentials_or_paths"
+  },
+  "source": {
+    "source_id": "usda-fdc-171688",
+    "policy_sha256": "14152c86f9f718ee7057d65b038d6b9be65d3a7197995308f29ef91f5876b85f",
+    "installed_state": "active_exact_match",
+    "installed_revision": 0,
+    "runtime_loaded_source_count": 1,
+    "display_name": "蘋果",
+    "scope": "generic_raw_apple_with_visibly_present_skin_no_cultivar_inference",
+    "fuji_1750340_included": false
+  },
+  "release": {
+    "existing_scheduled_task": "NutriLens Backend",
+    "task_state": "Running",
+    "listener": "127.0.0.1:5000",
+    "previous_pid": 16352,
+    "new_pid": 32084,
+    "app_version": "v1.0.3",
+    "started_at": "2026-11-16T23:42:59.209397+08:00",
+    "database": "sqlite",
+    "authentication_required": true,
+    "official_layers_available": true,
+    "automatic_web_fallback_enabled": false,
+    "local_and_public_health_match": true,
+    "public_database_path_redacted": true,
+    "entry": "/_expo/static/js/web/entry-5115ba442ac55ef3887c0fae59bdaf53.js",
+    "entry_sha256": "8c1840d3f1d52dcf85f1b26cab3d98da7e277d7f0eafda79b5981c6909695bca",
+    "local_public_disk_entry_hashes_match": true,
+    "frontend_export": "existing_build_local_clear_cache_same_origin_private_output_then_copy",
+    "persistent_frontend_settings": "ignored_local_dotenv_public_flags_only_no_server_credentials",
+    "rollback": "original_backend_env_full_dist_database_backups_and_private_runbook_preserved_outside_git",
+    "fresh_pre_switch_backup": true,
+    "rollback_performed": false,
+    "new_task_service_bat_or_funnel": false
+  },
+  "observed_runtime": {
+    "observation": "actual_task_startup_log_matching_new_health_started_at",
+    "source_load_decision": "ready",
+    "reviewed_selection": true,
+    "confirmation": true,
+    "profile_preview": true,
+    "candidate_search": false,
+    "raw_detail_http": false,
+    "profile_accept": false,
+    "enrichment": false,
+    "server_fdc_key_available": true
+  },
+  "observed_frontend_build": {
+    "observation": "explicit_cleared_export_inputs_and_emitted_entry_call_sites",
+    "EXPO_PUBLIC_FDC_REVIEWED_SELECTION_ENABLED": true,
+    "EXPO_PUBLIC_FDC_CONFIRMATION_ENABLED": true,
+    "EXPO_PUBLIC_FDC_PROFILE_PREVIEW_ENABLED": true,
+    "EXPO_PUBLIC_FDC_CANDIDATE_SEARCH_ENABLED": false,
+    "EXPO_PUBLIC_NUTRITION_ENRICHMENT_ENABLED": false,
+    "same_origin": true,
+    "authentication_required": true,
+    "private_credentials_scan": {
+      "text_files": 14,
+      "known_secret_values_checked": 7,
+      "matches": 0,
+      "test_url_or_token_matches": 0
+    }
+  },
+  "sqlite": {
+    "original_and_backup_and_post_switch_quick_check": "ok",
+    "source_policy_rows_added": 1,
+    "source_policy_version_rows_added": 1,
+    "checked_account_scan_snapshot_confirmation_preview_profile_record_counts_unchanged": true,
+    "new_nutrition_profiles": 0,
+    "new_meal_records": 0,
+    "not_a_claim_of_identical_database_bytes": true,
+    "validation_install_and_app_startup_used_backup_copy": true,
+    "production_install_used_explicit_digest_cli_after_backup_and_task_stop": true
+  },
+  "provider_validation": {
+    "location": "isolated_validation_process_using_staged_server_environment_not_production_scan_request",
+    "usda_fixed_detail_attempts": 1,
+    "fdc_id": "171688",
+    "source_description_matches": true,
+    "data_type": "SR Legacy",
+    "content_hash": "6e0dbf92c89dfd20a196fb2914ea89d33c95912695f1999bc383fbb7fcca0c29",
+    "retrieved_at": "2026-11-16T15:37:32.830361+00:00",
+    "production_strict_adapter_passed": true,
+    "known_nutrients": 9,
+    "calories_per_100g": 52,
+    "portion_g": 150,
+    "portion_calories": 78,
+    "search_calls": 0,
+    "tavily_calls": 0,
+    "model_calls": 0,
+    "retries": 0
+  },
+  "verification": {
+    "full_backend_before_final_startup_diagnostic_addition": {
+      "passed": 1142,
+      "subtests_passed": 1282,
+      "failed": 0,
+      "skipped": 0,
+      "elapsed_seconds": 149.76
+    },
+    "final_focused_lifecycle_admission_selection": {
+      "passed": 38,
+      "subtests_passed": 72,
+      "failed": 0,
+      "skipped": 0,
+      "elapsed_seconds": 11.09
+    },
+    "frontend_build_configuration_tests_passed": 8,
+    "closeout": {
+      "evidence_json": "parsed",
+      "python_files_ast_and_hashes_passed": 3,
+      "public_markdown_documents_checked": 6,
+      "existing_local_links": 238,
+      "balanced_fences_and_whitespace": "passed",
+      "git_diff_check": "passed",
+      "persistent_frontend_flags_match_export": true,
+      "private_rollback_runbook_present": true,
+      "final_health_started_at_unchanged_since_deployment": true,
+      "test_listeners_8090_8443": "absent"
+    },
+    "isolated_app_source_load_and_required_excluded_flags": "passed",
+    "public_anonymous_post_routes_http_401": [
+      "/nutrition/fdc/reviewed-selection", "/nutrition/fdc/confirmation",
+      "/nutrition/fdc/profile-preview", "/nutrition/fdc/candidates",
+      "/nutrition/fdc/detail", "/nutrition/fdc/profile-accept", "/nutrition/enrichment"
+    ],
+    "source_file_sha256": {
+      "backend/app.py": "69410814e9f6dce46999b1004407ec77c9ab905eeb72e0f05adda1ac70661435",
+      "backend/services/fdc_reviewed_source_lifecycle_service.py": "4f69732567e9594505723bf84d1a6a9864522857ed7e0b22f5654a8281976824",
+      "backend/tests/test_fdc_reviewed_source_lifecycle.py": "a23b089e0dcc4bc44adf91bd4bf21ddd1403528a386ee6924802bde293741def"
+    }
+  },
+  "limitations": [
+    "No new real-photo model or Android UI acceptance; previous fixed fixture evidence is not recognition accuracy.",
+    "A successful local nutrition hit must retain priority; source selection requires an actual eligible local miss.",
+    "Unknown skin, prepared/peeled/brand/scope conflicts remain excluded; nutrition never raises vision confidence.",
+    "Preview writes scan, snapshot, confirmation and preview state; profile accept and meal writes remain disabled in this FDC scope.",
+    "Source/load/admission tool deployment_authorized=false means the tool does not grant authority; deployment was a separate bounded operation.",
+    "Tavily registry remains empty; account/publisher and cross-user cache rights have no new approval.",
+    "Deployment is not unrestricted third-layer activation, formal real-photo end-to-end acceptance, a Git commit or GitHub push."
+  ],
+  "next_existing_item": "normal_scanner_real_photo_local_priority_identity_and_conditional_preview_acceptance_without_forced_misses_or_repeating_fixed_phone_fixture"
+}

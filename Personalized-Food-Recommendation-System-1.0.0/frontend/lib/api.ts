@@ -401,10 +401,6 @@ export type ApiAuth = {
   accessToken?: string | null;
 };
 
-// 本機後端連不上時的遠端備援。寫死網址會在後端搬家或砍掉之後變成死連結，
-// 改成用環境變數指定；沒設就不做 fallback。
-const RENDER_API_BASE_URL = process.env.EXPO_PUBLIC_FALLBACK_API_BASE_URL?.trim() || '';
-
 function buildHeaders(auth?: ApiAuth, contentType?: string): HeadersInit {
   const headers: Record<string, string> = {};
   if (contentType) headers['Content-Type'] = contentType;
@@ -618,9 +614,6 @@ export async function fetchHealthyFoodRecommendations(
   try {
     return await fetchJsonWithNetworkMessage<HealthyFoodResponse>(`${apiBaseUrl}${path}`, requestInit);
   } catch (err: any) {
-    if (RENDER_API_BASE_URL && isLocalApiBaseUrl(apiBaseUrl) && apiBaseUrl !== RENDER_API_BASE_URL) {
-      return fetchJsonWithNetworkMessage<HealthyFoodResponse>(`${RENDER_API_BASE_URL}${path}`, requestInit);
-    }
     if (err?.message?.startsWith('無法連線到後端 API')) {
       const healthReachable = await canReachBackendHealth(apiBaseUrl);
       if (healthReachable) {

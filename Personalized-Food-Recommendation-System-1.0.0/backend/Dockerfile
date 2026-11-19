@@ -1,5 +1,5 @@
-# 讓後端不綁定單一平台。Koyeb、Fly.io、Railway、Hugging Face Spaces
-# 都接受 Dockerfile，換家時不必再改設定。
+# Optional API-only development image; production uses the Windows scheduled task.
+# Mount persistent SQLite storage and supply credentials outside the image.
 FROM python:3.12-slim
 
 # 相依套件都有預編譯的輪子，不需要編譯工具鏈；
@@ -11,8 +11,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# 各家平台注入的埠號不同，app.py 讀 PORT；沒有就用 8000。
+# Container port publishing requires binding inside the container to all interfaces.
 ENV PORT=8000
+ENV SHARE_ON_LAN=true
 EXPOSE 8000
 
 # app.py 在非 debug 模式下用 waitress 啟動，不是 Flask 的開發伺服器。

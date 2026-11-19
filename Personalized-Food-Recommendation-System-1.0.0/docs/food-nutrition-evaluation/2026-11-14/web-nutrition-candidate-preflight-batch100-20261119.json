@@ -1,0 +1,43 @@
+{
+  "batch": 100,
+  "date": "2026-11-19",
+  "branch": "v1.0.3",
+  "outcome": "preflight_complete_insufficient_evidence",
+  "positive_acceptance": "not_started",
+  "candidate": {
+    "publisher": "GREEN&SAFE",
+    "product_name": "香菇赤肉羹",
+    "product_id": "MEG0028ABCS",
+    "url": "https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS",
+    "label_basis": ["per_serving", "per_100g"],
+    "label_scope": "frozen prepared product including broth and meat",
+    "not_substitutable_for": ["generic meat thick soup", "meat thick soup with rice noodles", "solids only"]
+  },
+  "historical_extraction_control": {
+    "case": "exact_soup",
+    "fixture": "../2026-11-13/positive-pipeline.json",
+    "settings": "../2026-11-13/tavily-settings.json",
+    "observations": ["table retrieved on some requests", "table omitted on an earlier request"],
+    "not_evidence_of": ["confirmed real scan", "normal official-source miss", "current end-to-end acceptance"]
+  },
+  "entry_gate": {
+    "confirmed_food_and_consumed_scope_from_real_scan": "not_evidenced",
+    "normal_tfda_and_usda_fdc_compatibility_miss": "not_evidenced",
+    "publisher_terms_supporting_trial_use": "not_verified"
+  },
+  "publisher_rights_check": {
+    "page": "https://www.green-n-safe.com/Common/TradementSafety",
+    "observation": "Search snippet wording on site-content rights was not corroborated on the opened page.",
+    "conclusion": "No auditable evidence for the intended use was found in this review; no legal prohibition was inferred."
+  },
+  "next_action": "Wait for one real case that meets all three gates before a bounded isolated positive trial; do not expand the candidate search without new evidence.",
+  "production": {
+    "web_registry": "unchanged_empty",
+    "automatic_web_fallback": "unchanged_disabled",
+    "sqlite_accessed": false,
+    "deployment_changed": false
+  },
+  "provider_calls": { "tavily": 0, "model": 0, "usda_api": 0 },
+  "nutrition_values_copied": false,
+  "application_tests": "not_run_documentation_only"
+}

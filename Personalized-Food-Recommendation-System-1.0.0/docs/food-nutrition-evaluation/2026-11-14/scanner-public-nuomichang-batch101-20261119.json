@@ -1,0 +1,89 @@
+{
+  "batch": 101,
+  "date": "2026-11-19",
+  "branch": "v1.0.3",
+  "outcome": "public_photo_vision_and_bounded_official_lookup_complete_no_compatible_match",
+  "photo": {
+    "title": "Nuomichang.jpg",
+    "author": "Brian Jeffery Beggerly",
+    "source": "https://commons.wikimedia.org/wiki/File:Nuomichang.jpg",
+    "license": "https://creativecommons.org/licenses/by/2.0/",
+    "download": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/76/Nuomichang.jpg/960px-Nuomichang.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "transformation": "Existing Wikimedia thumbnail of a cropped Commons file; no local transform",
+    "dimensions_px": [960, 540],
+    "bytes": 141231,
+    "sha256": "511b3b04f99c62e08b7a90d18d2fe08977120496fdd6cc907cef162c68e39e8d",
+    "stored_in_repository": false
+  },
+  "vision": {
+    "endpoint": "/predict/vision-food",
+    "http_status": 200,
+    "configured_model": "[AN]gemini-4-hydrogen-high",
+    "reported_model": "gemini-4-hydrogen",
+    "relay_calls": 1,
+    "retries": 0,
+    "relay_seconds": 13.945,
+    "reported_total_tokens": 4060,
+    "food_name_hint_supplied": false,
+    "item_count": 1,
+    "name_zh": "糯米腸",
+    "meal_guess": "烤糯米腸",
+    "food_state": "prepared",
+    "preparation_method": "roasted",
+    "components_scope": "food_only",
+    "brand": null,
+    "model_confidence": 0.92,
+    "estimated_weight_g": 1800,
+    "model_weight_confidence": 0.3,
+    "identity_confirmation_required": false,
+    "portion_independently_verified": false,
+    "validation_issues": []
+  },
+  "local_lookup": {
+    "TFDA": {"status": "available", "records": 2213},
+    "USDA FNDDS": {"status": "available", "records": 5431},
+    "item_status": "no_local_mapping",
+    "candidate_count": 0,
+    "compatible_count": 0
+  },
+  "fdc": {
+    "endpoint": "/nutrition/fdc/candidates",
+    "http_status": 200,
+    "snapshot_status": "available",
+    "searches": [
+      {"query": "糯米腸", "returned_candidates": 0},
+      {"query": "glutinous rice sausage", "returned_candidates": 5},
+      {"query": "Taiwanese glutinous rice sausage", "returned_candidates": 5}
+    ],
+    "deduplicated_candidates": [
+      {"id": "1104867", "description": "Flour, rice, glutinous"},
+      {"id": "168883", "description": "Rice, white, glutinous, unenriched, uncooked"},
+      {"id": "169711", "description": "Rice, white, glutinous, unenriched, cooked"},
+      {"id": "2708345", "description": "Cake made with glutinous rice"},
+      {"id": "2708422", "description": "Rice, white, cooked, glutinous"}
+    ],
+    "compatibility_review": "None represents the complete food; bounded result, not an exhaustive database claim",
+    "detail_calls": 0
+  },
+  "nutrition": {
+    "complete": false,
+    "portion_calculated": false,
+    "reported_aggregate_scope": "matched_items_only",
+    "aggregate_zero_means_no_matched_items": true
+  },
+  "third_layer": {
+    "status": "not_started",
+    "reason": "No independently verified consumed scope or compatible nutrition source with verified usage terms. Photo license is not nutrition data admission.",
+    "tavily_calls": 0,
+    "extraction_model_calls": 0
+  },
+  "isolation": {
+    "harness": "Flask test client with genuine temporary-account signup and authenticated routes",
+    "scan_context_persisted_in_test_database": true,
+    "temporary_sqlite_removed": true,
+    "production_database_accessed": false,
+    "production_flags_or_deployment_changed": false,
+    "meal_or_profile_write_called": false,
+    "mobile_camera_test": false
+  }
+}

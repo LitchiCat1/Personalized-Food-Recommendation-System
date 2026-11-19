@@ -1,0 +1,123 @@
+{
+  "batch": 82,
+  "date": "2026-11-17",
+  "branch": "v1.0.3",
+  "outcome": "bounded_real_apple_identity_and_reviewed_source_selection_verified_mobile_gate_incomplete",
+  "scope": "One real image through the current vision prompt/model, normal Flask vision and reviewed-selection routes, actual local datasets/matcher, and isolated temporary SQLite. Not a deployed scanner, Android, confirmation, nutrition preview, or meal-save acceptance.",
+  "input": {
+    "photo": "food_picture/蘋果.jpg",
+    "bytes": 89300,
+    "sha256": "80a7e116a21d460e9132a6764114504667b9594dfb30915e167027ab5684fe43",
+    "extension": ".jpg",
+    "actual_format": "WebP",
+    "dimensions_px": [1071, 675],
+    "mime_detected_by_existing_decoder": "image/webp",
+    "transformation": "none; original bytes were base64 encoded",
+    "visible_logo": "A logo is visible in the corner, separate from the apple and with no evidence it identifies the food brand. The model returned brand=null."
+  },
+  "requests": {
+    "observed_vision_transport": 1,
+    "retries": 0,
+    "configured_model": "[AN]gemini-4-hydrogen-high",
+    "reported_model": "gemini-4-hydrogen",
+    "reported_usage": {
+      "prompt_tokens": 2180,
+      "completion_tokens": 208,
+      "total_tokens": 3252,
+      "reasoning_tokens": 864
+    },
+    "vision_elapsed_seconds": 8.9,
+    "known_price_or_cost": null,
+    "tavily": 0,
+    "usda_search_or_detail": 0
+  },
+  "isolation": {
+    "database": "Dedicated temporary SQLite, closed and directory removed",
+    "authentication": "Test-only owner/session verifier; not password login acceptance",
+    "reviewed_source": "171688 installed only in the temporary SQLite for the ordinary reviewed-selection handler",
+    "production_database_directly_opened": false,
+    "production_data_writes": false,
+    "production_configuration_changed": false,
+    "production_restart_or_deploy": false,
+    "fdc_key_available_in_test_process": false,
+    "confirmation_or_preview_called": false,
+    "meal_or_profile_write_routes_called": false,
+    "temporary_counts": {
+      "scan_contexts": 1,
+      "candidate_snapshots": 1,
+      "confirmations": 0,
+      "previews": 0,
+      "profiles": 0
+    },
+    "temporary_sqlite_closed": true,
+    "temporary_directory_removed": true
+  },
+  "results": {
+    "vision_http_status": 200,
+    "reviewed_selection_http_status": 200,
+    "normalized_validation_issues": 0,
+    "recognized_items": 1,
+    "identity": {
+      "name_zh": "蘋果",
+      "name_en": "apple",
+      "confidence_reported_by_model": 0.98,
+      "food_state": "raw",
+      "preparation_method": "mixed",
+      "components_scope": "food_only",
+      "brand": null,
+      "variant": "with_skin",
+      "visual_evidence_reported_by_model": "畫面中央成人手掌中托著1顆完整的紅黃色生鮮蘋果，果皮與果梗完整且未經烹調或去皮。",
+      "alternatives": [],
+      "estimated_weight_g": 180,
+      "weight_confidence_reported_by_model": 0.5
+    },
+    "local_lookup": {
+      "TFDA": "no compatible match",
+      "USDA FNDDS": "no compatible match",
+      "classification": "genuine local miss for this normalized identity and state; not a dataset-health failure"
+    },
+    "reviewed_usda_fdc_selection": {
+      "reason": "reviewed_match",
+      "candidate_count": 1,
+      "fdc_id": "171688",
+      "identity": "generic raw apple with skin; no cultivar inferred",
+      "user_confirmation_required": true,
+      "photo_confidence_changed": false
+    },
+    "nutrition_values_returned": false,
+    "nutrition_complete": false
+  },
+  "interpretation": [
+    "The existing vision request already returned a generic food identity, visible skin/state evidence, alternatives and uncertainty fields; a second image-model call is not needed for the proposed sequence.",
+    "A single model response at confidence 0.98 is an observation, not calibrated accuracy or proof of cultivar. The weight confidence was only 0.5 and 180 g is an estimate, not a measurement.",
+    "Both local layers missed, so the existing explicitly reviewed USDA FDC 171688 source was selected as a pending reference. No Detail request, user confirmation or preview occurred.",
+    "No Tavily call was made: the normal pipeline found a compatible reviewed USDA source. This test does not establish the behavior or credibility of any Tavily result."
+  ],
+  "three_layer_design_review": {
+    "vision_stage": "Return a conservative canonical display name plus visible evidence, food state/scope, explicitly supported variant, and alternatives/uncertainty. Never infer cultivar, brand or hidden ingredients from likely appearance alone.",
+    "retrieval_order": "Keep TFDA then compatible USDA/FDC. Only a genuine, healthy-dataset local miss may enter an admitted Web/Tavily source path; incompatible, ambiguous-identity, partial-profile and unavailable are different outcomes, not search misses.",
+    "tavily_role": "Search for permitted nutrition sources using the already recognized generic identity and visible state/scope; do not send the image, health data or unsupported identity guesses. Tavily relevance score is not food-match confidence.",
+    "model_extraction_role": "Use the fixed structured extraction prompt on retrieved source text only; return candidate food identity, original serving basis, units, nutrient cells and citations. Do not use model memory to invent values or use nutrition-page contents to resolve what the image depicts.",
+    "adoption_gate": "Backend independently verifies exact food/state/scope compatibility, source rights/admission, original cited values, units, completeness/unknowns, ranges and arithmetic. Keep image identity confidence separate from source compatibility and nutrition provenance. On uncertainty, return unresolved and ask the user rather than fabricate precision.",
+    "activation_status": "Planning clarification only. Production Tavily registry remains empty and automatic Web fallback remains disabled."
+  },
+  "evidence_integrity": {
+    "ignored_diagnostic": "tmp/scanner-apple-b82.json",
+    "ignored_diagnostic_sha256": "13030fdd897b7c31ac8e3158b2c42e8eaa19003adfc514700bd6cd705320d1c9",
+    "ignored_probe_script": "tmp/probe-scanner-apple-b82.py",
+    "ignored_probe_script_sha256": "66752eb07f983df746abb04f07314f86a2ad95b98eebbd052c607fb99ddff200"
+  },
+  "source_sha256_at_evidence_creation": {
+    "backend/app.py": "0b03b9862594cd5ee68639763731f6f52520a579522aa987a6096025a64e02dc",
+    "backend/services/vision_food_service.py": "207be50d0044e674da027b9951b0e76cdccf325cff8b7fb696a43bacaa74f605",
+    "backend/services/vision_nutrition_service.py": "4be4939a75a0b355ecb2a99f33ef9e32d1bdf2a8ec6996e8bfc826445b00bb07",
+    "backend/services/fdc_reviewed_selection_service.py": "4238e3ed62df3f124cd2f05805f61353570a62fbe3dab4846760c2d8817c33ae",
+    "backend/services/nutrition_label_service.py": "4a35f7307f2ac95435dab80a228b505241f15e21ecee453b98c1eee62a82f64f"
+  },
+  "limitations_and_next": [
+    "Normal Flask test_client routes with temporary SQLite are not the deployed HTTPS scanner, real Android gallery/camera flow, user confirmation or preview acceptance.",
+    "One image/model call does not establish general recognition, state, skin, cultivar, confidence calibration, weight or nutrition accuracy.",
+    "Next: have the user run this original image through the ordinary scanner page and capture the pending generic apple/reference confirmation. Do not confirm or save on the user's behalf; do not force a local miss or repeat the fixed fixture.",
+    "No Tavily activation, new Web-source admission, profile acceptance, meal write, broader UI or additional workstream is authorized by this experiment."
+  ]
+}

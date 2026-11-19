@@ -78,8 +78,21 @@ class ScannerBrowserE2eHarnessTests(unittest.TestCase):
             self.assertEqual(harness.os.environ["NUTRILENS_SKIP_LOCAL_ENV"], "1")
             self.assertEqual(harness.os.environ["NUTRITION_SCAN_CONTEXT_TTL_SECONDS"], "120")
             for flag in ("FDC_PROFILE_ACCEPT_ROUTE_ENABLED", "FDC_DETAIL_ROUTE_ENABLED",
+                         "NUTRITION_IDENTITY_CONFIRMATION_ROUTE_ENABLED",
                          "NUTRITION_ENRICHMENT_ROUTE_ENABLED"):
                 self.assertEqual(harness.os.environ[flag], "false")
+
+    def test_static_frontend_must_be_a_completed_export_inside_this_test_directory(self):
+        directory = self.database.parent / "dist"
+        with self.assertRaises(SystemExit):
+            harness.validate_frontend_dist(directory, self.database)
+        directory.mkdir()
+        with self.assertRaises(SystemExit):
+            harness.validate_frontend_dist(directory, self.database)
+        (directory / "index.html").write_text("test fixture", encoding="utf-8")
+        self.assertEqual(harness.validate_frontend_dist(directory, self.database), directory)
+        with self.assertRaises(SystemExit):
+            harness.validate_frontend_dist(SCRIPT.parents[2] / "frontend" / "dist", self.database)
 
     def test_nonloopback_host_is_rejected_before_database_creation(self):
         with patch.object(harness, "parse_args", return_value=type("Args", (), {

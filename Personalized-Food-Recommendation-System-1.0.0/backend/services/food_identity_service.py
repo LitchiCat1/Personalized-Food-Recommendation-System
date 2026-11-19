@@ -5,6 +5,7 @@ prevents known category labels from gaining identity through a nutrition search.
 Comparison normalization never changes the stored visual name or confidence.
 """
 
+import math
 import re
 import unicodedata
 
@@ -43,6 +44,14 @@ _UNCERTAINTY_MARKERS = (
 )
 _ENGLISH_UNCERTAINTY = re.compile(r"\b(?:unknown|unidentified|uncertain|possibly)\b")
 
+VISION_IDENTITY_READY_CONFIDENCE = 0.75
+_IDENTITY_VALUES = {
+    "food_state": {"prepared", "raw", "dry"},
+    "preparation_method": {"boiled", "stir_fried", "pan_fried", "deep_fried", "roasted",
+                           "braised", "steamed", "mixed"},
+    "components_scope": {"food_only", "noodles_only", "whole_dish_with_broth", "with_sides"},
+}
+
 
 def requires_food_identity_confirmation(name):
     """Return whether a name is invalid or a known generic/uncertain label.
@@ -79,4 +88,62 @@ def requires_food_identity_confirmation(name):
     return True
 
 
-__all__ = ["requires_food_identity_confirmation"]
+def vision_identity_needs_confirmation(item, *, minimum_confidence=None):
+    """Derive identity uncertainty without treating uncertain weight as identity.
+
+    Alternatives are synonyms in the vision contract, not competing species.
+    Invalid model fields still fail closed through validation_issues.
+    """
+    confidence = item.get("confidence")
+    threshold = VISION_IDENTITY_READY_CONFIDENCE
+    if minimum_confidence is not None:
+        if (isinstance(minimum_confidence, bool) or not isinstance(minimum_confidence, (int, float))
+                or not math.isfinite(minimum_confidence) or minimum_confidence < 0
+                or minimum_confidence > 1):
+            return True
+        threshold = max(threshold, minimum_confidence)
+    return not (
+        not isinstance(confidence, bool) and isinstance(confidence, (int, float))
+        and math.isfinite(confidence) and threshold <= confidence <= 1
+        and not item.get("validation_issues")
+        and not requires_food_identity_confirmation(item.get("name_zh"))
+        and all(isinstance(item.get(field), str) and item[field] in values
+                for field, values in _IDENTITY_VALUES.items())
+    )
+
+
+def identity_attributes_are_known(item):
+    """Require usable state/preparation/scope independently of name confidence."""
+    return (
+        isinstance(item, dict)
+        and not item.get("validation_issues")
+        and all(isinstance(item.get(field), str) and item[field] in values
+                for field, values in _IDENTITY_VALUES.items())
+    )
+
+
+def web_identity_ready(item, *, minimum_confidence=None):
+    """Require an explicit server decision plus current identity constraints.
+
+    Old scan snapshots lack the decision and remain readable, but cannot gain
+    web authority. The repository hash and scan token bind this decision.
+    """
+    source = item.get("identity_confirmation_source")
+    if source is not None or "identity_confirmation_id" in item:
+        confirmation_id = item.get("identity_confirmation_id")
+        return (
+            source == "user"
+            and isinstance(confirmation_id, str) and bool(confirmation_id.strip())
+            and len(confirmation_id) <= 256
+            and not any(ord(char) < 32 or ord(char) == 127 for char in confirmation_id)
+            and item.get("identity_confirmation_required") is False
+            and not requires_food_identity_confirmation(item.get("name_zh"))
+            and identity_attributes_are_known(item)
+        )
+    return (item.get("identity_confirmation_required") is False
+            and not vision_identity_needs_confirmation(item, minimum_confidence=minimum_confidence))
+
+
+__all__ = ["requires_food_identity_confirmation", "vision_identity_needs_confirmation",
+           "identity_attributes_are_known", "web_identity_ready",
+           "VISION_IDENTITY_READY_CONFIDENCE"]

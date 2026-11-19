@@ -1,7 +1,8 @@
 from copy import deepcopy
 import unittest
 
-from services.food_identity_service import requires_food_identity_confirmation
+from services.food_identity_service import (requires_food_identity_confirmation,
+                                            vision_identity_needs_confirmation, web_identity_ready)
 from services.food_query_normalization_service import (
     FoodQueryNormalizationError,
     build_fdc_search_query_plan,
@@ -9,6 +10,7 @@ from services.food_query_normalization_service import (
 from services.fdc_candidate_search_service import _eligible_for_search
 from services.nutrition_enrichment_route_service import _web_enrichment_eligible
 from services.web_nutrition_service import _identity_ready
+from services.vision_food_service import build_vision_food_response
 
 
 GENERIC_NAMES = (
@@ -74,10 +76,73 @@ class FoodIdentityTests(unittest.TestCase):
         for name in SPECIFIC_NAMES:
             for gate in (_eligible_for_search, _web_enrichment_eligible, _identity_ready):
                 with self.subTest(name=name, gate=gate.__name__):
-                    item = {"name_zh": name, "confidence": 0.95, "validation_issues": []}
+                    item = {"name_zh": name, "confidence": 0.95, "validation_issues": [],
+                            "identity_confirmation_required": False, "food_state": "prepared",
+                            "preparation_method": "stir_fried", "components_scope": "food_only"}
                     self.assertTrue(gate(item))
                     self.assertFalse(gate(dict(item, confidence=0.4)))
                     self.assertFalse(gate(dict(item, validation_issues=["ambiguous_name"])))
+
+    def test_web_identity_requires_server_status_but_not_portion_confidence(self):
+        item = {"name_zh": "青江菜", "confidence": 0.95, "validation_issues": [],
+                "identity_confirmation_required": False, "food_state": "prepared",
+                "preparation_method": "stir_fried", "components_scope": "food_only",
+                "weight_confidence": 0.1}
+        self.assertFalse(vision_identity_needs_confirmation(item))
+        self.assertTrue(web_identity_ready(item))
+        self.assertFalse(web_identity_ready({key: value for key, value in item.items()
+                                             if key != "identity_confirmation_required"}))
+        self.assertFalse(web_identity_ready(dict(item, confidence=0.74)))
+        self.assertFalse(web_identity_ready(dict(item, food_state="unknown")))
+
+    def test_generic_name_cannot_be_cleared_by_a_client_status(self):
+        item = {"name_zh": "炒菜葉", "confidence": 0.99, "validation_issues": [],
+                "identity_confirmation_required": False, "food_state": "prepared",
+                "preparation_method": "stir_fried", "components_scope": "food_only"}
+        self.assertTrue(vision_identity_needs_confirmation(item))
+        self.assertFalse(web_identity_ready(item))
+
+    def test_server_owned_user_confirmation_can_replace_vision_confidence_only(self):
+        item = {
+            "name_zh": "青江菜", "confidence": 0.42, "validation_issues": [],
+            "identity_confirmation_required": False, "identity_confirmation_source": "user",
+            "identity_confirmation_id": "server-confirmation-1", "food_state": "prepared",
+            "preparation_method": "stir_fried", "components_scope": "food_only",
+        }
+        self.assertTrue(vision_identity_needs_confirmation(item))
+        self.assertTrue(web_identity_ready(item))
+        self.assertTrue(_eligible_for_search(item))
+        self.assertTrue(_web_enrichment_eligible(item))
+
+        self.assertFalse(web_identity_ready(dict(item, name_zh="菜葉")))
+        self.assertFalse(web_identity_ready(dict(item, identity_confirmation_id=None)))
+        self.assertFalse(web_identity_ready(dict(item, preparation_method="unknown")))
+        self.assertFalse(web_identity_ready(dict(item, validation_issues=["bad_state"])))
+
+    def test_client_status_or_invented_confirmation_provenance_stays_blocked(self):
+        base = {"name_zh": "青江菜", "confidence": 0.42, "validation_issues": [],
+                "identity_confirmation_required": False, "food_state": "prepared",
+                "preparation_method": "stir_fried", "components_scope": "food_only"}
+        self.assertFalse(web_identity_ready(base))
+        self.assertFalse(web_identity_ready(dict(
+            base, identity_confirmation_source="model", identity_confirmation_id="client-id")))
+
+    def test_global_vision_issues_mark_identity_as_unconfirmed(self):
+        class Storage:
+            def get_user(self, _user_id):
+                return None
+
+            def get_custom_foods(self, _user_id):
+                return []
+
+        parsed = {"items": [{"name_zh": "蘋果", "name_en": "apple", "confidence": 0.98,
+                             "weight_confidence": 0.2, "estimated_weight_g": 100,
+                             "food_state": "raw", "preparation_method": "mixed",
+                             "components_scope": "food_only"}],
+                  "validation_issues": ["response_warning"]}
+        response = build_vision_food_response(parsed, Storage(), {}, {}, {"groups": []},
+                                              [], [], "user-1", lambda food, *_: food)
+        self.assertTrue(response["recognition_context"]["items"][0]["identity_confirmation_required"])
 
 
 if __name__ == "__main__":

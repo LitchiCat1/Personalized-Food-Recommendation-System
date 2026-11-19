@@ -88,9 +88,8 @@ class BindHostTests(ApiTestBase):
         self.assertEqual(self.app_module.bind_host(["--lan"], {}), "0.0.0.0")
         self.assertEqual(self.app_module.bind_host([], {"SHARE_ON_LAN": "true"}), "0.0.0.0")
 
-    def test_render_needs_every_network(self):
-        # Render 只看 0.0.0.0 上有沒有開埠；綁 127.0.0.1 會部署失敗、一直跑舊版
-        self.assertEqual(self.app_module.bind_host([], {"RENDER": "true"}), "0.0.0.0")
+    def test_retired_platform_variable_does_not_expose_the_server(self):
+        self.assertEqual(self.app_module.bind_host([], {"RENDER": "true"}), "127.0.0.1")
 
 
 class LoginLimitTests(ApiTestBase):
@@ -169,12 +168,11 @@ class SignupGateTests(ApiTestBase):
             self.assertEqual(self.signup("guest@example.com", environ_base=LAN).status_code, 201)
             self.assertEqual(self.signup("guest2@example.com", headers=TUNNEL_HEADERS).status_code, 201)
 
-    def test_render_is_open_unless_turned_off(self):
-        # Render 上每個連線都算其他裝置，環境變數要到後台設；沒設就預設開放
+    def test_retired_platform_variable_does_not_open_signup(self):
         with patch.dict(os.environ, {"RENDER": "true", "SIGNUP_CODE": ""}):
             os.environ.pop("OPEN_SIGNUP", None)
-            self.assertEqual(self.client.get("/auth/config", environ_base=LAN).get_json()["signup"], "open")
-            self.assertEqual(self.signup("guest@example.com", environ_base=LAN).status_code, 201)
+            self.assertEqual(self.client.get("/auth/config", environ_base=LAN).get_json()["signup"], "closed")
+            self.assertEqual(self.signup("guest@example.com", environ_base=LAN).status_code, 403)
         with patch.dict(os.environ, {"RENDER": "true", "OPEN_SIGNUP": "false", "SIGNUP_CODE": ""}):
             self.assertEqual(self.client.get("/auth/config", environ_base=LAN).get_json()["signup"], "closed")
             self.assertEqual(self.signup("guest2@example.com", environ_base=LAN).status_code, 403)
@@ -278,7 +276,7 @@ class WriteLimitTests(ApiTestBase):
     """飲食紀錄、自訂食品、健康檔案這幾條會寫進資料庫的路由。
 
     先前沒有限流，能收多大又只看全站給照片用的 12 MB：一筆 8 MB 的紀錄原樣
-    存進資料庫，一分鐘送幾百筆也照收，幾十次就能塞滿 Supabase 免費的 500 MB。
+    存進資料庫，一分鐘送幾百筆也照收，會快速佔滿伺服器的磁碟空間。
     """
 
     FOOD = {"name": "雞腿便當", "calories": 700}

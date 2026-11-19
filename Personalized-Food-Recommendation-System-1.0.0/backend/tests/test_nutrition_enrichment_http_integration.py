@@ -7,6 +7,7 @@ from repositories.nutrition_enrichment_repository import NutritionEnrichmentRequ
 from repositories.nutrition_quota_repository import NutritionQuotaRepository
 from repositories.scan_context_repository import NutritionScanContextRepository
 from repositories.sqlite_db import SqliteDatabase
+from services.fdc_candidate_search_service import FdcCandidateSearchService
 from services.nutrition_authority_service import NutritionAuthorityService
 from services.nutrition_profile_service import calculate_portion, profile_from_local_food
 
@@ -18,7 +19,7 @@ ITEM = {
     "confidence": 0.94, "weight_confidence": 0.8, "estimated_weight_g": 100,
     "food_state": "prepared", "preparation_method": "steamed",
     "components_scope": "food_only", "brand": None, "variant": None,
-    "validation_issues": [],
+    "validation_issues": [], "identity_confirmation_required": False,
 }
 
 
@@ -58,9 +59,21 @@ class NutritionEnrichmentHttpIntegrationTests(ApiTestBase):
 
     def test_authority_is_consumed_once_and_same_request_replays(self):
         clock = time.time()
-        scan = NutritionScanContextRepository(clock=lambda: clock)
-        requests = NutritionEnrichmentRequestRepository(clock=lambda: clock)
-        quota = NutritionQuotaRepository(per_user_limit=2, global_limit=2, clock=lambda: clock)
+        db = SqliteDatabase(":memory:")
+        self.addCleanup(db.close)
+        scan = NutritionScanContextRepository(db, clock=lambda: clock)
+        snapshots = FdcCandidateSnapshotRepository(
+            db, scan_context_repository=scan, clock=lambda: clock)
+        requests = NutritionEnrichmentRequestRepository(db, clock=lambda: clock)
+        quota = NutritionQuotaRepository(db, per_user_limit=2, global_limit=2, clock=lambda: clock)
+        fdc_client = Mock()
+        fdc_client.search_foods.return_value = {"candidates": [], "confirmed_no_hits": True}
+        official_health = {source: {"status": "available"} for source in ("TFDA", "USDA FNDDS")}
+        local_lookup = Mock(return_value={"status": "no_local_mapping"})
+        fdc_search = FdcCandidateSearchService(
+            scan_context_repository=scan, snapshot_repository=snapshots,
+            local_lookup_factory=lambda user_id: local_lookup,
+            client_factory=lambda: fdc_client, official_health=official_health)
         authority = NutritionAuthorityService({"active": b"h" * 32}, clock=lambda: clock)
         scan.save_scan_context(
             user_id="user-a", scan_id="http-scan", scan_revision=0,
@@ -76,15 +89,53 @@ class NutritionEnrichmentHttpIntegrationTests(ApiTestBase):
                 return {"status": "complete", "result": {"items": [_provider_item(ITEM)]}}
             return provider
 
+        cache = Mock()
+        cache.get.return_value = None
         with self.mock_auth("user-a"), \
                 patch.object(self.app_module, "nutrition_scan_context_repository", scan), \
+                patch.object(self.app_module, "fdc_candidate_snapshot_repository", snapshots), \
+                patch.object(self.app_module, "fdc_candidate_route_enabled", True), \
+                patch.object(self.app_module, "fdc_candidate_search_service", fdc_search), \
                 patch.object(self.app_module, "nutrition_enrichment_repository", requests), \
                 patch.object(self.app_module, "nutrition_quota_repository", quota), \
                 patch.object(self.app_module, "nutrition_profile_repository", _SourceStub()), \
-                patch.object(self.app_module, "nutrition_cache_repository", None), \
+                patch.object(self.app_module, "nutrition_cache_repository", cache), \
+                patch.object(self.app_module, "NUTRITION_DATASET_HEALTH", official_health), \
+                patch.object(self.app_module, "make_local_nutrition_lookup", return_value=local_lookup), \
                 patch.object(self.app_module, "nutrition_authority_service", authority), \
                 patch.object(self.app_module, "nutrition_enrichment_route_enabled", True), \
-                patch.object(self.app_module, "nutrition_enrichment_provider_factory", side_effect=provider_factory):
+                patch.object(self.app_module, "nutrition_enrichment_provider_factory", side_effect=provider_factory) as factory:
+            pending = self.client.post(
+                "/nutrition/enrichment", json=self._body(token), headers=self.auth_headers())
+            self.assertEqual(pending.status_code, 409)
+            self.assertEqual(pending.get_json()["error"]["code"], "official_nutrition_pending")
+            cache.get.assert_not_called()
+            factory.assert_not_called()
+            self.assertEqual(quota.quota_snapshot("user-a")["user_used"], 0)
+
+            official = self.client.post("/nutrition/fdc/candidates",
+                                        json={"scan_id": "http-scan", "scan_revision": 0},
+                                        headers=self.auth_headers())
+            self.assertEqual(official.status_code, 200)
+            self.assertEqual(official.get_json()["status"], "empty")
+            fdc_client.search_foods.assert_called_once()
+
+            with patch.dict(official_health, {"TFDA": {"status": "unavailable"}}):
+                unavailable = self.client.post(
+                    "/nutrition/enrichment", json=self._body(token), headers=self.auth_headers())
+                self.assertEqual(unavailable.status_code, 503)
+                self.assertEqual(unavailable.get_json()["error"]["code"], "local_unavailable")
+                cache.get.assert_not_called()
+                factory.assert_not_called()
+
+            with patch.object(self.app_module.fdc_reviewed_selection_service.registry,
+                              "compatible", return_value=[object()]):
+                pending = self.client.post(
+                    "/nutrition/enrichment", json=self._body(token), headers=self.auth_headers())
+                self.assertEqual(pending.get_json()["error"]["code"], "official_nutrition_pending")
+                cache.get.assert_not_called()
+                factory.assert_not_called()
+
             first = self.client.post(
                 "/nutrition/enrichment", json=self._body(token), headers=self.auth_headers())
             self.assertEqual(first.status_code, 200)
@@ -94,6 +145,7 @@ class NutritionEnrichmentHttpIntegrationTests(ApiTestBase):
                 "/nutrition/enrichment", json=self._body(token), headers=self.auth_headers())
             self.assertEqual(replay.status_code, 200)
             self.assertTrue(replay.get_json()["replayed"])
+            self.assertEqual(quota.quota_snapshot("user-a")["user_used"], 1)
 
             rejected = self.client.post(
                 "/nutrition/enrichment",
@@ -268,3 +320,4 @@ class NutritionEnrichmentHttpIntegrationTests(ApiTestBase):
 
 if __name__ == "__main__":
     unittest.main()
+from repositories.fdc_candidate_snapshot_repository import FdcCandidateSnapshotRepository

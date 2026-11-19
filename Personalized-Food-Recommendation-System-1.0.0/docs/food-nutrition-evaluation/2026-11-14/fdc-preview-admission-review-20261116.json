@@ -1,0 +1,219 @@
+{
+  "review_date": "2026-11-16",
+  "batch": 75,
+  "scope": "production_source_installation_registry_and_flag_admission_review_not_deployment",
+  "branch": "v1.0.3",
+  "outcome": "review_complete_configuration_blocked_no_activation",
+  "repository_default_review": {
+    "schema_version": "FdcPreviewAdmissionReviewV1",
+    "scope": "configuration_review_only_not_runtime_or_deployment_authorization",
+    "decision": "blocked",
+    "deployment_authorized": false,
+    "sources": [],
+    "blockers": [
+      {
+        "code": "prerequisite_unverified",
+        "target": "sqlite"
+      },
+      {
+        "code": "prerequisite_unverified",
+        "target": "authentication"
+      },
+      {
+        "code": "prerequisite_unverified",
+        "target": "server_usda_key"
+      },
+      {
+        "code": "required_flag_disabled",
+        "target": "FDC_REVIEWED_SELECTION_ROUTE_ENABLED"
+      },
+      {
+        "code": "required_flag_disabled",
+        "target": "FDC_CONFIRMATION_ROUTE_ENABLED"
+      },
+      {
+        "code": "required_flag_disabled",
+        "target": "FDC_PROFILE_PREVIEW_ROUTE_ENABLED"
+      },
+      {
+        "code": "required_flag_disabled",
+        "target": "EXPO_PUBLIC_FDC_REVIEWED_SELECTION_ENABLED"
+      },
+      {
+        "code": "required_flag_disabled",
+        "target": "EXPO_PUBLIC_FDC_CONFIRMATION_ENABLED"
+      },
+      {
+        "code": "required_flag_disabled",
+        "target": "EXPO_PUBLIC_FDC_PROFILE_PREVIEW_ENABLED"
+      },
+      {
+        "code": "no_reviewed_sources",
+        "target": "reviewed_fdc_configuration"
+      }
+    ],
+    "write_boundary": {
+      "scan_snapshot_confirmation_and_preview_state": true,
+      "nutrition_profile_accept": false,
+      "meal_record": false,
+      "cross_user_cache": false
+    },
+    "provider_boundary": {
+      "fixed_confirmed_fdc_detail": true,
+      "fdc_search": false,
+      "tavily": false,
+      "model_nutrition_generation": false
+    },
+    "observations": {
+      "configuration": "repository_defaults_not_runtime",
+      "installed_sources": "not_inspected",
+      "local_datasets": "actual_repository_files",
+      "credentials": "not_read",
+      "deployed_frontend_bundle": "not_inspected",
+      "running_backend_flags": "not_inspected"
+    }
+  },
+  "prospective_initial_scope": {
+    "source_ids": [
+      "usda-fdc-171688"
+    ],
+    "food_identity": "generic raw apple, visibly with skin; photographed name remains apple",
+    "policy_sha256": "14152c86f9f718ee7057d65b038d6b9be65d3a7197995308f29ef91f5876b85f",
+    "excluded_from_initial_set": [
+      "usda-fdc-1750340",
+      "unapproved Tavily sources"
+    ],
+    "backend_required_true": [
+      "FDC_REVIEWED_SELECTION_ROUTE_ENABLED",
+      "FDC_CONFIRMATION_ROUTE_ENABLED",
+      "FDC_PROFILE_PREVIEW_ROUTE_ENABLED"
+    ],
+    "backend_required_false": [
+      "FDC_CANDIDATE_ROUTE_ENABLED",
+      "FDC_DETAIL_ROUTE_ENABLED",
+      "FDC_PROFILE_ACCEPT_ROUTE_ENABLED",
+      "NUTRITION_ENRICHMENT_ROUTE_ENABLED"
+    ],
+    "frontend_build_required_true": [
+      "EXPO_PUBLIC_FDC_REVIEWED_SELECTION_ENABLED",
+      "EXPO_PUBLIC_FDC_CONFIRMATION_ENABLED",
+      "EXPO_PUBLIC_FDC_PROFILE_PREVIEW_ENABLED"
+    ],
+    "frontend_build_required_false": [
+      "EXPO_PUBLIC_FDC_CANDIDATE_SEARCH_ENABLED",
+      "EXPO_PUBLIC_NUTRITION_ENRICHMENT_ENABLED"
+    ],
+    "key_and_authentication": "server-only configured USDA key and authenticated SQLite flow must be observed at deployment; not inspected this batch",
+    "source_loading": "reviewed source artifacts are not production configuration or installed policies",
+    "writes": "scan, snapshot, confirmation and preview state persist; no nutrition profile accept, meal save or cross-user cache in this scope",
+    "fixed_detail": "preview service calls fixed confirmed ID internally; raw Detail HTTP route need not be enabled"
+  },
+  "implementation": {
+    "service": "backend/services/fdc_preview_admission_service.py",
+    "cli": "tools/review_fdc_preview_admission.py",
+    "tests": "backend/tests/test_fdc_preview_admission.py",
+    "reuses_actual_selection_policy_admission_and_descriptor_validation": true,
+    "checks": [
+      "explicit boolean prerequisites, required flags and excluded flags",
+      "healthy TFDA and USDA FNDDS repository files",
+      "nonempty canonical reviewed sources",
+      "unique IDs and unambiguous compatible identities",
+      "current installed source active, same full policy, canonical nonnegative revision",
+      "withdrawn, uninstalled, drifted and unreadable policies fail closed",
+      "unknown observations never imply runtime verification"
+    ],
+    "database_reader": {
+      "explicit_existing_path_only": true,
+      "mode": "ro",
+      "query_only": true,
+      "consistent_read_transaction": true,
+      "schema_initialization": false,
+      "source_installation": false,
+      "withdrawal_reactivation": false
+    },
+    "disclaimer": "pure configuration reviewer, not production loader, installer, rights grant or runtime enforcement; any supplied snapshot can be stale or incorrect"
+  },
+  "tests": {
+    "initial_focused": {
+      "passed": 46,
+      "subtests_passed": 75,
+      "elapsed_seconds": 6.69,
+      "note": "before adding the two final ambiguity/distinct-source cases; superseded by final full run"
+    },
+    "final_full_backend": {
+      "command": "python -m pytest backend/tests -q --disable-warnings",
+      "passed": 1124,
+      "subtests_passed": 1262,
+      "failed": 0,
+      "skipped": 0,
+      "elapsed_seconds": 150.81,
+      "isolation": "skip local dotenv, empty DATABASE_PATH, external DB/provider environment removed; only test memory/temp SQLite"
+    },
+    "new_test_methods": 11,
+    "read_only_sqlite_evidence": [
+      "temporary installed policy gives configuration_ready without deployment consent",
+      "write attempt is rejected on read-only connection; main database bytes unchanged",
+      "withdrawn source denied, missing schema denied without initialization, absent file not created",
+      "CLI defaults blocked; explicit snapshot ready only for configuration; unexpected secret field rejected without echo"
+    ],
+    "network_in_new_tests": "socket connect forbidden",
+    "ui_changed": false,
+    "ui_retest": "not required; previous batch74 browser evidence retained"
+  },
+  "official_references_rechecked": [
+    {
+      "url": "https://fdc.nal.usda.gov/api-guide/",
+      "finding": "FDC public-domain/CC0 data; source attribution requested; key private; default 1000 requests/hour/IP"
+    },
+    {
+      "url": "https://www.tavily.com/terms",
+      "page_last_updated": "2026-05-04",
+      "finding": "application use and Order Form terms, third-party rights and obligations remain separate; no blanket retention/cross-user approval inferred",
+      "account_order_form_inspected": false,
+      "new_publisher_approvals": false
+    }
+  ],
+  "review_findings": [
+    "Candidate source JSON, installed active source policy and frontend/backend enabled flags are three independent conditions.",
+    "Read-only nutrition preview still persists workflow state.",
+    "Raw Search/Detail HTTP and accept are not prerequisites for the reviewed-only preview scope.",
+    "A successful supplied-snapshot review does not verify a live backend, built bundle or future policy state.",
+    "The existing source registry already rejects duplicate sources before redundant diagnostic code; initial assertion corrected without weakening validation."
+  ],
+  "side_effects": {
+    "real_model_calls": 0,
+    "real_usda_calls": 0,
+    "real_tavily_calls": 0,
+    "production_database_reads": 0,
+    "production_database_writes": 0,
+    "credentials_read": false,
+    "production_policy_installed": false,
+    "production_flags_changed": false,
+    "production_registry_changed": false,
+    "frontend_build_or_deploy": false,
+    "server_restart": false,
+    "commit_or_push": false,
+    "existing_server": {
+      "port": 5000,
+      "pid_observed": 16352,
+      "modified": false
+    },
+    "temporary_8090_listener": "absent"
+  },
+  "artifact_validation": {
+    "python_compile": "passed for service, CLI and tests",
+    "markdown_files_checked": 5,
+    "local_links_checked": 221,
+    "markdown_fences": "balanced",
+    "json_parse": "passed",
+    "whitespace_and_git_diff_check": "passed"
+  },
+  "self_review": "same agent, no independent or legal review claimed",
+  "next_existing_item": "explicit171688 installation and restart loading in isolated SQLite; preserve withdrawal and reject drift, then controlled rollout using the completed matrix",
+  "limitations": [
+    "No fresh food-photo, model-accuracy, nutrition-ground-truth or mobile-save claim",
+    "Production DB policies, deployed bundle and effective runtime flags not inspected",
+    "Tavily account/publisher/retention/cross-user approvals unresolved and excluded",
+    "No installation or automatic source-file discovery added by this review"
+  ]
+}

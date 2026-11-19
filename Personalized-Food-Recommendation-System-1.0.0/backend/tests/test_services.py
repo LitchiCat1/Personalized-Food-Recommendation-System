@@ -403,7 +403,7 @@ class ServiceSmokeTests(unittest.TestCase):
         self.assertIn("en:milk", mapped["allergens"])
 
     def test_custom_food_lookup_requires_user_scope(self):
-        repo = StorageRepository(None, False, {}, [], [])
+        repo = StorageRepository({}, [], [])
         saved = repo.upsert_custom_food(
             {
                 "food_id": "custom_1",
@@ -1364,7 +1364,7 @@ class OpenNowRecommendationTests(unittest.TestCase):
         }
 
     def _build(self, venues):
-        storage = StorageRepository(None, False, {}, [], [])
+        storage = StorageRepository({}, [], [])
         storage.upsert_user({"user_id": "u1", "name": "U", "height": 170, "weight": 65, "age": 30})
         with patch.object(healthy_food_service_module, "fetch_google_places_restaurants",
                           return_value=venues):
@@ -1393,7 +1393,7 @@ class IndexedMenuRecommendationTests(unittest.TestCase):
     """已建檔的店要逐道菜比對疾病禁忌，不是掛一個「到店後再選」的佔位品項。"""
 
     def _storage(self, conditions=(), allergens=(), menu=None):
-        storage = StorageRepository(None, False, {}, [], [])
+        storage = StorageRepository({}, [], [])
         storage.upsert_user({
             "user_id": "u1", "name": "U", "height": 170, "weight": 65, "age": 30,
             "health_conditions": list(conditions), "allergens": list(allergens),
@@ -1476,7 +1476,7 @@ class RemainingCalorieRecommendationTests(unittest.TestCase):
     ]
 
     def _storage(self, eaten_calories=0):
-        storage = StorageRepository(None, False, {}, [], [])
+        storage = StorageRepository({}, [], [])
         storage.upsert_user({"user_id": "u1", "name": "U", "height": 170, "weight": 65, "age": 30})
         storage.save_restaurant_menu("阿美飯館", self.MENU, venue={"google_place_id": "p1"})
         if eaten_calories:
@@ -1533,7 +1533,7 @@ class MenuCacheStalenessTests(unittest.TestCase):
     """店家會改菜單、漲價、換營業時間，快取不能永久有效。"""
 
     def setUp(self):
-        self.storage = StorageRepository(None, False, {}, [], [])
+        self.storage = StorageRepository({}, [], [])
 
     def test_a_freshly_saved_menu_is_not_stale(self):
         self.storage.save_restaurant_menu(
@@ -1787,7 +1787,7 @@ class RecommendationHonestyTests(unittest.TestCase):
         rules = load_disease_rules(base)
         taxonomy = load_allergen_taxonomy(base)
 
-        storage = StorageRepository(None, False, {}, [], [])
+        storage = StorageRepository({}, [], [])
         storage.upsert_user({
             "user_id": "u1", "name": "U", "height": 170, "weight": 65, "age": 30,
             "health_conditions": ["diabetes"],

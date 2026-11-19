@@ -1,0 +1,57 @@
+{
+  "batch": 89,
+  "date": "2026-11-17",
+  "branch": "v1.0.3",
+  "scope": "prepare_unsubmitted_fsanz_afcd_reuse_clarification_request",
+  "official_contact": {
+    "contact_page": "https://www.foodstandards.gov.au/contact",
+    "enquiry_form": "https://www.foodstandards.gov.au/contact/enquiry-form",
+    "observed_guidance": "FSANZ directs general questions to its enquiry form and says it can only provide general information about requirements in the Code; the request asks for referral to an appropriate licensing contact if the licence question is outside the form's remit."
+  },
+  "draft_artifact": "docs/plans/fsanz-afcd-clarification-request-2026-11-17.md",
+  "questions_covered": [
+    "Private SQLite retention of one AFCD food entry, user-specific profile/meal snapshots and backups",
+    "Authenticated API/UI distribution by a free public non-commercial university application",
+    "Fixed-JSON normalization with search/extraction service and AI model assistance followed by server validation",
+    "Attribution, licence, limitation, Australian-data notice and disclaimer placement for API, UI, exports and saved copies",
+    "Whether selected single-record values/profile constitute a Derivative Work or substantial part, and ShareAlike scope",
+    "Third-party source material and difference between public detail page use and dataset-file download"
+  ],
+  "decision": {
+    "superseded_by_user_direction": "Do not contact FSANZ; keep the draft as an unsubmitted historical reference.",
+    "request_submitted": false,
+    "licence_accepted": false,
+    "dataset_downloaded": false,
+    "real_nutrient_values_included": false,
+    "source_admitted": false,
+    "production_web_registry_count": 0,
+    "automatic_web_fallback_enabled": false
+  },
+  "next_gate": [
+    "Per the user's 2026-11-17 direction, do not submit this draft or contact FSANZ; this draft is no longer an active task.",
+    "The decision not to contact FSANZ does not resolve reuse rights. Keep AFCD out of the source registry and automatic fallback unless a separately approved rights path is established.",
+    "Evaluate alternative nutrition sources with clear reuse terms, then check exact food identity, preparation scope, nutrient-field coverage and attribution obligations before any adapter test."
+  ],
+  "side_effects": {
+    "official_contact_page_opens": 2,
+    "licence_page_term_lookups": 3,
+    "form_submissions": 0,
+    "emails_sent": 0,
+    "credentials_read": 0,
+    "dataset_files_downloaded": 0,
+    "licence_acceptance_actions": 0,
+    "nutrition_values_copied": false,
+    "tavily_api_requests": 0,
+    "model_calls": 0,
+    "production_database_operations": 0,
+    "production_flags_changed": false,
+    "application_code_changed": false,
+    "deployed_or_restarted": false,
+    "committed_or_pushed": false
+  },
+  "review_limits": [
+    "The draft is not legal advice and has not been submitted.",
+    "FSANZ's general enquiry form may not provide a legal interpretation of the data licence.",
+    "No acceptance or permission is inferred from preparing or submitting an enquiry."
+  ]
+}

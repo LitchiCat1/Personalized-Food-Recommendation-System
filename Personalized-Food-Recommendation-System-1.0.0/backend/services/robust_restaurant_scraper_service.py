@@ -68,7 +68,7 @@ def fetch_public_menu_text(url: str) -> str:
     return ""
 
 def generate_fallback_menu(restaurant_name: str) -> list[dict]:
-    """Generates a highly realistic mock menu based on the restaurant name keyword."""
+    """Return category-based sample dishes, not verified items or nutrition for a venue."""
     name = restaurant_name.lower()
     
     # 1. McDonald's / KFC / Burgers / Fast Food
@@ -609,7 +609,7 @@ def _read_menu_photo_with_openai(prompt: str, image_base64: str, image_mime_type
 def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐廳") -> dict:
     """辨識菜單照片，回傳品項與給畫面用的狀態。
 
-    有設 OPENAI_API_KEY 時先問 ChatGPT，它沒辨識出品項才換 Gemini Vision。
+    中轉設定存在時共用中轉；未設定中轉才走舊版 OpenAI／Gemini 路徑。
     """
     if not image_base64:
         return {"items": [], "recognition_status": "error", "recognition_error": "缺少菜單圖片"}
@@ -627,7 +627,7 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
         return {
             "items": [],
             "recognition_status": "error",
-            "recognition_error": "後端未設定 Gemini API key，請在 Render 設定 GEMINI_API_KEYS 後重新部署。",
+            "recognition_error": "後端未設定 AI API key，請設定專案 key.txt 或 backend/.env.local 後重新啟動後端。",
         }
     
     prompt = f"""
@@ -742,9 +742,9 @@ def parse_menu_image_with_gemini(image_base64: str, restaurant_name: str = "餐�
                     if res.status_code == 404:
                         remember_forbidden_gemini_model(gemini_key, model_name)
                     if res.status_code == 429:
-                        last_error = "Gemini 使用額度已達上限，請稍後再試，或在 Render 更新 GEMINI_API_KEYS。"
+                        last_error = "Gemini 使用額度已達上限，請稍後再試，或由管理者更新後端 GEMINI_API_KEYS。"
                     elif res.status_code in (401, 403):
-                        last_error = "Gemini API key 無效或沒有模型存取權限，請檢查 Render 的 GEMINI_API_KEYS。"
+                        last_error = "Gemini API key 無效或沒有模型存取權限，請由管理者檢查後端 GEMINI_API_KEYS。"
                     elif res.status_code == 503:
                         last_error = "Gemini 目前服務繁忙，請稍後再試。"
                     else:

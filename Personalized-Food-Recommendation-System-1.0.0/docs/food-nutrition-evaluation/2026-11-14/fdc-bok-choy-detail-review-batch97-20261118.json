@@ -1,0 +1,89 @@
+{
+  "batch": 97,
+  "date": "2026-11-18",
+  "branch": "v1.0.3",
+  "scope": "read_only_fdc_bok_choy_detail_and_reference_only_feasibility_review",
+  "provider_requests": {
+    "endpoint": "https://api.nal.usda.gov/fdc/v1/food/{fdc_id}",
+    "demo_key_attempts": {"requests": 3, "http_status": 403, "retried": false},
+    "successful_detail_requests": {
+      "requests": 3,
+      "retried": false,
+      "fdc_ids": ["2685572", "170390", "170391"],
+      "credential_source": "server-side USDA KEY.txt; credential value not emitted or persisted"
+    },
+    "detail_amounts_received": true,
+    "detail_amounts_persisted_to_evidence_or_database": false,
+    "tavily_requests": 0,
+    "model_calls": 0
+  },
+  "detail_records": [
+    {
+      "fdc_id": "2685572",
+      "description": "Cabbage, bok choy, raw",
+      "data_type": "Foundation",
+      "food_class": "FinalFood",
+      "state": "raw",
+      "mapped_nutrient_fields_present": ["calories", "protein", "carbs", "fat", "sodium", "fiber"],
+      "mapped_nutrient_fields_missing": ["sugar", "saturated_fat", "trans_fat"],
+      "energy_method_numbers_present": ["957", "958"],
+      "energy_selection_requires_review": true,
+      "overlaps_with_other_raw_record_but_values_differ": true
+    },
+    {
+      "fdc_id": "170390",
+      "description": "Cabbage, chinese (pak-choi), raw",
+      "data_type": "SR Legacy",
+      "food_class": "FinalFood",
+      "state": "raw",
+      "mapped_nutrient_fields_present": ["calories", "protein", "carbs", "fat", "sodium", "fiber", "sugar", "saturated_fat", "trans_fat"],
+      "mapped_nutrient_fields_missing": [],
+      "trans_fat_source_amount_is_zero": true,
+      "overlaps_with_other_raw_record_but_values_differ": true
+    },
+    {
+      "fdc_id": "170391",
+      "description": "Cabbage, chinese (pak-choi), cooked, boiled, drained, without salt",
+      "data_type": "SR Legacy",
+      "food_class": "FinalFood",
+      "state": "cooked_boiled_drained_without_salt",
+      "mapped_nutrient_fields_present": ["calories", "protein", "carbs", "fat", "sodium", "fiber", "sugar", "saturated_fat", "trans_fat"],
+      "mapped_nutrient_fields_missing": [],
+      "compatible_with_stir_fried_scan": false
+    }
+  ],
+  "review": {
+    "raw_reference_only_is_technically_feasible": true,
+    "existing_preview_can_be_reused_without_portion_calculation": false,
+    "required_separate_contract": [
+      "explicitly label the basis as raw per 100 g",
+      "never apply the cooked image-estimated weight",
+      "do not merge the reference into scan nutrition totals, medical risk, saved profiles, or meal records",
+      "keep the scanned prepared item unresolved for meal-intake nutrition",
+      "require confirmed food identity and a separately reviewed source record"
+    ],
+    "source_selection_ready": false,
+    "reasons_source_selection_is_not_ready": [
+      "two raw FDC records overlap but disagree on shared nutrient fields",
+      "Foundation record has two kcal methods requiring an explicit choice and omits three mapped optional nutrients",
+      "the Detail metadata reviewed here did not capture nutrient derivation, sample, footnote, or per-cell provenance needed to resolve the discrepancy",
+      "neither record is a cultivar-specific Taiwanese identity"
+    ],
+    "decision": "Keep the stir-fried scan unmatched. Do not create a bok-choy policy/profile or display either row as the dish nutrition yet. First compare the provenance and analytical metadata of the two raw records, select one fixed record and energy method (or retain no-match), then implement and test an isolated reference-only contract."
+  },
+  "side_effects": {
+    "application_code_changed": false,
+    "tests_run": false,
+    "production_database_accessed_or_changed": false,
+    "profiles_or_meals_written": false,
+    "runtime_flags_changed": false,
+    "deployed_or_restarted": false,
+    "committed_or_pushed": false
+  },
+  "limitations": [
+    "FDC Search/Detail results do not establish that a photographed serving is the same botanical cultivar or preparation.",
+    "Coverage indicates recognized FDC nutrient-number presence, not analytical quality or completeness of all possible nutrients.",
+    "The current app has no raw-reference-only endpoint or UI; the existing FDC preview requires a compatible identity and positive weight and calculates a portion.",
+    "This review does not validate photo identity, cooked portion mass, or nutrition accuracy for a prepared dish."
+  ]
+}

@@ -57,6 +57,26 @@ class FdcCandidateSnapshotRepositoryTests(unittest.TestCase):
                                       candidates_by_item={ITEM["item_id"]: changed_candidates})
         self.assertEqual(error.exception.code, "snapshot_conflict")
 
+    def test_empty_snapshot_without_search_evidence_does_not_qualify(self):
+        item_id = ITEM["item_id"]
+        scope = {"user_id": "u1", "scan_id": "scan-1", "scan_revision": 0}
+        self.repo.save_candidates(**scope, candidates_by_item={item_id: []})
+        self.assertFalse(self.repo.has_confirmed_search_miss(**scope, item_id=item_id))
+
+    def test_search_miss_is_bound_to_user_scan_revision_item_and_expiry(self):
+        item_id = ITEM["item_id"]
+        scope = {"user_id": "u1", "scan_id": "scan-1", "scan_revision": 0}
+        self.repo.save_candidates(
+            **scope, candidates_by_item={item_id: []}, no_hit_item_ids=[item_id])
+        reference = {**scope, "item_id": item_id}
+        self.assertTrue(self.repo.has_confirmed_search_miss(**reference))
+        for overrides in ({"user_id": "u2"}, {"scan_id": "scan-2"}, {"scan_revision": 1},
+                          {"item_id": "scan-1:1"}):
+            with self.subTest(overrides=overrides):
+                self.assertFalse(self.repo.has_confirmed_search_miss(**{**reference, **overrides}))
+        self.now[0] += 120
+        self.assertFalse(self.repo.has_confirmed_search_miss(**reference))
+
     def test_wrong_user_revision_and_digest_are_rejected(self):
         self.repo.save_candidates(user_id="u1", scan_id="scan-1", scan_revision=0,
                                   candidates_by_item={ITEM["item_id"]: CANDIDATES})
@@ -156,10 +176,12 @@ class FdcCandidateSnapshotRepositoryTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "fake commit failure"):
                 self.repo.save_candidates(
                     user_id="u1", scan_id="scan-1", scan_revision=0,
-                    candidates_by_item={ITEM["item_id"]: CANDIDATES},
+                    candidates_by_item={ITEM["item_id"]: []},
                     reservation_owner="worker-a",
+                    no_hit_item_ids=[ITEM["item_id"]],
                 )
         self.assertIsNone(self.repo.get_snapshot(user_id="u1", scan_id="scan-1", scan_revision=0))
+        self.assertEqual(self.sql.query_one("SELECT COUNT(*) AS count FROM nutrition_fdc_search_no_hits")["count"], 0)
         reservation = self.repo.get_search_reservation(user_id="u1", scan_id="scan-1", scan_revision=0)
         self.assertEqual(reservation["status"], "pending")
         self.assertEqual(reservation["lease_owner"], "worker-a")

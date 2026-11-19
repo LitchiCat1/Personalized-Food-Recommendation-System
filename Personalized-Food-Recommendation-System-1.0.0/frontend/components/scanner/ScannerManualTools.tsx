@@ -3,8 +3,10 @@ import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator } from 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import DataPill from '@/components/ui/data-pill';
+import type { NutritionEnrichmentItem } from '@/lib/nutrition-enrichment-api';
 
 type RejectedDetection = {
+  item_id?: string;
   label: string;
   confidence: number;
   reason: string;
@@ -21,7 +23,23 @@ type Props = {
   onOCRSearch: () => void;
 };
 
-export function ScannerPendingFoods({ rs, items }: { rs: (value: number) => number; items: RejectedDetection[] }) {
+export function ScannerPendingFoods({
+  rs, items, identityItems = [], identityEnabled = false, identityDrafts = {}, identityPending = {},
+  identityErrors = {}, identityLocked = false, identitySubmitting = false,
+  onIdentityDraftChange, onConfirmIdentity,
+}: {
+  rs: (value: number) => number;
+  items: RejectedDetection[];
+  identityItems?: NutritionEnrichmentItem[];
+  identityEnabled?: boolean;
+  identityDrafts?: Record<string, string>;
+  identityPending?: Record<string, { name_zh: string }>;
+  identityErrors?: Record<string, string>;
+  identityLocked?: boolean;
+  identitySubmitting?: boolean;
+  onIdentityDraftChange?: (itemId: string, value: string) => void;
+  onConfirmIdentity?: (itemId: string) => void;
+}) {
   if (items.length === 0) return null;
   return (
         <View style={styles.rejectedCard}>
@@ -37,6 +55,46 @@ export function ScannerPendingFoods({ rs, items }: { rs: (value: number) => numb
               {(item.search_hints || []).length > 0 ? (
                 <Text style={styles.searchHintText}>建議搜尋：{(item.search_hints || []).join('、')}</Text>
               ) : null}
+              {identityEnabled && item.item_id ? (() => {
+                const identity = identityItems.find((candidate) => candidate.item_id === item.item_id &&
+                  candidate.identity_confirmation_required === true && candidate.validation_issues.length === 0);
+                if (!identity) return null;
+                const pending = identityPending[item.item_id];
+                const value = pending?.name_zh ?? identityDrafts[item.item_id] ?? identity.name_zh;
+                return (
+                  <View style={styles.identityConfirmSection}>
+                    <Text style={styles.identityConfirmLabel}>確認食材名稱</Text>
+                    <TextInput
+                      accessibilityLabel={`${item.label} 的食材名稱`}
+                      value={value}
+                      onChangeText={(next) => onIdentityDraftChange?.(item.item_id!, next)}
+                      maxLength={120}
+                      editable={!identityLocked}
+                      autoCorrect={false}
+                      style={[styles.identityConfirmInput, identityLocked && styles.identityDisabled]}
+                    />
+                    <Text style={styles.identityConfirmHint}>只確認名稱；不會提高影像信心或修改估計份量。</Text>
+                    {identityErrors[item.item_id] ? (
+                      <Text accessibilityRole="alert" style={styles.identityError}>{identityErrors[item.item_id]}</Text>
+                    ) : null}
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={pending ? '以相同名稱重試' : '確認食材名稱並重新查找'}
+                      onPress={() => onConfirmIdentity?.(item.item_id!)}
+                      disabled={identitySubmitting || (identityLocked && !pending)}
+                      style={[styles.identityConfirmButton,
+                        (identitySubmitting || (identityLocked && !pending)) && styles.identityDisabled]}
+                    >
+                      {identitySubmitting ? <ActivityIndicator size="small" color={Palette.text.inverse} /> : (
+                        <>
+                          <Ionicons name="checkmark-circle-outline" size={17} color={Palette.text.inverse} />
+                          <Text style={styles.identityConfirmButtonText}>{pending ? '以相同名稱重試' : '確認並重新查找'}</Text>
+                        </>
+                      )}
+                    </Pressable>
+                  </View>
+                );
+              })() : null}
             </View>
           ))}
         </View>
@@ -111,6 +169,21 @@ const styles = StyleSheet.create({
   rejectedItem: { marginBottom: 6 },
   rejectedText: { ...Typography.small, color: Palette.text.secondary },
   searchHintText: { ...Typography.small, color: Palette.accent.blue, marginTop: 2 },
+  identityConfirmSection: { marginTop: Spacing.sm, gap: Spacing.xs },
+  identityConfirmLabel: { ...Typography.caption, color: Palette.text.primary },
+  identityConfirmInput: {
+    minHeight: 46, borderWidth: 1, borderColor: Palette.border.subtle,
+    borderRadius: Radius.md, backgroundColor: Palette.bg.card, color: Palette.text.primary,
+    paddingHorizontal: Spacing.sm, ...Typography.body,
+  },
+  identityConfirmHint: { ...Typography.caption, color: Palette.text.secondary },
+  identityError: { ...Typography.caption, color: Palette.status.error },
+  identityConfirmButton: {
+    minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs,
+    borderRadius: Radius.md, backgroundColor: Palette.accent.green, paddingHorizontal: Spacing.md,
+  },
+  identityConfirmButtonText: { ...Typography.bodyBold, color: Palette.text.inverse },
+  identityDisabled: { opacity: 0.55 },
   manualCard: {
     backgroundColor: Palette.bg.card,
     borderRadius: Radius.xl,

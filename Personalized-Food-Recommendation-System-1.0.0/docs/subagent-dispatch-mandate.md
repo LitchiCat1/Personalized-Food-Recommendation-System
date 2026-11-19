@@ -1,5 +1,7 @@
 # 子 Agent 調度實作規定（供 Codex / GPT-5.5 嚴格遵守）
 
+> **歷史封存（2026-11-17）：**下文規定、待辦與委派要求已失效，不是目前開發授權。Render／Supabase／舊 Blueprint 已退役；現行架構見 [專案狀態](Project_Architecture_and_Status.md)，執行範圍依目前會話與 `AGENTS.md`。
+
 > 生成日期：2026-06-19
 > 審查者：Claude Opus 4.8
 > 專案定位：**大學畢業專題（capstone / demo）**，非上市產品

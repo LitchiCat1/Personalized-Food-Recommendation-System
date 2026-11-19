@@ -5,7 +5,6 @@ import os
 import tempfile
 import threading
 import unittest
-from types import SimpleNamespace
 
 from repositories.sqlite_db import SqliteDatabase
 from repositories.sqlite_schema import SCHEMA_VERSION, add_record_nutrition_contract, upgrade_schema
@@ -34,85 +33,13 @@ def partial_record(identifier="partial"):
     }
 
 
-class FakeMongoCursor:
-    def __init__(self, rows):
-        self.rows = rows
-
-    def sort(self, key, direction):
-        self.rows.sort(key=lambda row: row.get(key, ""), reverse=direction < 0)
-        return self
-
-    def skip(self, amount):
-        self.rows = self.rows[amount:]
-        return self
-
-    def limit(self, amount):
-        self.rows = self.rows[:amount]
-        return self
-
-    def __iter__(self):
-        return iter(self.rows)
-
-
-class FakeMongoRecords:
-    def __init__(self):
-        self.rows = []
-
-    @staticmethod
-    def matches(row, query):
-        for key, expected in query.items():
-            actual = row
-            for part in key.split("."):
-                actual = actual.get(part) if isinstance(actual, dict) else None
-            if isinstance(expected, dict):
-                if "$ne" in expected and actual == expected["$ne"]:
-                    return False
-                if "$regex" in expected and not str(actual).startswith(expected["$regex"].removeprefix("^")):
-                    return False
-                if "$gte" in expected and actual < expected["$gte"]:
-                    return False
-                if "$lt" in expected and actual >= expected["$lt"]:
-                    return False
-            elif actual != expected:
-                return False
-        return True
-
-    def find(self, query, projection=None):
-        rows = [copy.deepcopy(row) for row in self.rows if self.matches(row, query)]
-        if projection and projection.get("_id") == 0:
-            for row in rows:
-                row.pop("_id", None)
-        return FakeMongoCursor(rows)
-
-    def find_one(self, query, projection=None):
-        return next(iter(self.find(query, projection)), None)
-
-    def insert_one(self, record):
-        record["_id"] = "mongo-generated"
-        self.rows.append(copy.deepcopy(record))
-
-    def find_one_and_delete(self, query):
-        for index, row in enumerate(self.rows):
-            if self.matches(row, query):
-                return self.rows.pop(index)
-        return None
-
-    def update_one(self, query, update):
-        for row in self.rows:
-            if self.matches(row, query):
-                row.update(copy.deepcopy(update["$set"]))
-                return SimpleNamespace(matched_count=1)
-        return SimpleNamespace(matched_count=0)
-
-
 class RecordNutritionStorageTests(unittest.TestCase):
     def repositories(self):
-        memory = StorageRepository(None, False, {}, [], [])
+        memory = StorageRepository({}, [], [])
         sql = SqliteDatabase(":memory:")
         self.addCleanup(sql.close)
-        sqlite = StorageRepository(None, False, {}, [], [], sql=sql)
-        mongo = StorageRepository(SimpleNamespace(records=FakeMongoRecords()), True, {}, [], [])
-        return {"memory": memory, "sqlite": sqlite, "mongo_fake": mongo}
+        sqlite = StorageRepository({}, [], [], sql=sql)
+        return {"memory": memory, "sqlite": sqlite}
 
     def test_nullable_profiles_context_and_unresolved_denominator_round_trip(self):
         for backend, repository in self.repositories().items():
@@ -146,7 +73,7 @@ class RecordNutritionStorageTests(unittest.TestCase):
                 self.assertEqual(saved["total_calories"], 150)
                 self.assertEqual(saved["foods"][0]["nutrition_profile"]["per_100g"]["calories"], 300)
 
-    def test_read_results_do_not_alias_memory_or_mongo_snapshots(self):
+    def test_read_results_do_not_alias_stored_snapshots(self):
         for backend, repository in self.repositories().items():
             with self.subTest(backend=backend):
                 repository.insert_record(partial_record())
@@ -246,7 +173,7 @@ class RecordNutritionStorageTests(unittest.TestCase):
                 self.assertEqual(current["nutrition_context"]["coverage"]["nutrients"]["calories"]["known_sum"], 450)
 
     def test_today_and_history_have_no_five_hundred_record_cap(self):
-        repository = StorageRepository(None, False, {}, [], [])
+        repository = StorageRepository({}, [], [])
         # Bypass insertion deduplication to exercise the complete range reader.
         for index in range(502):
             record = partial_record(str(index))
@@ -260,12 +187,12 @@ class RecordNutritionStorageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = os.path.join(folder, "nutrition.db")
             first_sql = SqliteDatabase(path)
-            first = StorageRepository(None, False, {}, [], [], sql=first_sql)
+            first = StorageRepository({}, [], [], sql=first_sql)
             first.insert_record(partial_record())
             first_sql.close()
             reopened_sql = SqliteDatabase(path)
             try:
-                reopened = StorageRepository(None, False, {}, [], [], sql=reopened_sql)
+                reopened = StorageRepository({}, [], [], sql=reopened_sql)
                 saved = reopened.get_record_by_client_record_id("user-a", "partial")
                 self.assertEqual(saved["nutrition_contract_version"], 2)
                 self.assertIsNone(saved["foods"][0]["nutrition_profile"]["per_100g"]["sodium"])
@@ -274,7 +201,7 @@ class RecordNutritionStorageTests(unittest.TestCase):
                 reopened_sql.close()
 
     def test_history_summary_keeps_known_average_and_unknown_coverage(self):
-        repository = StorageRepository(None, False, {}, [], [])
+        repository = StorageRepository({}, [], [])
         repository.insert_record(partial_record())
         response = build_history_response(repository, "user-a", 7, nutrition_contract_version=2)
         summary = response["summary"]
@@ -285,13 +212,13 @@ class RecordNutritionStorageTests(unittest.TestCase):
         self.assertIsNone(summary["nutrition_coverage"]["nutrients"]["sodium"]["total_upper_bound"])
 
     def test_empty_v2_history_never_claims_complete(self):
-        repository = StorageRepository(None, False, {}, [], [])
+        repository = StorageRepository({}, [], [])
         summary = build_history_response(repository, "user-a", 7, nutrition_contract_version=2)["summary"]
         self.assertIsNone(summary["avg_known_sum"]["sodium"])
         self.assertEqual(summary["nutrition_coverage"]["nutrients"]["sodium"]["status"], "unknown")
 
     def test_mixed_legacy_history_keeps_unknown_in_summary(self):
-        repository = StorageRepository(None, False, {}, [], [])
+        repository = StorageRepository({}, [], [])
         repository.insert_record(partial_record())
         repository.insert_record({"user_id": "user-a", "client_record_id": "legacy",
                                   "timestamp": app_now().isoformat(),

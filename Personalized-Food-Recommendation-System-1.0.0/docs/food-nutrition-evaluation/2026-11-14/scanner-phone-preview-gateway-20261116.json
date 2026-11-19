@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-16",
+  "batch": 69,
+  "branch": "v1.0.3",
+  "backup_ref": "origin/v1.0.2",
+  "backup_commit": "f45c52f14735fabb17be7cb4351d16201a2c49e3",
+  "v1_0_1_protection_revoked_by_user": true,
+  "scope": "Short-lived public HTTPS gateway for synthetic scanner candidate confirmation and read-only nutrition preview; physical Android result is pending.",
+  "isolation": {
+    "gateway_bind": "127.0.0.1:8091",
+    "public_https_port": 8443,
+    "original_harness": "loopback-only; fixed token and controls not published",
+    "phone_credential": "fresh random short-lived token; omitted from evidence",
+    "credential_bootstrap": "fragment removed before authenticated session bootstrap",
+    "database": "dedicated temporary SQLite",
+    "frontend": "dedicated temporary Expo export; same-origin API",
+    "environment": "OS/toolchain allowlist; EXPO_NO_DOTENV=1; cleared Metro cache",
+    "providers": "synthetic vision, FDC Search and FDC Detail",
+    "enrichment_enabled": false,
+    "maximum_request_bytes": 8388608,
+    "maximum_response_bytes": 2097152,
+    "host_origin_auth_expiry_checked": true,
+    "upstream_redirects_allowed": false,
+    "session_minutes": 60,
+    "expires_at": "2026-11-16T20:40:39+08:00",
+    "scan_reference_ttl_seconds": 120,
+    "funnel_existing_8443_refused": true,
+    "cleanup_only_matching_owned_8443": true,
+    "actual_deadline_cleanup_observed": false
+  },
+  "browser_e2e": {
+    "transport": "real browser through public HTTPS Funnel to gateway and Flask HTTP",
+    "application_api_interception": false,
+    "bootstrap_and_real_authgate_restoration": true,
+    "upload": "gallery file chooser; non-food repository app icon deliberately used",
+    "vision_http": 200,
+    "candidates_http": 200,
+    "confirmation_http": 202,
+    "scan_revision_before": 0,
+    "scan_revision_after": 1,
+    "preview_http": 200,
+    "fdc_id": 171688,
+    "source_description": "Apples, raw, with skin",
+    "weight_g": 150,
+    "energy_kcal_per_100g": 52,
+    "portion_energy_kcal": 78,
+    "secure_context": true,
+    "console_errors": 0,
+    "viewports_without_horizontal_overflow": [
+      {"width": 390, "height": 844},
+      {"width": 1440, "height": 1000}
+    ],
+    "preview_retained_on_resize": true,
+    "bottom_scrolled_preview_screenshot_reviewed": true,
+    "screenshots": [
+      "scanner-phone-preview-mobile-20261116.png",
+      "scanner-phone-preview-desktop-20261116.png"
+    ]
+  },
+  "temporary_sqlite_counts": {
+    "scan_contexts": 2,
+    "candidate_snapshots": 1,
+    "confirmations": 1,
+    "previews": 1,
+    "nutrition_profiles": 0,
+    "meal_records": 0
+  },
+  "fake_provider_calls": {"search": 1, "detail": 1},
+  "negative_public_http": {
+    "forbidden_403": [
+      "/record",
+      "/nutrition/fdc/profile-accept",
+      "/nutrition/enrichment",
+      "/__e2e__/control",
+      "/__e2e__/state"
+    ],
+    "unauthenticated_candidate_post": 401,
+    "database_counts_unchanged": true,
+    "fake_provider_calls_unchanged": true
+  },
+  "checks": {
+    "phone_and_browser_unittest_passed": 16,
+    "focused_pytest_passed": 36,
+    "focused_pytest_subtests_passed": 34,
+    "focused_pytest_seconds": 9.59,
+    "scanner_tests_passed": 24,
+    "typecheck": "passed",
+    "lint": "passed",
+    "cache_cleared_isolated_web_export": "passed",
+    "bundle_name": "entry-299c8a88c0725bb496f8344f21ae36d5.js",
+    "bundle_sha256": "78878be99013f729fbdbd3f57d03fe5578d5e512043001edacb4b09d30fa4377",
+    "full_backend_rerun": false
+  },
+  "normal_site": {
+    "https_port": 443,
+    "backend_port": 5000,
+    "reported_app_version": "v1.0.2",
+    "backend_restarted": false,
+    "frontend_dist_replaced": false,
+    "automatic_web_fallback_enabled": false,
+    "other_runtime_flags": "not exposed by health; not independently verified",
+    "production_source_registry": "empty; unchanged"
+  },
+  "side_effects": {
+    "live_model_calls": 0,
+    "live_usda_calls": 0,
+    "live_tavily_calls": 0,
+    "production_database_reads_or_writes": 0,
+    "production_flag_changes": false,
+    "git_commit_or_push": false,
+    "background_phone_gateway_started": true,
+    "independent_funnel_8443_started": true
+  },
+  "not_established": [
+    "Android operation of this new gateway",
+    "private tailnet peer connectivity",
+    "arbitrary-image recognition or portion accuracy",
+    "live provider nutrient retrieval",
+    "production source rights or admission",
+    "profile accept or meal record persistence through this gateway",
+    "actual deadline shutdown and Funnel cleanup"
+  ]
+}

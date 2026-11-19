@@ -121,10 +121,22 @@ def _validated_scan_items(items):
     result, seen = [], set()
     allowed = {"item_id", "item_revision", "name_zh", "confidence", "weight_confidence",
                "estimated_weight_g", "food_state", "preparation_method", "components_scope",
-               "brand", "variant", "validation_issues"}
+               "brand", "variant", "validation_issues", "identity_confirmation_required",
+               "identity_confirmation_source", "identity_confirmation_id"}
     for item in items:
         if not isinstance(item, dict) or set(item) - allowed:
             _fail("invalid_claim", "scan item contains unsupported fields")
+        if "identity_confirmation_required" in item and type(item["identity_confirmation_required"]) is not bool:
+            _fail("invalid_claim", "identity_confirmation_required must be a boolean")
+        confirmation_source = item.get("identity_confirmation_source")
+        confirmation_id = item.get("identity_confirmation_id")
+        if confirmation_source is not None and confirmation_source != "user":
+            _fail("invalid_claim", "identity_confirmation_source is invalid")
+        if confirmation_id is not None:
+            _id(confirmation_id, "identity_confirmation_id")
+        if ((confirmation_source == "user") != (confirmation_id is not None)
+                or (confirmation_source == "user" and item.get("identity_confirmation_required") is not False)):
+            _fail("invalid_claim", "User identity confirmation provenance is incomplete")
         item_id = _id(item.get("item_id"), "item_id")
         if item_id in seen:
             _fail("invalid_claim", "scan item IDs must be unique")

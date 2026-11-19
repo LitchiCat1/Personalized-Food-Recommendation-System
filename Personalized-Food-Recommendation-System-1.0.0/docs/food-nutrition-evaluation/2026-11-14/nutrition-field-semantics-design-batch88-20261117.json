@@ -1,0 +1,73 @@
+{
+  "batch": 88,
+  "date": "2026-11-17",
+  "branch": "v1.0.3",
+  "scope": "afcd_nutrient_value_origin_and_missingness_contract_design",
+  "inspected_contracts": {
+    "nutrition_profile": "NutritionProfileV1",
+    "extraction": "NutritionExtractionV1",
+    "files": [
+      "backend/services/nutrition_profile_service.py",
+      "backend/services/nutrition_evidence_service.py",
+      "backend/services/nutrition_source_adapter.py",
+      "backend/services/nutrition_extraction_model_service.py",
+      "backend/services/web_nutrition_service.py"
+    ],
+    "current_behavior": [
+      "NutritionProfileV1 preserves raw value, unit, comparison, evidence and label-rounding, and has nullable fields plus upper bounds.",
+      "The Markdown adapter maps its reviewed missing tokens to null, but does not retain why a value is missing or whether a number was analysed, calculated or imputed.",
+      "The evidence validator accepts exact and less-than numeric cells; the model selects server-issued row IDs and does not supply values.",
+      "NutritionProfileV1 defines complete/partial from numeric point presence, so a numeric imputed zero currently cannot be distinguished from a measured zero in profile status or coverage.",
+      "The profile cell validator rejects unrecognized top-level cell fields; inserting a new status there without a versioned contract change would fail validation."
+    ]
+  },
+  "proposed_semantics_not_implemented": {
+    "record_derivation": ["analysed", "recipe", "calculated", "mixed", "unknown"],
+    "numeric_value_status": ["analytical", "source_derived", "imputed", "imputed_zero"],
+    "missing_status": ["not_reported", "not_analysed", "not_applicable", "unknown"],
+    "cell_contract": {
+      "numeric": "Preserve original decimal text, unit and exact/less-than comparison; add server-adapter-owned value_status plus status evidence/source reference.",
+      "imputed_zero": "Require an explicit source statement that the zero is imputed and a numeric value exactly equal to zero; do not infer from an ordinary 0 cell.",
+      "missing": "Keep value null and preserve the source-supported missing reason; when the source does not disambiguate a blank/dash, use unknown rather than guessing.",
+      "comparison": "Keep exact versus less_than independent from analytical/derived/imputed origin; a bound is not missing and is not a point value."
+    },
+    "authority": "Only a reviewed source-specific server adapter may assign derivation/value/missing statuses from source documentation. The model may select source row IDs only; it must not invent value origin or fill missing fields.",
+    "calculation_and_display": "Never coerce null to zero. A documented numeric imputed_zero remains a numeric source observation only when the source-specific policy allows it, and must remain explicitly labelled as imputed in profile, coverage and UI. Complete numeric coverage must not be presented as all-analytical coverage.",
+    "versioning": "NutritionProfileV1 does not preserve these distinctions. Introduce a versioned profile/extraction contract and update backend validators, persistence, read models, frontend types and coverage before adopting such records; do not smuggle statuses into unvalidated V1 fields."
+  },
+  "decision": {
+    "schema_approved_for_implementation": false,
+    "code_changed": false,
+    "real_afcd_values_used": false,
+    "tavily_or_model_called": false,
+    "source_admitted": false,
+    "reason": "This is a conservative contract proposal only. Rights for AFCD public-app reuse and durable profiles remain unresolved, and the proposal needs a product/schema review before versioned implementation."
+  },
+  "next_gate": [
+    "Obtain the FSANZ written clarification and project-owner decision documented in batch 87.",
+    "Review this semantic model against the desired user-facing meaning of AFCD values and approve or amend the versioned contract before coding.",
+    "If approved and reuse is cleared, implement provenance-aware field validation/coverage before any AFCD real-value extraction or persistence.",
+    "Only then run a bounded, rights-approved source-format adapter test; do not claim photo-pipeline or nutrition-accuracy validation."
+  ],
+  "side_effects": {
+    "project_source_files_read": 5,
+    "official_web_requests": 0,
+    "tavily_api_requests": 0,
+    "model_calls": 0,
+    "credentials_read": 0,
+    "dataset_files_downloaded": 0,
+    "licence_acceptance_actions": 0,
+    "nutrition_values_copied_into_evidence": false,
+    "production_database_operations": 0,
+    "production_flags_changed": false,
+    "application_code_changed": false,
+    "deployed_or_restarted": false,
+    "committed_or_pushed": false
+  },
+  "review_limits": [
+    "The proposed status names are a design draft, not an implemented API or migration contract.",
+    "Source-specific status mapping cannot be inferred from a numeric cell alone.",
+    "No real AFCD nutrient values were used or copied into this artifact.",
+    "The review does not resolve FSANZ licensing or third-party rights."
+  ]
+}

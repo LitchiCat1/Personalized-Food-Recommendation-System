@@ -1,0 +1,121 @@
+{
+  "batch": 85,
+  "date": "2026-11-17",
+  "branch": "v1.0.3",
+  "scope": "tavily_free_plan_scope_and_bok_choy_source_candidate_review",
+  "outcome": "customer_app_use_supported_by_official_help_but_terms_scope_unreconciled; no_exact_bok_choy_preparation_source_admitted",
+  "user_reported_account_context": {
+    "plan": "Tavily Researcher free",
+    "order_form_or_written_confirmation": false,
+    "project_context": "non-commercial university graduation project",
+    "verification_limit": "User-provided; account dashboard and private account documents were not inspected."
+  },
+  "user_scope_preference": {
+    "requested_scope": "Return the bok choy ingredient's nutrition without adding cooking oil to the calculation.",
+    "accepted_exclusions": ["added cooking oil"],
+    "working_assumption": "Ingredient-only means cooking additions are not included; only added oil was explicitly named by the user, so salt/sauce treatment should remain a visible scope assumption rather than a measured omission.",
+    "display_boundary": "Ingredient-only reference; must not be labelled as complete stir-fried dish nutrition.",
+    "portion_weight_boundary": "Raw per-100g data cannot be multiplied by estimated cooked grams as an exact result. A raw-equivalent mass or a separately reviewed no-added-fat cooked record is needed for portion scaling."
+  },
+  "tavily_scope_review": {
+    "help_center_observations": [
+      "Official Tavily Help Center says customer-facing applications may have end users trigger searches through the developer's backend.",
+      "The same article says personal projects and the free Researcher plan are allowed, including commercial/production use; keep keys server-side, do not give end users direct API access, and do not resell the API.",
+      "Official Governing Terms FAQ says API use is governed by the Platform Terms and uses outside those terms need a signed agreement or express written permission."
+    ],
+    "platform_terms_observations": [
+      "Platform Terms dated 2026-05-04 grant API use for the customer's internal business purposes.",
+      "The Terms separately contemplate customer applications with third-party end users, but the internal-business-purpose limitation is not explicitly reconciled with the newer Help Center customer-app guidance."
+    ],
+    "urls": [
+      "https://help.tavily.com/articles/5880393096-permitted-use-customer-applications",
+      "https://help.tavily.com/articles/3473422950-governing-terms-contracting-permissions",
+      "https://www.tavily.com/terms",
+      "https://help.tavily.com/articles/6594896502-best-practices-for-tavily-api-key-safety"
+    ],
+    "decision": "The free plan and server-proxied customer-app pattern are explicitly supported by official Help Center guidance; an enterprise plan is not stated as a prerequisite. Do not describe the Platform Terms scope as fully reconciled or use this review as legal advice. Continue only bounded isolated technical tests under the existing user authorization. Before general public/production activation, record the applicable account terms or obtain a written scope clarification; keep the API key server-side and automatic fallback disabled."
+  },
+  "nutrition_source_candidates": [
+    {
+      "publisher": "Japan Ministry of Education, Culture, Sports, Science and Technology (MEXT)",
+      "food_record": "ITEM_NO=6_06338_7; チンゲンサイ/葉/油いため",
+      "url": "https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=6_06338_7",
+      "observed_scope": "Leaf portion, oil-fried/stir-fried; not the complete plant/stalk scope visible in the user's bento example.",
+      "decision": "Reject as an exact whole-bok-choy candidate. Do not call the model on this record or apply its nutrition to the whole plant."
+    },
+    {
+      "publisher": "Food Standards Australia New Zealand (FSANZ), Australian Food Composition Database Release 3",
+      "food_record": "F001301; Bok choy, raw",
+      "url": "https://www.foodstandards.gov.au/science-data/food-nutrient-databases/afcd/search/food/F001301",
+      "observed_scope": "Official indexed detail describes the whole vegetable with pale stems and rounded dark-green leaves, uncooked. Most nutrient data reportedly include a composite of 7 samples of fresh baby bok choy purchased in Melbourne and Canberra in 2005, with some nutrients drawn from other samples/years or imputed.",
+      "licence_url": "https://www.foodstandards.gov.au/science-data/monitoringnutrients/afcd/datauserlicenceagreement",
+      "decision": "Best current candidate for the user's explicitly requested ingredient-only/raw 100g reference. Still requires source text extraction, nutrient-level derivation/missing-value review, attribution/license handling, and an explicit raw-versus-cooked portion policy. Not yet a model-validated adapter or production source."
+    },
+    {
+      "publisher": "Food Standards Australia New Zealand (FSANZ), Australian Food Composition Database Release 3",
+      "food_record": "F001300; Bok choy, fried, no added fat",
+      "url": "https://www.foodstandards.gov.au/science-data/food-nutrient-databases/afcd/search/food/F001300",
+      "observed_scope": "Official indexed record describes pale stems and rounded dark-green leaves and says fried without added fat; nutrient profile is recipe-derived.",
+      "licence_url": "https://www.foodstandards.gov.au/science-data/monitoringnutrients/afcd/datauserlicenceagreement",
+      "licence_observations": [
+        "AFCD data are licensed under the FSANZ Data User Licence Agreement based on CC BY-SA 3.0 Australia.",
+        "Distributed data/derivatives require attribution, applicable ShareAlike terms, the limitation statement, and a notice that Australian data may not be appropriate for other countries.",
+        "The official data-files page requires reading and accepting terms before downloading; this review did not accept the licence or download a workbook."
+      ],
+      "decision": "Potential alternative for a cooked, no-added-fat ingredient reference under the user's requested exclusion of added oil. Recipe-derived and still not an exact match to every stir-fry method; candidate only, no values copied into this evidence file, policy, registry, or application."
+    },
+    {
+      "publisher": "FSANZ, AUSNUT 2023",
+      "candidate_lead": "A third-party indexed result points to food code 24201002, 'Bok choy or pak choy, baked, roasted, fried, stir-fried, grilled or BBQ'd, added fat'.",
+      "official_dataset_page": "https://www.foodstandards.gov.au/science-data/food-nutrient-databases/ausnut/food-nutrients",
+      "official_data_files_page": "https://www.foodstandards.gov.au/science-data/food-nutrient-databases/ausnut/data-files",
+      "observed_scope": "Potentially closer because added-fat preparation is included, but several materially different cooking methods are grouped together.",
+      "unresolved": [
+        "The food code, original row, preparation metadata, source derivation and nutrient cells were not verified from the official workbook.",
+        "The exact licence and third-party-data conditions for this row were not resolved.",
+        "The grouped preparation cannot be assumed to match the photographed dish or its unknown oil/salt amount."
+      ],
+      "decision": "Unverified research lead only. Do not use it to fill the bento item or admit a source policy."
+    }
+  ],
+  "application_and_food_pipeline_findings": {
+    "user_photo_ground_truth": "The user previously identified the bento's right-side green vegetable as 青江菜; the vision result reported a generic 炒菜葉 label. Search results cannot repair that image-identity gap or increase vision confidence.",
+    "local_lookup": "Prior isolated healthy lookup of the identified leafy foods found no compatible local mapping under prepared + stir_fried; no local data, files, or health state were changed in this batch.",
+    "adapter_shape_risk": "Current generic web adapter accepts one bounded contiguous Markdown table (maximum 64 rows) with every data-column basis explicitly reviewed. AFCD/AUSNUT pages/files may use richer or multi-section structures; actual Extract output and adapter compatibility remain untested, so a source-specific adapter may be required.",
+    "candidate_admission": "No source ID/policy was created, no source was installed, and no nutrition was returned or saved."
+  },
+  "admission_decision": {
+    "production_web_registry_count": 0,
+    "automatic_web_fallback_enabled": false,
+    "first_candidate_selected_for_production": false,
+    "next_gate": [
+      "Keep any next Tavily/model call isolated and bounded; the official Help Center supports the free plan and backend-proxied customer-app pattern, while production/public activation waits for applicable terms scope to be documented.",
+      "Verify the AFCD F001301 raw and/or F001300 no-added-fat cooked primary-source records, applicable reuse terms, nutrient derivations and fixed-schema extraction; do not accept any download licence on the user's behalf.",
+      "Keep the result scope ingredient-only. The user explicitly excludes added cooking oil; do not estimate salt or sauces as part of the bok choy profile, and do not describe the result as complete prepared-dish nutrition.",
+      "Do not multiply a raw 100g profile by cooked image-estimated grams as if exact; require raw-equivalent mass or a separately reviewed cooked-state profile for portion scaling.",
+      "If an adapter-only test is run, classify it as source-format testing, not a valid photo/local-miss nutrition result; do not infer a vague image label from nutrition search.",
+      "Use a genuinely identified food and an unforced healthy TFDA/USDA miss before claiming an application-level Tavily fallback test."
+    ]
+  },
+  "side_effects": {
+    "web_research_tool_calls": 12,
+    "live_tavily_api_search_requests": 0,
+    "live_tavily_api_extract_requests": 0,
+    "model_calls": 0,
+    "credentials_or_account_pages_read": 0,
+    "dataset_files_downloaded": 0,
+    "licence_acceptance_actions": 0,
+    "production_database_operations": 0,
+    "production_flags_changed": false,
+    "application_code_changed": false,
+    "deployed_or_restarted": false,
+    "tests_run": false,
+    "committed_or_pushed": false
+  },
+  "review_limits": [
+    "User account details are user-reported; no account dashboard, key, or Order Form was inspected.",
+    "This is a technical source-scope review, not legal advice, a Tavily contract amendment, or a publisher's individualized permission.",
+    "A source title or search score does not prove visual identity, preparation match, nutrient accuracy, or per-photo applicability.",
+    "No nutrient values from AFCD/AUSNUT were retained in this evidence artifact."
+  ]
+}

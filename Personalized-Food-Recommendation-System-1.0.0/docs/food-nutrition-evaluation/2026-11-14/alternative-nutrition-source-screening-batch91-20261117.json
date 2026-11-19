@@ -1,0 +1,99 @@
+{
+  "batch": 91,
+  "date": "2026-11-17",
+  "branch": "v1.0.3",
+  "scope": "screen_official_alternatives_to_fsanz_afcd_for_bok_choy",
+  "user_direction": {
+    "do_not_contact_fsanz": true,
+    "ingredient_scope": "Bok choy ingredient only; exclude added cooking oil; do not label as complete dish nutrition."
+  },
+  "candidate_sources": [
+    {
+      "publisher": "Japan Ministry of Education, Culture, Sports, Science and Technology (MEXT)",
+      "database": "Standard Tables of Food Composition in Japan, 2023 Supplement",
+      "record": "06160; Vegetables / Green bok choy / leaves, raw",
+      "record_url": "https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=6_06160_7",
+      "reuse_url": "https://www.mext.go.jp/a_menu/syokuhinseibun/",
+      "official_reuse_observation": "MEXT says food-composition data may be freely used and requests that secondary use in articles, books and applications identify the source as the 2023 supplement.",
+      "food_scope_observation": "The official record explicitly says leaves, raw; it is not a verified whole-plant bok choy record.",
+      "decision": "Rights conditions appear clear for the data under the stated citation instruction, but the record scope does not match the whole visible ingredient. Do not use it as a whole-bok-choy or cooked-portion profile."
+    },
+    {
+      "publisher": "Public Health England / GOV.UK",
+      "database": "Composition of Foods Integrated Dataset (CoFID)",
+      "dataset_url": "https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid",
+      "observations": [
+        "The official page says the last update was 2021-03-19 and that some older foods remain in a separate file without review or validation in later updates.",
+        "The GOV.UK footer states that content is under Open Government Licence v3.0 except where otherwise stated."
+      ],
+      "food_record_status": "No exact raw whole-bok-choy record was verified from the official workbook in this batch; third-party search results were not accepted as authoritative proof of the row.",
+      "decision": "Keep as a possible source pending official-row and third-party-rights verification; not admitted and not used for nutrition."
+    },
+    {
+      "publisher": "Health Canada",
+      "database": "Canadian Nutrient File (CNF)",
+      "api_guide_url": "https://produits-sante.canada.ca/api/documentation/cnf-documentation-en.html",
+      "current_overview_url": "https://www.canada.ca/en/health-canada/services/food-nutrition/healthy-eating/nutrient-data/canadian-nutrient-file-about-us.html",
+      "cnf_2015_user_guide_url": "https://www.canada.ca/en/health-canada/services/food-nutrition/healthy-eating/nutrient-data/canadian-nutrient-file-compilation-canadian-food-composition-data-users-guide.html",
+      "cnf_2026_dataset_url": "https://open.canada.ca/data/en/dataset/1b6139bd-ed7e-4043-bc28-ff00e10f3109",
+      "api_food_record_test": {
+        "endpoint": "https://food-nutrition.canada.ca/api/canadian-nutrient-file/food/?lang=en&id=2038&type=json",
+        "response_identity": {
+          "food_code": 2038,
+          "food_description": "Bok choy, pak-choi, raw"
+        },
+        "request_scope": "Food-description endpoint only; nutrientamount endpoint was not called and no nutrient values were retrieved."
+      },
+      "api_capabilities": [
+        "Official guide documents JSON/XML API access for reuse in applications.",
+        "Nutrient amount endpoint describes mean nutrient values per 100 g edible portion and returns nutrient source ID, standard error and number of observations.",
+        "Health Canada's current overview says the online searchable CNF 2015 remains available while a more user-friendly way to access the CNF 2026 dataset is being developed."
+      ],
+      "cnf_2015_reuse_observation": "The official 2015 user guide says commercial and non-commercial use is allowed without further permission, requests Health Canada attribution, says nutrient values must not be modified but may be expressed in different serving sizes, and requires as-is, non-endorsement and reference-only context.",
+      "cnf_2026_reuse_observation": "Open Government Portal metadata for the 2026 dataset reports Open Government Licence - Canada and links its licence. This batch did not retrieve or inspect the dataset files, verify the 2026 row 2038, or clear any record-level third-party material.",
+      "decision": "Strongest current alternative candidate, but not admitted. Keep the 2015 API and 2026 downloadable dataset as separate reuse routes; verify version-specific record, lineage and delivery/retention obligations before use. A direct authoritative API could be more deterministic than Tavily extraction for this known record, but no architecture change is approved."
+    }
+  ],
+  "cross_cutting_constraints": [
+    "A raw 100 g food record does not become an exact nutrient profile for the image-estimated cooked grams of a stir-fried portion.",
+    "If only ingredient reference values are available, label the source preparation and per-100-g basis; do not present them as a complete dish or exact cooked serving.",
+    "The raw CNF record may overlap with USDA-derived data; inspect nutrient source IDs and local USDA matching before treating it as independent evidence or a new fallback layer.",
+    "Using a specific direct government API may reduce search and model parsing uncertainty, but changing the planned TFDA -> USDA -> Tavily/model flow requires an explicit architecture decision."
+  ],
+  "decision": {
+    "source_admitted": false,
+    "production_web_registry_count": 0,
+    "automatic_web_fallback_enabled": false,
+    "licence_accepted_or_dataset_downloaded": false,
+    "nutrition_values_copied_to_evidence": false,
+    "tavily_api_requests": 0,
+    "model_calls": 0,
+    "reason": "CNF presents a promising, more explicit reuse path and an exact raw food-name match in the legacy API, but the latest 2026 record lineage, exact source-version licensing details, USDA overlap, local routing eligibility, and photo-portion conversion are not yet verified."
+  },
+  "next_gate": [
+    "Verify whether CNF 2026 contains code 2038 with the same food description and inspect its nutrient source IDs without inferring missing values as zero.",
+    "Compare code 2038's provenance against the project's USDA/FDC source so a duplicated USDA-derived profile is not misrepresented as independent evidence.",
+    "Decide whether a source-specific official API belongs inside the third-layer source registry or whether general Tavily/model web extraction remains the intended fallback.",
+    "Only after rights, source identity, field semantics and portion scope are documented may an isolated nutrient-response test be run; keep production registry and automatic fallback disabled until admission review."
+  ],
+  "side_effects": {
+    "official_web_research_batches": 9,
+    "official_metadata_or_food_description_api_reads": 2,
+    "cnf_nutrient_api_requests": 0,
+    "tavily_api_requests": 0,
+    "model_calls": 0,
+    "dataset_files_downloaded": 0,
+    "credentials_read": 0,
+    "production_database_operations": 0,
+    "application_code_changed": false,
+    "production_flags_changed": false,
+    "deployed_or_restarted": false,
+    "committed_or_pushed": false
+  },
+  "review_limits": [
+    "This is a technical source and licence-document review, not legal advice.",
+    "CNF food code 2038 was verified against the current online API response, which Health Canada identifies as the 2015 CNF online; the same row was not verified in the 2026 downloadable dataset.",
+    "The CNF 2026 Open Government Licence metadata does not by itself clear third-party source components or prove that the legacy API and current dataset have identical rights conditions.",
+    "No nutrient values were requested from CNF, MEXT or CoFID in this batch."
+  ]
+}

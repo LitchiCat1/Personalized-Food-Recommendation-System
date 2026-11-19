@@ -473,7 +473,7 @@ def build() -> None:
         doc,
         [
             ("前端與使用流程", "Expo React Native 實作 Web/iOS/Android 可延伸介面，支援拍照、OCR、手動搜尋、飲食紀錄、推薦與地圖探索。"),
-            ("後端與資料服務", "Flask API 部署於 Render，資料以 Supabase Postgres/Auth 為主，保留 MongoDB / In-memory fallback 作為開發與備援路徑。"),
+            ("後端與資料服務", "Windows 單一 Flask／Waitress 後端透過 Tailscale Funnel 提供 HTTPS，帳號、session、健康檔案與飲食紀錄存於本機 SQLite；正式服務不使用記憶體儲存。"),
             ("食物辨識", "Gemini Vision 產生可能食物名稱、份量描述、同義候選與信心程度；低信心或無資料庫對應時，要求使用者手動確認。"),
             ("營養 grounding", "熱量、三大營養素、鈉、纖維等數值優先由 TFDA 台灣食品營養資料庫與自訂食品資料換算。"),
             ("安全與推薦", "Safety Guard 依疾病規則與過敏原設定篩除或提示高風險項目；推薦分數整合剩餘熱量、NutritionMatch、PreferenceScore 與 FeedbackAdjustment。"),

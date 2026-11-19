@@ -11,7 +11,7 @@ import math
 import threading
 import time
 
-from services.food_identity_service import requires_food_identity_confirmation
+from services.food_identity_service import web_identity_ready
 from services.nutrition_evidence_service import (
     NUTRIENTS, STATUSES, SCHEMA_VERSION, NutritionEvidenceError,
     build_nutrition_extraction_prompt, validate_and_build_nutrition_profiles,
@@ -26,8 +26,8 @@ from services.nutrition_source_adapter import (
 )
 from services.strict_json_service import parse_strict_model_json
 from services.tavily_retrieval_service import TavilyRetrievalError, validate_reviewed_url
-from services.vision_nutrition_service import find_vision_food_matches
 from services.vision_food_service import VISION_FOOD_MIN_CONFIDENCE
+from services.vision_nutrition_service import find_vision_food_matches
 
 
 MAX_ITEMS = 64
@@ -158,7 +158,30 @@ class NutritionSourceRegistry:
         return matches
 
 
-PRODUCTION_SOURCE_REGISTRY = NutritionSourceRegistry()
+def build_production_web_registry(policies=(), *, admission_reviews=()):
+    """Build only the Tavily registry from hash-bound server admission reviews."""
+    from services.nutrition_source_admission_service import validate_source_admission
+
+    _require(isinstance(admission_reviews, (list, tuple)) and len(admission_reviews) <= 64,
+             "invalid_review", "Admission reviews must be a bounded sequence")
+    registry = NutritionSourceRegistry(policies)
+    reviews = {}
+    for review in admission_reviews:
+        _require(isinstance(review, dict) and _text(review.get("source_id"))
+                 and review["source_id"] not in reviews,
+                 "invalid_review", "Admission source IDs must be unique")
+        reviews[review["source_id"]] = review
+    _require(set(reviews) == {policy["source_spec"]["source_id"] for policy in policies},
+             "admission_review_required", "Every production policy needs exactly one review")
+    for policy in policies:
+        review = reviews[policy["source_spec"]["source_id"]]
+        validate_source_admission(policy, review)
+        _require(review["provider_kind"] == "tavily_extract", "provider_mismatch",
+                 "FDC API policies require their dedicated fixed-ID flow")
+    return registry
+
+
+PRODUCTION_SOURCE_REGISTRY = build_production_web_registry()
 
 
 def make_local_nutrition_lookup(storage, database, user_id, build_custom_food_search_result):
@@ -207,11 +230,7 @@ def _validated_items(items):
 
 
 def _identity_ready(item):
-    confidence = item.get("confidence")
-    return (not isinstance(confidence, bool) and isinstance(confidence, (int, float))
-            and 0 <= confidence <= 1 and math.isfinite(confidence) and confidence >= VISION_FOOD_MIN_CONFIDENCE
-            and not item.get("validation_issues")
-            and not requires_food_identity_confirmation(item.get("name_zh")))
+    return web_identity_ready(item, minimum_confidence=VISION_FOOD_MIN_CONFIDENCE)
 
 
 def _queries(item):
@@ -267,7 +286,9 @@ def enrich_nutrition(items, *, official_health, lookup_local, registry, tavily,
     results = {item["item_id"]: {"item_id": item["item_id"], "item_revision": item["item_revision"],
                "original_visual_name": item["name_zh"], "status": "pending", "origin": None,
                "recognition_context": {field: deepcopy(item.get(field)) for field in
-                    ("name_zh", "confidence", "weight_confidence", "estimated_weight_g", *_IDENTITY_FIELDS)},
+                    ("name_zh", "confidence", "weight_confidence", "estimated_weight_g",
+                     "identity_confirmation_required", "identity_confirmation_source",
+                     "identity_confirmation_id", *_IDENTITY_FIELDS)},
                "nutrition_profile": None} for item in items}
     events, groups = [], {}
     health_ok = (isinstance(official_health, dict) and all(

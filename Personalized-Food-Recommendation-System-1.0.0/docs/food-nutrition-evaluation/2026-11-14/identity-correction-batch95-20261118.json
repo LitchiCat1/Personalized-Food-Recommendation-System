@@ -1,0 +1,59 @@
+{
+  "batch": 95,
+  "date": "2026-11-18",
+  "branch": "v1.0.3",
+  "status": "passed_isolated",
+  "environment": {
+    "browser": "Playwright CLI",
+    "http": "loopback Flask with an isolated Expo export",
+    "storage": "temporary SQLite file",
+    "recognition": "fixed vision output; not an accuracy test",
+    "local_lookup": "real TFDA and USDA FNDDS datasets",
+    "tfda_food_count": 2213,
+    "fndds_food_count": 5431,
+    "viewports": [[390, 844], [1440, 1000]]
+  },
+  "results": {
+    "vision_http_status": 200,
+    "rejected_name": "炒菜葉",
+    "rejection_http_status": 422,
+    "rejection_code": "invalid_identity",
+    "editable_after_rejection": true,
+    "confirmed_name": "青江菜",
+    "confirmation_http_status": 202,
+    "local_lookup_status": "no_local_mapping",
+    "scan_revisions": [0, 1],
+    "item_revisions": [0, 1],
+    "old_scan_status": "superseded",
+    "new_scan_status": "active",
+    "new_identity_confirmation_source": "user",
+    "immutable_fields": {
+      "confidence": 0.92,
+      "estimated_weight_g": 120,
+      "weight_confidence": 0.82,
+      "food_state": "prepared",
+      "preparation_method": "stir_fried",
+      "components_scope": "food_only"
+    },
+    "identity_confirmation_count": 1,
+    "fdc_search_calls": 0,
+    "fdc_detail_calls": 0,
+    "tavily_calls": 0,
+    "live_model_calls": 0,
+    "nutrition_profile_count": 0,
+    "meal_record_count": 0
+  },
+  "regression": {
+    "backend_focused_passed": 74,
+    "backend_focused_subtests_passed": 41,
+    "frontend_nutrition_passed": 149,
+    "frontend_scanner_passed": 26,
+    "frontend_config_passed": 11,
+    "typecheck_passed": true,
+    "lint_passed": true,
+    "expo_web_export_passed": true
+  },
+  "deployment_changed": false,
+  "android_device_retested": false,
+  "next_step": "Add a controlled bok choy FDC alias and verify raw, boiled, and stir-fried compatibility without scaling raw reference values by prepared weight."
+}

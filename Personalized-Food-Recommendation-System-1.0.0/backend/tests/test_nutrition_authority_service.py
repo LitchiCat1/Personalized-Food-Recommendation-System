@@ -25,12 +25,14 @@ class NutritionAuthorityTests(unittest.TestCase):
                                                  active_kid="current", clock=lambda: self.now[0])
 
     def test_scan_token_binds_user_revision_and_items(self):
+        item = dict(ITEM, identity_confirmation_required=True)
         token = self.service.issue_scan_context(user_id="user-1", scan_id="scan-1", scan_revision=2,
-                                                items=[ITEM])
+                                                items=[item])
         claims = self.service.verify(token, expected_type=SCAN_TOKEN_TYPE, user_id="user-1")
         self.assertEqual(claims["scan_id"], "scan-1")
         self.assertEqual(claims["scan_revision"], 2)
         self.assertEqual(claims["items"][0]["item_id"], "item-1")
+        self.assertTrue(claims["items"][0]["identity_confirmation_required"])
 
     def test_cross_user_and_wrong_type_are_rejected(self):
         token = self.service.issue_scan_context(user_id="user-1", scan_id="scan-1", scan_revision=0, items=[ITEM])

@@ -188,6 +188,17 @@ class FoodDataCentralClientTests(unittest.TestCase):
         self.assertTrue(response.closed)
         self.assertNotIn(KEY, repr(result))
 
+    def test_search_no_hits_requires_an_explicit_integer_zero_and_no_rows(self):
+        for body, expected in (
+            ({"foods": [], "totalHits": 0}, True),
+            ({"foods": [], "totalHits": 4}, False),
+            ({"foods": [], "totalHits": False}, False),
+            ({"foods": []}, False),
+        ):
+            with self.subTest(body=body):
+                client, _, _ = self.client(body=body)
+                self.assertIs(client.search_foods("apple", deadline=25)["confirmed_no_hits"], expected)
+
     def test_search_request_inputs_are_bounded_and_analytical_only(self):
         invalid = (
             {"query": ""}, {"query": " apples"}, {"query": "a\nb"}, {"query": "x" * 129},

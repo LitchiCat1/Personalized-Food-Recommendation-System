@@ -282,6 +282,8 @@ class FoodDataCentralClient:
         canonical = _canonical_payload(body)
         return {
             "candidates": candidates,
+            "confirmed_no_hits": not candidates and type(body.get("totalHits")) is int
+            and body["totalHits"] == 0,
             "response_hash": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
             "retrieved_at": datetime.now(timezone.utc).isoformat(),
             "retrieval_version": SEARCH_RETRIEVAL_VERSION,

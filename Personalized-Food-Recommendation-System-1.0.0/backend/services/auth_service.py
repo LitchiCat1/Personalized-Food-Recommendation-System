@@ -34,11 +34,7 @@ class AuthError(Exception):
 
 
 def is_auth_required() -> bool:
-    """預設就要驗證。
-
-    先前只有偵測到 RENDER 環境變數才驗證，所以本機或任何其他部署方式跑起來
-    都是完全不設防的。安全的預設值應該是「要驗證」，要關掉就明確關掉。
-    """
+    """所有部署方式預設都要驗證；暫時測試須明確設定 AUTH_REQUIRED=false。"""
     configured_value = os.environ.get("AUTH_REQUIRED")
     if configured_value is not None:
         return configured_value.strip().lower() in TRUTHY_VALUES

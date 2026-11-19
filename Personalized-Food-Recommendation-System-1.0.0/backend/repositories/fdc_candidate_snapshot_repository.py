@@ -72,6 +72,14 @@ CREATE TABLE IF NOT EXISTS nutrition_fdc_candidate_search_reservations (
 );
 CREATE INDEX IF NOT EXISTS idx_nutrition_fdc_search_reservations_expiry
     ON nutrition_fdc_candidate_search_reservations (scan_expires_at);
+CREATE TABLE IF NOT EXISTS nutrition_fdc_search_no_hits (
+    scan_id TEXT NOT NULL,
+    scan_revision INTEGER NOT NULL,
+    item_id TEXT NOT NULL,
+    PRIMARY KEY (scan_id, scan_revision, item_id),
+    FOREIGN KEY (scan_id, scan_revision) REFERENCES nutrition_fdc_candidate_snapshots
+        (scan_id, scan_revision) ON DELETE CASCADE
+);
 """
 
 
@@ -218,7 +226,7 @@ class FdcCandidateSnapshotRepository:
         return context
 
     def save_candidates(self, *, user_id, scan_id, scan_revision, candidates_by_item,
-                        reservation_owner=None):
+                        reservation_owner=None, no_hit_item_ids=()):
         """Create and persist a snapshot from trusted server-side search results.
 
         This method intentionally accepts neither a client snapshot nor a
@@ -237,6 +245,12 @@ class FdcCandidateSnapshotRepository:
                 context["items"], candidates_by_item, scan_revision=scan_revision)
         except FdcCandidateSelectionError as error:
             raise FdcCandidateSnapshotRepositoryError(error.code, str(error)) from error
+        empty_item_ids = {item["item_id"] for item in normalized["items"] if not item["candidates"]}
+        if (not isinstance(no_hit_item_ids, (tuple, list))
+                or any(not isinstance(item_id, str) or item_id not in empty_item_ids
+                       for item_id in no_hit_item_ids)
+                or len(set(no_hit_item_ids)) != len(no_hit_item_ids)):
+            _fail("invalid_request", "FDC no-hit evidence must reference unique empty candidate groups")
         _canonical_json(normalized)
         issued, expiry = float(context["issued_at"]), float(context["expires_at"])
         if expiry <= now:
@@ -244,10 +258,11 @@ class FdcCandidateSnapshotRepository:
         return self._save_snapshot(user_id=user_id, scan_id=scan_id,
                                    scan_revision=scan_revision, snapshot=normalized,
                                    issued_at=issued, expires_at=expiry,
-                                   reservation_owner=reservation_owner)
+                                   reservation_owner=reservation_owner,
+                                   no_hit_item_ids=no_hit_item_ids)
 
     def _save_snapshot(self, *, user_id, scan_id, scan_revision, snapshot, issued_at, expires_at,
-                       reservation_owner=None):
+                       reservation_owner=None, no_hit_item_ids=()):
         """Private persistence primitive; production code cannot supply client snapshots."""
         normalized = _snapshot(snapshot)
         if normalized["scan_revision"] != scan_revision:
@@ -302,6 +317,10 @@ class FdcCandidateSnapshotRepository:
                                 user_id=user_id, scan_id=scan_id, scan_revision=scan_revision,
                                 lease_owner=reservation_owner)
                         return concurrent
+                    for item_id in no_hit_item_ids:
+                        self.sql.execute(
+                            "INSERT INTO nutrition_fdc_search_no_hits (scan_id, scan_revision, item_id) "
+                            "VALUES (?, ?, ?)", (scan_id, scan_revision, item_id))
                     if reservation_owner is not None:
                         self._finish_search_reservation(
                             user_id=user_id, scan_id=scan_id, scan_revision=scan_revision,
@@ -317,6 +336,23 @@ class FdcCandidateSnapshotRepository:
                 return prior
             self._snapshots[key] = deepcopy(document)
             return deepcopy(document)
+
+    def has_confirmed_search_miss(self, *, user_id, scan_id, scan_revision, item_id):
+        """Read an explicit, unexpired Search result, never infer it from an empty list."""
+        if not self.durable:
+            return False
+        now = _clock(self.clock)
+        return self.sql.query_one(
+            "SELECT 1 FROM nutrition_fdc_search_no_hits h "
+            "JOIN nutrition_fdc_candidate_snapshots s USING (scan_id, scan_revision) "
+            "JOIN nutrition_scan_contexts c USING (scan_id, scan_revision) "
+            "WHERE h.scan_id = ? AND h.scan_revision = ? AND h.item_id = ? "
+            "AND s.user_id = ? AND c.user_id = s.user_id "
+            "AND ((s.status = 'active' AND c.status = 'active') "
+            "OR (s.status IN ('active', 'superseded') AND c.status = 'consumed')) "
+            "AND s.expires_at > ? AND c.expires_at > ?",
+            (scan_id, scan_revision, item_id, user_id, now, now),
+        ) is not None
 
     def reserve_search(self, *, user_id, scan_id, scan_revision, lease_owner,
                        lease_seconds=60.0):

@@ -1,0 +1,111 @@
+{
+  "batch": 92,
+  "date": "2026-11-17",
+  "branch": "v1.0.3",
+  "scope": "verify_cnf_2026_bok_choy_provenance_against_usda_fdc_and_existing_candidate_flow",
+  "user_direction": {
+    "gemini_reply_is_reference_only": true,
+    "contact_fsanz_or_send_letter": false,
+    "ingredient_scope": "Bok choy ingredient only; exclude added cooking oil; do not label as complete dish nutrition."
+  },
+  "official_sources": [
+    {
+      "publisher": "Health Canada / Open Government Portal",
+      "dataset": "Canadian Nutrient File, 2026",
+      "dataset_url": "https://open.canada.ca/data/en/dataset/1b6139bd-ed7e-4043-bc28-ff00e10f3109",
+      "food_name_resource_id": "e1ffee62-58cb-4e3e-b359-115c658388ad",
+      "nutrient_amount_resource_id": "0ff718fc-1133-4154-80c5-3d619e6c63be",
+      "nutrient_name_resource_id": "e0aca283-16b5-4eba-a54a-4994490a3262",
+      "food_source_resource_id": "53819b2a-bf8e-40c1-9a12-0c8897d6dc76",
+      "nutrient_source_resource_id": "76c74969-2599-4ebb-8401-d5aaa60a3100",
+      "api_base": "https://open.canada.ca/data/api/action/datastore_search"
+    },
+    {
+      "publisher": "USDA Agricultural Research Service",
+      "dataset": "FoodData Central API",
+      "api_guide_url": "https://fdc.nal.usda.gov/api-guide/",
+      "search_endpoint": "https://api.nal.usda.gov/fdc/v1/foods/search",
+      "detail_endpoint_template": "https://api.nal.usda.gov/fdc/v1/food/{fdcId}"
+    },
+    {
+      "publisher": "Project-local dataset",
+      "dataset": "USDA FNDDS 2021-2023",
+      "source_manifest": "backend/nutrition_db_usda.source.json",
+      "dataset_file": "backend/nutrition_db_usda.json"
+    }
+  ],
+  "cnf_2026_record": {
+    "food_code": "2038",
+    "description": "Bok choy, pak-choi, raw",
+    "scientific_name": "Brassica rapa (Chinensis Group)",
+    "food_source_code": "0",
+    "food_source_meaning": "Food based on data from USDA: No changes",
+    "usda_ndb_code": "11116",
+    "food_last_updated_date": "2012-07-11",
+    "nutrient_source_code_0_meaning": "No change from USDA",
+    "nutrient_source_code_4_meaning": "Nutrient calculated from USDA data",
+    "nutrient_source_code_12_meaning": "Nutrient value is an assumed zero",
+    "compared_core_nutrient_codes": ["203", "204", "205", "208", "291", "301", "307"],
+    "compared_core_values_match_usda_sr_legacy_fdc_id_170390": true,
+    "nutrient_values_saved_to_evidence": false,
+    "interpretation": "CNF 2026 contains a bok-choy row, but the row explicitly identifies its food data as unchanged USDA data and its USDA NDB code matches USDA FDC SR Legacy. It is not independent corroboration. Code 12 must not be presented as an analytically measured zero."
+  },
+  "usda_fdc_live_check": {
+    "credential": "USDA public DEMO_KEY only; no private key read",
+    "query_bok_choy_results": [
+      {"fdc_id": "2685572", "description": "Cabbage, bok choy, raw", "data_type": "Foundation", "ndb_number": "11116"},
+      {"fdc_id": "170390", "description": "Cabbage, chinese (pak-choi), raw", "data_type": "SR Legacy", "ndb_number": "11116"},
+      {"fdc_id": "168517", "description": "Cabbage, chinese (pak-choi), cooked, boiled, drained, with salt", "data_type": "SR Legacy", "ndb_number": "11754"},
+      {"fdc_id": "170391", "description": "Cabbage, chinese (pak-choi), cooked, boiled, drained, without salt", "data_type": "SR Legacy", "ndb_number": "11117"}
+    ],
+    "query_qingjiang_cai_results": [],
+    "foundation_and_sr_legacy_selected_values_are_identical": false,
+    "interpretation": "USDA FDC has both raw and cooked candidates. Search results alone do not prove a photographed prepared ingredient is equivalent to a raw 100 g record. The current Foundation record is distinct from the SR Legacy-derived CNF values."
+  },
+  "project_pipeline_check": {
+    "local_usda_dataset": "FNDDS 2021-2023; not the complete online FoodData Central corpus",
+    "local_dataset_literal_name_screen": "No bok choy, pak-choi, Chinese cabbage, or 青江菜 text hit in the checked USDA JSON; this is a literal screen, not a full compatibility proof.",
+    "candidate_search_gate": "FDC candidate search is restricted to eligible high-confidence, validation-clean specific identities that return a true local no-mapping result.",
+    "confidence_default": 0.45,
+    "generic_identity": "Generic leafy-green labels such as 炒菜葉 are rejected before FDC search.",
+    "query_normalization": "The server-owned English alias allowlist includes 糯米腸 only; 青江菜 has no English alias and the generated query plan contains only 青江菜.",
+    "route_confirmation": "FDC Search returns candidate metadata only; candidate selection is not accepted automatically and the existing flow requires user confirmation before Detail/preview.",
+    "feature_flag_code_defaults": "FDC candidate, confirmation, Detail, preview, accept and enrichment flags default false in backend/app.py; runtime environment was not inspected.",
+    "live_query_result": "The official FDC API returned no records for exact Chinese query 青江菜 and returned raw bok-choy records for English query bok choy."
+  },
+  "architecture_decision": {
+    "cnf_admitted": false,
+    "cnf_as_independent_third_source": false,
+    "production_web_registry_count": 0,
+    "automatic_web_fallback_enabled": false,
+    "recommended_layering": [
+      "TFDA local dataset",
+      "USDA local FNDDS, followed by the existing user-confirmed USDA FoodData Central candidate/Detail/preview path for true local misses",
+      "Tavily retrieval plus constrained model extraction only after a specific food identity is established and no compatible admitted TFDA/USDA record exists"
+    ],
+    "next_engineering_gate": "Add a narrowly server-allowlisted English retrieval alias for 青江菜, test that it finds the raw FDC candidate without relaxing the generic-name gate, then verify cooked-versus-raw compatibility and the reference-only presentation before any Tavily/model nutrition extraction.",
+    "portion_rule": "Raw per-100-g nutrition cannot be multiplied by image-estimated cooked grams as an exact cooked-portion result. Label raw ingredient reference values as such or require a compatible cooked record; do not include added oil."
+  },
+  "side_effects": {
+    "official_canada_datastore_read_requests": 9,
+    "official_usda_fdc_api_requests": 4,
+    "tavily_api_requests": 0,
+    "model_calls": 0,
+    "private_credentials_read": 0,
+    "dataset_archive_downloaded": false,
+    "nutrition_values_saved_to_project": false,
+    "production_database_operations": 0,
+    "application_code_changed": false,
+    "production_flags_changed": false,
+    "deployed_or_restarted": false,
+    "fsanz_contact_or_email_sent": false,
+    "committed_or_pushed": false
+  },
+  "review_limits": [
+    "This is a technical source and pipeline review, not legal advice or source admission.",
+    "The CNF comparison was limited to selected core nutrient fields; the data values themselves were not retained in this evidence record.",
+    "A literal local dataset text screen is not a substitute for executing the complete local compatibility matcher against a real scan context.",
+    "No photographed-food identity, model confidence calibration, cooked-serving weight, or nutrition accuracy was validated.",
+    "The USDA FDC DEMO_KEY has lower rate limits than a registered key; this isolated read is not a production quota test."
+  ]
+}

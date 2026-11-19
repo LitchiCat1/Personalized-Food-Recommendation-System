@@ -199,6 +199,38 @@ class ScanContextRepositoryTests(unittest.TestCase):
             self.assertEqual(first["item_set_hash"], second["item_set_hash"])
             sql_a.close(); sql_b.close()
 
+    def test_identity_decision_survives_sqlite_reopen_and_changes_item_hash(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "scan.db")
+            first_sql = SqliteDatabase(path)
+            first = NutritionScanContextRepository(first_sql, clock=lambda: 1000.0)
+            item = dict(ITEM_A, identity_confirmation_required=True)
+            saved = first.save_scan_context(user_id="u1", scan_id="identity-scan",
+                                            scan_revision=0, items=[item])
+            first_sql.close()
+
+            second_sql = SqliteDatabase(path)
+            try:
+                second = NutritionScanContextRepository(second_sql, clock=lambda: 1000.0)
+                loaded = second.get_scan_context(user_id="u1", scan_id="identity-scan",
+                                                 scan_revision=0)
+                self.assertEqual(loaded["items"], [item])
+                self.assertEqual(loaded["item_set_hash"], saved["item_set_hash"])
+                with self.assertRaises(ScanContextRepositoryError) as mismatch:
+                    second.assert_complete_item_set(
+                        user_id="u1", scan_id="identity-scan", scan_revision=0,
+                        items=[dict(item, identity_confirmation_required=False)])
+                self.assertEqual(mismatch.exception.code, "item_set_mismatch")
+            finally:
+                second_sql.close()
+
+    def test_identity_confirmation_state_must_be_boolean(self):
+        with self.assertRaises(ScanContextRepositoryError) as raised:
+            self.repo.save_scan_context(user_id="u1", scan_id="bad-identity",
+                                        scan_revision=0,
+                                        items=[dict(ITEM_A, identity_confirmation_required="false")])
+        self.assertEqual(raised.exception.code, "invalid_items")
+
 
 if __name__ == "__main__":
     unittest.main()

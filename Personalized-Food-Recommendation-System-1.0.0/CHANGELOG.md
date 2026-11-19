@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.0.3 - 2026-11-19
+
+- Windows 工作排程＋Tailscale Funnel＋SQLite 為現行部署；本機登入與同源 Expo 網站取代舊雲端服務。
+- 第七十八批已發布171688一般帶皮生蘋果的已審查來源選用、明確確認及營養預覽。Tavily自動補全、新來源profile接受與餐點保存仍未開啟。
+- 第七十九批清理廢止的 Blueprint、Pages自動發布、Procfile、Render平台特例及前端遠端備援，移除MongoDB程式路徑／依賴，整理文件與註解；此批程式尚未部署。
+- 掃描器支援更正食材名稱並重新比對本機 TFDA／USDA；保留照片原辨識分數，名稱更正不等於營養已配對。
+- 第102–103批在隔離環境驗證 TFDA → 本機 USDA → 線上 USDA FDC → Tavily＋模型的順序。後端只接受同一掃描品項的有效 FDC 零筆證據；補全不覆寫既有營養或使用者校正的份量。
+- 本版是 GitHub 原始碼快照，不是正式伺服器部署。第三層真來源驗收尚未執行，正式來源清單維持空白、自動補全保持關閉。詳見[流程企劃書](docs/plans/2026-11-13-web-nutrition-fallback.md)。
+- 以下舊版本的Render／Supabase／PostgreSQL／MongoDB敘述記錄當時行為，不代表目前仍支援；現行依據見 [架構](docs/Project_Architecture_and_Status.md)與 [維運手冊](docs/Operations_Runbook.md)。
+
+## v1.0.2 - GitHub備份（2026-11-16）
+
+- 當時程式與使用者同意公開的照片已備份至 `f45c52f14735fabb17be7cb4351d16201a2c49e3`。後續實作於v1.0.3進行，金鑰、正式DB與私密暫存不公開。
+
 ## v1.0.1 - 2026-11-13（AI 中轉站金鑰池與照片營養配對修正）
 
 ### Added

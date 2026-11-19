@@ -1,5 +1,7 @@
 # Render 用 Supabase、本機用 SQLite：實作計畫
 
+> **歷史封存（2026-11-17）：**整份計畫及下方 checkbox／agent 指示均已失效，不是目前授權或待辦。v1.0.3 僅支援 SQLite；不要按本文恢復舊資料庫、部署或子代理流程。現行流程見 [營養企劃](../../plans/2026-11-13-web-nutrition-fallback.md)與 [Windows 部署](../../Local_Server_Deployment.md)。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 後端在設了 `DATABASE_URL` 時改用 Supabase 的 Postgres，沒設時照舊用本機 SQLite，登入方式不變。

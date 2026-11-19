@@ -119,7 +119,7 @@ class ScannerToEnrichmentIntegrationTests(unittest.TestCase):
             {
                 "item_id", "item_revision", "name_zh", "confidence", "weight_confidence",
                 "estimated_weight_g", "food_state", "preparation_method", "components_scope",
-                "brand", "variant", "validation_issues",
+                "brand", "variant", "validation_issues", "identity_confirmation_required",
             },
         )
         self.assertNotIn("name_en", items[0])

@@ -1,0 +1,107 @@
+{
+  "batch": 90,
+  "date": "2026-11-17",
+  "branch": "v1.0.3",
+  "scope": "verify_user_supplied_gemini_claims_about_fsanz_afcd_reuse",
+  "user_direction": {
+    "gemini_reply_is_reference_only": true,
+    "contact_official_or_send_letter": false
+  },
+  "official_sources_reviewed": [
+    {
+      "publisher": "Food Standards Australia New Zealand",
+      "title": "Data User Licence Agreement",
+      "url": "https://www.foodstandards.gov.au/science-data/monitoringnutrients/afcd/datauserlicenceagreement",
+      "page_last_updated": "2025-02-25",
+      "relevant_terms": {
+        "acceptance": "The licence states that by exercising any rights to the Work, the user accepts and agrees to be bound by its terms.",
+        "reproduction": "Reproduce includes making a copy in material form, including storage in digital form.",
+        "distribution": "Distribute means making available to the public by any means, including electronic communication.",
+        "work_distribution_conditions": [
+          "Distribute the Work only under the licence terms.",
+          "Include a copy or URI for the licence, the Limitation of Data Statement, and a notice that the Work is based on Australian data that may not be appropriate for other countries, with every distributed copy.",
+          "Keep intact notices that refer to the licence and warranty disclaimer with every distributed copy.",
+          "Provide attribution details reasonably appropriate to the medium and avoid implying connection, sponsorship, or endorsement without written permission."
+        ],
+        "derivative_distribution": "A Derivative Work may only be distributed under this licence; reasonable steps must identify changes.",
+        "third_party_data": "The databases contain third-party data; FSANZ does not warrant that reuse will not infringe third-party rights.",
+        "warranty_and_liability": "The licence contains as-is warranty language and limitations of liability subject to applicable law; this does not amount to a blanket determination that all liability is excluded."
+      }
+    },
+    {
+      "publisher": "Food Standards Australia New Zealand",
+      "title": "AFCD Data files",
+      "url": "https://www.foodstandards.gov.au/science-data/food-nutrient-databases/afcd/data-files",
+      "page_last_updated": "2025-12-23",
+      "observed_access": "The page describes downloadable Excel workbooks and says they are developed for loading into users' own software and manipulating for different purposes.",
+      "api_scope": "This reviewed page does not describe or establish an official AFCD API. It does not prove that no API exists elsewhere."
+    }
+  ],
+  "claim_assessment": [
+    {
+      "claim": "Acceptance only happens by checking a box when acquiring the raw dataset.",
+      "assessment": "Not supported by the licence text. The agreement says exercising rights to the Work constitutes acceptance; the page's download flow does not narrow that clause to a checkbox moment.",
+      "confidence": "high_for_textual_observation; not_a_legal_opinion"
+    },
+    {
+      "claim": "A direct API needs no acceptance parameter, so API use is outside the licence acceptance process.",
+      "assessment": "Unsupported inference. Lack of an API parameter does not establish that the data source or its rights terms do not apply. No official AFCD API was established from the reviewed Data files page; any third-party API would need its provider, data provenance and terms identified.",
+      "confidence": "high_for_limitation_of_inference"
+    },
+    {
+      "claim": "Once acquired, attribution on the app page or docs is enough for compliance.",
+      "assessment": "Incomplete. Attribution is one requirement; distribution of Work also lists a licence URI, the limitation statement, an Australian-data suitability notice with every copy, and preservation of relevant notices. Derivative Work has additional ShareAlike and change-identification requirements. Exact placement for this app remains an implementation/legal classification question.",
+      "confidence": "high_for_listed_terms; unresolved_for_app_specific_implementation"
+    },
+    {
+      "claim": "The licence prohibits implying FSANZ endorsement and contains warranty/liability disclaimers.",
+      "assessment": "Broadly supported by the text, with the qualification that liability language is subject to applicable law and is not an unlimited exclusion.",
+      "confidence": "high_for_textual_observation"
+    },
+    {
+      "claim": "A selected single-record nutrient JSON profile is cleared if attribution is added.",
+      "assessment": "Unresolved. The licence defines Derivative Work using editing/adaptation of the Work or a substantial part, but the reviewed material does not classify this exact selected-field profile or decide its copyright status. Third-party data concerns also remain.",
+      "confidence": "unresolved"
+    }
+  ],
+  "decision": {
+    "legal_opinion_provided": false,
+    "gemini_reply_accepted_as_authority": false,
+    "official_contact_requested_or_sent": false,
+    "licence_accepted": false,
+    "dataset_downloaded": false,
+    "real_nutrient_values_copied": false,
+    "source_admitted": false,
+    "production_web_registry_count": 0,
+    "automatic_web_fallback_enabled": false,
+    "afcd_reuse_rights_resolved": false,
+    "reason": "The public licence text clarifies acceptance and distribution conditions but does not determine whether the project's selected nutrient profile is protected Work or a Derivative Work, nor clear third-party lineage. Per user direction, no official inquiry will be sent; AFCD remains excluded pending a separately approved rights path."
+  },
+  "next_gate": [
+    "Do not submit the batch 89 FSANZ enquiry draft; retain it only as an unsubmitted historical reference.",
+    "Review alternative nutrition sources with clearer reuse terms and verify exact bok choy food records, preparation scope, field coverage, derivation and attribution conditions.",
+    "Only after source rights and food-scope compatibility are documented should an isolated schema/adapter test be considered; it must not be described as photo nutrition validation."
+  ],
+  "side_effects": {
+    "official_fsanz_pages_reviewed": 2,
+    "official_contact_or_form_submission": 0,
+    "emails_sent": 0,
+    "credentials_or_account_pages_read": 0,
+    "dataset_files_downloaded": 0,
+    "licence_acceptance_actions": 0,
+    "nutrition_values_copied": false,
+    "tavily_api_requests": 0,
+    "model_calls": 0,
+    "production_database_operations": 0,
+    "production_flags_changed": false,
+    "application_code_changed": false,
+    "deployed_or_restarted": false,
+    "committed_or_pushed": false
+  },
+  "review_limits": [
+    "This is a technical reading of published text, not legal advice or a legal determination.",
+    "The reviewed Data files page does not establish the complete landscape of APIs; it only does not describe an official AFCD API on that page.",
+    "The licence text does not resolve copyright protection or derivative-work classification for a single selected nutrient profile.",
+    "No third-party API terms or record-level source rights were reviewed in this batch."
+  ]
+}

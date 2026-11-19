@@ -108,6 +108,37 @@ class FdcDetailProfileServiceTests(unittest.TestCase):
                                              item_id="item-1", weight_g=100)
                 self.assertEqual(caught.exception.code, "identity_mismatch")
 
+    def test_raw_or_boiled_bok_choy_cannot_be_relabelled_as_stir_fried(self):
+        document, spec = fixture()
+        for source_state, source_method, scan_state, scan_method in (
+                ("raw", "mixed", "prepared", "stir_fried"),
+                ("prepared", "boiled", "prepared", "stir_fried")):
+            with self.subTest(source_state=source_state, source_method=source_method):
+                identity = {
+                    "name": "Cabbage, chinese (pak-choi)",
+                    "food_state": source_state,
+                    "preparation_method": source_method,
+                    "components_scope": "food_only",
+                    "brand": None,
+                    "variant": None,
+                }
+                bok_choy_spec = {**spec, "food_identity": identity}
+                scan_identity = {
+                    "name_zh": "青江菜",
+                    "food_state": scan_state,
+                    "preparation_method": scan_method,
+                    "components_scope": "food_only",
+                    "brand": None,
+                    "variant": None,
+                }
+                with self.assertRaises(FdcDetailProfileError) as caught:
+                    build_fdc_detail_profile(
+                        document=document, spec=bok_choy_spec,
+                        confirmed_item_identity=scan_identity,
+                        item_id="item-1", weight_g=100,
+                    )
+                self.assertEqual(caught.exception.code, "identity_mismatch")
+
 
 if __name__ == "__main__":
     unittest.main()

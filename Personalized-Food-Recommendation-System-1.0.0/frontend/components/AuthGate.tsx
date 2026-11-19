@@ -250,14 +250,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     list.includes(id) ? list.filter((entry) => entry !== id) : [...list, id];
 
   /**
-   * 後端在 Render 免費方案上會休眠，第一個請求要等它冷啟動。
-   *
-   * 實測開首頁時 `OPTIONS /user/...` 一直 pending，畫面停在「正在載入你的
-   * 基本資料...」超過 30 秒——沒有說明、沒有逾時、沒有重試。而 AuthGate 會
-   * 擋住所有子畫面，所以那 30 秒裡整個 App 都不能用，看起來像壞了。
-   *
-   * 修不掉冷啟動本身（那是方案限制），但可以不要讓使用者對著一個沉默的
-   * 轉圈圈猜發生什麼事。
+   * 後端重新啟動或網路延遲時，profile 載入可能較久。AuthGate 會擋住子畫面，
+   * 因此保留已等待秒數，讓載入狀態與重試提示有明確依據。
    */
   useEffect(() => {
     if (profileStatus !== 'loading') {

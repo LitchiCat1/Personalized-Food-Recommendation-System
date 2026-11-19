@@ -23,7 +23,8 @@ def fixture(index=1):
     identity = {"food_state": "prepared", "preparation_method": "roasted", "components_scope": "food_only",
                 "brand": None, "variant": None}
     item = dict(identity, item_id="item-" + str(index), item_revision=0, name_zh=name,
-                confidence=0.9, weight_confidence=0.6, estimated_weight_g=150, validation_issues=[])
+                confidence=0.9, weight_confidence=0.6, estimated_weight_g=150, validation_issues=[],
+                identity_confirmation_required=False)
     url = "https://example.com/product-" + str(index)
     spec = {"source_id": "source-" + str(index), "source_url": url, "adapter_version": "fixture-v1",
             "table_id": "nutrition-1", "food_identity": dict(identity, name=name), "identity_line": "# " + name,
@@ -463,6 +464,12 @@ class WebNutritionTests(unittest.TestCase):
             output = self.run_enrich()
         self.assertEqual(output["items"][0]["status"], "needs_identity")
         self.assertFalse(self.client.searches)
+
+    def test_specific_but_mid_confidence_identity_makes_no_provider_calls(self):
+        self.item["confidence"] = 0.74
+        output = self.run_enrich()
+        self.assertEqual(output["items"][0]["status"], "needs_identity")
+        self.assertFalse(self.client.searches or self.client.extracts or self.model.calls)
 
 
 if __name__ == "__main__":

@@ -232,7 +232,7 @@ def build():
     add_bullet(doc, "附近店家探索由 Google Places 提供真實位置、評分、營業狀態與距離；店家菜單、營養與過敏原資料仍需由使用者依現場標示、掃描或手動搜尋確認。", left=0.73, size=11.5, after=5)
     add_text(doc, "(2)  AI 技術實作流程：", left=0.28, size=12, bold=True, after=1)
     add_bullet(doc, "食物辨識採 Gemini Vision 產生候選食物名稱、份量描述、同義候選與信心程度；營養數值優先由 TFDA 台灣食品營養資料庫與自訂食品資料換算。", left=0.73, size=11.5)
-    add_bullet(doc, "前端以 Expo React Native 建立 Web/iOS/Android 可延伸介面，後端以 Flask API 提供掃描、紀錄、推薦與地圖相關服務，資料以 Supabase Postgres/Auth 管理。", left=0.73, size=11.5)
+    add_bullet(doc, "前端以 Expo React Native 建立 Web/iOS/Android 可延伸介面，Windows Flask／Waitress 後端提供掃描、紀錄、推薦與地圖服務，經 Tailscale Funnel 提供 HTTPS，資料與本機登入由 SQLite 管理。", left=0.73, size=11.5)
     add_bullet(doc, "Safety Guard 會讀取疾病規則與過敏原設定，針對高血壓、糖尿病、高血脂、痛風、慢性腎臟病等情境提供高鈉、高糖、高脂、蛋白質或過敏風險提示。", left=0.73, size=11.5)
     add_bullet(doc, "推薦邏輯採可解釋的規則型雙軌設計：Safety Guard 先處理疾病與過敏原風險，再依剩餘熱量、營養匹配、近期飲食偏好與推薦回饋排序。此作法適合 MVP 展示，且能降低直接依賴生成式 AI 輸出精準營養數字的風險。", left=0.73, size=11.5, after=14)
 

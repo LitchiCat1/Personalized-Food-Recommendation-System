@@ -1,0 +1,93 @@
+{
+  "batch": 98,
+  "date": "2026-11-19",
+  "branch": "v1.0.3",
+  "scope": "read_only_fdc_bok_choy_provenance_and_energy_metadata_review",
+  "provider_requests": {
+    "endpoint": "https://api.nal.usda.gov/fdc/v1/food/{fdc_id}",
+    "successful_detail_requests": {
+      "requests": 6,
+      "retried": false,
+      "by_fdc_id": {"2685572": 2, "170390": 4},
+      "credential_source": "server-side USDA KEY.txt; credential value not emitted or persisted"
+    },
+    "metadata_saved": true,
+    "nutrient_amounts_saved": false,
+    "full_payloads_saved": false,
+    "processing_note": "The first metadata extraction printed nested analytical-detail objects, including nutrient amounts, to command output. No values or payloads were written to files or databases. Subsequent requests used a metadata-only projection; this scope mistake is recorded rather than described as zero output.",
+    "tavily_requests": 0,
+    "model_calls": 0
+  },
+  "reviewed_records": [
+    {
+      "fdc_id": "2685572",
+      "description": "Cabbage, bok choy, raw",
+      "data_type": "Foundation",
+      "publication_date": "4/18/2024",
+      "ndb_number": 11116,
+      "food_nutrient_row_count": 25,
+      "relevant_provenance": {
+        "water": {"data_points": 8, "derivation": "Analytical", "analysis_detail_count": 8, "methods": ["Vacuum oven"]},
+        "fat": {"data_points": 8, "derivation": "Analytical", "analysis_detail_count": 8, "methods": ["Acid hydrolysis"]},
+        "fiber": {"data_points": 8, "derivation": "Analytical", "analysis_detail_count": 8, "methods": ["Enzymatic-gravimetric"]},
+        "sodium": {"data_points": 8, "derivation": "Analytical", "analysis_detail_count": 8, "methods": ["ICP"]},
+        "protein": {"data_points": null, "derivation": "Calculated", "source": "Calculated or imputed", "analysis_detail_count": 0},
+        "carbohydrate": {"data_points": null, "derivation": "Calculated", "source": "Calculated or imputed", "analysis_detail_count": 0},
+        "energy_957": {"derivation": "Calculated", "source": "Calculated or imputed", "analysis_detail_count": 0},
+        "energy_958": {"derivation": "Calculated", "source": "Calculated or imputed", "analysis_detail_count": 0},
+        "mapped_optional_fields_missing": ["sugar", "saturated_fat", "trans_fat"]
+      },
+      "metadata_limitations": [
+        "Some nutrients expose analysis method and eight data points, but the mapped nutrients do not share a complete common sample/method basis.",
+        "No per-row footnotes were present for the reviewed mapped nutrients.",
+        "The API response does not establish equivalence to Taiwanese cultivars."
+      ]
+    },
+    {
+      "fdc_id": "170390",
+      "description": "Cabbage, chinese (pak-choi), raw",
+      "data_type": "SR Legacy",
+      "publication_date": "4/1/2019",
+      "ndb_number": 11116,
+      "food_nutrient_row_count": 97,
+      "relevant_provenance": {
+        "protein": {"data_points": 1, "derivation_metadata_present": false, "analysis_details_present": false},
+        "fat": {"data_points": 1, "derivation_metadata_present": false, "analysis_details_present": false},
+        "sodium": {"data_points": 2, "derivation_metadata_present": false, "analysis_details_present": false},
+        "fiber": {"data_points": 0, "derivation_metadata_present": false, "analysis_details_present": false},
+        "carbohydrate": {"data_points": 0, "derivation": "Calculated", "source": "Calculated or imputed"},
+        "sugar": {"data_points": 0, "derivation": "Other procedure used from imputing", "source": "Calculated or imputed"},
+        "saturated_fat": {"data_points": 0, "derivation": "Calculated", "source": "Calculated or imputed"},
+        "trans_fat": {"data_points": 0, "derivation": "Assumed zero", "source": "Assumed zero"},
+        "energy_kcal_208": {"data_points": 0, "derivation": "Calculated", "source": "Calculated or imputed"},
+        "energy_kj_268": {"data_points": 0, "derivation": "Calculated", "source": "Calculated or imputed"}
+      },
+      "metadata_limitations": [
+        "No lab method, sample details, or row footnotes were exposed for the reviewed SR Legacy nutrients.",
+        "Zero data points and assumed-zero derivation are not analytical measurements.",
+        "The shared NDB number does not establish that this record and the Foundation record are interchangeable or that their differences have a single explainable cause."
+      ]
+    }
+  ],
+  "decision": {
+    "raw_reference_source_selected": false,
+    "energy_method_selected": false,
+    "stir_fried_scan": "remain_unmatched",
+    "reason": "Lineage metadata shows materially different derivation and data-point coverage, but cannot establish a sufficiently comparable or Taiwan-specific reference record; the Foundation record is not complete for all mapped nutrients, while SR Legacy provenance is sparse. Do not choose by recency or field coverage alone and do not merge rows.",
+    "next_step": "Search for another single authoritative, rights-reviewable record whose food scope and nutrient provenance can support an explicitly labelled raw per-100-g reference; otherwise keep bok choy unmatched. Only after a source is selected should an isolated reference-only API/UI contract be implemented."
+  },
+  "side_effects": {
+    "application_code_changed": false,
+    "tests_run": false,
+    "production_database_accessed_or_changed": false,
+    "profiles_or_meals_written": false,
+    "runtime_flags_changed": false,
+    "deployed_or_restarted": false,
+    "committed_or_pushed": false
+  },
+  "limitations": [
+    "No nutrient amounts or full provider payload were persisted in this evidence record.",
+    "The reviewed metadata is not a nutrition-accuracy validation or botanical identity confirmation.",
+    "This batch does not approve an FDC policy/profile or a raw-reference UI."
+  ]
+}

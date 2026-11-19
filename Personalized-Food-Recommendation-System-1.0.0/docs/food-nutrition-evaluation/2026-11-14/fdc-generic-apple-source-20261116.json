@@ -1,0 +1,39 @@
+{
+  "scope": "one_real_usda_detail_capture_not_image_recognition_or_deployment",
+  "fdc_id": 171688,
+  "description": "Apples, raw, with skin (Includes foods for USDA's Food Distribution Program)",
+  "data_type": "SR Legacy", "ndb_number": "9003",
+  "retrieved_at": "2026-11-16T13:00:45.505513+00:00",
+  "source_url": "https://api.nal.usda.gov/fdc/v1/food/171688",
+  "payload_sha256": "5d271bb2cc8ba2e7f7c96425e341e06268951b82f3c17d24c5e8e82c9799bd1c",
+  "food_nutrient_rows": 110,
+  "requests": {"usda_detail": 1, "usda_search": 0, "model": 0, "tavily": 0, "retries": 0},
+  "policy_sha256": "14152c86f9f718ee7057d65b038d6b9be65d3a7197995308f29ef91f5876b85f",
+  "selected_nutrient_numbers": {
+    "calories": "208", "protein": "203", "carbs": "205", "fat": "204",
+    "fiber": "291", "sugar": "269", "sodium": "307",
+    "saturated_fat": "606", "trans_fat": "605"
+  },
+  "per_100g": {
+    "calories": 52, "protein": 0.26, "carbs": 13.81, "sugar": 10.39,
+    "fat": 0.17, "saturated_fat": 0.028, "trans_fat": 0, "fiber": 2.4, "sodium": 1
+  },
+  "portion_150g": {"values": {
+    "calories": 78, "protein": 0.39, "carbs": 20.715, "sugar": 15.585,
+    "fat": 0.255, "saturated_fat": 0.042, "trans_fat": 0, "fiber": 3.6, "sodium": 1.5
+  }},
+  "compatibility": {
+    "recognition_name": "蘋果", "cultivar": "unspecified, not Fuji",
+    "skin_evidence_required": "with_skin in the existing variant field",
+    "state": "raw", "preparation": "mixed is the explicit legacy unheated-apple convention",
+    "scope": "food_only", "brand": null,
+    "not_allowed": ["unknown skin state", "peeled", "cooked", "dried", "juice", "branded product"]
+  },
+  "limitations": [
+    "The older shortened 171688 fixtures remain synthetic, even where numeric values coincide",
+    "Preserve the Food Distribution Program annotation in the original source name",
+    "Reported trans-fat zero is a real source cell, not a replacement for missing data",
+    "Reference class data does not measure the photographed food or establish its weight",
+    "Candidate not installed into production; no automatic confirmation or feature flag activation"
+  ]
+}

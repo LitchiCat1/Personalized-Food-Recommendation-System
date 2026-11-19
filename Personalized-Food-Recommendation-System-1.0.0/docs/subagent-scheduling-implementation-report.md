@@ -1,5 +1,7 @@
 # Subagent Scheduling Implementation Report
 
+> **歷史報告（2026-11-17 標示）：**以下僅為當時執行紀錄，不是現行委派指示、待辦或版本驗收。現行架構見 [專案狀態](Project_Architecture_and_Status.md)，營養工作進度見 [企劃書](plans/2026-11-13-web-nutrition-fallback.md)。
+
 > 日期：2026-06-19
 > 依據：
 > - `docs/subagent-dispatch-mandate.md`

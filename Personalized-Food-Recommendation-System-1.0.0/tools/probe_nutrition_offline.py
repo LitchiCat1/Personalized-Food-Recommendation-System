@@ -75,14 +75,14 @@ def main():
         with tempfile.TemporaryDirectory() as folder:
             db_path = str(Path(folder) / "probe.db")
             db = SqliteDatabase(db_path)
-            repository = StorageRepository(None, False, {}, [], [], sql=db)
+            repository = StorageRepository({}, [], [], sql=db)
             with patch.object(app, "storage", repository):
                 sql_post = client.post("/record", json=payload)
                 result["sqlite_api_persistence"] = {"status": sql_post.status_code,
                                                     "record": sql_post.get_json().get("record")}
             db.close()
             reopened = SqliteDatabase(db_path)
-            repository = StorageRepository(None, False, {}, [], [], sql=reopened)
+            repository = StorageRepository({}, [], [], sql=reopened)
             result["sqlite_after_reopen"] = repository.get_records("probe-only")
             reopened.close()
 

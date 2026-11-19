@@ -1,6 +1,288 @@
 # 營養流程分階段驗收
 
-最新：第六十八批收到使用者 Android 拍照辨識結果回報。使用者表示以相機拍照並取得結果；截圖選中「拍照」，但無法單獨證明快門與結果的請求對應，故記為 user-attested camera smoke。畫面共8個候選，白飯與茄子2項配對、6項待確認，合計357 kcal／77mg鈉；截圖仍出現舊 badge／標題。唯讀 GET 確認目前公開 scanner HTML／bundle HTTP 200，bundle SHA-256 `65a1c6ad6ae466bdcfa76aaea307201e36e9b96cd15f00da2896d1b1bebd24d9` 與本機修正版一致，且未見舊文案字串；手機當時載入的資產仍未知。證據：[android-camera-results-20261116.json](android-camera-results-20261116.json)。正式 automatic fallback 與 v2 scanner 仍關閉。
+第102–103批已驗證第三層的後端 USDA 優先檢查與 Scanner 排序；未做第三層真來源驗收。第101批公開糯米腸真照完成後端辨識與前兩層查找，沒有相容營養。第100批香菇赤肉羹未啟動第三層正向驗收；第99批青江菜維持未配對。正式Tavily來源清單為空，自動補全維持關閉。
+
+**收尾複核：**現有案例皆無法進入第三層真來源驗收；特別是糯米腸「候選不相容」不等於「原始FDC Search明確零筆」。未開新測試批次，具體重開條件見[企劃書第19節](../../plans/2026-11-13-web-nutrition-fallback.md#19-實測後的放行決定)，各案例判定見[收尾複核](../../plans/2026-11-13-web-nutrition-fallback-review.md#第三層收尾複核2026-11-19)。
+
+## 第一百零三批 Scanner 分層順序（2026-11-19）
+
+隔離 Expo 瀏覽器驗證原始 FDC 搜尋先於補全請求、網路失敗與重試、後端拒絕、本機已校正份量保留、清除後不套用遲到的補全結果。這些案例使用固定 API 回應，不算新的實拍／真來源測試。[複核紀錄](../../plans/2026-11-13-web-nutrition-fallback-review.md#第一百零三批-scanner-分層順序2026-11-19)。
+
+## 第一百零二批 第三層後端順序檢查（2026-11-19）
+
+已用隔離 HTTP 與 SQLite 驗證：沒有同一品項的成功 FDC 零筆證據時，第三層在快取及供應商前停止。範圍、反例與測試結果見[複核紀錄](../../plans/2026-11-13-web-nutrition-fallback-review.md#第一百零二批-第三層後端順序檢查2026-11-19)。
+
+## 第一百零一批 公開糯米腸真照自動辨識（2026-11-19）
+
+照片：[Nuomichang.jpg](https://commons.wikimedia.org/wiki/File:Nuomichang.jpg)，Brian Jeffery Beggerly，[CC BY 2.0](https://creativecommons.org/licenses/by/2.0/)。使用Commons既有裁切版本的960px縮圖，未另行修改，未把影像檔加入專案。
+
+在臨時SQLite註冊測試帳號，送圖至辨識API後再用回傳的scan reference查FDC。辨識「糯米腸」，無品牌，分數0.92，估重信心0.30；TFDA及本機USDA均無配對。FDC中文0筆，兩個英文別名各5筆，去重後五筆皆非糯米腸。沒有取得或保存該食品的營養數值。第三層未啟動，正式設定及SQLite未動。[第101批機器紀錄](scanner-public-nuomichang-batch101-20261119.json)。
+
+## 第一百批 第三層單一候選前置查核（2026-11-19）
+
+[GREEN&SAFE「香菇赤肉羹」官方商品頁](https://www.green-n-safe.com/Products/Content?id=MEG0028ABCS)標示的是含羹湯與肉羹的冷凍調理包，有每份與每100g欄。[早期 `exact_soup` 紀錄](../2026-11-13/positive-pipeline.json)是固定擷取控制，不是前兩層正常查詢或實際掃描證據。
+
+缺少真實掃描的品項與食用範圍確認、正常TFDA／USDA及限定FDC無相容配對紀錄，以及可核對的來源使用依據。此次只查前置資料，不算執行後失敗或通過。沒有新合格案例就停止；本批無程式或設定變更、無Tavily／模型／USDA API呼叫，未執行應用程式回歸測試。[第100批機器紀錄](web-nutrition-candidate-preflight-batch100-20261119.json)。
+
+## 第九十九批青江菜替代來源有限查核與停止決策 2026-11-19
+
+MEXT `06160`、`06161`、`06338`分別標示青梗菜的葉、生，葉、水煮及葉、油炒。標示與備註不足以確認涵蓋青江菜整體可食部分，油炒列也含用油資料。[MEXT 生鮮列](https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=6_06160_7)、[MEXT 水煮及烹調說明](https://fooddb.mext.go.jp/details/foodInfo.pl?ITEM_NO=6_06161_7)、[MEXT 油炒列](https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=6_06338_7)。
+
+唯讀掃描CoFID 2021主表及舊食品工作簿的品名與描述欄。主表命中 `13-516 Pak choi, steamed`，涵蓋16份英國產及進口樣本。舊食品表無比對名稱命中。蒸熟樣本不符合生鮮參考或熟炒基準。工作簿下載至暫存，MEXT頁面檢索有顯示營養數字。專案只留下食品身分、範圍與來源結論。[CoFID 官方資料](https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid)。
+
+此批以已知候選為查核範圍。青江菜維持未配對，只有具體新原列或改變准入結論的證據才重開。後端聚焦83項與105個子測試、前端掃描器26項通過。前端測試出現Node既有模組類型警告。[第99批機器紀錄](bok-choy-bounded-source-close-batch99-20261119.json)。
+
+## 第九十八批：青江菜 FDC 來源血緣與能量中繼資料審查（2026-11-19）
+
+以既有伺服器端 USDA FDC client 對固定 Detail `2685572`、`170390`進行六次唯讀中繼資料查核（前者2次、後者4次；均無重試）。只保留列級 derivation、data points、分析方法與屬性結構，不保存營養amount或完整payload；未呼叫Tavily／模型、未讀寫SQLite／profile／餐點、未改flags或部署。
+
+Foundation `2685572`發佈日為2024-04-18，NDB number為11116。水分、脂肪、纖維、鈉可見各8個data points與分析細節，方法各異；蛋白質、碳水及兩個energy numbers屬calculated/calculated-or-imputed，無分析細節。映射的糖、飽和脂肪及反式脂肪缺值。SR Legacy `170390`發佈日為2019-04-01、同為NDB 11116；蛋白質／脂肪只有1 data point、鈉2點、纖維0點且無分析詳情；碳水、糖、飽和脂肪與kcal/kJ energy列為計算／推算，反式脂肪明示assumed zero。所查欄位無footnote。兩者data point與推導差異能說明資料脈絡不同，不能據此將其營養差異判為誰更接近台灣青江菜真值；共同NDB number亦不代表可拼欄或互換。
+
+**決定：**不選FDC列或energy method，不建立青江菜來源policy/profile；raw reference-only與熟炒掃描均維持no-match，不能因Foundation較新或SR Legacy欄位較齊而自動選擇。下一步尋找單一、權利條件可審且食物範圍／逐欄血緣較充分的權威來源；若無則維持未配對。只有來源審查通過後，才設計獨立reference-only唯讀API/UI，並隔離熟菜重量、掃描合計、風險、profile及飲食紀錄。證據：[第98批機器紀錄](fdc-bok-choy-lineage-review-batch98-20261119.json)。
+
+## 第九十七批：青江菜固定 FDC Detail 與 raw 參考可行性（2026-11-18）
+
+用伺服器端 USDA key 對固定 FDC ID `2685572`、`170390`、`170391` 各做一次唯讀 Detail；另外三次公開 `DEMO_KEY` 嘗試均回403，沒有重試。成功回應含營養數值，但本批只記欄位覆蓋及差異，不把數值寫入證據檔、SQLite或profile。沒有呼叫Tavily／模型，沒有讀寫正式資料庫、改flags或部署。
+
+`2685572` 是 Foundation 生鮮bok choy，九項schema欄位中有熱量、蛋白質、碳水、脂肪、鈉、纖維六項；糖、飽和脂肪、反式脂肪未提供，且含兩種kcal計算法，須審核明確選一。`170390` 是 SR Legacy 生鮮pak-choi，九項欄位皆有映射值，其中反式脂肪原格是零；這不等於證明其他來源也會記為零。兩筆生鮮資料的重疊欄位值不同，不能合併兩列補欄，也不能單以欄位較完整或資料型態較新來自動決定優先。`170391` 是無鹽水煮瀝乾列，雖有九項欄位，仍不相容於熟炒影像。三筆描述均非台灣青江菜特定品種標示。
+
+**結論：**raw reference-only在技術上可行，但現有preview一定需要相容身分與正重量並計算portion，因此不能直接重用。若後續核准此呈現，必須有獨立API／UI契約，清楚標「生鮮每100g參考」、不套用熟菜估重、不納入掃描結果合計／風險／飲食紀錄，且熟炒項目仍維持未配對。本批尚未選定資料列；下一步先比對兩筆生鮮FDC的分析方法、樣本數、逐項來源／修飾語及熱量算法，再決定固定列及energy number；若血緣仍不足以解釋差異，就保留no-match。證據：[第97批機器紀錄](fdc-bok-choy-detail-review-batch97-20261118.json)。
+
+## 第九十六批：青江菜 USDA FDC alias 與生熟相容性（2026-11-18）
+
+對精確名稱「青江菜」加入server-owned `bok choy`英文alias；中文顯示名稱不變，泛稱阻擋、身分完整性、先查本機及候選人工確認均維持。Live FDC只用公開DEMO_KEY，共7次官方Search/Detail唯讀request：exact Chinese query回0；英文query回傳 Foundation `2685572`及SR Legacy `170390`兩筆raw、`168517`（boiled with salt）與`170391`（boiled without salt），另有名稱較泛的FNDDS `2709774`。後者不能只憑搜尋相關性認定為青江菜。固定Detail僅核對ID、描述及data type，沒有抓取／保存營養數值。
+
+四個聚焦後端測試檔共41項及22項子測試通過，完整後端回歸1179項及1282項subtests通過。source/scan identity測試證明raw→熟炒與boiled→熟炒會在Detail取值前拒絕，估計熟重不會乘生鮮值；不計添加油不會使兩種烹調方式等價。候選只是檢索命中，沒有安裝青江菜FDC policy、建立profile、預覽portion或保存餐點。沒有Tavily／模型呼叫、私密key讀取、runtime flag變更或部署。[機器可讀證據](fdc-bok-choy-alias-compatibility-batch96-20261118.json)。
+
+**發現的缺口：**現行preview要求source/scan身份精確相容並套用份量計算；沒有raw每100g參考但不乘熟菜估重的reference-only路徑。下一步先唯讀審查固定Detail與營養欄位完整性，再決定新增清楚標示的raw reference-only呈現或維持no-match；不得把煮菜／FNDDS泛稱當熟炒配對。
+
+## 第九十五批：食材名稱更正與本機營養重查（2026-11-18）
+
+Playwright透過本機Flask HTTP及暫存SQLite上傳便當照，以固定影像輸出「炒菜葉」驗證互動。泛稱確認回422，畫面允許改填「青江菜」後重送（202）。後端原子建立scan及item revision 1，舊掃描為 `superseded`，僅存一筆名稱確認。影像分數0.92、估重120g、估重信心0.82、熟炒及食材本體範圍保留，均為測試樣本資料。
+
+更正後的實際TFDA／USDA FNDDS本機比對回 `no_local_mapping`。畫面顯示本機比對已完成，逐項標示名稱已確認但未找到相容營養，未計入合計。390×844及1440×1000畫面皆核對完畢；瀏覽器唯一錯誤是預期的422。FDC Search／Detail、營養profile、飲食紀錄皆為0。未呼叫真模型或Tavily、未部署。這次驗證的是更正流程及本機重查，未重測菜種辨識品質或Android真機。
+
+聚焦後端74項及41項子測試通過；前端nutrition 149、scanner 26、config 11，並通過typecheck、lint和清快取的Expo Web匯出。[機器可讀證據](identity-correction-batch95-20261118.json)。
+
+## 第九十四批：server-owned身分資格與provider零呼叫修補（2026-11-18，歷史）
+
+實作專用`identity_confirmation_required`；未把影像UI混合份量／營養缺值／候選狀態的`needs_confirmation`整體複製至web gate。server端以既有辨識最低門檻與0.75兩者較高者、泛稱／不確定名稱、validation issues、food state／preparation／scope已知性判定。替代名稱遵循prompt為同義詞，不單憑不同字串拒絕。低估重信心不屬身分問題：clear identity仍可查每100g profile；missing weight stays null，不算份量且scanner不生成可保存食物。
+
+新旗標進入vision context、SQLite snapshot hash、HMAC authority token、request idempotency fingerprint及scanner前端context；route仍先做本機lookup，在local miss後、web cache前阻擋未確認身分，故不建立provider／耗quota／consume JTI。修改client旗標會被snapshot hash拒絕；舊context缺旗標保守禁止web；SQLite reopen後狀態及hash一致。現有FDC來源確認只確認資料來源，不會確認／更改食材名稱，不能解鎖此gate。通用使用者食材名稱更正API／UI與新revision未實作，故尚無手動解除路徑。
+
+驗證：聚焦後端117 passed／397 subtests；全後端1161 passed／1273 subtests；前端nutrition145、scanner25、typecheck、lint、web export通過。真Tavily／模型／USDA呼叫0，未讀金鑰或production DB，未改flags／部署。細節見[機器可讀證據](identity-enrichment-gate-batch94-20261118.json)。
+
+## 第九十三批：企劃整體流程與身分確認閘門複核（2026-11-18）
+
+重讀主計畫與對照後端scan-context adapter、enrichment eligibility、HTTP route及scanner條件式呼叫。確認目前有server-signed authority、authenticated `/nutrition/enrichment`、SQLite durable quota／request lease／cache和前端條件式接線；第15節曾將這些已實作項目錯列為未完成，已在主計畫更正。這些隔離實作不代表production runtime flags已核實，也不代表有已准入Tavily來源。
+
+找到一項需先修的身分安全缺口：vision標記`needs_confirmation`（例如低於0.75或候選衝突），但權威scan context沒有保留該旗標；第三層准入主看0.45最低辨識門檻。下一步是把server-owned確認狀態與revision帶入authority contract，未確認項目在確認及重查TFDA／USDA前不得呼叫provider，並用測試證明provider-call count為0。
+
+其後才為明確確認的青江菜加入受控FDC英文alias，保留泛稱「炒菜葉」阻擋與人工候選確認，實測生鮮、煮熟和熟炒相容性。raw每100g不可乘熟菜照片估重；若提供raw reference，明示生鮮每100g且不計熟菜portion。再往後才挑權利可核對、真正沒有相容TFDA／USDA資料的食品，測Tavily＋模型固定格式抽取。AFCD不聯絡FSANZ且不准入；CNF與USDA資料重疊，不是獨立第三來源。此批只做文件與靜態程式查核，沒有測試執行、provider呼叫、私密設定讀取、SQLite操作或部署。完整審查見[審查紀錄第93批](../../plans/2026-11-13-web-nutrition-fallback-review.md)。機器可讀證據：[plan-flow-review-batch93-20261118.json](plan-flow-review-batch93-20261118.json)。
+
+## 第九十二批：CNF 2026 與 USDA FDC 血緣及青江菜查詢驗證（2026-11-17）
+
+透過加拿大官方開放資料唯讀查詢 CNF 2026 code 2038：`Bok choy, pak-choi, raw`，Food Source Code 0 的定義是基於 USDA 且未修改，USDA NDB code 為11116，food row 最後更新日為2012-07-11。CNF nutrient-source code 0 表示未改自USDA；code 12 明確表示假設為零，不能當成實測零。抽查蛋白質、脂肪、碳水、能量、纖維、鈣、鈉的來源代碼和值，與USDA FDC SR Legacy ID 170390一致；營養數字未寫入本批證據檔。CNF 2026因此是USDA既有資料的再發布，不是獨立營養佐證。
+
+USDA官方FDC API搜尋`bok choy`找到生鮮 Foundation ID 2685572與生鮮 SR Legacy ID 170390，並找到兩筆煮熟記錄；`青江菜`精確中文查詢沒有結果。專案本機資料是USDA FNDDS 2021-2023，不等於完整FDC。現有FDC候選服務只對真正本機未配對且名稱具體、信心達門檻、無validation issue的項目搜尋；`炒菜葉`維持被擋，正確保留了身份門檻。但server allowlist目前只有`糯米腸`英文別名，沒有`青江菜`別名，所以即使模型已回傳具體名稱，現有線上FDC查詢仍可能只送中文而落空。FDC候選搜尋、使用者確認與Detail/preview是USDA層延伸，不應另外命名為第三層。
+
+**決定：**不准入CNF、不新增營養來源、不啟用automatic fallback。修正優先順序為：先為明確識別的青江菜加受控英文查詢別名與測試；維持泛稱阻擋及候選人工確認；明確處理熟炒食材與raw每100g資料的呈現界線；之後才對符合來源權利條件的真正eligible miss測試Tavily／固定schema抽取。青江菜只代表食材本體，不估添加油；raw資料不直接乘熟菜影像估重。詳見[機器可讀證據](alternative-nutrition-source-screening-batch92-20261117.json)。本批只做官方資料唯讀查詢、程式／資料集靜態檢查及文件更新，未下載整包資料、呼叫Tavily／AI模型、讀取私人key、操作DB、改程式／旗標或部署。
+
+## 第九十一批：MEXT、CoFID 與 Health Canada CNF 替代來源初篩（2026-11-17）
+
+MEXT官方說明食品成分資料可自由使用，二次使用需標註日本食品標準成分表（八訂）增補2023年；但官方青江菜code 06160名稱明確是`Green bok choy/leaves, raw`，不能當整株資料。CoFID的GOV.UK頁面顯示資料最後更新於2021-03-19，部分舊食品未在後續版重新審核；本批未下載或核對官方Excel中的精確青江菜列，故不採用。
+
+Health Canada CNF最有希望。官方指南/API文件說CNF 2015可商業及非商業使用、需標來源、不可改營養值但允許換算份量，並有免責、非背書及參考資料說明；API支援JSON/XML，營養欄位含來源ID與樣本資訊。唯讀查詢food-description endpoint確認code 2038名稱為`Bok choy, pak-choi, raw`，沒有呼叫營養值endpoint。Health Canada表示目前線上可查的是2015 CNF；CNF 2026以下載資料集提供，Open Government Portal metadata標示Open Government Licence - Canada，但新版code／來源血緣未驗。2015 API與2026下載檔屬不同版本路徑，不混用授權結論。
+
+**結論：**CNF僅列為候選，source registry仍空、automatic fallback關閉。下一步核對2026版記錄、營養source IDs和既有USDA/FDC重複，再決定直接CNF API是否比Tavily+模型更適合作為第三層的受信來源adapter。raw每100g資料不等於影像估算熟菜份量營養。詳見[機器可讀證據](alternative-nutrition-source-screening-batch91-20261117.json)。本批沒有資料集下載、營養值查詢、模型／Tavily呼叫、FSANZ聯絡、DB或程式改動。
+
+## 第九十批：Gemini AFCD 授權說法核對（2026-11-17）
+
+使用者提供Gemini對下載checkbox、API取用與署名義務的說法作參考，並指示不需寫信給官方。核對[FSANZ Data User Licence Agreement](https://www.foodstandards.gov.au/science-data/monitoringnutrients/afcd/datauserlicenceagreement)：條文寫明行使授權權利即接受並受條款約束，因此「只在取得原始資料當下勾選才接受」不受條文支持；公開電子傳輸被定義為distribution，數位儲存被定義為reproduction。條文要求散布Work時附授權連結、資料限制聲明、澳洲資料適用性聲明及相關通知；衍生作品另有ShareAlike與標示修改條件。
+
+[AFCD Data files頁](https://www.foodstandards.gov.au/science-data/food-nutrient-databases/afcd/data-files)說明可下載Excel檔，供載入自有軟體及操作，沒有據此證實FSANZ提供AFCD API。若其他供應者提供API，仍須識別其來源及條款；無API同意參數不代表不受資料來源權利限制。Gemini關於署名、不得暗示官方背書及無擔保的提醒部分正確，但「只要標註來源即可」不完整。官方條文沒有直接解決一列營養profile／選定欄位是否為受保護Work或Derivative Work，也沒有清除第三方來源權利。
+
+**結論：**這是授權文字與工程流程核對，不是法律意見。使用者決定不聯絡FSANZ，因此第89批英文草稿不提交並僅作歷史參考；AFCD來源仍排除，不接受授權、不下載、不留存真實營養值。下一步比較其他官方資料源的reuse terms與青江菜原列，優先選權利條件明確者。詳見[機器可讀證據](source-rights-gemini-claim-review-batch90-20261117.json)。本批僅查閱FSANZ官方兩頁，未聯絡官方、未讀憑證、未下載資料、未呼叫Tavily／模型、未操作DB、未改程式／旗標或部署。
+
+## 第八十九批：FSANZ 權利詢問草稿（2026-11-17；未提交並已停止此待辦）
+
+查閱[FSANZ聯絡頁](https://www.foodstandards.gov.au/contact)及[官方詢問表單](https://www.foodstandards.gov.au/contact/enquiry-form)。官方將一般問題導向表單，且說明只能提供一般資訊；草稿因此請求FSANZ若無法處理授權解讀，提供或轉介適當的AFCD licensing contact。已準備英文詢問內容，具體列出F001301單列資料在公開免費大學專題、SQLite持久保存／user snapshots／備份、authenticated API／UI／匯出、Tavily與AI模型協助檢索和schema欄列選取、ShareAlike邊界、署名與聲明位置、第三方來源權利及網頁與下載檔差異等問題。
+
+草稿位於[FSANZ詢問文件](../../plans/fsanz-afcd-clarification-request-2026-11-17.md)，未提交。依使用者後續指示，不需寫信給官方，草稿不提交並只留作歷史參考；沒有替使用者填聯絡資料、傳送或接受條款，也沒有附照片、營養數值、key或資料庫。完整狀態見[機器可讀紀錄](fsanz-afcd-clarification-draft-batch89-20261117.json)。不聯絡官方不等於取得許可，production registry仍0、自動fallback關閉。
+
+## 第八十八批：AFCD欄位來源與缺值語意設計（2026-11-17）
+
+比對目前`NutritionProfileV1`、`NutritionExtractionV1`、Markdown adapter與relay selector。V1保留原始數字、單位、exact／less-than、cell evidence及null，但adapter會把`-`、`—`、`N/A`折成null且不記缺值原因；模型只選server-issued row ID。profile completeness按數值點判斷，無法表達來源值是實測、推算或imputed zero。V1有嚴格欄位驗證，不應把狀態臨時塞進未知欄位。
+
+草案建議分層保存食品列derivation、逐營養欄位來源狀態／missing reason與數值比較：`analytical`／`source_derived`／`imputed`／`imputed_zero`分開；`not_reported`／`not_analysed`／`not_applicable`／`unknown`一律保持null；`exact`與`less_than`獨立於來源狀態。只有明確來源說明才能判imputed zero；0本身不能推導。metadata由server-owned adapter根據來源註記建立，模型不得自判。新coverage須區分數值完整度與實測品質，且需升版後同步後端、SQLite snapshot、read model與前端型別。
+
+這只是需schema review的提案，不是已實作資料契約；FSANZ權利gate仍關閉。本批未用AFCD真值、未呼叫網路／模型／Tavily、未操作DB、未改程式或部署。完整邊界見[機器可讀設計證據](nutrition-field-semantics-design-batch88-20261117.json)。下一步是FSANZ書面權利釐清與專案schema review；通過前不做真來源抽取或profile保存。
+
+## 第八十七批：AFCD公開使用與持久化授權範圍（2026-11-17）
+
+核對[FSANZ Data User Licence Agreement](https://www.foodstandards.gov.au/science-data/monitoringnutrients/afcd/datauserlicenceagreement)及[CC BY-SA 3.0 AU法律條文](https://creativecommons.org/licenses/by-sa/3.0/au/legalcode.en)。FSANZ將Reproduce定義包含數位形式保存，Distribute包含公開電子傳輸；衍生作品定義涉及修改／改編原作品或其實質部分。若散布Work，須附授權連結、資料限制聲明、澳洲資料可能不適用其他國家的聲明及必要署名／免責資訊；散布衍生作品需採相同授權。條款也指出，作品置於Collection時不會因此要求Collection整體都採該授權。
+
+工程上的可能路徑存在，但不能據此直接判定准入：若SQLite保存內容屬受保護Work，數位保存落入條款所稱reproduction；若API／畫面傳送的 profile 屬Work或Derivative Work，公開傳送也可能落入distribution。FSANZ文字沒有直接回答「只取F001301一筆資料的選定營養數值、經模型重排為本專案JSON schema」是否達substantial part／Derivative Work，也未釐清profile與app是獨立衍生物或Collection項目。條款沒有明列非商業例外；因此畢業專題非營利不能自動視為免除授權條件。FSANZ另聲明AFCD含第三方材料且不保證使用不侵害第三方權利，該筆資料的來源脈絡仍需分開釐清。
+
+**決定：**這是條款文字審查，不是法律意見，也不代表已取得准用權。未替使用者接受授權或下載AFCD資料；F001301仍未准入。請FSANZ書面確認：非營利公開app是否可持久保存單一食品的選定營養值／來源provenance、經API及UI提供給使用者、納入user-specific profile／meal snapshots與備份；固定JSON欄位映射是否構成衍生作品、ShareAlike只適用營養資料profile或另有app範圍、每個API回應／畫面／匯出／保存副本需要如何放置授權及聲明，以及F001301是否有需獨立清理的第三方來源例外。確認與由專案負責人接受適用條款前，不做真來源Tavily／模型抽取、營養數值持久化或production准入。完整問題與逐項決策見[機器可讀審查](source-rights-candidate-review-batch87-20261117.json)。本批3次官方搜尋、2次官方文件查閱；無Tavily API／模型呼叫、未讀憑證、未下載資料、未接受授權、未操作SQLite、未改程式／旗標或部署。
+
+下一步：取得FSANZ書面回覆，再由專案負責人決定是否接受其條款；同時可先設計分析值／來源推算／imputed zero／缺值的抽象schema，不使用AFCD真數值。權利明確且獲專案負責人核准後，才做單一來源格式／adapter測試；它不構成照片辨識、portion換算或營養準確率驗收。
+
+## 第八十六批：青江菜來源原列與使用者範圍確認（2026-11-17）
+
+使用者確認營養來源可只取青江菜食材本體，不必將添加油計入。這只明確排除添加油；本輪不估算完整菜餚或其他調味料，不把後者記成使用者另行確認的偏好。結果須標明來源食物狀態與每100g基準，不能命名為整道炒青菜營養。
+
+FSANZ AFCD官方頁確認F001301為「Bok choy, raw」，每100g呈列，描述白至淡綠莖與深綠葉；Analysed Portion為80% leaf & stem，另20% end of stem未分析。資料來源混合1997、2001、2005、2021年採樣及引用，色胺酸由savoy cabbage推算，酒精、部分維生素、膽固醇、脂肪酸與咖啡因列為imputed zero。故不是完整部位皆直接化驗，也不可把所有0一概解讀為測得零。F001300為fried, no added fat、recipe-derived的熟製比較列。官方Data User Licence基於CC BY-SA 3.0 Australia，公開散布須依授權署名、衍生作品ShareAlike並附資料限制及澳洲資料適用性聲明；本輪未接受授權、下載資料集或複製營養值至證據文件。
+
+目前最佳候選為F001301作「青江菜生鮮每100g參考」；照片熟菜的影像估重不可直接當成等量生鮮克數相乘。F001300可以比較熟製基準，但不能代表一般炒菜的配方或照片營養。真實Tavily／模型抽取、固定schema、來源專用adapter、營養null／imputed-zero mapping及publisher准入均未測，registry仍0、自動fallback關閉。下一階段先處理AFCD資料再使用權與欄位映射；未取得准入前僅可把頁面結構研究記為候選分析，不能接正式nutrition profile。證據：[機器可讀來源審查](source-rights-candidate-review-batch86-20261117.json)。本批4次網頁搜尋／查閱，Tavily API／模型呼叫0，未讀憑證或帳戶頁、未下載資料、未接受授權、未操作SQLite、未改程式／flags、未部署。
+
+## 第八十五批：Researcher 免費方案與青江菜本體來源範圍（2026-11-17）
+
+使用者回報 Tavily Researcher 免費方案，沒有 Order Form／書面確認，專案是非營利大學畢業專題。官方 Help Center 明確允許個人專案、免費 Researcher 以及使用者透過應用程式後端觸發搜尋，並要求 API key 留在伺服器；官方 Governing Terms FAQ 說API由Platform Terms治理，Terms仍有internal-business-purpose授權文字。結論不是免費方案禁止應用，也不是正式法律核准：可繼續有界隔離技術試驗；公開／production啟用前，需保留適用條款依據或書面釐清，production Web registry保持空且自動fallback關閉。
+
+營養來源以青江菜本體為範圍，使用者明確指定不需計入添加油，可直接查青江菜食材本體營養；這不等同完整炒菜營養，也不代表已確認其他調味料的處理方式。本輪不估算油、鹽或醬料。FSANZ AFCD F001301 raw描述莖葉外觀，作為生鮮每100g主要候選；第86批再核實其80% leaf & stem分析、20% end of stem未分析。F001300為fried/no-added-fat、recipe-derived熟製比較候選。AFCD Data User Licence基於CC BY-SA 3.0 AU，包含署名、ShareAlike及澳洲資料限制聲明；本批沒有下載檔案或替使用者接受條款。MEXT 06338是葉片油炒，與整株不符。AUSNUT 24201002只來自第三方索引，官方原列、推算方法及授權尚未核實。無一候選已完成Tavily/model抽取、固定schema、source adapter或production准入。
+
+生鮮每100g可作食材本體參考，但照片中是熟菜；不能把影像推估的熟重直接當作生鮮等價重量計算精確份量營養。第85批提出的來源比對下一步已由第86批更新：先處理資料再使用權與imputed-zero／缺值語意，再考慮Tavily Extract可讀性、模型schema選格和adapter驗證。任何source-format測試不構成照片pipeline正向驗收，也不能用搜尋反推圖中菜名。完整記錄：[機器可讀審查](source-rights-candidate-review-batch85-20261117.json)。本批研究未讀取憑證／帳戶頁、未呼叫Tavily或模型、未下載數據、未接受license、未改程式／正式設定／SQLite、未部署或重啟。
+
+## 第八十四批：Tavily 範圍與公開資料來源候選審查（2026-11-17）
+
+官方Tavily Help Center表示可用於客戶面向應用、由後端代理的end-user search，且Researcher免費方案亦可作商用／production；同一日期查閱的Platform Terms仍寫API grant限customer's internal business purposes。Help Center又說另行簽署的agreement controls as written。未檢視使用者實際方案、Order Form或客服書面答覆，故此落差仍是正式接入阻擋，不推定可用或不可用。Tavily不授予第三方publisher內容權利，網站條款仍須逐來源核對。
+
+候選方面，MEXT官方頁說明日本食品成分資料以可食部每100g為基準、資料可自由使用，應用程式二次利用需標示《日本食品標準成分表（八訂）増補2023年》為來源；2023資料頁列出2026-03-27正誤更新。CoFID由GOV.UK提供Excel並標示Open Government Licence v3.0（第三方內容例外），但頁面最後更新於2021-03-19，部分old foods未被後續版本review/validated。兩者尚未選定任何食品列，沒有檢查特定營養原格、九欄映射、食物相容性、Tavily抽取效果、頁面自動存取條款或台灣食物代表性；不得加入production Web registry或作可信營養輸出。
+
+**決定：**維持fail-closed。先取得適用的Tavily plan／Order Form或Tavily書面範圍確認，再挑選真實已識別且健康TFDA／USDA均無相容來源的食品，進行單一來源限域擷取；不強迫local miss、不用身份不明的葉菜、不重複蘋果USDA preview。完整觀測與來源連結見[機器可讀審查](source-rights-candidate-review-20261117.json)。本批只有官方頁面研究及文件更新，無Tavily API／模型呼叫、credential／account頁讀取、正式SQLite操作、設定變更、部署或測試執行。
+
+## 第八十三批：Android 蘋果相簿確認與 preview 截圖核對（2026-11-17）
+
+使用者用`food_picture/蘋果.jpg`走一般HTTPS scanner相簿流程。四張截圖依序顯示：蘋果（98%）待確認；估重180g及`Apples, raw, with skin · USDA FDC 171688 · SR Legacy`來源；名稱／份量已確認且preview未套用紀錄；唯讀營養preview。名稱維持通用「蘋果」，沒有顯示富士品種。九項每100g數值乘1.8後與180g顯示值一致（畫面捨入）；這是算術檢查，不是重量、營養真值或模型準確率證據。模型前批報weight confidence 0.5，畫面也明示份量來自影像估重而非秤重。
+
+此例顯示USDA FDC來源，不是Tavily第三層正向驗收；正常流程不應對已有相容USDA/FDC資料的蘋果再做Web fallback。截圖沒有request trace，故不推定實際Tavily呼叫數。頁首「目前沒有配對營養資料」與下方「找到相容USDA參考營養」同時出現，容易被理解為矛盾；企劃已記錄建議改成「尚無已確認並計入的營養資料，1項待確認」。本輪只檢視截圖和更新文件，沒有讀取部署、資料庫或呼叫provider。逐圖hash及限制見[機器可讀證據](android-apple-preview-screenshots-20261117.json)。
+
+下一步仍是既有來源准入gate：先確定可展示／保存的Web來源及publisher rights，再以真正eligible local miss驗證Tavily檢索、固定格式抽取、後端驗證與使用者確認；不以本次已配對USDA來源強制觸發Tavily。
+
+## 第八十二批：蘋果照片身分與來源選用（2026-11-17）
+
+## 第八十二批：蘋果照片身分與來源選用（2026-11-17）
+
+輸入`蘋果.jpg`實際是WebP（1071×675），原始89,300 bytes未更動；既有decoder按檔案內容正確產生`image/webp`。現行vision prompt／真relay只呼叫1次、0重試，reported model `gemini-4-hydrogen`、3,252 tokens、8.9秒；費用未知。正常Flask vision及reviewed-selection皆200，strict normalized issues 0。模型回「蘋果／apple」、raw、with_skin、brand=null、confidence0.98、估重180g／weight confidence0.5及紅黃色果皮可見文字證據；這只支持本張圖遵守通用品名／可見皮膚提示，不能證明品種、校準信心、重量或準確率。照片角落logo不在食品包裝，未被作為食品品牌。
+
+TFDA及USDA FNDDS皆無相容local mapping；這不是資料集故障。臨時SQLite明確載入171688後，正常selection產生唯一reviewed_match，source是通用raw-with-skin蘋果，信心未改。candidate snapshot1；confirmation／preview／profile均0。沒有FDC Detail、USDA Search、Tavily或餐點保存請求。模型提出的重量是估計，不能作實測。
+
+這次經驗修正第三層設計：影像辨識已在同一個vision回合產生通用身分和視覺證據，不應再多打一個影像模型叫它猜品種。只有TFDA及相容USDA/FDC真查無後，才用已識別通用名稱／可見狀態／scope請Tavily檢索已准入來源；模型只依檢索原文固定schema擷取營養，後端另驗source identity、原始數格、基準、單位、完整度及算術。Tavily不辨照片、score不等於身分機率、來源營養不能反推品種／提高vision confidence；身分／來源歧義即未確認，不填數字。正式registry仍空、Web fallback仍關閉。完整限制及下一步見[機器證據](scanner-apple-identity-20261117.json)。
+
+第82批的test_client不是HTTPS scanner或手機；第83批已由使用者提供一般scanner Android相簿畫面，顯示確認與preview，但不含request trace或目前服務runtime／flags核驗。未替使用者操作profile accept或飲食保存。
+
+## 第八十一批：真便當照片本機優先（2026-11-17）
+
+原JPEG未加工，現行prompt／真relay單次回7項strict validation無issues；vision200／reviewed-selection200、完整scan及7個獨立ID。TFDA命中白飯／豆干，USDA命中滷雞腿／茄子且TFDA無相容命中；兩份泛稱葉菜為identity_required，熟毛豆與本機候選狀態不合，皆未產生新來源候選。4項核心原格換算及已配對合計713kcal／570mg鈉吻合，合計仍不完整，不是整餐真值或九項完整營養。scan／snapshot各1、confirmation／preview／profile均0，未呼叫餐點保存，temp DB已關閉／目錄移除。
+
+留存請求1次／0重試、7311 reported total tokens、33.061秒；先前工具未留輸出那輪實際0–3次不可恢復，本批總數僅可界定1–4次，費用未知。Tavily／USDA呼叫0。服務health本機／公開ok／v1.0.3／SQLite／auth true／automatic fallback false，PID14912／started_at=2026-11-17T17:24:35.717018+08:00；entry hash仍同第78批。重啟原因與當前私密flags／來源／key／第79批載入未重查，本批沒有操作重啟或部署。下一步仍是既有正式一般scanner真照片與條件式蘋果預覽，不強迫miss或重做fixture。[機器可讀證據](scanner-real-photo-local-priority-20261117.json)。
+
+## 第八十批：企劃進度一致性核對（2026-11-17）
+
+主企劃首頁、六工作流、第2／13／19節與第22節階段表已對齊第70至79批證據，補入缺列成果、移正第74批順序並標明各歷史列的時間範圍。修正「沒有HTTP接線／真來源adapter」及已完成Detail仍像待辦的摘要；區分空Tavily Web registry、已安裝的FDC171688與尚未部署的第79批清理。原始證據及失敗案例保留，沒有宣稱第三層可信真頁正向採用已成功。
+
+唯讀核對task Running／PID32084、local/public health ok／v1.0.3／SQLite／auth true／automatic fallback false；started_at與local/public/disk entry hash不變，9份程式／測試hash與第79批一致。未直接讀私密key／flags檔或正式policy列，細項沿用第78批發布證據，不以health推定全部執行期開關。health本身會讀DB筆數及檢查既有relay設定；本輪未直接連DB或寫正式資料，模型／USDA／Tavily呼叫0，未改設定、重啟／部署或commit／push；不重做固定手機fixture，未新增真照片證據。[機器可讀進度核對](plan-progress-reconciliation-20261117.json)。
+
+以上第82批及以下各批次為歷史驗收範圍，當批「下一步／未部署」不覆蓋最新摘要；當前僅有一例使用者Android相簿畫面到preview，不能據此宣稱正式runtime／Tavily已完整驗收。
+
+## 第七十九批：文件、註解與舊部署程式整理（2026-11-17）
+
+移除Render Blueprint、Pages自動發布、Procfile及平台專用註冊／綁定／health環境處理；清除未使用的Mongo啟動、依賴、repository分支與fake Mongo測試，22處constructor呼叫對齊。前端推薦不再將失敗請求連同auth headers轉送另一個舊後端，新增3項行為測試。SQLite／明確暫存記憶體、DATABASE_URL拒絕、health.mongo=false與仍有引用的相容／遷移路徑保留。
+
+現行文件、env範例、程式註解及兩個提案產生器文案對齊Windows排程／Tailscale Funnel／SQLite。舊維運與架構另存historical，過時計畫／多Agent指令／交接標為歷史；原Word／Excel／圖表與測試結果不改寫。[文件索引](../../README.md)分辨現行指南及歷史快照。
+
+完整後端1143 passed／1273subtests、0failed／skipped、69.89秒；前端營養145、scanner25、設定／連線目標11、typecheck／lint及tmp暫存same-origin匯出通過。20份Markdown連結／fence、191份Python AST／22處constructor引用及空白檢查通過；44份文字對7組已知私密值掃描0命中，9份來源hash一致。已修正初輪bcrypt模組測試回復與缺key訊息斷言；TLS核對使用requests正常憑證驗證，未略過驗證。詳見[機器可讀清理證據](deployment-legacy-cleanup-20261117.json)。
+
+本機／公開health與已部署entry雜湊仍同第七十八批；未改正式env／dist／DB／flags、重啟或部署，模型／USDA／Tavily呼叫0。沒有重做Expo／Android固定fixture，也沒有新的真照片或營養準確率證據。下一步只保留正式一般scanner真照片：本機已命中不強迫fallback；精確相容且真正未命中時才驗171688確認→預覽。Tavily／accept／新來源飲食保存／跨使用者cache仍排除，未commit／push。
+
+## 第七十八批：171688單一來源預覽發布（2026-11-16）
+
+補上server-only絕對來源設定路徑，維持空預設與完整准入／current-policy檢查。既有備份流程及舊env／dist回復副本均完成，先以隔離副本驗安裝／審查／app啟動，再在同一排程停止後正式安裝與切換。新started_at=`2026-11-16T23:42:59.209397+08:00`，5000／PID32084；本機／公開health與entry一致，私密啟動診斷核對後端3開4關，公開7條匿名POST均401。未新增task、BAT、Funnel或SQL種類。
+
+一次真USDA fixed Detail171688驗證完整來源描述、9營養及52kcal/100g→150g78kcal；模型／Tavily／Search0。完整後端1142／1282subtests（最後診斷前）、最終focused38／72subtests與build-config8通過，0failed／skipped。清快取same-origin匯出成功，14個文字輸出／7組已知機密掃描0命中；frontend dotenv僅含公開旗標且被Git忽略。正式SQLite來源policy／version各加1列，其餘已查帳號與掃描／飲食狀態列數不變。
+
+本次不重做已完成固定手機fixture，也不宣稱真照片／重量準確率或全食品第三層已開。下一步一般scanner真照片驗本機優先、名稱與帶皮身分、條件式確認／preview；本機已命中不得強迫fallback。Tavily／accept／meal／cross-user cache仍排除，未commit／push。完整hash、觀測與限制見[發布證據](fdc171688-preview-release-20261116.json)。
+
+## 第七十七批：實際上線前檢查與審查修正（2026-11-16）
+
+查核scheduled task／PID、health、現行dotenv必要布林及mode=ro／query_only的正式SQLite；quick_check=ok，171688無安裝列。本機與既有公開Funnel的scanner／entry皆200，entry SHA-256同disk。僅檔案設定觀測，不能據此聲稱舊程序FDC flags／key或frontend baked flags已確認。USDA KEY.txt有一組正確格式key且被Git忽略，未驗live有效性或轉入.env。
+
+修正一個已重現假陽性：installed policy_id與JSON不同時，審查先前通過而startup拒絕；兩者現在皆blocked。真temp SQLite drift回歸及唯讀bytes不變通過。focused36 passed／64subtests，0failed／skipped、13.14秒；未重跑full backend或Expo／Android，無真provider呼叫／正式SQL寫入／設定修改／build／重啟／部署。服務保留5000／PID16352，8090無listener。
+
+接續沿既有備份、server-only key、明確來源配置／安裝、最小開關、same-origin build及受控重啟流程，不新增規劃輪或重做固定手機fixture。詳細狀態／hash／限制見[機器可讀證據](fdc-preview-rollout-preflight-20261116.json)與[部署核對表](../../Local_Server_Deployment.md#單一蘋果來源的實際上線前檢查)。
+
+## 第七十六批：明確安裝、重啟與撤回不復活（2026-11-16）
+
+15個新測試方法；focused51 passed／71subtests，完整後端1139 passed／1272subtests、0failed／skipped、143.11秒。測試包含SQLite兩次close/reopen、讀取bytes不變與query_only、單一交易回滾、兩連線同時安裝及安裝／撤回競爭、CLI安全失敗。4個全新app程序實驗確認已安裝active來源可載入，撤回後或空配置均停用reviewed-selection；已有程序的選用也會重新檢查撤回。
+
+明確安裝需要policy／admission／candidate與額外SHA-256釘選；完全相同active來源不新增版本，撤回或內容不同不能被安裝命令恢復／替換。啟動只讀明確配置，不掃描候選目錄、不安裝或更新來源政策；app既有schema初始化／遷移仍可能寫DB，不能稱整個啟動唯讀。CLI來源配置與上批開關snapshot分開記於[操作說明](../../Local_Server_Deployment.md#fdc-來源明確安裝與啟動載入)。
+
+本批未修改production tuple／flags／DB或重啟服務，無真USDA／Tavily／模型呼叫；5000仍PID16352，8090無listener。無UI變更，不重做Expo／Android固定fixture，未測真照片或新prompt遵循率。下一步回既定171688單一來源的受控部署核對，不擴增工作流。完整觀測與限制見[機器可讀證據](fdc-reviewed-source-lifecycle-20261116.json)。
+
+## 第七十五批：最小啟用範圍與設定檢查（2026-11-16）
+
+完整後端回歸`1124 passed / 1262 subtests`、0failed／skipped、150.81秒。新增11個測試方法，含真temp SQLite的mode=ro／query_only寫入拒絕與DB bytes不變、缺檔不建立、缺schema不初始化、撤回／drift／來源歧義及完整CLI設定快照。先前focused46／75subtests為加入最後兩項反例前的結果，以最後full run為準。
+
+`python tools/review_fdc_preview_admission.py`只讀checkout預設與兩庫檔案，確認TFDA／USDA FNDDS健康；正式reviewed FDC設定空、required flags均false，結果blocked。實際SQLite政策、runtime登入／key／flags及已部署bundle未查，不能把unverified寫成missing或已驗證。即使明確設定快照／隔離DB結果configuration_ready，deployment_authorized仍false。
+
+最小矩陣前後端各3個開關；Search、原始Detail HTTP、accept、Tavily及跨使用者cache排除。fixed Detail由preview內部使用，scan／snapshot／confirmation／preview仍持久化，無nutrition profile／meal writes。正式來源安裝及重啟載入尚未實作；下一個既有子項只處理171688明確安裝、讀取與撤回不復活，再依本輪矩陣進受控部署，不重測固定手機fixture。
+
+本輪0真模型／USDA／Tavily呼叫，未讀寫正式DB、改正式registry／flags、讀credential、重啟／部署或commit。無UI修改，未重跑Expo。來源條款重查、測試與觀測邊界見[機器可讀證據](fdc-preview-admission-review-20261116.json)及[部署說明](../../Local_Server_Deployment.md#fdc-預覽啟用前檢查)。
+
+第七十四批歷史結果：已把唯一已審查來源的系統選用接入一般scanner，隔離Expo靜態版實際完成選圖→配對→明確確認→唯讀preview。顯示「蘋果・估計150g」，營養為52kcal/100g、78kcal/150g；名稱與來源分離，未猜富士。當批尚待的設定准入審查由第七十五批接續完成，正式來源仍未安裝／啟用。
+
+## 第七十四批：系統來源配對與完整Expo靜態版互動（2026-11-16）
+
+新增預設關閉的`POST /nutrition/fdc/reviewed-selection`，只由server-owned scan reference在健康官方資料真正未命中後配對，唯一且精確相容的已安裝active／hash-admitted來源才可選；系統不代替使用者確認。相容來源在主要畫面顯示食材名及估重，原始來源詳情可展開。修正確認後radio選取及Web aria-checked、殘留候選文案和過時的等待Detail提示。
+
+真Flask HTTP／temp SQLite與hydrated Expo web互動通過：vision200、selection200、confirmation202／revision1、preview200；顯示蘋果150g78kcal且信心不變。vision、local miss及上傳icon是fixture，Detail使用既有真171688capture離線回放；沒有API攔截或真provider呼叫。乾淨session console error／warning0，五種寬度無水平溢出，手機／桌面截圖已檢視。最終段confirmations2→3、previews2→3，profiles與records均0。
+
+前段完整後端1120／1224subtests通過；接續focused17／27subtests、nutrition145、scanner25、typecheck／lint及enabled／disabled兩種暫存web export通過。正式服務與dist未替換、未安裝來源／開旗標或寫正式資料。開發伺服器命令遭自動拒絕，以及初次重複filechooser與缺少aria狀態的測試發現均保留在[本批證據](fdc-reviewed-selection-browser-e2e-20261116.json)及審查紀錄；最終改用獲允許的靜態export和單一CLI選檔，不能回溯稱早期失敗已成功。
+
+## 第七十三批：真通用蘋果來源與身分傳遞（2026-11-16）
+
+結果：新增5項測試；focused60／104subtests、最終完整後端1110／1210subtests通過，0failed／skipped，141.94秒。Python編譯、generic／Fuji真capture的隔離SQLite回放通過。本批未修改前端或重跑UI驗收。
+
+`tools/probe_fdc_generic_apple.py --live`只發1次固定ID USDA Detail，無重試；Search／模型／Tavily均0。完整envelope留ignored本機目錄，公開[來源證據](fdc-generic-apple-source-20261116.json)保留原文、hash、time、nutrient編號與九值；不是把先前合成fixture改稱真資料。每100g52kcal、150g78kcal均由真原格驗證；反式脂肪0來自明確605列，不是缺值補0。
+
+既有policy精確比對在generic／Fuji順序互換時都只選通用來源；variant=with_skin表示可見帶皮、未知品種仍可名為蘋果。13種名稱／狀態／做法／scope／brand反例及optional identity格式反例被拒絕或標記。新增測試透過真vision response producer與scan adapter／SQLite核對brand、skin、原名與兩種信心完整保留。初次accept暴露source原文未列alias，已補完整審查名及新digest，未放寬底層驗證。
+
+更新後`tools/verify_fdc_reviewed_source.py`可指定candidate／proof，檢查capture與policy／證據hash和ID，保留原始擷取時間；[保存證據](fdc-generic-apple-acceptance-20261116.json)為離線回放，temp SQLite preview不寫profile、accept保存一筆、兩次reopen、同鍵重播、owner隔離及withdrawal阻止新接受／lookup、保留歷史皆通過。另回歸原Fuji capture成功，兩脂肪null未變。測試identity合成且skin明確，沒有新真模型照片遵循率、手機保存、process crash或完整Expo互動測試；本批沒有UI變更。來源權利沿用前次官方FDC證據，非新Tavily權利核准。完整回歸結果見主計畫審查紀錄。
+
+## 第七十二批：名稱分離與真來源隔離保存（2026-11-16）
+
+工具`tools/verify_fdc_reviewed_source.py`讀取既有capture，先比對前次公開證據中的canonical SHA-256，再檢查hash-bound candidate policy；不載入credential，不呼叫live模型／USDA／Tavily。暫存SQLite中合成明確富士identity完成preview、accept、profile保存及兩次close/reopen／冪等重播，只有一筆profile、沒有飲食紀錄。三種name／variant不相容反例於Detail前拒絕，confirmation沒有改名或推定品種；撤回擋住pending accept及current lookup，owner歷史snapshot保留。原每100g七值及150g換算與既有真回應一致，飽和／反式脂肪保持null。這是已捕獲真資料的離線回放，不是新live retrieval、process crash、手機保存或影像品種辨識驗收。
+
+後端focused90／138subtests、前端相關測試、typecheck／lint／web export通過。Expo測試啟動被自動審查拒絕後，改用無API／無功能旗標的靜態元件render；五寬度無水平溢出，手機／桌面截圖在本機暫存目錄並已檢視。icon／button為stub，沒有hydration或新互動測試，僅證明變更文案及名稱分離的呈現；唯一console error為favicon404。Browser plugin unavailable，因此使用Playwright。正式服務未部署，registry未新增，原始capture與暫存DB不提交。
+
+第七十一批歷史摘要：完成hash-bound來源准入邊界，需物理刪除／條件不明的來源本版排除；FDC1750340生鮮帶皮富士蘋果完成限定候選review，當時未安裝正式policy／registry。完整後端1098／1185subtests通過。後續通用171688的限定發布見第七十八批，Tavily准入仍未解除；已完成的第七十批Android流程不重做。證據：[source-admission-boundary-20261116.json](source-admission-boundary-20261116.json)。
+
+## 第七十一批：來源准入與限定 FDC 候選（2026-11-16）
+
+新增完整policy digest與publisher／provider／刪除條件／cross-user cache准入review，正式Web registry builder要求每份來源唯一審查且拒絕FDC混入Tavily。來源要求物理刪除或條件不明則排除，本版不擴建purge；既有withdrawal不會抹除歷史snapshot／SQLite頁／backup。
+
+FDC1750340候選只限生鮮帶皮富士蘋果／明確variant，不適用一般蘋果、未知品種、去皮／熟食／品牌食品；使用前次真Detail及官方權利證據，並非手機synthetic171688。原表七種營養有值、飽和／反式脂肪未知。檔案不由app自動載入，無正式SQLite或registry寫入、flags未改、服務未重啟。本輪沒有新live provider或官方頁面呼叫，也未讀credential。
+
+admission unittest14及focused74／69subtests通過；完整後端1098／1185subtests，0失敗／略過、133.41秒。新測試禁止socket；temp SQLite驗證policy保存、close/reopen及withdrawal拒絕current lookup而保留historical，profiles=0。自行複核明列hash不是授權證明、低階repository仍需server-owned載入、Tavily實際方案／publisher未准入；未宣稱真來源全流程／保存通過。下一項為既有隔離preview／accept／保存與最終flags審查。[完整證據](source-admission-boundary-20261116.json)。
+
+## 第七十批：Android 候選確認與 preview 完成（2026-11-16）
+
+使用者回報已完成前批三項操作且皆正常正確，依步驟記為固定蘋果150g／78kcal的Android流程驗收完成。裝置、畫面與數字核對屬user-attested；沒有新手機截圖或raw response，也未區分相簿或拍照模式。
+
+測試gateway日誌新增台北20:02:01 vision200／candidate200、20:02:13 confirmation202、20:02:21 preview200。暫存counts相較前批由2contexts／1snapshot／1confirmation／1preview變為4／2／2／2；fake Search及Detail各由1變2，profiles及meal records仍0。此共用session增量佐證流程，不能單靠它識別Android。日誌另有兩次bootstrap401，原因未獨立定位；後續完整成功序列成立。
+
+已核對程序身分並結束synthetic child，觀察gateway退出、兩測試埠關閉、8443 Funnel移除；原443／5000保留且health started_at未變。這是人工結束後的清理，未等待期限觸發。本批不改應用程式、不重跑既有測試、不呼叫真provider、不讀寫正式DB、不開正式flags。固定資料流程通過不證明真食物準確率、live Tavily、accept／保存或來源准入；後續回到既定門檻，無需重做同項手機驗收。
+
+## 第六十九批：公開隔離手機 preview 入口（2026-11-16）
+
+原 browser harness 維持 loopback；新增短效隨機 token gateway，只在獨立8443公開必要登入／fixture profile／scan／candidate／confirmation／preview。使用獨立暫存 SQLite／frontend export、fake vision／Search／Detail，沒有正式資料或金鑰。手機可直接開HTTPS，無需Tailscale app。原443服務和正式匯出未改。
+
+真瀏覽器未攔截API，經公開Funnel完成選圖、confirmation202／revision0→1及preview200；固定FDC171688蘋果150g，52kcal/100g換算78kcal。SQLite為2contexts／1snapshot／1confirmation／1preview、0profiles／0records，fake Search／Detail各1。record／accept／enrichment／原harness controls反例403，未登入candidate401，反例前後counts不變。390×844及1440×1000無水平溢出，console0errors，secure context=true。
+
+phone／browser unittest16通過，focused pytest36通過／34subtests，scanner24通過；typecheck、lint與清快取獨立Expo匯出通過。mobile與desktop截圖已檢視，包含捲到底的preview：[手機](scanner-phone-preview-mobile-20261116.png)、[桌面](scanner-phone-preview-desktop-20261116.png)。
+
+本輪無live模型／USDA／Tavily呼叫，無production DB讀寫或profile／meal保存；正式runtime只重查automatic fallback=false，其餘未暴露旗標不推論。固定fixture不是辨識準確率證據；Android本輪操作、來源准入、accept／飲食保存與正式旗標審查仍未完成。入口有1–60分鐘上限，本次自動結束與Funnel清理尚待到期觀察；短效token不列入文件。原scan的120秒期限不變，過期須重掃。
 
 ## 第六十八批：Android 拍照辨識結果（2026-11-16）
 
@@ -231,7 +513,7 @@ authority 10項、guard 11項通過；加入本批後完整隔離後端回歸為
 | 截圖 | 390x844與1440x1000已目視確認換行與關閉鈕 |
 | 互動與資料保留 | 關閉、輸入及重載通過，future queue原值仍在 |
 
-截圖位於測試機暫存，未加入repo：[手機](C:/Users/botto/AppData/Local/Temp/nutrition-v2-mobile.png)、[桌面](C:/Users/botto/AppData/Local/Temp/nutrition-v2-desktop.png)。畫面既有v1.0.1徽章是應用release文字，本次只建立v1.0.2工作分支，未改release metadata。
+當時截圖位於測試機暫存，未加入repo，檔名為`nutrition-v2-mobile.png`／`nutrition-v2-desktop.png`；第七十四批文件複核時兩檔已不存在，保留此歷史紀錄，不再提供失效連結或將其視為可重新檢視的圖片證據。當時畫面既有v1.0.1徽章是應用release文字，該批只建立v1.0.2工作分支，未改release metadata。
 
 獨立審查發現並修正：假完整coverage、未解IDs遺失、point／bound矛盾、必要metadata遺失、POST去重混版、queue必填型別及舊retry忽略固定時間。嚴格回應檢查亦發現營養欄位陣列順序差異，已對齊後端並補未解項跨語言比對。
 
@@ -270,7 +552,7 @@ Browser plugin未提供，使用Playwright CLI；網址`http://localhost:8092/sc
 
 OCR只用假辨識回應；照片經檔案選擇但被本機攔截，沒有量測OCR或營養準確率。初次自動化重複處理file chooser觸發Expo removeChild overlay；改一次CLI upload後完整重跑通過。另一次臨時測試誤用未提供的clock.uninstall及模糊文字locator，均改用現有API／精確role後重跑。這些是測試操作問題，不掩蓋為成功。
 
-截圖：[手機](C:/Users/botto/AppData/Local/Temp/nutrition-submit-mobile.png)、[桌面](C:/Users/botto/AppData/Local/Temp/nutrition-submit-desktop.png)。v1.0.1側欄徽章仍是release文字；本次工作分支為v1.0.2，未變更release metadata。測試瀏覽器及Expo服務於驗收後關閉。
+當時暫存截圖檔名為`nutrition-submit-mobile.png`／`nutrition-submit-desktop.png`；第七十四批文件複核時兩檔已不存在，保留此歷史紀錄，不再提供失效連結或宣稱圖片仍可檢視。當時v1.0.1側欄徽章仍是release文字，該批工作分支為v1.0.2，未變更release metadata。測試瀏覽器及Expo服務於該次驗收後關閉。
 
 本批修正重新審查通過：完整body／本地日期、後端目標、換帳號後畫面保護、舊保存只清相同camera／OCR草稿、OCR固定ID。saveRecord抑制過期舊session的401登出事件，當前session的401仍會通知，已加入既有帳號測試；其他API未全面改造。新版分頁共用Web Lock但不涵蓋舊lockless分頁；無Web Locks的瀏覽器會停止本機queue操作，native仍只保證單runtime。舊未綁定目標及兩key混版需後續明確調解，現階段保留並阻擋，不能稱完整遷移。
 

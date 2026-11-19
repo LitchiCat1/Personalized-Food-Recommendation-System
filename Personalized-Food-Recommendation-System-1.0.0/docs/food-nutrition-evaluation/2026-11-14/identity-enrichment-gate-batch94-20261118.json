@@ -1,0 +1,75 @@
+{
+  "batch": 94,
+  "date": "2026-11-18",
+  "branch": "v1.0.3",
+  "scope": "server_owned_identity_gate_for_web_enrichment",
+  "decision": {
+    "gate": "identity_confirmation_required",
+    "threshold": "max(0.75, VISION_FOOD_MIN_CONFIDENCE)",
+    "also_requires": [
+      "specific non-uncertain food name",
+      "no validation issues",
+      "known food_state",
+      "known preparation_method",
+      "known components_scope"
+    ],
+    "portion_uncertainty_blocks_identity": false,
+    "legacy_context_missing_flag": "fail_closed_for_web",
+    "local_first_lookup_preserved": true,
+    "fdc_source_confirmation_is_identity_confirmation": false
+  },
+  "code_paths": [
+    "backend/services/food_identity_service.py",
+    "backend/services/vision_food_service.py",
+    "backend/services/nutrition_scan_context_adapter.py",
+    "backend/repositories/scan_context_repository.py",
+    "backend/services/nutrition_authority_service.py",
+    "backend/services/nutrition_enrichment_guard_service.py",
+    "backend/services/nutrition_enrichment_route_service.py",
+    "backend/services/web_nutrition_service.py",
+    "frontend/lib/nutrition-enrichment-api.ts",
+    "frontend/lib/scanner.ts"
+  ],
+  "security_regressions": [
+    "mid-confidence identity blocked before cache/provider/quota",
+    "client identity flag mutation rejected by scan item hash",
+    "legacy context without identity flag blocked after local miss",
+    "identity decision survives SQLite close/reopen and is included in item hash",
+    "HMAC authority claims bind the identity decision",
+    "generic food remains blocked even if status field is false",
+    "missing or unknown identity enums fail closed",
+    "low weight confidence and missing weight still allow per-100g lookup without portion calculation"
+  ],
+  "verification": {
+    "focused_backend_tests": 117,
+    "focused_backend_subtests": 397,
+    "full_backend_tests": 1161,
+    "full_backend_subtests": 1273,
+    "frontend_nutrition_tests": 145,
+    "frontend_scanner_tests": 25,
+    "frontend_typecheck": "passed",
+    "frontend_lint": "passed",
+    "frontend_build_web": "passed",
+    "git_diff_check": "passed_with_line_ending_warnings"
+  },
+  "external_calls": {
+    "tavily": 0,
+    "model": 0,
+    "usda_api": 0
+  },
+  "not_done": [
+    "generic user food-name confirmation/correction API and UI",
+    "trusted new identity item/scan revision flow",
+    "green bok choy FDC alias and raw/prepared compatibility validation",
+    "live Tavily positive extraction with rights-reviewed source",
+    "production registry admission or automatic fallback enablement"
+  ],
+  "operations": {
+    "production_database_read": false,
+    "credentials_read": false,
+    "runtime_flags_changed": false,
+    "service_restarted_or_deployed": false,
+    "commit_or_push": false,
+    "filesystem_notes": "Frontend web export produced ignored build output; pre-existing user worktree changes were preserved."
+  }
+}

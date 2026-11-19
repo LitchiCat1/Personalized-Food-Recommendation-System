@@ -44,6 +44,7 @@ export default function FdcCandidateReview({
   onUnavailable,
 }: Props) {
   const [choices, setChoices] = useState<Record<string, Choice>>({});
+  const [sourceDetails, setSourceDetails] = useState<Record<string, boolean>>({});
   const [pendingRequest, setPendingRequest] = useState<NutritionFdcConfirmationRequest | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -57,11 +58,13 @@ export default function FdcCandidateReview({
   const previewRequestsRef = useRef(new Set<string>());
   const previewGenerationRef = useRef(0);
   const snapshotBody = snapshot.snapshot.snapshot;
+  const reviewed = Boolean(snapshot.selection);
   const hasPendingChoices = snapshotBody.items.every((item) => Boolean(choices[item.item_id]));
   const locked = Boolean(pendingRequest) || Boolean(completedResult);
 
   useEffect(() => {
     setChoices({});
+    setSourceDetails({});
     setPendingRequest(null);
     pendingRequestRef.current = null;
     submissionInFlightRef.current = false;
@@ -107,10 +110,12 @@ export default function FdcCandidateReview({
         { accessToken: accessToken || undefined }, { enabled: previewEnabled, isCurrentSession: isCurrent });
       if (!isCurrent()) return;
       const snapshotItem = snapshotBody.items.find((item) => item.item_id === itemId);
+      const selectedWeight = snapshot.selection?.items.find((item) => item.item_id === itemId)?.weight_g;
       if (!snapshotItem || result.snapshot_digest !== snapshotDigest || result.fdc_id !== expectedFdcId ||
           result.item_revision !== snapshotItem.item_revision ||
+          (reviewed && result.weight_g !== selectedWeight) ||
           result.weight_g !== result.preview.portion.weight_g) {
-        throw new NutritionFdcPreviewApiError('預覽與已確認的候選、版本或伺服器份量不一致', 200, 'binding_mismatch');
+        throw new NutritionFdcPreviewApiError('預覽與已確認的參考資料、版本或伺服器份量不一致', 200, 'binding_mismatch');
       }
       setPreviews((current) => ({ ...current, [itemId]: result }));
     } catch (error) {
@@ -151,7 +156,7 @@ export default function FdcCandidateReview({
           decisions,
         });
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : '候選決定格式不正確');
+        setErrorMessage(error instanceof Error ? error.message : '確認內容格式不正確');
         return;
       }
       pendingRequestRef.current = request;
@@ -187,9 +192,10 @@ export default function FdcCandidateReview({
     <View style={styles.section}>
       <View style={styles.header}>
         <View style={styles.headingCopy}>
-          <Text style={styles.title}>USDA 候選核對</Text>
+          <Text style={styles.title}>{reviewed ? '確認食材與估計份量' : '營養參考資料核對'}</Text>
           <Text style={styles.subtitle}>
-            候選僅供名稱比對，不含營養資料。確認後仍需固定資料明細檢查；影像信心度不會改變。
+            {reviewed ? '使用系統配對的 USDA 參考營養。請確認食材與估計份量；不相符時可選「稍後處理」。'
+              : '以下是 USDA 的參考食品，不代表照片已辨識出該品種或品牌。不確定是否相符時可選「稍後處理」。'}
           </Text>
         </View>
         <Ionicons name="checkmark-done-outline" size={22} color={Palette.accent.blue} />
@@ -198,14 +204,15 @@ export default function FdcCandidateReview({
       <View style={styles.contractNotice}>
         <Ionicons name="information-circle-outline" size={17} color={Palette.accent.blue} />
         <Text style={styles.contractText}>
-          目前份量校正只用於本機飲食紀錄。後續資料預覽使用伺服器掃描估重，本階段不會套用營養素或寫入紀錄。
+          {reviewed ? '以下份量來自本次影像估重，並非秤重結果。確認後可預覽營養，尚不會加入飲食紀錄。'
+            : '目前份量校正只用於本機飲食紀錄。後續資料預覽使用伺服器掃描估重，本階段不會套用營養素或寫入紀錄。'}
         </Text>
       </View>
 
       {snapshot.status === 'empty' ? (
         <View style={styles.emptyNotice}>
           <Ionicons name="search-outline" size={17} color={Palette.text.tertiary} />
-          <Text style={styles.emptyText}>這次掃描沒有找到可供核對的 USDA 候選。</Text>
+          <Text style={styles.emptyText}>{reviewed ? '目前沒有可直接使用的已審查營養來源。' : '這次掃描沒有找到可供核對的 USDA 參考食品。'}</Text>
         </View>
       ) : null}
 
@@ -216,20 +223,28 @@ export default function FdcCandidateReview({
           <View key={item.item_id} style={styles.itemSection}>
             <View style={styles.itemHeader}>
               <Text style={styles.foodName}>{item.recognition_identity.name_zh}</Text>
-              {completedItem ? <Text style={styles.itemStatus}>{statusLabel(completedItem.status)}</Text> : null}
+              {completedItem ? <Text style={styles.itemStatus}>{reviewed && completedItem.status === 'confirmed_pending_revision'
+                ? '已確認名稱與份量' : statusLabel(completedItem.status)}</Text> : null}
             </View>
 
             {item.candidates.length === 0 ? (
-              <Text style={styles.noCandidate}>沒有可確認候選；可保留待處理或標記不相符。</Text>
+              <Text style={styles.noCandidate}>{reviewed
+                ? reviewedReasonLabel(snapshot.selection?.items.find((entry) => entry.item_id === item.item_id)?.reason)
+                : '沒有可確認的參考食品；可保留待處理或標記不相符。'}</Text>
             ) : (
               <View style={styles.candidateList}>
                 {item.candidates.map((candidate) => {
-                  const selected = choice?.decision === 'confirm' && choice.candidate_fdc_id === candidate.fdcId;
+                  const selected = completedItem
+                    ? completedItem.status === 'confirmed_pending_revision' && completedItem.confirmed_fdc_id === candidate.fdcId
+                    : choice?.decision === 'confirm' && choice.candidate_fdc_id === candidate.fdcId;
+                  const weight = snapshot.selection?.items.find((entry) => entry.item_id === item.item_id)?.weight_g;
                   return (
+                    <React.Fragment key={candidate.fdcId}>
                     <Pressable
                       key={candidate.fdcId}
                       accessibilityRole="radio"
                       accessibilityState={{ checked: selected, disabled: locked }}
+                      aria-checked={selected}
                       onPress={() => choose(item.item_id, { decision: 'confirm', candidate_fdc_id: candidate.fdcId })}
                       disabled={locked}
                       style={[styles.candidateRow, selected && styles.candidateSelected, locked && styles.disabled]}
@@ -240,13 +255,29 @@ export default function FdcCandidateReview({
                         color={selected ? Palette.accent.green : Palette.text.tertiary}
                       />
                       <View style={styles.candidateCopy}>
-                        <Text style={styles.candidateName}>{candidate.description}</Text>
-                        <Text style={styles.candidateMeta}>
+                        <Text style={styles.candidateName}>{reviewed
+                          ? `${item.recognition_identity.name_zh} · 估計 ${weight} g`
+                          : `參考食品：${candidate.description}`}</Text>
+                        {reviewed ? <Text style={styles.candidateMeta}>確認名稱、此估計份量及採用 USDA 參考營養</Text> : <Text style={styles.candidateMeta}>
                           {candidate.dataType}{candidate.brandOwner ? ` · ${candidate.brandOwner}` : ''}
                           {candidate.foodCategory ? ` · ${candidate.foodCategory}` : ''}
-                        </Text>
+                        </Text>}
                       </View>
                     </Pressable>
+                    {reviewed ? <>
+                      <Pressable accessibilityRole="button" accessibilityLabel="營養來源詳情"
+                        accessibilityState={{ expanded: Boolean(sourceDetails[item.item_id]) }}
+                        onPress={() => setSourceDetails((current) => ({ ...current, [item.item_id]: !current[item.item_id] }))}
+                        style={styles.sourceDetailsButton}>
+                        <Ionicons name={sourceDetails[item.item_id] ? 'chevron-up-outline' : 'chevron-down-outline'}
+                          size={17} color={Palette.text.secondary} />
+                        <Text style={styles.candidateMeta}>營養來源詳情</Text>
+                      </Pressable>
+                      {sourceDetails[item.item_id] ? <Text style={styles.candidateMeta}>
+                        參考食品：{candidate.description} · USDA FDC {candidate.fdcId} · {candidate.dataType}
+                      </Text> : null}
+                    </> : null}
+                    </React.Fragment>
                   );
                 })}
               </View>
@@ -294,20 +325,20 @@ export default function FdcCandidateReview({
         <View style={styles.resultNotice}>
           <Ionicons name="checkmark-circle-outline" size={18} color={Palette.status.success} />
           <View style={styles.resultCopy}>
-            <Text style={styles.resultTitle}>候選決定已記錄</Text>
+            <Text style={styles.resultTitle}>{reviewed ? '食材與份量確認已記錄' : '參考資料確認已記錄'}</Text>
             <Text style={styles.resultText}>
               {completedResult.requires_detail_replay
-                ? '確認的項目已綁定新的伺服器掃描版本，仍待取得並檢查固定資料明細。營養資料尚未套用。'
+                ? '確認的項目可供營養預覽；預覽僅供核對，尚未套用至掃描結果或飲食紀錄。'
                 : '尚未確認資料來源；保留與拒絕的項目不會建立營養資料。'}
             </Text>
           </View>
         </View>
       ) : (
         <>
-          {!enabled ? <Text style={styles.disabledNotice}>候選確認功能目前未啟用。</Text> : null}
+          {!enabled ? <Text style={styles.disabledNotice}>參考營養確認功能目前未啟用。</Text> : null}
           {errorMessage ? <Text accessibilityRole="alert" style={styles.errorText}>{errorMessage}</Text> : null}
           <PrimaryButton
-            label={submitting ? '送出確認中' : pendingRequest ? '使用同一決定重試' : '送出逐項決定'}
+            label={submitting ? '送出確認中' : pendingRequest ? '使用同一決定重試' : reviewed ? '確認食材與份量' : '送出逐項決定'}
             onPress={submit}
             disabled={!enabled || submitting || !confirmationRetryable || (!pendingRequest && !hasPendingChoices)}
             icon={submitting
@@ -318,6 +349,16 @@ export default function FdcCandidateReview({
       )}
     </View>
   );
+}
+
+function reviewedReasonLabel(reason?: string): string {
+  switch (reason) {
+    case 'identity_required': return '食材身分仍需確認，暫不套用營養。';
+    case 'weight_required': return '缺少可用估重，暫不套用營養。';
+    case 'local_priority': return '優先保留原有的本機營養查詢結果。';
+    case 'ambiguous_reviewed_source': return '有多筆相容參考，暫不自動選用。';
+    default: return '尚無符合目前食用狀態的已審查來源。';
+  }
 }
 
 function FdcProfilePreview({
@@ -369,7 +410,7 @@ function FdcProfilePreview({
       <View style={styles.previewHeading}>
         <View style={styles.previewTitleCopy}>
           <Text style={styles.previewTitle}>{displayName} · 營養預覽</Text>
-          <Text style={styles.previewMeta}>{sourceName} · FDC {preview.fdc_id}</Text>
+          <Text style={styles.previewMeta}>營養參考資料：{sourceName} · USDA FDC {preview.fdc_id}</Text>
         </View>
         <Ionicons name="eye-outline" size={19} color={Palette.accent.blue} />
       </View>
@@ -463,7 +504,7 @@ function ChoiceButton({ label, icon, selected, disabled, onPress }: {
 }
 
 function statusLabel(status: NutritionFdcConfirmationResponse['items'][number]['status']): string {
-  if (status === 'confirmed_pending_revision') return '已確認候選';
+  if (status === 'confirmed_pending_revision') return '已確認參考資料';
   if (status === 'rejected') return '已標記不相符';
   return '保留待處理';
 }
@@ -502,6 +543,7 @@ const styles = StyleSheet.create({
   itemStatus: { ...Typography.small, color: Palette.status.success },
   noCandidate: { ...Typography.small, color: Palette.text.tertiary },
   candidateList: { gap: Spacing.xs },
+  sourceDetailsButton: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, minHeight: 44 },
   candidateRow: {
     minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
     borderWidth: 1, borderColor: Palette.border.subtle, borderRadius: Radius.sm, padding: Spacing.sm,

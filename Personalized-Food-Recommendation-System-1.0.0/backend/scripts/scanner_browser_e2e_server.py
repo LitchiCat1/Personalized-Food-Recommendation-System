@@ -1,6 +1,7 @@
 """Run an isolated SQLite HTTP server for the scanner browser E2E only."""
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -22,6 +23,10 @@ def parse_args():
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8090)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--reviewed-apple-capture", help="Offline reviewed171688 capture; never calls providers")
+    parser.add_argument("--frontend-dist", help="Optional static Expo export inside this test DB's temp directory")
+    parser.add_argument("--identity-correction-fixture", action="store_true",
+                        help="Enable an isolated generic-food name correction fixture")
     return parser.parse_args()
 
 
@@ -45,6 +50,17 @@ def validate_database_path(value, *, resume=False):
 
 def state_path(database_path):
     return database_path.with_name(database_path.name + ".e2e-state.json")
+
+
+def validate_frontend_dist(value, database_path):
+    path = Path(value).resolve()
+    try:
+        path.relative_to(database_path.parent.resolve())
+    except ValueError as error:
+        raise SystemExit("Static test export must stay inside the dedicated temporary directory") from error
+    if not path.is_dir() or not (path / "index.html").is_file():
+        raise SystemExit("A completed static Expo export is required")
+    return path
 
 
 def read_test_state(database_path):
@@ -108,10 +124,12 @@ def configure_environment(database_path):
         "ALLOWED_ORIGINS": "http://localhost:8082",
         "GEMINI_API_KEY": "e2e-dummy-key-never-sent",
         "FDC_CANDIDATE_ROUTE_ENABLED": "true",
+        "FDC_REVIEWED_SELECTION_ROUTE_ENABLED": "false",
         "FDC_CONFIRMATION_ROUTE_ENABLED": "true",
         "FDC_PROFILE_PREVIEW_ROUTE_ENABLED": "true",
         "FDC_PROFILE_ACCEPT_ROUTE_ENABLED": "false",
         "FDC_DETAIL_ROUTE_ENABLED": "false",
+        "NUTRITION_IDENTITY_CONFIRMATION_ROUTE_ENABLED": "false",
         "NUTRITION_ENRICHMENT_ROUTE_ENABLED": "false",
         "NUTRITION_SCAN_CONTEXT_TTL_SECONDS": "120",
     })
@@ -152,6 +170,8 @@ def main():
     database_path = validate_database_path(args.database_path, resume=args.resume)
     clock = TestClock(database_path, resume=args.resume)
     configure_environment(database_path)
+    if args.identity_correction_fixture:
+        os.environ["NUTRITION_IDENTITY_CONFIRMATION_ROUTE_ENABLED"] = "true"
 
     backend_dir = Path(__file__).resolve().parents[1]
     tests_dir = backend_dir / "tests"
@@ -160,12 +180,17 @@ def main():
 
     from test_fdc_profile_preview_service import FakeClient, detail_document, reviewed_policy
     from services.fdc_profile_preview_service import FdcProfilePreviewService
+    from services.fdc_reviewed_selection_service import FdcReviewedSelectionService
 
     import app as backend
+
+    if args.frontend_dist:
+        backend.FRONTEND_DIST = str(validate_frontend_dist(args.frontend_dist, database_path))
 
     backend.app.config.update(TESTING=True)
     for repository in (
         backend.nutrition_scan_context_repository,
+        backend.nutrition_identity_confirmation_repository,
         backend.fdc_candidate_snapshot_repository,
         backend.fdc_candidate_confirmation_repository,
         backend.fdc_profile_preview_repository,
@@ -178,24 +203,79 @@ def main():
         return {"id": TEST_USER_ID, "email": "browser-e2e@example.invalid"}
 
     backend.verify_access_token = verify_test_token
-    backend.call_gemini_food_recognition_with_rotation = lambda *_args: {
-        "meal_guess": "蘋果",
-        "items": [{
-            "name_zh": "蘋果",
-            "name_en": "Apples, raw, with skin",
-            "confidence": 0.95,
-            "estimated_weight_g": 150,
-            "weight_confidence": 0.9,
-            "food_state": "raw",
-            "preparation_method": "mixed",
-            "components_scope": "food_only",
-            "count": 1,
-            "portion_description": "一顆中型蘋果",
-            "visual_evidence": "Synthetic E2E recognition fixture",
-            "alternatives": [],
-        }],
-        "uncertainty_notes": [],
-    }
+    reviewed_entry = None
+    replay_document = detail_document()
+    if args.reviewed_apple_capture:
+        root = backend_dir.parent
+        candidate = json.loads((backend_dir / "config" / "nutrition_source_candidates" /
+                                "usda-fdc-171688.json").read_text(encoding="utf-8"))
+        proof = json.loads((root / "docs" / "food-nutrition-evaluation" / "2026-11-14" /
+                           "fdc-generic-apple-source-20261116.json").read_text(encoding="utf-8"))
+        replay_document = json.loads(Path(args.reviewed_apple_capture).read_text(encoding="utf-8"))
+        digest = hashlib.sha256(json.dumps(replay_document["payload"], ensure_ascii=True,
+            sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+        spec = candidate["policy"]["source_spec"]
+        if (digest != proof["payload_sha256"] or digest != replay_document.get("content_hash")
+                or str(replay_document["payload"].get("fdcId")) != "171688"
+                or replay_document.get("url") != spec["source_url"]
+                or replay_document.get("retrieval_version") != spec["retrieval_version"]
+                or replay_document.get("retrieved_at") != proof["retrieved_at"]
+                or replay_document["payload"].get("description") != spec["food_identity"]["name"]):
+            raise SystemExit("Refusing unverified reviewed-apple capture")
+        reviewed_entry = {"policy": candidate["policy"], "admission_review": candidate["admission_review"],
+            "candidate": {"fdcId": "171688", "description": replay_document["payload"]["description"],
+                          "dataType": replay_document["payload"]["dataType"],
+                          "brandOwner": None, "foodCategory": None}}
+        backend.fdc_reviewed_selection_route_enabled = True
+        backend.fdc_candidate_route_enabled = False
+        backend.fdc_reviewed_selection_service = FdcReviewedSelectionService(
+            scan_context_repository=backend.nutrition_scan_context_repository,
+            snapshot_repository=backend.fdc_candidate_snapshot_repository,
+            source_repository=backend.nutrition_profile_repository,
+            local_lookup_factory=lambda _owner: lambda _item: {"status": "no_local_mapping"},
+            official_health={name: {"status": "available"} for name in ("TFDA", "USDA FNDDS")},
+            reviewed_sources=[reviewed_entry])
+
+    if args.identity_correction_fixture:
+        vision_fixture = {
+            "meal_guess": "炒菜葉",
+            "items": [{
+                "name_zh": "炒菜葉",
+                "name_en": "stir-fried leafy greens",
+                "confidence": 0.92,
+                "estimated_weight_g": 120,
+                "weight_confidence": 0.82,
+                "food_state": "prepared",
+                "preparation_method": "stir_fried",
+                "components_scope": "food_only",
+                "count": 1,
+                "portion_description": "一份炒菜",
+                "visual_evidence": "Synthetic generic-food identity fixture",
+                "alternatives": [],
+            }],
+            "uncertainty_notes": [],
+        }
+    else:
+        vision_fixture = {
+            "meal_guess": "蘋果",
+            "items": [{
+                "name_zh": "蘋果",
+                "name_en": "Apples, raw, with skin",
+                "confidence": 0.95,
+                "estimated_weight_g": 150,
+                "weight_confidence": 0.9,
+                "food_state": "raw",
+                "preparation_method": "mixed",
+                "components_scope": "food_only",
+                "variant": "with_skin" if reviewed_entry else None,
+                "count": 1,
+                "portion_description": "一顆中型蘋果",
+                "visual_evidence": "Synthetic E2E recognition fixture",
+                "alternatives": [],
+            }],
+            "uncertainty_notes": [],
+        }
+    backend.call_gemini_food_recognition_with_rotation = lambda *_args: vision_fixture
 
     backend.storage.upsert_user({
         "user_id": TEST_USER_ID,
@@ -214,7 +294,8 @@ def main():
         "profile_complete": True,
     })
     if not args.resume:
-        backend.nutrition_profile_repository.save_source_policy(reviewed_policy())
+        backend.nutrition_profile_repository.save_source_policy(
+            reviewed_entry["policy"] if reviewed_entry else reviewed_policy())
 
     fake_search = FakeSearchClient()
     backend.fdc_candidate_search_service.local_lookup_factory = (
@@ -235,7 +316,7 @@ def main():
             clock.advance(advance)
 
     def detail_client():
-        return FakeClient(detail_document(), on_get=detail_returned)
+        return FakeClient(replay_document, on_get=detail_returned)
 
     backend.fdc_profile_preview_service = FdcProfilePreviewService(
         confirmation_repository=backend.fdc_candidate_confirmation_repository,
@@ -258,6 +339,7 @@ def main():
             "scan_contexts": "nutrition_scan_contexts",
             "candidate_snapshots": "nutrition_fdc_candidate_snapshots",
             "confirmations": "nutrition_fdc_candidate_confirmations",
+            "identity_confirmations": "nutrition_identity_confirmations",
             "previews": "nutrition_fdc_profile_previews",
             "nutrition_profiles": "nutrition_profiles",
             "meal_records": "records",
@@ -267,6 +349,7 @@ def main():
         return jsonify({
             "pid": os.getpid(), "now": clock(), "clock_offset_seconds": clock.state["clock_offset_seconds"],
             "search_calls": len(fake_search.calls), "detail_calls": len(detail_calls),
+            "identity_confirmation_route_enabled": backend.nutrition_identity_confirmation_route_enabled,
             "scan_ttl_seconds": backend._nutrition_scan_context_ttl_seconds(), "counts": counts,
             "policies": [dict(row) for row in backend.sql_db.query_all(
                 "SELECT source_id, policy_revision, status FROM nutrition_source_policies")],

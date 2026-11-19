@@ -1,0 +1,91 @@
+{
+  "batch": 84,
+  "date": "2026-11-17",
+  "branch": "v1.0.3",
+  "scope": "current_official_terms_and_public_nutrition_source_candidate_review",
+  "outcome": "official_open_data_candidates_identified_but_no_tavily_source_admitted",
+  "evidence_checked": [
+    {
+      "publisher": "Tavily",
+      "urls": [
+        "https://help.tavily.com/articles/5880393096-permitted-use-customer-applications",
+        "https://help.tavily.com/articles/3473422950-governing-terms-contracting-permissions",
+        "https://help.tavily.com/articles/4716869118-attribution-third-party-content-rights",
+        "https://www.tavily.com/terms"
+      ],
+      "observations": [
+        "Official Help Center says customer-facing applications and free Researcher plan use are permitted, including backend-triggered end-user searches.",
+        "The current Platform Terms grant API use for the customer's internal business purposes, and the Help Center says a separate signed agreement controls where applicable.",
+        "Tavily does not grant rights to third-party publisher content; source-site terms remain the customer's responsibility."
+      ],
+      "unresolved": [
+        "The account's actual plan, order form, governing terms version, and any written support clarification were not inspected.",
+        "The Help Center customer-application guidance and Platform Terms wording are not reconciled for this project's intended end-user deployment."
+      ],
+      "decision": "Do not treat the Tavily API application-scope gate as cleared until the applicable account terms or written confirmation resolve the discrepancy."
+    },
+    {
+      "publisher": "Japan Ministry of Education, Culture, Sports, Science and Technology (MEXT)",
+      "urls": [
+        "https://www.mext.go.jp/a_menu/syokuhinseibun/index.htm",
+        "https://www.mext.go.jp/a_menu/syokuhinseibun/mext_00001.html",
+        "https://fooddb.mext.go.jp/"
+      ],
+      "observations": [
+        "MEXT describes standard edible-portion values per 100 g and publishes the 2023 supplement as downloadable Excel and PDF.",
+        "MEXT states food-composition data may be used freely and asks secondary uses, including applications, to cite the 2023 Standard Tables.",
+        "The 2023 page lists an errata update dated 2026-03-27."
+      ],
+      "unresolved": [
+        "No specific food row, nutrient mapping, identity compatibility, or Tavily extraction result was tested.",
+        "The government page links the food composition database as an external site; its page-level access behavior and Tavily/HTML extractability were not reviewed.",
+        "Japanese standard-food coverage may not represent Taiwanese dishes or local preparation; no eligible local-miss target was selected."
+      ],
+      "decision": "Promising official-data candidate for a bounded review, not an admitted Tavily source or validated Taiwan-food substitute."
+    },
+    {
+      "publisher": "UK Public Health England / GOV.UK CoFID",
+      "urls": [
+        "https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid",
+        "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/"
+      ],
+      "observations": [
+        "The official CoFID page describes nutrient composition of the UK food supply and offers an Excel dataset and user guide.",
+        "GOV.UK content is under Open Government Licence v3.0 except where stated; the CoFID 2021 report also identifies third-party exclusions.",
+        "The page was last updated 2021-03-19 and notes a separate old-foods file containing foods not reviewed or validated in later updates."
+      ],
+      "unresolved": [
+        "No specific food row, nutrient mapping, identity compatibility, or Tavily extraction result was tested.",
+        "Age and UK-specific representativeness limit use for Taiwanese dishes; third-party material must be excluded."
+      ],
+      "decision": "Secondary candidate only; not an admitted source or a current-data guarantee."
+    }
+  ],
+  "admission_decision": {
+    "production_web_registry_count": 0,
+    "automatic_web_fallback_enabled": false,
+    "first_candidate_selected_for_production": false,
+    "next_gate": [
+      "Resolve Tavily account/application scope using the actual plan/order form or written support confirmation.",
+      "Select a real, already identified food whose healthy TFDA and USDA/FNDDS lookup has a genuine compatible miss; do not force a miss or infer an unresolved leaf identity.",
+      "Review the exact source record, preparation, edible basis, nutrient cells, attribution, page access terms, extractability, storage and withdrawal requirements before creating a hash-bound policy."
+    ]
+  },
+  "side_effects": {
+    "browser_research_requests": 2,
+    "live_tavily_api_requests": 0,
+    "model_calls": 0,
+    "credentials_or_account_pages_read": 0,
+    "production_database_operations": 0,
+    "production_flags_changed": false,
+    "application_code_changed": false,
+    "deployed_or_restarted": false,
+    "tests_run": false,
+    "committed_or_pushed": false
+  },
+  "review_limits": [
+    "This is a technical source-screening summary, not legal advice or a publisher authorization.",
+    "Official dataset reuse language does not by itself establish that Tavily can extract a particular page or that a record matches a photographed food.",
+    "No source was installed, added to the production registry, or used to return nutrition to a user."
+  ]
+}

@@ -15,11 +15,11 @@ export function getNutritionFdcRecovery(error: unknown): {
   if (STALE_REFERENCE_CODES.has(code)) {
     return {
       rescan: true, retryable: false,
-      message: '這次掃描的候選或確認已過期或失效，請重新拍照或從相簿選擇餐點。原有辨識結果仍保留。',
+      message: '這次掃描的營養參考資料或確認已過期或失效，請重新拍照或從相簿選擇餐點。原有辨識結果仍保留。',
     };
   }
   if (code === 'feature_disabled') {
-    return { rescan: false, retryable: false, message: 'USDA 候選與營養預覽目前未啟用。' };
+    return { rescan: false, retryable: false, message: 'USDA 參考營養查詢或預覽目前未啟用。' };
   }
   if (failure.status === 401 || failure.status === 403) {
     return { rescan: false, retryable: false, message: '目前無法驗證這次掃描的權限，請確認登入狀態後重新掃描。' };

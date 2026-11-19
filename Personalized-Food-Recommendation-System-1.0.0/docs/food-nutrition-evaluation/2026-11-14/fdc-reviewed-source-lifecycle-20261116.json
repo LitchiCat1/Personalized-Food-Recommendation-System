@@ -1,0 +1,90 @@
+{
+  "review_date": "2026-11-16",
+  "batch": 76,
+  "branch": "v1.0.3",
+  "scope": "explicit_source_installation_and_read_only_startup_loading_in_isolated_sqlite",
+  "outcome": "implemented_and_verified_not_deployed",
+  "source": {
+    "source_id": "usda-fdc-171688",
+    "policy_sha256": "14152c86f9f718ee7057d65b038d6b9be65d3a7197995308f29ef91f5876b85f",
+    "identity": "generic_raw_apple_with_visible_skin_not_fuji",
+    "source_values_retested": false,
+    "live_provider_requests": 0
+  },
+  "installation": {
+    "entry_requires": ["policy", "admission_review", "candidate"],
+    "explicit_digest_required": true,
+    "atomic_write_boundary": ["nutrition_source_policies", "nutrition_source_policy_versions"],
+    "new_source_revision": 0,
+    "identical_active_source": "already_installed_without_new_revision_or_timestamp_changes",
+    "withdrawn_source": "source_withdrawn_without_reactivation",
+    "different_policy": "policy_changed_without_replacement",
+    "repository_without_sqlite_connection_rejected": true,
+    "policy_update_or_readmission_supported": false,
+    "admission_is_service_boundary_not_universal_low_level_repository_gate": true
+  },
+  "startup_loading": {
+    "explicit_configuration_only": true,
+    "candidate_directory_discovery": false,
+    "source_policy_writes": false,
+    "source_installation_on_startup": false,
+    "required_state": "every_configured_source_installed_active_exact_policy_and_policy_id_valid_revision",
+    "missing_drifted_inactive_invalid_or_unreadable": "all_or_none_empty_registry_and_reviewed_selection_disabled",
+    "empty_configuration": "empty_registry_and_reviewed_selection_disabled",
+    "current_policy_rechecked_by_selection_after_loading": true,
+    "entire_app_startup_is_read_only": false,
+    "note": "Existing application schema initialization or migrations may still write; only this source-policy loader is read-only. Loading is not a lease against later withdrawal."
+  },
+  "verified_cases": [
+    "install_then_two_close_reopens_and_idempotent_reinstallation",
+    "admission_digest_descriptor_and_explicit_digest_rejection_before_write",
+    "real_read_only_sqlite_query_only_write_rejection_and_unchanged_database_bytes",
+    "installed_unconfigured_fuji_source_not_discovered",
+    "withdrawal_preserved_across_two_reopens_and_reinstallation_attempts",
+    "policy_drift_rejected_even_if_replacement_has_a_valid_new_admission",
+    "injected_history_insert_failure_rolls_back_current_policy_insert",
+    "two_independent_sqlite_connections_create_one_current_and_one_history_row",
+    "concurrent_reinstallation_and_cas_withdrawal_leave_source_withdrawn",
+    "already_loaded_selection_rechecks_withdrawal_without_restart",
+    "duplicate_overlapping_invalid_partially_installed_or_unavailable_configurations_load_nothing",
+    "invalid_rows_and_lookup_errors_fail_closed_without_sensitive_diagnostics",
+    "cli_defaults_to_read_only_and_requires_explicit_source_and_digest_to_install",
+    "cli_missing_file_not_created_and_missing_schema_not_initialized",
+    "four_fresh_app_processes_two_active_starts_then_withdrawn_start_then_empty_configuration_start"
+  ],
+  "test_results": {
+    "new_test_methods": 15,
+    "final_focused": {"passed": 51, "subtests_passed": 71, "failed": 0, "skipped": 0, "elapsed_seconds": 11.71},
+    "full_backend": {"passed": 1139, "subtests_passed": 1272, "failed": 0, "skipped": 0, "elapsed_seconds": 143.11},
+    "full_command": "python -m pytest backend/tests -q --disable-warnings",
+    "isolation": ["NUTRILENS_SKIP_LOCAL_ENV=1", "DATABASE_PATH empty for main test process", "external_database_and_provider_environment_cleared", "new_lifecycle_tests_block_socket_connect", "startup_children_use_only_explicit_temporary_sqlite_and_block_socket_connect"],
+    "frontend_ui_changed": false,
+    "new_expo_or_android_test": false,
+    "real_photo_accuracy_or_model_prompt_compliance_proven": false
+  },
+  "new_file_sha256": {
+    "backend/services/fdc_reviewed_source_lifecycle_service.py": "e2c29ba09f7bac845212be7a1c379971f004e5e71dad2101a33f85268909ac31",
+    "backend/tests/test_fdc_reviewed_source_lifecycle.py": "3d9ed2806921f9b1cbe03235348c6facd978b879afc02c0244f391178608e35f",
+    "tools/manage_reviewed_fdc_source.py": "bc6a3ae4fe1f47839a13a52ad5d2362d5ef85311a9d71e624ba10b5d61d24218"
+  },
+  "production_observations": {
+    "source_configuration": "repository_default_remains_empty",
+    "installed_production_sources": "not_inspected",
+    "runtime_auth_key_and_feature_flags": "not_inspected_or_changed",
+    "deployed_frontend_bundle": "not_inspected_or_changed",
+    "listener_5000_pid": 16352,
+    "listener_8090": "absent",
+    "production_database_reads_or_writes": 0,
+    "provider_requests": {"model": 0, "usda": 0, "tavily": 0},
+    "production_restart_deploy_commit_push": false
+  },
+  "review": {
+    "same_agent_self_review": true,
+    "subagents": 0,
+    "new_blocking_defect_found_in_tested_scope": false,
+    "tavily_rights_or_source_admission_newly_granted": false,
+    "database_policy": "sqlite_only",
+    "next_existing_item": "controlled_rollout_review_for_single_171688_preview_scope_using_batch75_flag_matrix_not_another_fixed_phone_fixture"
+  },
+  "deployment_authorized": false
+}

@@ -1,0 +1,83 @@
+{
+  "batch": 87,
+  "date": "2026-11-17",
+  "branch": "v1.0.3",
+  "scope": "fsanz_afcd_public_app_storage_and_derivative_scope_review",
+  "source": {
+    "publisher": "Food Standards Australia New Zealand (FSANZ)",
+    "database": "Australian Food Composition Database",
+    "food_record": "F001301",
+    "licence_name": "FSANZ Data User Licence Agreement based on Creative Commons Attribution-ShareAlike 3.0 Australia",
+    "licence_url": "https://www.foodstandards.gov.au/science-data/monitoringnutrients/afcd/datauserlicenceagreement",
+    "official_food_record_url": "https://www.foodstandards.gov.au/science-data/food-nutrient-databases/afcd/search/food/F001301",
+    "creative_commons_legal_code_url": "https://creativecommons.org/licenses/by-sa/3.0/au/legalcode.en"
+  },
+  "official_terms_observed": {
+    "acceptance_language": "The FSANZ page says to read and accept the terms before downloading files, and that exercising granted rights constitutes acceptance.",
+    "reproduction_includes_digital_storage": true,
+    "distribution_includes_public_electronic_communication": true,
+    "derivative_work_boundary": "Editing, modifying or adapting the Work or a substantial part may be a Derivative Work; whether one food row or selected nutrient cells meet this threshold is not resolved by the text alone.",
+    "distribution_conditions": [
+      "Provide the licence URI or a copy with distributed Work.",
+      "Include the Limitation of Data Statement and a notice that Australian data may not be appropriate for other countries with every copy of distributed Work.",
+      "Preserve copyright and disclaimer notices and provide attribution in a manner reasonable to the medium.",
+      "Do not impose terms or technological measures on the Work that prevent recipients from exercising the licence rights."
+    ],
+    "share_alike_boundary": "A distributed Derivative Work must use the licence; the agreement says this does not require other independent material in a Collection or the Collection as a whole to use that licence.",
+    "third_party_data_notice": "The AFCD contains third-party data and material; FSANZ says it makes no warranty that reuse will not infringe third-party rights.",
+    "noncommercial_exemption_found": false
+  },
+  "project_application_analysis": {
+    "public_app": "The agreement grants worldwide, royalty-free rights subject to its terms and does not state a non-commercial-only restriction. This does not by itself establish that this project's exact use is cleared.",
+    "sqlite_persistence": "If stored material is a copy of protected Work, digital storage falls within the agreement's definition of reproduction. Applicability to an extracted single-record nutrient profile remains unresolved.",
+    "api_or_ui_delivery": "If a response contains licensed Work or a Derivative Work, public electronic delivery appears within the agreement's distribution definition; exact treatment of selected facts and normalized profiles needs written clarification.",
+    "model_extracted_profile": "Converting source cells into the application's fixed schema may be a transformation, but whether the selected fields constitute a substantial part or derivative is unresolved. Model use does not independently grant rights.",
+    "application_code_license": "The agreement says other independent material in a Collection and the Collection as a whole need not be relicensed solely because it contains the Work or a Derivative Work. It remains unresolved whether the proposed profile is a separate Derivative Work or only a Collection item.",
+    "third_party_rights": "The record-level third-party source lineage and any relevant exceptions have not been independently cleared."
+  },
+  "decision": {
+    "legal_clearance_established": false,
+    "licence_accepted_by_agent": false,
+    "source_admitted": false,
+    "production_web_registry_count": 0,
+    "automatic_web_fallback_enabled": false,
+    "bounded_real_source_extraction_allowed": false,
+    "reason": "The licence provides a possible reuse path with concrete conditions, but the status of a selected F001301 profile, durable SQLite copies, public API/UI delivery, model-normalized derivatives and third-party lineage is not sufficiently clear to admit the source."
+  },
+  "publisher_questions_before_admission": [
+    "For a public, free, non-commercial university project, may the app retain one AFCD food record's selected nutrient values and source provenance durably in SQLite, including user-specific profile or meal snapshots and backups?",
+    "May the server return those selected values to app users through an authenticated API and display them in a nutrition preview, and what exact attribution, licence link, data limitation and Australian-data notice must accompany each response, screen, export or saved copy?",
+    "Does extracting selected nutrient cells from the F001301 public detail page or file and mapping them into a fixed JSON nutrition schema count as a Derivative Work or substantial part under the FSANZ agreement? If so, should only the profile/data artifact be licensed CC BY-SA 3.0 AU, or does FSANZ consider any additional part of the app affected?",
+    "Does the answer differ between copying values from the public detail page, downloading the AFCD files after acceptance, and having Tavily/model tooling retrieve and normalize the page?",
+    "Does the agreement cover all third-party-derived components in F001301 for this use, or must the project separately clear any record-level source material?"
+  ],
+  "next_gate": [
+    "Obtain written FSANZ clarification on the exact durable storage, public delivery and model-normalized profile workflow; do not accept the licence or download the dataset on the user's behalf.",
+    "If the publisher confirms the path, have the project owner review and accept the applicable terms, then design attribution and notices at API, UI, export and persisted-copy boundaries before admission.",
+    "Separately define analytical, source-derived, imputed-zero and missing-value semantics without copying real nutrient values into a test fixture before reuse is cleared.",
+    "Only after the rights gate, run a bounded single-source format/adapter test; label it source-format testing, not photo-pipeline or nutrition-accuracy validation.",
+    "Keep F001301 limited to an explicitly labelled raw per-100-g reference until a reviewed raw-equivalent portion conversion exists."
+  ],
+  "side_effects": {
+    "official_search_queries": 3,
+    "official_page_opens": 2,
+    "tavily_api_requests": 0,
+    "model_calls": 0,
+    "credentials_or_account_pages_read": 0,
+    "dataset_files_downloaded": 0,
+    "licence_acceptance_actions": 0,
+    "nutrition_values_copied_into_evidence": false,
+    "production_database_operations": 0,
+    "production_flags_changed": false,
+    "application_code_changed": false,
+    "deployed_or_restarted": false,
+    "committed_or_pushed": false
+  },
+  "review_limits": [
+    "This is a technical reading of published terms, not legal advice or a legal determination.",
+    "A public webpage review is not dataset download, licence acceptance or permission to reuse data.",
+    "The terms' definition of substantial part does not resolve whether one record or selected nutrient facts are protected or derivative.",
+    "The licence's third-party-data caveat leaves record-level source lineage as a separate risk.",
+    "No real F001301 nutrient values were copied into this evidence artifact."
+  ]
+}

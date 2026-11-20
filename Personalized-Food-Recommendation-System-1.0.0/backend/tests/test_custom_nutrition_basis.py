@@ -155,6 +155,70 @@ class CustomNutritionBasisTests(unittest.TestCase):
     def test_label_text_parsing_preserves_valid_ocr_flow(self):
         result = normalize_ocr_result({"serving_size_g": "200 g", "nutrition_per_serving": {"calories": "400 kcal"}})
         self.assertEqual(result["nutrition_per_100g"]["calories"], 200)
+        self.assertEqual(result["nutrition_per_100g_source"], "calculated")
+
+    def test_ocr_preserves_printed_values_and_flags_mismatches(self):
+        base = {"serving_size_g": 40, "nutrition_per_serving": {"calories": 180, "sugar": 0}}
+        for calories, conflict in ((450, False), (500, True)):
+            result = normalize_ocr_result({**base, "nutrition_per_100g": {"calories": calories, "sugar": 0, "fiber": "<0.1 g"}})
+            self.assertEqual(result["nutrition_per_100g"]["calories"], calories)
+            self.assertIsNone(result["nutrition_per_100g"]["fiber"])
+            self.assertEqual(result["nutrition_per_100g"]["sugar"], 0)
+            self.assertEqual(result["nutrition_per_100g_source"], "label")
+            self.assertEqual(result["nutrition_basis_conflict"], conflict)
+
+    def test_ocr_does_not_convert_serving_volume_to_grams(self):
+        for weight in ("100mL", "40mg", "0.04 kg", "250cc", "40-60 g", "40g / 320g", "200毫公克", "40"):
+            with self.subTest(weight=weight):
+                result = normalize_ocr_result({"serving_size_g": weight, "nutrition_per_serving": {"calories": 100}})
+                self.assertIsNone(result["serving_size_g"])
+                self.assertIsNone(result["nutrition_per_100g"])
+
+    def test_ocr_accepts_only_a_single_serving_count(self):
+        for raw in ("8-10份", "約8份", "8份 / 10份", "8盒"):
+            with self.subTest(raw=raw):
+                self.assertIsNone(normalize_ocr_result({"servings_per_container": raw})["servings_per_container"])
+        self.assertEqual(normalize_ocr_result({"servings_per_container": "8 份"})["servings_per_container"], 8)
+
+    def test_ocr_missing_serving_grams_preserves_independent_printed_basis(self):
+        result = normalize_ocr_result({"package_net_weight_g": 320,
+                                       "nutrition_per_serving": {"calories": 186.48},
+                                       "nutrition_per_100g": {"calories": 466.2}})
+        self.assertTrue(result["nutrition_basis_unverifiable"])
+        self.assertFalse(result["nutrition_basis_conflict"])
+        self.assertEqual(result["nutrition_per_100g"]["calories"], 466.2)
+        self.assertEqual(result["nutrition_per_100g_source"], "label")
+
+    def test_ocr_retains_precision_and_rejects_wrong_units_and_qualified_values(self):
+        result = normalize_ocr_result({"serving_size_g": 40, "nutrition_per_serving": {
+            "calories": "186.48 kcal", "trans_fat": "0.04 公克", "sodium": "0.15 g",
+            "protein": "未檢出 (<0.1 g)", "sugar": 0}})
+        serving, hundred = result["nutrition_per_serving"], result["nutrition_per_100g"]
+        self.assertEqual(serving["calories"], 186.48)
+        self.assertAlmostEqual(hundred["calories"], 466.2)
+        self.assertEqual(serving["trans_fat"], 0.04)
+        self.assertEqual(hundred["trans_fat"], 0.1)
+        self.assertIsNone(serving["sodium"])
+        self.assertIsNone(serving["protein"])
+        self.assertEqual(serving["sugar"], 0)
+
+    def test_ocr_package_net_weight_is_independent_of_serving_weight(self):
+        for raw in (320, "320 g", "320公克", "320克"):
+            with self.subTest(raw=raw):
+                result = normalize_ocr_result({"package_net_weight_g": raw, "serving_size_g": 40,
+                                               "servings_per_container": 8})
+                self.assertEqual(result["package_net_weight_g"], 320)
+                self.assertEqual(result["serving_size_g"], 40)
+        package_only = normalize_ocr_result({"package_net_weight_g": 320, "nutrition_per_serving": SERVING})
+        self.assertIsNone(package_only["serving_size_g"])
+        self.assertIsNone(package_only["nutrition_per_100g"])
+
+    def test_ocr_package_net_weight_does_not_infer_or_reinterpret_invalid_inputs(self):
+        for raw in (None, True, 0, -1, math.nan, math.inf, "320", "320mL", "0.32 kg", "<320 g", "320 g / 40 g"):
+            with self.subTest(raw=raw):
+                result = normalize_ocr_result({"package_net_weight_g": raw, "serving_size_g": 40,
+                                               "servings_per_container": 8})
+                self.assertIsNone(result["package_net_weight_g"])
 
     def test_ocr_boolean_and_invalid_numbers_cannot_become_nutrition(self):
         for value in (True, -1, math.nan, math.inf):

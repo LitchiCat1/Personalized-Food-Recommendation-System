@@ -105,13 +105,17 @@ def _metadata(body):
 
 class TavilyClient:
     def __init__(self, api_key, *, session=None, clock=time.monotonic):
-        _require(isinstance(api_key, str) and 0 < len(api_key) <= 512
-                 and api_key.isascii() and all(33 <= ord(character) <= 126 for character in api_key),
-                 "not_configured", "Tavily requires a backend API key")
-        self._api_key = api_key
+        self._api_key = self.validate_api_key(api_key)
         self._session = session if session is not None else requests.Session()
         self._session.trust_env = False
         self._clock = clock
+
+    @staticmethod
+    def validate_api_key(api_key):
+        _require(isinstance(api_key, str) and 0 < len(api_key) <= 512
+                 and api_key.isascii() and all(33 <= ord(character) <= 126 for character in api_key),
+                 "not_configured", "Tavily requires a backend API key")
+        return api_key
 
     @classmethod
     def from_environment(cls):

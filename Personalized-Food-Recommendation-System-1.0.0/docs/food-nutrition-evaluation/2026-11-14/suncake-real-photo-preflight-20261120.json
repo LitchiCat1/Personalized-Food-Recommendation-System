@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-20",
+  "scope": "isolated real vision followed by a separately replayed identity for live FDC search",
+  "source_trace": "B-112981393-00000-5-09040000-0000000001",
+  "photo": {
+    "source": "TFDA traceability dataset productId 5201820, packingSpecId 1478320, pictureId 44391, pictureSeq 1",
+    "sha256": "8140feba11b4f8b15e5a4fe42e412a0832de721e04fdcca711383e825bb8476c",
+    "dimensions": [512, 384], "bytes": 24602, "mime": "image/jpeg",
+    "republished": false
+  },
+  "vision": {
+    "http": 200, "calls": 1, "retries": 0, "elapsed_seconds": 7.75,
+    "food_name_hint_supplied": false,
+    "name_zh": "小太陽餅", "brand": "Sugar&Spice", "variant": null,
+    "confidence": 0.95, "weight_confidence": 0.35, "estimated_weight_g": 30,
+    "food_state": "prepared", "preparation_method": "roasted", "components_scope": "food_only",
+    "identity_confirmation_required": false, "validation_issues": []
+  },
+  "local_lookup": {"official_layers_available": true, "status": "no_local_mapping"},
+  "fdc": {
+    "identity_replayed_into_new_temporary_scan": true,
+    "http": 200, "snapshot_status": "empty",
+    "queries": [{"query": "小太陽餅", "confirmed_no_hits": true, "candidate_count": 0}],
+    "durable_zero_hit_evidence_created_in_temporary_database": true,
+    "english_aliases_covered": false, "exhaustive_database_absence_proven": false
+  },
+  "outcome": "not_admitted_pending_reviewed_brand_mapping_and_search_scope",
+  "limitations": [
+    "Manufacturer legal name and model brand are not interchangeable without a reviewed mapping",
+    "The original vision scan was closed before the live FDC replay; no continuous scan authority is retained",
+    "Photo estimate is not verified intake weight",
+    "The source label effective date is historical and current product equivalence remains unverified"
+  ],
+  "tavily_calls": 0, "extraction_model_calls": 0,
+  "production_changed": false, "meal_or_profile_write_called": false
+}

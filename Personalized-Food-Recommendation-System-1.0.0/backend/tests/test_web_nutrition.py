@@ -135,12 +135,54 @@ class WebNutritionTests(unittest.TestCase):
         self.assertEqual(details["food_identity"]["name"], self.item["name_zh"])
         self.assertEqual(details["source_url"], self.document["url"])
         self.assertEqual(details["match_policy"], "reference_only")
+        self.assertNotIn("manufacturer_label", details)
         self.assertEqual(result["nutrition_profile"]["per_100g"]["calories"], 200)
         self.assertEqual(len(self.client.searches), 1)
         self.assertEqual(len(self.client.extracts), 1)
         self.assertEqual(len(self.model.calls), 1)
         self.assertEqual(self.item, original)
         self.assertFalse(output["production_enabled"])
+
+    def test_manufacturer_label_attributes_reviewed_product_and_source_basis(self):
+        self.item["brand"] = self.policy["target_identity"]["brand"] = "Fixture brand"
+        spec = self.policy["source_spec"]
+        spec["food_identity"]["brand"] = "Fixture brand"
+        spec["manufacturer_label"] = {"publisher": "Fixture manufacturer"}
+        self.policy["match_policy"] = "same_product"
+        self.document["title"] = "Untrusted retrieval title"
+        output = self.run_enrich()
+        result = output["items"][0]
+        profile = result["nutrition_profile"]
+        self.assertEqual(profile["source_details"]["manufacturer_label"], {
+            "publisher": "Fixture manufacturer", "product_name": spec["food_identity"]["name"],
+        })
+        self.assertEqual(profile["source_details"]["source_url"], self.document["url"])
+        self.assertEqual(profile["source_basis"], {"basis": "per_serving", "weight_g": "200", "volume_ml": None})
+        self.assertEqual(profile["per_100g"]["calories"], 200)
+        self.assertIsNone(profile["per_100g"]["fiber"])
+        self.assertEqual(result["status"], "partial")
+        self.assertIsNone(result["portion"]["weight_g"])
+        self.assertIsNone(result["portion"]["values"]["calories"])
+        coverage = output["nutrition_coverage"]["nutrients"]["calories"]
+        self.assertEqual((coverage["known_sum"], coverage["unresolved_items"]), (0, 1))
+
+        other = dict(self.item, brand="Other brand")
+        self.client.searches.clear()
+        self.assertEqual(self.run_enrich([other])["items"][0]["status"], "needs_source_review")
+        self.assertEqual(self.client.searches, [])
+
+    def test_manufacturer_label_cannot_be_unbranded_reference_or_link_override(self):
+        spec = self.policy["source_spec"]
+        spec["manufacturer_label"] = {"publisher": "Fixture manufacturer"}
+        with self.assertRaisesRegex(WebNutritionError, "Manufacturer attribution"):
+            NutritionSourceRegistry([self.policy])
+        self.policy["match_policy"] = "same_product"
+        with self.assertRaisesRegex(WebNutritionError, "Manufacturer attribution"):
+            NutritionSourceRegistry([self.policy])
+        self.policy["target_identity"]["brand"] = spec["food_identity"]["brand"] = "Fixture brand"
+        spec["manufacturer_label"]["source_url"] = "https://example.com/not-the-reviewed-url"
+        with self.assertRaisesRegex(WebNutritionError, "Manufacturer attribution"):
+            NutritionSourceRegistry([self.policy])
 
     def test_local_hit_uses_existing_priority_without_paid_calls_even_if_other_layer_down(self):
         food = {"unit": "per 100g", "calories": 200, "protein": 6, "carbs": 30, "fat": 6, "sodium": 300}

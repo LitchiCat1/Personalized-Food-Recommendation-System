@@ -43,7 +43,7 @@ def call_gemini_food_recognition(image_b64: str, mime_type: str, api_key: str, g
         text, _finish = relay_chat(prompt, image_base64=image_b64, image_mime_type=mime_type)
         if _finish not in (None, "stop"):
             raise ValueError("Food recognition output did not finish normally")
-        return normalize_vision_result(parse_strict_model_json(text, allow_array=True))
+        return normalize_vision_result(parse_strict_model_json(text, allow_array=True), require_weight_basis=True)
     payload = {
         "contents": [
             {
@@ -62,7 +62,7 @@ def call_gemini_food_recognition(image_b64: str, mime_type: str, api_key: str, g
         raise ValueError("Food recognition output did not finish normally")
     parts = candidates[0].get("content", {}).get("parts") or []
     text = "".join(part.get("text", "") for part in parts if isinstance(part, dict))
-    return normalize_vision_result(parse_strict_model_json(text, allow_array=True))
+    return normalize_vision_result(parse_strict_model_json(text, allow_array=True), require_weight_basis=True)
 
 
 def build_food_recognition_prompt():
@@ -88,6 +88,9 @@ def build_food_recognition_prompt():
         "每種食品多個相同個體只列一項，count 寫可見數量，estimated_weight_g 是全部個體的總可食重量。"
         "重量以照片中已烹調、可食的狀態估算，骨頭、容器不算；湯與麵分開時不能把湯重算進麵。"
         "整顆蛋糕是整顆重量，不當成一片；照片無比例尺時 weight_confidence 請降低，無法估重則 null。"
+        "weight_basis 只能填 visible_portion（照片可見、可合理估重的食用份量）、package_label（只有包裝淨重或標示份量）、unknown。"
+        "即使包裝透明或印有總重、每份公克數、幾份入，也不得當成食用量。只有包裝或份量不可判斷時，"
+        "estimated_weight_g 填 null、weight_confidence 填 0。package_label 與 unknown 都不填食用重量。"
         "food_state 只能是 prepared（熟食或沖泡後）、raw（生食材）、dry（未沖泡乾品）、unknown。"
         "無法判斷食用狀態填 unknown。preparation_method 只能填以下英文值："
         "boiled（水煮或汆燙）、stir_fried（拌炒）、pan_fried（平底煎）、deep_fried（油炸）、"
@@ -102,7 +105,7 @@ def build_food_recognition_prompt():
         "例如白飯的同義詞為白米飯，不是滷肉飯；糯米腸不是豬大腸；雞腿不是雞腿菇。"
         "只回合法 JSON，無 markdown，JSON schema: "
         '{"meal_guess":"","items":[{"name_zh":"","name_en":"",'
-        '"confidence":0.0,"estimated_weight_g":null,"weight_confidence":0.0,'
+        '"confidence":0.0,"estimated_weight_g":null,"weight_confidence":0.0,"weight_basis":"unknown",'
         '"food_state":"unknown","preparation_method":"unknown","components_scope":"unknown",'
         '"brand":null,"variant":null,'
         '"count":null,"portion_description":"",'
@@ -110,7 +113,7 @@ def build_food_recognition_prompt():
     )
 
 
-def normalize_vision_result(parsed):
+def normalize_vision_result(parsed, *, require_weight_basis=False):
     if isinstance(parsed, list):
         parsed = {"items": parsed}
     if not isinstance(parsed, dict) or not isinstance(parsed.get("items"), list):
@@ -132,6 +135,13 @@ def normalize_vision_result(parsed):
         normalized["estimated_weight_g"] = normalize_weight(item.get("estimated_weight_g"))
         if item.get("estimated_weight_g") is not None and normalized["estimated_weight_g"] is None:
             item_issues.append("invalid_weight")
+        if require_weight_basis or "weight_basis" in item:
+            basis = item.get("weight_basis")
+            if basis != "visible_portion":
+                normalized["weight_basis"] = "package_label" if basis == "package_label" else "unknown"
+                normalized["estimated_weight_g"] = None
+        if normalized["estimated_weight_g"] is None:
+            normalized["weight_confidence"] = 0.0
         for field, allowed in RECOGNITION_ENUMS.items():
             value = item.get(field)
             if isinstance(value, str) and value in allowed:
@@ -255,7 +265,11 @@ def build_vision_food_response(
         local_lookup = {}
         food_matches = find_vision_food_matches(storage, tfda_db, item, user_id, build_custom_food_search_result,
                                                diagnostics=local_lookup)
-        if not food_matches:
+        if not food_matches or item["estimated_weight_g"] is None:
+            reason = ("已辨識食物，但食用重量待確認，未計入營養合計" if food_matches else
+                      "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充")
+            if item.get("weight_basis") == "package_label":
+                reason += "；包裝淨重不是食用量"
             rejected_detections.append(
                 {
                     "item_id": item_id,
@@ -263,9 +277,9 @@ def build_vision_food_response(
                     "recognition_context": recognition_context,
                     "label": name_zh,
                     "confidence": confidence,
-                    "reason": "已辨識食物，但缺少相同食品與食用狀態的可信營養資料；未計入營養合計，請以標示或自訂食品補充",
+                    "reason": reason,
                     "recognition_status": "recognized",
-                    "nutrition_status": "unmatched",
+                    **({"nutrition_status": "unmatched"} if not food_matches else {}),
                     "local_lookup": local_lookup,
                     "search_hints": search_terms[:5],
                 }
@@ -277,14 +291,11 @@ def build_vision_food_response(
             "fiber": "膳食纖維", "sugar": "總糖", "saturated_fat": "飽和脂肪", "trans_fat": "反式脂肪",
         }
         missing_nutrients = [field for field in optional_nutrients if matched_food.get(field) is None]
-        estimated_weight = normalize_weight(item.get("estimated_weight_g"))
-        missing_weight = estimated_weight is None
-        if estimated_weight is None:
-            estimated_weight = 100.0
+        estimated_weight = item["estimated_weight_g"]
 
         match_notes = matched_food.get("match_notes", [])
         needs_confirmation = (confidence < 0.75 or len(food_matches) > 1 or bool(match_notes)
-                              or missing_weight or bool(missing_nutrients)
+                              or bool(missing_nutrients)
                               or bool(item.get("validation_issues"))
                               or normalize_confidence(item.get("weight_confidence", 0.5)) < 0.75)
         nutrients = {
@@ -333,8 +344,6 @@ def build_vision_food_response(
         if missing_nutrients:
             labels = "、".join(optional_nutrients[field] for field in missing_nutrients)
             warnings.append(f"資料來源未提供{labels}；缺值不代表實測為 0，相關營養合計可能低估")
-        if missing_weight:
-            warnings.append("照片無法估重，暫以 100 g 換算；請修改重量後再記錄")
         if item.get("portion_description"):
             warnings.append(f"份量描述：{item['portion_description']}")
         warnings.extend(

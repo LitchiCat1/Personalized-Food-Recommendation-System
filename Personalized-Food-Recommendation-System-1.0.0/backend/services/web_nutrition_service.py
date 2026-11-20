@@ -21,6 +21,7 @@ from services.nutrition_profile_service import (
     NutritionProfileError, aggregate_nutrition_coverage, calculate_portion,
     profile_from_local_food,
 )
+from services.nutrition_source_admission_service import source_policy_digest
 from services.nutrition_source_adapter import (
     NutritionSourceAdapterError, build_reviewed_markdown_source,
 )
@@ -95,6 +96,12 @@ class NutritionSourceRegistry:
             if policy["match_policy"] == "same_product":
                 _require(all(target.get(field) == source.get(field) for field in ("brand", "variant")),
                          "invalid_policy", "Exact product matching cannot erase a source brand or variant")
+            if "manufacturer_label" in spec:
+                label = spec["manufacturer_label"]
+                _require(isinstance(label, dict) and set(label) == {"publisher"}
+                         and _text(label["publisher"], 256) and _text(source.get("name"), 256)
+                         and _text(source.get("brand")) and policy["match_policy"] == "same_product",
+                         "invalid_policy", "Manufacturer attribution requires a reviewed branded product and publisher")
             _require(_text(policy.get("compatibility_review"), 4096), "invalid_policy", "Compatibility review evidence is required")
             rights = policy.get("rights")
             _require(isinstance(rights, dict) and _text(rights.get("reference"), 4096), "invalid_policy", "A rights review reference is required")
@@ -140,6 +147,19 @@ class NutritionSourceRegistry:
             _require(all(isinstance(rights.get(flag), bool) for flag in
                          ("search_allowed", "extract_allowed", "snapshot_allowed", "reuse_allowed")),
                      "invalid_policy", "Rights permissions must be explicit booleans")
+
+    def restrict_to_active_policy(self, source):
+        """Bind a request's current SQLite policy document to one server-reviewed policy."""
+        _require(isinstance(source, dict) and source.get("status") == "active"
+                 and type(source.get("revision")) is int and source["revision"] >= 0,
+                 "source_unavailable", "An active source policy revision is required")
+        policy = next((candidate for candidate in self._policies
+                       if candidate["source_spec"]["source_id"] == source.get("source_id")
+                       and candidate["policy_id"] == source.get("policy_id")), None)
+        _require(policy is not None, "source_unavailable", "The active source is not admitted for web retrieval")
+        _require(source_policy_digest(source.get("policy")) == source_policy_digest(policy),
+                 "source_conflict", "The active source policy differs from the reviewed policy")
+        return NutritionSourceRegistry((policy,))
 
     def compatible(self, item):
         matches = []
@@ -445,14 +465,21 @@ def enrich_nutrition(items, *, official_health, lookup_local, registry, tavily,
                                     results[item_id]["status"] = "incomplete_core"
                                     continue
                                 original = next(item for item in items if item["item_id"] == item_id)
+                                spec = policy["source_spec"]
                                 try:
-                                    calculate_portion(profile, original.get("estimated_weight_g"), portion_source="vision_estimate")
+                                    if "manufacturer_label" not in spec:
+                                        calculate_portion(profile, original.get("estimated_weight_g"), portion_source="vision_estimate")
                                 except NutritionProfileError as error:
                                     results[item_id]["status"] = "invalid_portion"
                                     events.append({"operation": "validation", "item_id": item_id, "status": error.code})
                                     continue
                                 profile["source_details"].update(match_policy=policy["match_policy"], policy_id=policy["policy_id"],
                                     rights_reference=policy["rights"]["reference"], compatibility_review=policy["compatibility_review"])
+                                if "manufacturer_label" in spec:
+                                    profile["source_details"]["manufacturer_label"] = {
+                                        "publisher": spec["manufacturer_label"]["publisher"],
+                                        "product_name": spec["food_identity"]["name"],
+                                    }
                                 results[item_id].update(status="accepted", origin="web", nutrition_profile=profile)
     except (TavilyRetrievalError, NutritionExtractionModelError) as error:
         terminal_pending(error.code if error.code in ("timeout", "budget_exceeded", "invalid_output") else "upstream_error")
@@ -465,6 +492,11 @@ def enrich_nutrition(items, *, official_health, lookup_local, registry, tavily,
     for item in items:
         result = results[item["item_id"]]
         profile = result["nutrition_profile"]
+        if profile is not None and "manufacturer_label" in profile["source_details"]:
+            # A verified label is a preview; the photo estimate is not an intake weight.
+            result.update(status="partial", portion=calculate_portion(None, None))
+            coverage_items.append({"item_id": item["item_id"], "profile": None, "weight_g": None})
+            continue
         result["portion"] = calculate_portion(profile, item.get("estimated_weight_g"), portion_source="vision_estimate")
         if profile is not None:
             result["status"] = ("needs_portion" if item.get("estimated_weight_g") is None else

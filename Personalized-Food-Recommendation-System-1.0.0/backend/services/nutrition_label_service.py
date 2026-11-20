@@ -483,11 +483,20 @@ def call_gemini_nutrition_ocr(image_b64: str, mime_type: str, api_key: str, gemi
     gemini_model = gemini_model or get_gemini_models()[0]
     prompt = (
         "請辨識這張食品營養標示圖片，盡量依台灣常見營養標示格式擷取資訊。"
+        "分開讀取每份與每100公克欄，禁止自行換算、把一欄抄到另一欄，或把每100毫升視為每100公克。"
+        "沒有印出、看不清楚、或只印有上限的數值填 null；只有明確印為零才填 0。"
+        "serving_size_g 只填以公克標示的每份重量，不得使用整包淨重或把毫升當作公克。"
+        "package_net_weight_g 只填同一包裝明示的公克淨重；不含包裝重量，不可抄每份重量、乘份數換算或將毫升當公克。"
+        "若整包淨重未明示為公克或無法確定對應本包裝，填 null。"
+        "熱量用大卡、鈉用毫克，其餘營養用公克。"
         "只回傳合法 JSON，不要加 markdown、不要加解釋。"
         "JSON schema: "
-        '{"product_name":"","brand":"","serving_size_g":null,'
+        '{"product_name":"","brand":"","serving_size_g":null,"package_net_weight_g":null,'
         '"servings_per_container":null,'
         '"nutrition_per_serving":{"calories":null,"protein":null,"fat":null,'
+        '"saturated_fat":null,"trans_fat":null,"carbs":null,"sugar":null,'
+        '"sodium":null,"fiber":null},'
+        '"nutrition_per_100g":{"calories":null,"protein":null,"fat":null,'
         '"saturated_fat":null,"trans_fat":null,"carbs":null,"sugar":null,'
         '"sodium":null,"fiber":null},'
         '"ocr_text":"","confidence_note":""}'
@@ -513,37 +522,59 @@ def call_gemini_nutrition_ocr(image_b64: str, mime_type: str, api_key: str, gemi
 
 
 def normalize_ocr_result(parsed: dict) -> dict:
-    if not isinstance(parsed, dict) or not isinstance(parsed.get("nutrition_per_serving", {}), dict):
-        raise ValueError("營養標示與每份營養資料必須是物件")
+    if not isinstance(parsed, dict) or any(
+        field in parsed and not isinstance(parsed[field], dict)
+        for field in ("nutrition_per_serving", "nutrition_per_100g")
+    ):
+        raise ValueError("營養標示與各基準的營養資料必須是物件")
 
-    def label_number(value):
-        if isinstance(value, bool):
-            raise ValueError("營養標示數字不可為布林值")
-        return extract_number(value)
+    def label_number(value, units):
+        if isinstance(value, str):
+            match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)\s*" + units, value.strip(), re.IGNORECASE)
+            value = float(match[1]) if match else None
+        if value is None:
+            return None
+        if not _finite_number(value) or value < 0:
+            raise ValueError("營養標示數字必須是非負有限數字或 null")
+        return float(value)
 
-    serving_size_g = positive_quantity(label_number(parsed.get("serving_size_g")), "serving_size_g")
-    servings_per_container = positive_quantity(label_number(parsed.get("servings_per_container")), "servings_per_container")
-    nutrition_per_serving = normalize_nutrition_payload(
-        {
-            "calories": label_number((parsed.get("nutrition_per_serving") or {}).get("calories")),
-            "protein": label_number((parsed.get("nutrition_per_serving") or {}).get("protein")),
-            "fat": label_number((parsed.get("nutrition_per_serving") or {}).get("fat")),
-            "carbs": label_number((parsed.get("nutrition_per_serving") or {}).get("carbs")),
-            "sodium": label_number((parsed.get("nutrition_per_serving") or {}).get("sodium")),
-            "fiber": label_number((parsed.get("nutrition_per_serving") or {}).get("fiber")),
-            "sugar": label_number((parsed.get("nutrition_per_serving") or {}).get("sugar")),
-            "saturated_fat": label_number((parsed.get("nutrition_per_serving") or {}).get("saturated_fat")),
-            "trans_fat": label_number((parsed.get("nutrition_per_serving") or {}).get("trans_fat")),
-        }
-    )
-    nutrition_per_100g = scale_nutrition_per_100g(nutrition_per_serving, serving_size_g)
+    grams = r"(?:g|公克|克)"
+    serving_size_g = positive_quantity(label_number(parsed.get("serving_size_g"), grams), "serving_size_g")
+    try:
+        package_net_weight_g = positive_quantity(label_number(parsed.get("package_net_weight_g"), grams), "package_net_weight_g")
+    except ValueError:
+        package_net_weight_g = None
+    servings_per_container = positive_quantity(label_number(parsed.get("servings_per_container"), r"(?:份)?"), "servings_per_container")
+
+    def table(field):
+        raw = parsed.get(field, {})
+        units = {"calories": r"(?:kcal|大卡)", "sodium": r"(?:mg|毫克)"}
+        return {key: label_number(raw.get(key), units.get(key, grams))
+                for key in normalize_nutrition_payload({})}
+
+    nutrition_per_serving = table("nutrition_per_serving")
+    printed_per_100g = table("nutrition_per_100g")
+    printed = has_nutrition_values(printed_per_100g)
+    calculated = (not printed and serving_size_g is not None
+                  and has_nutrition_values(nutrition_per_serving))
+    nutrition_per_100g = printed_per_100g if printed else None
+    if calculated:
+        nutrition_per_100g = {key: label_number(value * (100 / serving_size_g), "") if value is not None else None
+                              for key, value in nutrition_per_serving.items()}
+    basis_unverifiable = printed and has_nutrition_values(nutrition_per_serving) and serving_size_g is None
+    basis_conflict = printed and not basis_unverifiable and custom_nutrition_conflicts(
+        nutrition_per_serving, printed_per_100g, serving_size_g)
     return {
         "product_name": (parsed.get("product_name") or "未命名食品").strip(),
         "brand": (parsed.get("brand") or "").strip(),
         "serving_size_g": serving_size_g,
+        "package_net_weight_g": package_net_weight_g,
         "servings_per_container": servings_per_container,
         "nutrition_per_serving": nutrition_per_serving,
         "nutrition_per_100g": nutrition_per_100g,
+        "nutrition_per_100g_source": "label" if printed else "calculated" if calculated else None,
+        "nutrition_basis_conflict": basis_conflict,
+        "nutrition_basis_unverifiable": basis_unverifiable,
         "ocr_text": (parsed.get("ocr_text") or "").strip(),
         "confidence_note": (parsed.get("confidence_note") or "").strip(),
     }

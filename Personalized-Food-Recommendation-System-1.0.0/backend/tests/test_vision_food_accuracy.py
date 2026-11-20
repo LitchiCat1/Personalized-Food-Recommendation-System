@@ -148,8 +148,12 @@ class VisionFoodAccuracyTests(unittest.TestCase):
         for value in (None, math.nan, math.inf):
             self.assertIsNone(normalize_weight(value))
             response = self.response([{"name_zh": "白飯", "confidence": 0.99, "estimated_weight_g": value}])
-            self.assertTrue(response["detections"][0]["needs_confirmation"])
-            self.assertTrue(any("100 g" in note for note in response["detections"][0]["warnings"]))
+            self.assertEqual(response["detections"], [])
+            pending, = response["rejected_detections"]
+            self.assertIn("食用重量待確認", pending["reason"])
+            self.assertIsNone(pending["recognition_context"]["estimated_weight_g"])
+            self.assertEqual(response["summary"]["total_calories"], 0)
+            self.assertTrue(response["summary"]["requires_user_confirmation"])
 
     def test_missing_optional_nutrients_are_not_claimed_as_measured_zero(self):
         response = self.response([{"name_zh": "滷肉", "confidence": 0.96, "estimated_weight_g": 80}])

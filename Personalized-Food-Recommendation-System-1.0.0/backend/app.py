@@ -61,7 +61,6 @@ from services.nutrition_progress_service import build_daily_nutrition_progress, 
 from services.nutrient_service import NUTRITION_FIELDS, get_nutrient_value
 from services.nutrition_profile_service import (
     NutritionProfileError,
-    aggregate_nutrition_coverage,
     profile_from_local_food,
 )
 from services.record_nutrition_service import normalize_v2_record
@@ -128,7 +127,7 @@ from services.web_nutrition_service import (
     make_local_nutrition_lookup,
 )
 from services.nutrition_extraction_model_service import select_nutrition_cells_with_relay
-from services.tavily_retrieval_service import TavilyClient
+from services.tavily_retrieval_service import TavilyClient, TavilyRetrievalError
 from services.fooddata_central_client import FoodDataCentralClient, FoodDataCentralClientError
 from services.robust_restaurant_scraper_service import enrich_restaurant_with_gemini, parse_menu_image_with_gemini
 from services.medical_risk_service import (
@@ -745,18 +744,17 @@ def _nutrition_scan_context_ttl_seconds():
     return value
 
 
-def nutrition_enrichment_provider_factory(missing_items, known_items):
+def nutrition_enrichment_provider_factory(missing_items, known_items, *, resolved_source):
     """Build the third-layer provider using server configuration only.
 
     The factory is deliberately lazy: no Tavily client or model relay is
     created for a TFDA/USDA/cache hit, and missing credentials never reach the
     request payload or the frontend.
     """
-    if not os.environ.get("TAVILY_API_KEY", "").strip():
-        raise NutritionEnrichmentRouteError("provider_unavailable", "The web nutrition provider is not configured")
+    registry = PRODUCTION_SOURCE_REGISTRY.restrict_to_active_policy(resolved_source)
     try:
-        tavily = TavilyClient.from_environment()
-    except Exception as error:
+        api_key = TavilyClient.validate_api_key(os.environ.get("TAVILY_API_KEY", ""))
+    except TavilyRetrievalError as error:
         raise NutritionEnrichmentRouteError("provider_unavailable", "The web nutrition provider is not configured") from error
     local_lookup = make_local_nutrition_lookup(
         storage, TFDA_DB, None, build_custom_food_search_result)
@@ -764,13 +762,18 @@ def nutrition_enrichment_provider_factory(missing_items, known_items):
 
     def provider(payload):
         started = time.monotonic()
+        policy_reference = payload.get("source_policy")
+        if policy_reference != {"policy_id": resolved_source["policy_id"],
+                                "policy_revision": resolved_source["revision"]}:
+            return {"status": "source_conflict", "result": None}
         web_items = [item for item in payload.get("items", []) if item.get("item_id") in missing_ids]
+        tavily = TavilyClient(api_key)
         try:
             result = enrich_nutrition(
                 web_items,
                 official_health=NUTRITION_DATASET_HEALTH,
                 lookup_local=local_lookup,
-                registry=PRODUCTION_SOURCE_REGISTRY,
+                registry=registry,
                 tavily=tavily,
                 select_cells=select_nutrition_cells_with_relay,
                 deadline=started + 25,
@@ -791,31 +794,17 @@ def nutrition_enrichment_provider_factory(missing_items, known_items):
             # Official TFDA/USDA/cache data is authoritative for this request;
             # a web response cannot replace a known item with a weaker source.
             if item["item_id"] not in by_id:
+                profile = item.get("nutrition_profile")
+                if item.get("origin") == "web" and isinstance(profile, dict):
+                    profile["source_details"]["source_policy_revision"] = resolved_source["revision"]
                 by_id[item["item_id"]] = item
         merged = [by_id[item["item_id"]] for item in payload.get("items", [])
                   if item["item_id"] in by_id]
         if {item["item_id"] for item in merged} != {item["item_id"] for item in payload.get("items", [])}:
             return {"status": "invalid_output", "result": result,
                     "production_enabled": False}
-        try:
-            coverage_items = []
-            for item in merged:
-                context = item.get("recognition_context")
-                weight_g = context.get("estimated_weight_g") if isinstance(context, dict) else None
-                coverage_items.append({
-                    "item_id": item["item_id"],
-                    "profile": item.get("nutrition_profile"),
-                    "weight_g": weight_g,
-                    "portion_source": "vision_estimate",
-                })
-            coverage = aggregate_nutrition_coverage([
-                *coverage_items,
-            ])
-        except (KeyError, TypeError, AttributeError, NutritionProfileError):
-            return {"status": "invalid_output", "result": result,
-                    "production_enabled": False}
-        return dict(result, items=merged, nutrition_coverage=coverage,
-                    production_enabled=False)
+        # The request boundary rebuilds coverage from the full validated item set.
+        return dict(result, items=merged, production_enabled=False)
 
     return provider
 
@@ -1043,9 +1032,11 @@ def ocr_nutrition_label():
                     "name_zh": normalized["product_name"],
                     "brand": normalized["brand"],
                     "serving_size_g": normalized["serving_size_g"],
+                    "package_net_weight_g": normalized["package_net_weight_g"],
                     "servings_per_container": normalized["servings_per_container"],
                     "nutrition_per_serving": normalized["nutrition_per_serving"],
                     "nutrition_per_100g": normalized["nutrition_per_100g"],
+                    "nutrition_basis_unverifiable": normalized["nutrition_basis_unverifiable"],
                     "ocr_text": normalized["ocr_text"],
                     "source": "nutrition-label-ocr",
                 },
@@ -1415,6 +1406,7 @@ def nutrition_enrichment():
             local_lookup=make_local_nutrition_lookup(
                 storage, TFDA_DB, authenticated_user_id, build_custom_food_search_result),
             provider_factory=nutrition_enrichment_provider_factory,
+            source_registry=PRODUCTION_SOURCE_REGISTRY,
             feature_enabled=nutrition_enrichment_route_enabled,
             authority_service=nutrition_authority_service,
             require_official_miss=_require_official_nutrition_miss,

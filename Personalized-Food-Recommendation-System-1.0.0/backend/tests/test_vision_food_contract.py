@@ -64,6 +64,40 @@ class VisionRecognitionContractTests(unittest.TestCase):
                 self.assertIsNone(normalize_weight(value))
         self.assertEqual(normalize_weight(125.25), 125.2)
 
+    def test_package_net_weight_never_counts_as_consumed_even_with_a_database_match(self):
+        raw = {"name_zh": "堅果黑糖沙琪瑪", "brand": None, "variant": "堅果黑糖",
+               "confidence": 0.95, "weight_confidence": 0.95, "estimated_weight_g": 320,
+               "food_state": "prepared", "preparation_method": "unknown", "components_scope": "food_only"}
+        profile = {"calories": 466.2, "sodium": 147}
+        for basis in ({}, {"weight_basis": "package_label"}, {"weight_basis": "unknown"},
+                      {"weight_basis": None}, {"weight_basis": ["visible_portion"]}):
+            with self.subTest(basis=basis), patch(
+                    "services.vision_food_service.find_vision_food_matches", return_value=[profile]):
+                parsed = normalize_vision_result({"items": [{**raw, **basis}]}, require_weight_basis=True)
+                response = self.response(parsed["items"])
+                self.assertEqual(response["detections"], [])
+                pending, = response["rejected_detections"]
+                self.assertEqual(pending["label"], raw["name_zh"])
+                self.assertNotIn("nutrition_status", pending)
+                context = pending["recognition_context"]
+                self.assertIsNone(context["estimated_weight_g"])
+                self.assertEqual(context["weight_confidence"], 0)
+                self.assertEqual(context["confidence"], 0.95)
+                self.assertTrue(context["identity_confirmation_required"])
+                self.assertEqual(response["summary"]["total_calories"], 0)
+                self.assertEqual(response["summary"]["total_sodium"], 0)
+                self.assertFalse(response["summary"]["nutrition_complete"])
+
+    def test_model_visible_portion_can_still_be_scaled(self):
+        parsed = normalize_vision_result({"items": [{"name_zh": "白飯", "confidence": 0.95,
+            "weight_confidence": 0.8, "estimated_weight_g": 80, "weight_basis": "visible_portion",
+            "food_state": "prepared", "preparation_method": "steamed", "components_scope": "food_only"}]},
+            require_weight_basis=True)
+        with patch("services.vision_food_service.find_vision_food_matches", return_value=[{"calories": 200}]):
+            response = self.response(parsed["items"])
+        self.assertEqual(response["detections"][0]["estimated_weight_g"], 80)
+        self.assertEqual(response["summary"]["total_calories"], 160)
+
     def test_same_named_items_have_separate_ids_and_complete_unmatched_context(self):
         response = self.response([
             {"name_zh": "葉菜", "name_en": "leafy vegetable", "confidence": 0.8,
@@ -134,7 +168,7 @@ class VisionRecognitionContractTests(unittest.TestCase):
     def test_discarded_invalid_item_cannot_claim_complete_nutrition(self):
         profile = {"name_zh": "測試食品", "calories": 200, "protein": 5, "carbs": 30, "fat": 7, "sodium": 30}
         with patch("services.vision_food_service.find_vision_food_matches", return_value=[profile]):
-            response = self.response([{"name_zh": "測試食品", "confidence": 0.9}, None])
+            response = self.response([{"name_zh": "測試食品", "confidence": 0.9, "estimated_weight_g": 80}, None])
         self.assertFalse(response["summary"]["nutrition_complete"])
         self.assertTrue(response["summary"]["requires_user_confirmation"])
         self.assertTrue(response["detections"][0]["needs_confirmation"])
@@ -158,6 +192,20 @@ class VisionRecognitionContractTests(unittest.TestCase):
         with patch("services.vision_food_service.get_relay_config", return_value=None), \
                 patch("services.vision_food_service.requests.post", return_value=response):
             self.assertEqual(call_gemini_food_recognition("not-an-image", "image/jpeg", "unused-test-key")["items"], [])
+
+    def test_native_and_relay_model_output_require_explicit_portion_basis(self):
+        text = json.dumps({"items": [{"name_zh": "堅果黑糖沙琪瑪", "estimated_weight_g": 320,
+                                     "confidence": 0.95, "weight_confidence": 0.95}]})
+        for relay in (False, True):
+            with self.subTest(relay=relay), patch("services.vision_food_service.get_relay_config", return_value=relay), \
+                    patch("services.vision_food_service.requests.post") as transport, \
+                    patch("services.vision_food_service.relay_chat", return_value=(text, "stop")):
+                transport.return_value.json.return_value = {"candidates": [{"finishReason": "STOP",
+                    "content": {"parts": [{"text": text}]}}]}
+                item, = call_gemini_food_recognition("not-an-image", "image/jpeg", "unused-test-key", "test-model")["items"]
+                self.assertEqual(item["weight_basis"], "unknown")
+                self.assertIsNone(item["estimated_weight_g"])
+                self.assertEqual(item["weight_confidence"], 0)
 
 
 if __name__ == "__main__":

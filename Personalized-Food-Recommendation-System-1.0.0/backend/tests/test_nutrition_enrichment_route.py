@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import Mock
 
 from repositories.nutrition_enrichment_repository import NutritionEnrichmentRequestRepository
 from repositories.nutrition_quota_repository import NutritionQuotaRepository
@@ -34,6 +35,7 @@ def _provider_item(item, *, profile=None, status="accepted", origin="web"):
         "carbs": 15, "sodium": 50, "fiber": 1, "sugar": 2,
         "saturated_fat": 1, "trans_fat": 0,
     })
+    profile["source_details"].update(source_id="source-1", source_policy_revision=0)
     return {
         "item_id": item["item_id"], "item_revision": item["item_revision"],
         "original_visual_name": item["name_zh"], "status": status, "origin": origin,
@@ -132,7 +134,7 @@ class NutritionEnrichmentRouteTests(unittest.TestCase):
     def test_missing_local_data_uses_provider_once_and_replays(self):
         calls = []
 
-        def provider_factory(missing, known):
+        def provider_factory(missing, known, *, resolved_source):
             def provider(payload):
                 calls.append(payload)
                 return {"status": "complete", "result": {"items": [_provider_item(payload["items"][0])]}}
@@ -164,7 +166,7 @@ class NutritionEnrichmentRouteTests(unittest.TestCase):
             def put_success(self, **kwargs):
                 writes.append(kwargs)
 
-        def factory(missing, known):
+        def factory(missing, known, *, resolved_source):
             def provider(payload):
                 return {"status": "complete", "result": {"items": [{
                     **_provider_item(ITEM, profile=profile),
@@ -183,6 +185,20 @@ class NutritionEnrichmentRouteTests(unittest.TestCase):
         self.assertEqual(writes[0]["food_identity"]["name"], ITEM["name_zh"])
         self.assertEqual(writes[0]["source_id"], "source-1")
 
+    def test_manufacturer_preview_is_unresolved_in_route_coverage(self):
+        entry = _provider_item(ITEM, status="partial")
+        entry["nutrition_profile"]["source_details"].update(
+            manufacturer_label={"publisher": "Fixture publisher", "product_name": "Fixture product"},
+            source_url="https://example.com/source-1",
+        )
+        entry["portion"] = calculate_portion(None, None)
+        response = self._run(provider_factory=lambda *_, **_kw: lambda _: {"items": [entry]})
+        self.assertEqual(response["status"], "partial")
+        result = response["result"]
+        self.assertEqual(result["items"][0], entry)
+        coverage = result["nutrition_coverage"]["nutrients"]["calories"]
+        self.assertEqual((coverage["known_sum"], coverage["unresolved_items"]), (0, 1))
+
     def test_policy_id_alias_is_resolved_before_cache_lookup(self):
         class SourceAlias(SourceStub):
             def resolve_source_policy_reference(self, reference, *, revision=None):
@@ -198,9 +214,12 @@ class NutritionEnrichmentRouteTests(unittest.TestCase):
                 looked_up.append(kwargs)
                 return None
 
-        def factory(_missing, _known):
-            return lambda payload: {"status": "complete", "result": {
-                "items": [_provider_item(payload["items"][0])]}}
+        def factory(_missing, _known, *, resolved_source):
+            self.assertEqual(resolved_source, {"source_id": "source-1", "policy_id": "policy-1",
+                                               "revision": 0, "status": "active"})
+            entry = _provider_item(ITEM)
+            entry["nutrition_profile"]["source_details"]["policy_id"] = "policy-1"
+            return lambda payload: {"status": "complete", "result": {"items": [entry]}}
 
         output = process_enrichment_request(
             self._body(source_policy_id="policy-1", idempotency_key="policy-alias"),
@@ -229,13 +248,13 @@ class NutritionEnrichmentRouteTests(unittest.TestCase):
             "saturated_fat": 2, "trans_fat": 0,
         })
 
-        def factory(_missing, _known):
+        def factory(_missing, _known, *, resolved_source):
             web_item = {
                 "item_id": item2["item_id"], "item_revision": item2["item_revision"],
                 "original_visual_name": item2["name_zh"], "status": "accepted", "origin": "web",
                 "recognition_context": {"name_zh": item2["name_zh"],
                                         "estimated_weight_g": item2["estimated_weight_g"]},
-                "nutrition_profile": web_profile,
+                "nutrition_profile": _provider_item(item2, profile=web_profile)["nutrition_profile"],
                 "portion": calculate_portion(web_profile, item2["estimated_weight_g"],
                                               portion_source="vision_estimate"),
             }
@@ -253,7 +272,7 @@ class NutritionEnrichmentRouteTests(unittest.TestCase):
         self.assertEqual(result["nutrition_coverage"]["nutrients"]["calories"]["known_items"], 2)
 
     def test_malformed_complete_provider_item_is_persisted_as_invalid_output(self):
-        def factory(_missing, _known):
+        def factory(_missing, _known, *, resolved_source):
             return lambda _payload: {
                 "status": "complete",
                 "result": {"items": [{"item_id": ITEM["item_id"]}]},
@@ -261,7 +280,89 @@ class NutritionEnrichmentRouteTests(unittest.TestCase):
 
         output = self._run(provider_factory=factory, enabled=True)
         self.assertEqual(output["status"], "invalid_output")
-        self.assertIsInstance(output["result"], dict)
+        self.assertIsNone(output["result"])
+
+    def test_provider_result_for_another_source_or_revision_is_never_returned_or_cached(self):
+        for index, fields in enumerate(({"source_id": "other"}, {"source_policy_revision": 1})):
+            item = ITEM if index == 0 else dict(ITEM, item_id="scan-2:0", name_zh=f"{ITEM['name_zh']}2")
+            entry = _provider_item(item)
+            entry["nutrition_profile"]["source_details"].update(fields)
+            cache = Mock()
+            cache.get.return_value = None
+            scan_id = f"scan-{index + 1}"
+            body = self._body(scan_id=scan_id, items=[item], idempotency_key=f"wrong-source-{index}")
+            factory = Mock(return_value=lambda _: {"items": [entry]})
+            result = self._run(body, cache=cache, provider_factory=factory)
+            self.assertEqual(result["status"], "source_conflict")
+            self.assertIsNone(result["result"])
+            cache.put_success.assert_not_called()
+
+    def test_inactive_or_stale_source_cannot_read_cache_or_construct_provider(self):
+        for status, revision in (("withdrawn", 0), ("active", 1)):
+            with self.subTest(status=status, revision=revision):
+                self.source.get_source_policy = Mock(return_value={"source_id": "source-1",
+                                                                   "status": status, "revision": revision})
+                cache, factory = Mock(), Mock()
+                with self.assertRaises(NutritionEnrichmentRouteError) as raised:
+                    self._run(cache=cache, provider_factory=factory)
+                self.assertEqual(raised.exception.code, "source_unavailable")
+                cache.get.assert_not_called()
+                factory.assert_not_called()
+
+    def test_provider_profile_must_match_reviewed_url_and_adapter(self):
+        spec = {"source_url": "https://example.com/reviewed", "adapter_version": "reviewed-v1"}
+        self.source.get_source_policy = Mock(return_value={
+            "source_id": "source-1", "revision": 0, "status": "active", "policy": {"source_spec": spec},
+        })
+        for index, field in enumerate(spec, start=1):
+            with self.subTest(field=field):
+                item = ITEM if index == 1 else dict(ITEM, item_id="scan-2:0", name_zh=f"{ITEM['name_zh']}2")
+                entry = _provider_item(item)
+                entry["nutrition_profile"]["source_details"].update(spec)
+                entry["nutrition_profile"]["source_details"][field] = (
+                    "https://example.com/other" if field == "source_url" else "old-v1")
+                body = self._body(scan_id=f"scan-{index}", items=[item], idempotency_key=f"drift-{field}")
+                result = self._run(body, provider_factory=Mock(return_value=lambda _: {"items": [entry]}))
+                self.assertEqual(result["status"], "source_conflict")
+                self.assertIsNone(result["result"])
+
+    def test_source_withdrawn_during_cache_read_cannot_return_cached_result(self):
+        cache = Mock()
+        factory = Mock()
+
+        def get_cache(**_kwargs):
+            self.source.get_source_policy = Mock(return_value=None)
+            return {"profile": _provider_item(ITEM)["nutrition_profile"]}
+
+        cache.get.side_effect = get_cache
+        with self.assertRaises(NutritionEnrichmentRouteError) as raised:
+            self._run(cache=cache, provider_factory=factory, enabled=False)
+        self.assertEqual(raised.exception.code, "source_unavailable")
+        cache.get.assert_called_once()
+        factory.assert_not_called()
+
+    def test_cache_profile_from_different_policy_revision_does_not_satisfy_request(self):
+        cached_profile = _provider_item(ITEM)["nutrition_profile"]
+        cached_profile["source_details"]["source_policy_revision"] = 1
+        cache = Mock()
+        cache.get.return_value = {"profile": cached_profile}
+        provider = Mock(return_value={"items": [_provider_item(ITEM)]})
+        result = self._run(cache=cache, provider_factory=Mock(return_value=provider))
+        self.assertEqual(result["status"], "complete")
+        self.assertEqual(result["result"]["items"][0]["origin"], "web")
+        provider.assert_called_once()
+
+    def test_withdrawn_policy_cannot_replay_previously_accepted_result(self):
+        item = _provider_item(ITEM)
+        provider = Mock(return_value={"items": [item]})
+        factory = Mock(return_value=provider)
+        self.assertEqual(self._run(provider_factory=factory)["status"], "complete")
+        self.source.get_source_policy = Mock(return_value=None)
+        with self.assertRaises(NutritionEnrichmentRouteError) as raised:
+            self._run(provider_factory=factory)
+        self.assertEqual(raised.exception.code, "source_unavailable")
+        factory.assert_called_once()
+        provider.assert_called_once()
 
     def test_partial_web_profile_is_not_written_to_positive_cache(self):
         profile = profile_from_local_food({
@@ -282,7 +383,7 @@ class NutritionEnrichmentRouteTests(unittest.TestCase):
             def put_success(self, **kwargs):
                 writes.append(kwargs)
 
-        def factory(missing, known):
+        def factory(missing, known, *, resolved_source):
             return lambda payload: {"status": "partial", "result": {"items": [
                 _provider_item(ITEM, profile=profile, status="partial")
             ]}}
@@ -391,7 +492,7 @@ class NutritionEnrichmentRouteTests(unittest.TestCase):
                                     items=[item], ttl_seconds=120, issued_at=self.clock[0])
         seen = []
 
-        def factory(missing, known):
+        def factory(missing, known, *, resolved_source):
             seen.extend(missing)
             return lambda payload: {"status": "complete", "result": {
                 "items": [_provider_item(payload["items"][0])]}}
@@ -463,7 +564,7 @@ class NutritionEnrichmentRouteTests(unittest.TestCase):
             user_id="u1", scan_id="scan-1", scan_revision=0, items=[ITEM])
         calls = []
 
-        def factory(missing, known):
+        def factory(missing, known, *, resolved_source):
             def provider(payload):
                 calls.append(payload)
                 return {"status": "complete", "result": {"items": [_provider_item(payload["items"][0])]}}
@@ -540,7 +641,7 @@ class NutritionEnrichmentRouteTests(unittest.TestCase):
     def test_user_quota_is_enforced_by_coordinator(self):
         calls = []
 
-        def factory(missing, known):
+        def factory(missing, known, *, resolved_source):
             def provider(payload):
                 calls.append(payload)
                 return {"status": "complete", "result": {"items": [

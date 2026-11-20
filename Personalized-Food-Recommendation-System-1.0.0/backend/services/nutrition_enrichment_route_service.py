@@ -146,13 +146,16 @@ def _validate_body(body):
 
 
 def _coverage(items):
+    def coverage_item(item):
+        profile = item.get("nutrition_profile")
+        details = profile.get("source_details") if isinstance(profile, dict) else None
+        preview = item.get("origin") == "web" and isinstance(details, dict) and "manufacturer_label" in details
+        return {"item_id": item["item_id"], "profile": None if preview else profile,
+                "weight_g": None if preview else item.get("recognition_context", {}).get("estimated_weight_g"),
+                "portion_source": "vision_estimate"}
+
     try:
-        return aggregate_nutrition_coverage([
-            {"item_id": item["item_id"], "profile": item.get("nutrition_profile"),
-             "weight_g": item.get("recognition_context", {}).get("estimated_weight_g"),
-             "portion_source": "vision_estimate"}
-            for item in items
-        ])
+        return aggregate_nutrition_coverage([coverage_item(item) for item in items])
     except NutritionProfileError as error:
         _fail(getattr(error, "code", "invalid_output"), str(error))
 
@@ -197,7 +200,23 @@ def _combine(items, known, enriched):
             "nutrition_coverage": _coverage(ordered)}
 
 
-def _normalize_provider_result(result, *, items, known):
+def _profile_matches_source(profile, source):
+    details = profile.get("source_details") if isinstance(profile, dict) else None
+    spec = (source.get("policy") or {}).get("source_spec", {})
+    return (isinstance(details, dict) and details.get("source_id") == source["source_id"]
+            and type(details.get("source_policy_revision")) is int
+            and details["source_policy_revision"] == source["revision"]
+            and ("policy_id" not in source or details.get("policy_id") == source["policy_id"])
+            and ("source_url" not in spec or details.get("source_url") == spec["source_url"])
+            and ("adapter_version" not in spec or details.get("adapter_version") == spec["adapter_version"]))
+
+
+def _result_matches_source(result, source):
+    return all(item.get("nutrition_profile") is None or _profile_matches_source(item["nutrition_profile"], source)
+               for item in result["items"] if item.get("origin") != "local")
+
+
+def _normalize_provider_result(result, *, items, known, source):
     """Normalize provider output before it reaches the durable coordinator.
 
     The web service owns only cache/local misses, so its coverage describes a
@@ -210,14 +229,19 @@ def _normalize_provider_result(result, *, items, known):
     explicit = result.get("status")
     if explicit in {"timeout", "rate_limited", "upstream_error", "busy",
                     "source_conflict", "not_found", "invalid_output"}:
-        return deepcopy(result)
+        return {"status": explicit, "result": None}
     raw = result.get("result", result) if isinstance(explicit, str) else result
     if not isinstance(raw, dict) or not isinstance(raw.get("items"), list):
-        return {"status": "invalid_output", "result": deepcopy(raw) if isinstance(raw, dict) else None}
+        return {"status": "invalid_output", "result": None}
     try:
         normalized = _combine(items, known, raw["items"])
     except NutritionEnrichmentRouteError:
-        return {"status": "invalid_output", "result": deepcopy(raw)}
+        return {"status": "invalid_output", "result": None}
+    known_ids = {item["item_id"] for item in known}
+    if any(item["item_id"] not in known_ids and item.get("nutrition_profile") is not None
+           and (item.get("origin") != "web" or not _profile_matches_source(item["nutrition_profile"], source))
+           for item in normalized["items"]):
+        return {"status": "source_conflict", "result": None}
     # Preserve diagnostics for operators, but never preserve the provider's
     # stale coverage field.
     for key in ("events", "production_enabled"):
@@ -226,8 +250,7 @@ def _normalize_provider_result(result, *, items, known):
     return {"status": explicit, "result": normalized} if isinstance(explicit, str) else normalized
 
 
-def _cache_successful_web_profiles(*, cache_repository, result, items, user_id,
-                                   source_policy_revision):
+def _cache_successful_web_profiles(*, cache_repository, result, items, user_id, source):
     """Best-effort persistence for complete, provider-backed profiles.
 
     The cache repository is the policy/provenance authority.  This boundary
@@ -255,14 +278,12 @@ def _cache_successful_web_profiles(*, cache_repository, result, items, user_id,
                 or profile.get("nutrition_status") != "complete"
                 or profile.get("has_required_point_values") is not True):
             continue
-        details = profile.get("source_details")
-        source_id = details.get("source_id") if isinstance(details, dict) else None
-        if not isinstance(source_id, str) or not source_id:
+        if not _profile_matches_source(profile, source):
             continue
         try:
             cache_repository.put_success(
                 food_identity=_identity(item), profile=deepcopy(profile),
-                source_id=source_id, source_policy_revision=source_policy_revision,
+                source_id=source["source_id"], source_policy_revision=source["revision"],
                 user_id=user_id,
             )
         except Exception:
@@ -287,10 +308,12 @@ def _resolve_source_policy(profile_repository, reference, revision):
 def _validate_provider_authorities(*, user_id, body, profile_repository):
     """Fail before constructing a paid provider when source/profile is stale."""
     if profile_repository is None:
-        return
+        _fail("source_unavailable", "Source policy repository is unavailable")
     source = _resolve_source_policy(
         profile_repository, body["source_policy_id"], body["source_policy_revision"])
-    if source is None or source.get("status") != "active":
+    if (not isinstance(source, dict) or source.get("status") != "active"
+            or not isinstance(source.get("source_id"), str) or not source["source_id"]
+            or type(source.get("revision")) is not int or source["revision"] != body["source_policy_revision"]):
         _fail("source_unavailable", "Source policy is missing or withdrawn")
     for reference in body.get("profiles", []):
         if not isinstance(reference, dict) or set(reference) != {
@@ -362,7 +385,8 @@ def process_enrichment_request(body, *, authenticated_user_id, scan_context_repo
                                profile_repository, request_repository, quota_repository,
                                cache_repository, local_lookup, provider_factory=None,
                                feature_enabled=False, clock=time.monotonic,
-                               authority_service=None, require_official_miss=None):
+                               authority_service=None, require_official_miss=None,
+                               source_registry=None):
     """Process one authenticated request using server-owned dependencies.
 
     ``provider_factory`` is called only when at least one item misses both
@@ -402,6 +426,13 @@ def process_enrichment_request(body, *, authenticated_user_id, scan_context_repo
 
     known, missing, ineligible = [], [], []
     resolved_source = None
+
+    def require_current_source():
+        current = _validate_provider_authorities(
+            user_id=user_id, body=body, profile_repository=profile_repository)
+        if current != resolved_source:
+            _fail("source_conflict", "Approved source policy changed while processing the request")
+
     for item in items:
         try:
             local = local_lookup(deepcopy(item))
@@ -430,29 +461,26 @@ def process_enrichment_request(body, *, authenticated_user_id, scan_context_repo
                 user_id=user_id, scan_id=body["scan_id"],
                 scan_revision=body["scan_revision"], item=item)
         cached = None
-        if cache_repository is not None:
-            if resolved_source is None and profile_repository is not None:
+        if resolved_source is None:
+            resolved_source = _validate_provider_authorities(
+                user_id=user_id, body=body, profile_repository=profile_repository)
+            if source_registry is not None:
                 try:
-                    resolved_source = _resolve_source_policy(
-                        profile_repository, body["source_policy_id"],
-                        body["source_policy_revision"])
-                except NutritionEnrichmentRouteError:
-                    # The authoritative check below returns the stable public
-                    # error.  Treat an unresolved policy as a cache miss here.
-                    resolved_source = None
-            cache_source_id = (resolved_source or {}).get(
-                "source_id", body["source_policy_id"])
+                    source_registry.restrict_to_active_policy(resolved_source)
+                except ValueError as error:
+                    _fail(getattr(error, "code", "source_unavailable"), str(error))
+        if cache_repository is not None and not context_was_consumed:
             try:
                 cached = cache_repository.get(
-                    food_identity=_identity(item), source_id=cache_source_id,
-                    source_policy_revision=body["source_policy_revision"], user_id=user_id)
+                    food_identity=_identity(item), source_id=resolved_source["source_id"],
+                    source_policy_revision=resolved_source["revision"], user_id=user_id)
             except Exception as error:
                 # Cache is an optimisation. A stale/withdrawn policy is a miss;
                 # malformed storage still fails closed rather than inventing data.
                 if getattr(error, "code", "") not in {"source_unavailable", "source_conflict", "rights_not_allowed",
                                                         "reuse_not_allowed", "owner_required"}:
                     _fail(getattr(error, "code", "cache_error"), str(error))
-        if cached and isinstance(cached.get("profile"), dict):
+        if cached and _profile_matches_source(cached.get("profile"), resolved_source):
             try:
                 known.append(_item_result(item, status="accepted", origin="cache",
                                           profile=cached["profile"]))
@@ -465,10 +493,10 @@ def process_enrichment_request(body, *, authenticated_user_id, scan_context_repo
         _fail("confirmation_required",
               "Uncertain, generic or validation-flagged scan items require identity confirmation before web enrichment")
     if not missing:
+        if resolved_source is not None:
+            require_current_source()
         return {"request_id": None, "status": "complete", "result": _combine(items, known, []),
                 "error": None, "replayed": False, "local_only": True}
-    resolved_source = _validate_provider_authorities(
-        user_id=user_id, body=body, profile_repository=profile_repository)
     if not feature_enabled or not callable(provider_factory):
         _fail("feature_disabled", "Automatic web enrichment is not enabled")
 
@@ -488,7 +516,7 @@ def process_enrichment_request(body, *, authenticated_user_id, scan_context_repo
         )
 
     try:
-        provider = provider_factory(missing, known)
+        provider = provider_factory(missing, known, resolved_source=deepcopy(resolved_source))
     except Exception as error:
         _fail(getattr(error, "code", "provider_unavailable"), str(error))
     if not callable(provider):
@@ -500,8 +528,9 @@ def process_enrichment_request(body, *, authenticated_user_id, scan_context_repo
     raw_provider = provider
 
     def provider_with_route_contract(payload):
+        require_current_source()
         return _normalize_provider_result(
-            raw_provider(payload), items=items, known=known)
+            raw_provider(payload), items=items, known=known, source=resolved_source)
 
     # Build and validate the provider before consuming the one-time authority.
     # A missing credential or malformed provider configuration must not burn a
@@ -538,10 +567,14 @@ def process_enrichment_request(body, *, authenticated_user_id, scan_context_repo
     except NutritionEnrichmentCoordinatorError as error:
         raise NutritionEnrichmentRouteError(error.code, str(error)) from error
     if outcome.get("status") in {"accepted", "complete", "partial", "success"}:
+        require_current_source()
+        result = outcome.get("result")
+        if not isinstance(result, dict) or not isinstance(result.get("items"), list) or not _result_matches_source(result, resolved_source):
+            _fail("source_conflict", "Enrichment result does not match the approved source policy")
         _cache_successful_web_profiles(
-            cache_repository=cache_repository, result=outcome.get("result"),
+            cache_repository=None if outcome.get("replayed") else cache_repository, result=result,
             items=items, user_id=user_id,
-            source_policy_revision=body["source_policy_revision"],
+            source=resolved_source,
         )
     return outcome
 

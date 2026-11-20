@@ -19,6 +19,7 @@ import FeedbackBanner from '@/components/ui/feedback-banner';
 import ScannerManualTools, { ScannerPendingFoods } from '@/components/scanner/ScannerManualTools';
 import ScannerResults from '@/components/scanner/ScannerResults';
 import FdcCandidateReview from '@/components/scanner/FdcCandidateReview';
+import ManufacturerLabelPreviews from '@/components/scanner/ManufacturerLabelPreviews';
 import MenuCheckResults from '@/components/scanner/MenuCheckResults';
 import { checkMenuPhoto, type MenuPhotoCheckResponse } from '@/lib/api';
 import { resolveImageBase64 } from '@/lib/image';
@@ -29,11 +30,15 @@ import {
   formatScannerResultTitle,
   formatScannerSourceBadge,
   FOOD_NAME_REQUIRED_MESSAGE,
+  getOCRQuickAddIssue,
+  getOCRPortionPresets,
   hasReviewableNutritionMiss,
   getUserConfirmableIdentityItems,
   hasUserConfirmableIdentity,
   manualSearchFood,
   normalizeFoodName,
+  parseOCRPortion,
+  stepOCRPortion,
   runNutritionLabelOCR,
   runPrediction,
   mergeNutritionEnrichmentResult,
@@ -58,6 +63,7 @@ import {
 import { createNutritionFdcCandidateSnapshot, selectReviewedNutritionFdcSource } from '@/lib/nutrition-fdc-candidate-api';
 import { getNutritionFdcRecovery } from '@/lib/nutrition-fdc-recovery';
 import { runScannerNutritionFallback } from '@/lib/scanner-nutrition-fallback';
+import { getManufacturerLabelPreviews, type ManufacturerLabelPreview } from '@/lib/scanner-manufacturer-label';
 import type { NutritionFdcConfirmationResponse } from '@/lib/nutrition-fdc-confirmation-api';
 import type { NutritionFdcCandidateSnapshotResponse } from '@/lib/nutrition-fdc-candidate-api';
 import type { ScannerServerScanReference } from '@/store/useStore';
@@ -121,6 +127,10 @@ function OCRDraftCard({
   onQuickAdd,
   submitting,
   actionsDisabled,
+  confirmed,
+  onToggleConfirmed,
+  portion,
+  onPortionChange,
 }: {
   draft: OCRDraft;
   foodNameError: string | null;
@@ -130,9 +140,23 @@ function OCRDraftCard({
   onQuickAdd: () => void;
   submitting: boolean;
   actionsDisabled: boolean;
+  confirmed: boolean;
+  onToggleConfirmed: () => void;
+  portion: string;
+  onPortionChange: (value: string) => void;
 }) {
+  const quickAddIssue = getOCRQuickAddIssue(draft);
+  const { oneServing, wholePackage, packageConflict } = getOCRPortionPresets(draft);
+  const presets = [
+    { label: '1 份', value: oneServing },
+    { label: '整包', value: wholePackage },
+  ].filter(({ value }) => value !== '');
+  const servingValues = draft.nutrition_per_serving;
+  const per100Values = draft.nutrition_per_100g;
+  const hasServingValues = Object.values(servingValues ?? {}).some((value) => typeof value === 'number');
+  const hasPer100Values = Object.values(per100Values ?? {}).some((value) => typeof value === 'number');
   return (
-    <SectionBlock title="營養標示辨識結果" subtitle="可直接加入今日紀錄，或儲存成自訂食品供下次搜尋。">
+    <SectionBlock title="營養標示辨識結果">
       {draft.brand ? (
         <View style={styles.ocrBrandRow}>
           <DataPill tone="info">{draft.brand}</DataPill>
@@ -169,34 +193,82 @@ function OCRDraftCard({
           </View>
         ) : null}
       </View>
-      {draft.serving_size_g ? <Text style={styles.ocrMetaText}>每份 {draft.serving_size_g} g</Text> : null}
+      {!hasServingValues && !hasPer100Values ? <Text style={styles.ocrMetaText}>未讀取到可用的營養數值</Text> : null}
+      {[
+        { title: draft.serving_size_g ? `每份（${draft.serving_size_g} g）` : '每份（重量未讀取）', values: servingValues, present: hasServingValues },
+        { title: draft.nutrition_per_100g_source === 'calculated' ? '每 100 g（換算）' : '每 100 g', values: per100Values, present: hasPer100Values },
+      ].filter((basis) => basis.present).map(({ title, values }) => (
+        <View key={title} style={styles.ocrBasis}>
+          <Text style={styles.ocrMetaText}>{title}</Text>
       <View style={styles.nutritionGrid}>
         {[
-          { label: '熱量', value: draft.nutrition_per_serving?.calories ?? '--', unit: 'kcal', color: Palette.accent.green },
-          { label: '蛋白質', value: draft.nutrition_per_serving?.protein ?? '--', unit: 'g', color: Palette.accent.blue },
-          { label: '總碳水化合物', value: draft.nutrition_per_serving?.carbs ?? '--', unit: 'g', color: Palette.accent.orange },
-          { label: '精緻糖', value: draft.nutrition_per_serving?.sugar ?? '--', unit: 'g', color: Palette.accent.orange },
-          { label: '總脂肪', value: draft.nutrition_per_serving?.fat ?? '--', unit: 'g', color: Palette.accent.purple },
-          { label: '飽和脂肪', value: draft.nutrition_per_serving?.saturated_fat ?? '--', unit: 'g', color: Palette.accent.purple },
-          { label: '反式脂肪', value: draft.nutrition_per_serving?.trans_fat ?? '--', unit: 'g', color: Palette.status.error },
-          { label: '膳食纖維', value: draft.nutrition_per_serving?.fiber ?? '--', unit: 'g', color: Palette.accent.cyan },
-          { label: '鈉 (Sodium)', value: draft.nutrition_per_serving?.sodium ?? '--', unit: 'mg', color: Palette.accent.pink },
+          { label: '熱量', value: values?.calories, unit: 'kcal', color: Palette.accent.green },
+          { label: '蛋白質', value: values?.protein, unit: 'g', color: Palette.accent.blue },
+          { label: '總碳水化合物', value: values?.carbs, unit: 'g', color: Palette.accent.orange },
+          { label: '總糖', value: values?.sugar, unit: 'g', color: Palette.accent.orange },
+          { label: '總脂肪', value: values?.fat, unit: 'g', color: Palette.accent.purple },
+          { label: '飽和脂肪', value: values?.saturated_fat, unit: 'g', color: Palette.accent.purple },
+          { label: '反式脂肪', value: values?.trans_fat, unit: 'g', color: Palette.status.error },
+          { label: '膳食纖維', value: values?.fiber, unit: 'g', color: Palette.accent.cyan },
+          { label: '鈉', value: values?.sodium, unit: 'mg', color: Palette.accent.pink },
         ].map((item) => (
           <View key={item.label} style={styles.nutritionItem}>
             <Text style={styles.nutritionLabel}>{item.label}</Text>
             <Text style={[styles.nutritionValue, { color: item.color }]}>
-              {item.value}
-              <Text style={styles.nutritionUnit}> {item.unit}</Text>
+              {typeof item.value === 'number' && Number.isFinite(item.value) ? item.value : '未讀取'}
+              {typeof item.value === 'number' && Number.isFinite(item.value) ? <Text style={styles.nutritionUnit}> {item.unit}</Text> : null}
             </Text>
           </View>
         ))}
       </View>
+        </View>
+      ))}
       <View style={styles.ocrActions}>
-        <SecondaryButton label="儲存成自訂食品" onPress={onSaveCustomFood} disabled={actionsDisabled} icon={<Ionicons name="bookmark-outline" size={15} color={Palette.accent.green} />} />
+        {draft.nutrition_basis_unverifiable && !draft.nutrition_basis_conflict ? (
+          <Text style={styles.ocrMetaText}>缺少每份重量，僅採用每 100 g 標示。</Text>
+        ) : null}
+        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: confirmed, disabled: actionsDisabled || draft.nutrition_basis_conflict }}
+          disabled={actionsDisabled || draft.nutrition_basis_conflict} onPress={onToggleConfirmed} style={styles.ocrConfirm}>
+          <Ionicons name={confirmed ? 'checkbox-outline' : 'square-outline'} size={20} color={Palette.accent.green} />
+          <Text style={styles.ocrNameLabel}>已核對包裝營養標示</Text>
+        </Pressable>
+        <SecondaryButton label="儲存成自訂食品" onPress={onSaveCustomFood}
+          disabled={actionsDisabled || !confirmed || draft.nutrition_basis_conflict ||
+            (!hasPer100Values && (!hasServingValues || draft.nutrition_basis_unverifiable))}
+          icon={<Ionicons name="bookmark-outline" size={15} color={Palette.accent.green} />} />
+        {quickAddIssue ? <Text style={styles.ocrNameErrorText}>{quickAddIssue}</Text> : (
+          <View style={styles.ocrNameField}>
+            <Text style={styles.ocrNameLabel}>實際食用重量（g）</Text>
+            {presets.length > 0 ? <View style={styles.ocrPortionPresets}>
+              {presets.map(({ label, value }) => <Pressable key={label} accessibilityRole="button"
+                accessibilityState={{ selected: portion === value }} disabled={actionsDisabled}
+                onPress={() => onPortionChange(value)}
+                style={[styles.ocrPortionPreset, portion === value && styles.ocrPortionSelected]}>
+                <Text style={styles.ocrNameLabel}>{label} · {value} g</Text>
+              </Pressable>)}
+            </View> : null}
+            {packageConflict ? <Text style={styles.ocrNameErrorText}>整包淨重與份數標示不一致</Text> : null}
+            <View style={styles.ocrPortionControls}>
+              <Pressable accessibilityRole="button" accessibilityLabel="減少重量 5 g" style={styles.ocrPortionStep}
+                disabled={actionsDisabled || stepOCRPortion(portion, -1) === portion}
+                onPress={() => onPortionChange(stepOCRPortion(portion, -1))}>
+                <Ionicons name="remove" size={20} color={Palette.text.primary} />
+              </Pressable>
+              <TextInput value={portion} onChangeText={onPortionChange} editable={!actionsDisabled} maxLength={8}
+                accessibilityLabel="實際食用重量（g）" inputMode="decimal" keyboardType="decimal-pad"
+                style={[styles.ocrNameInput, styles.ocrPortionInput]} />
+              <Pressable accessibilityRole="button" accessibilityLabel="增加重量 5 g" style={styles.ocrPortionStep}
+                disabled={actionsDisabled || stepOCRPortion(portion, 1) === portion}
+                onPress={() => onPortionChange(stepOCRPortion(portion, 1))}>
+                <Ionicons name="add" size={20} color={Palette.text.primary} />
+              </Pressable>
+            </View>
+          </View>
+        )}
         <PrimaryButton
-          label={submitting ? '儲存中' : '直接加入今日紀錄'}
+          label={submitting ? '儲存中' : '加入今日紀錄'}
           onPress={onQuickAdd}
-          disabled={actionsDisabled}
+          disabled={actionsDisabled || !confirmed || !!quickAddIssue || parseOCRPortion(portion) === null}
           icon={submitting
             ? <ActivityIndicator size="small" color={Palette.text.inverse} />
             : <Ionicons name="add-circle-outline" size={18} color={Palette.text.inverse} />}
@@ -270,6 +342,11 @@ export default function ScannerScreen() {
   const [manualSearching, setManualSearching] = useState(false);
   const [rejectedDetections, setRejectedDetections] = useState<RejectedDetection[]>([]);
   const [identityScanContext, setIdentityScanContext] = useState<NutritionScanContext | null>(null);
+  const [labelPreviewState, setLabelPreviewState] = useState<{
+    reference: ScannerServerScanReference;
+    accessToken: typeof accessToken;
+    previews: ManufacturerLabelPreview[];
+  } | null>(null);
   const [identityNameDrafts, setIdentityNameDrafts] = useState<Record<string, string>>({});
   const [identityRequestErrors, setIdentityRequestErrors] = useState<Record<string, string>>({});
   const [pendingIdentityRequests, setPendingIdentityRequests] = useState<
@@ -281,6 +358,8 @@ export default function ScannerScreen() {
   const [mealWarnings, setMealWarnings] = useState<string[]>([]);
   const [ocrQuerying, setOcrQuerying] = useState(false);
   const [ocrDraft, setOcrDraft] = useState<OCRDraft | null>(null);
+  const [ocrConfirmed, setOcrConfirmed] = useState(false);
+  const [ocrPortion, setOcrPortion] = useState('');
   const [ocrNameError, setOcrNameError] = useState<string | null>(null);
   const [menuChecking, setMenuChecking] = useState(false);
   const [menuCheck, setMenuCheck] = useState<MenuPhotoCheckResponse | null>(null);
@@ -316,6 +395,9 @@ export default function ScannerScreen() {
   const sourceBadge = formatScannerSourceBadge(results.map((food) => food.source), rejectedDetections.length);
   const resultTitle = formatScannerResultTitle(results.length, rejectedDetections.length);
   const serverScanReference = scanResult.serverScanReference;
+  const labelPreviews = labelPreviewState && labelPreviewState.reference === serverScanReference &&
+    labelPreviewState.reference.ownerUserId === user.userId && labelPreviewState.reference.apiBaseUrl === apiBaseUrl &&
+    labelPreviewState.accessToken === accessToken ? labelPreviewState.previews : [];
   const activeIdentityContext = identityScanContext && serverScanReference &&
     identityScanContext.scan_id === serverScanReference.scan_id &&
     identityScanContext.scan_revision === serverScanReference.scan_revision
@@ -337,6 +419,7 @@ export default function ScannerScreen() {
   const fdcPreviewEnabled = process.env.EXPO_PUBLIC_FDC_PROFILE_PREVIEW_ENABLED?.trim().toLowerCase() === 'true';
   const pendingNutrition = describeScannerPendingNutrition(rejectedDetections, fdcCandidateSnapshot,
     completedFdcConfirmation, fdcConfirmationEnabled, fdcPreviewEnabled);
+  const labelPreviewIds = new Set(labelPreviews.map((preview) => preview.id));
   const totalCal = results.reduce((sum, f) => sum + f.nutrition.calories, 0);
   const totalSodium = results.reduce((sum, f) => sum + f.nutrition.sodium, 0);
   const userPendingRecords = pendingRecordQueue.filter((item) => item.userId === user.userId);
@@ -352,6 +435,7 @@ export default function ScannerScreen() {
 
   const clearScanAndInvalidate = () => {
     scanAttemptRef.current += 1;
+    setLabelPreviewState(null);
     setFdcConfirmationDisplay(null);
     setCandidateFailure(null);
     setIdentityScanContext(null);
@@ -611,6 +695,12 @@ export default function ScannerScreen() {
       const { scanResult: current } = useStore.getState();
       const contextIds = new Set(context.items.map((item) => item.item_id));
       const existingIds = new Set(current.detections.map((food) => food.id));
+      const eligiblePreviewIds = new Set([...contextIds].filter((id) => !existingIds.has(id)));
+      if (current.serverScanReference && current.serverScanReference.scan_id === context.scan_id &&
+          current.serverScanReference.scan_revision === context.scan_revision) {
+        setLabelPreviewState({ reference: current.serverScanReference, accessToken,
+          previews: getManufacturerLabelPreviews(response, eligiblePreviewIds) });
+      }
       const additions = mergeNutritionEnrichmentResult([], response).filter((food) => {
         if (!contextIds.has(food.id) || existingIds.has(food.id)) return false;
         existingIds.add(food.id);
@@ -695,6 +785,7 @@ export default function ScannerScreen() {
   };
 
   const analyzeImage = async (imageBase64: string) => {
+    setLabelPreviewState(null);
     setFdcConfirmationDisplay(null);
     setCandidateFailure(null);
     setIdentityScanContext(null);
@@ -764,8 +855,10 @@ export default function ScannerScreen() {
       const draft = await runNutritionLabelOCR({ apiBaseUrl, imageBase64: asset.base64, auth: { accessToken } });
       ocrSubmissionKeyRef.current = buildSubmissionKey('nutrition-label');
       setOcrDraft(draft);
+      setOcrConfirmed(false);
+      setOcrPortion(getOCRPortionPresets(draft).initial);
       setOcrNameError(null);
-      setRecordFeedback({ tone: 'success', title: '營養標示已辨識', message: '你可以直接儲存成自訂食品，之後就不必重複輸入。' });
+      setRecordFeedback(null);
     } catch (error: any) {
       setRecordFeedback({ tone: 'error', title: '營養標示辨識失敗', message: error?.message || '請確認後端已設定 Gemini API key' });
     } finally {
@@ -1097,7 +1190,7 @@ export default function ScannerScreen() {
 
   const handleSaveCustomFood = async () => {
     const draft = getValidatedOCRDraft();
-    if (!draft) return;
+    if (!draft || !ocrConfirmed) return;
     try {
       const data = await saveCustomFood({ apiBaseUrl, userId: user.userId, draft, auth: { accessToken } });
       setRecordFeedback({ tone: 'success', title: '自訂食品已儲存', message: `${data.food?.name_zh || draft.product_name} 之後可直接搜尋使用` });
@@ -1108,9 +1201,15 @@ export default function ScannerScreen() {
 
   const handleQuickAddOCRFood = async () => {
     const draft = getValidatedOCRDraft();
-    if (!draft) return;
+    if (!draft || !ocrConfirmed) return;
     const submissionKey = ocrSubmissionKeyRef.current;
-    const food = { ...buildOCRDetectedFood(draft), id: submissionKey };
+    let food: DetectedFood;
+    try {
+      food = { ...buildOCRDetectedFood(draft, parseOCRPortion(ocrPortion)), id: submissionKey };
+    } catch (error) {
+      setRecordFeedback({ tone: 'error', title: '未加入飲食紀錄', message: error instanceof Error ? error.message : '請核對營養標示與食用重量' });
+      return;
+    }
     await submitRecord({
       foods: [food],
       source: 'nutrition-label',
@@ -1217,7 +1316,8 @@ export default function ScannerScreen() {
       </View>
       <ScannerPendingFoods
         rs={rs}
-        items={pendingNutrition.items}
+        items={pendingNutrition.items.map((item) => item.item_id && labelPreviewIds.has(item.item_id)
+          ? { ...item, reason: '已找到可核對的廠商營養標示，僅供預覽，未計入合計。', search_hints: [] } : item)}
         identityItems={confirmableIdentityItems}
         identityEnabled={identityConfirmationEnabled}
         identityDrafts={identityNameDrafts}
@@ -1240,6 +1340,7 @@ export default function ScannerScreen() {
           ) : null}
         </View>
       ) : null}
+      <ManufacturerLabelPreviews previews={labelPreviews} />
       <ScannerResults
         hasUnmatchedFoods={rejectedDetections.length > 0}
         rs={rs}
@@ -1278,6 +1379,10 @@ export default function ScannerScreen() {
           onQuickAdd={handleQuickAddOCRFood}
           submitting={ocrRecordSubmitting}
           actionsDisabled={recordActionsDisabled}
+          confirmed={ocrConfirmed}
+          onToggleConfirmed={() => setOcrConfirmed((value) => !value)}
+          portion={ocrPortion}
+          onPortionChange={setOcrPortion}
         />
       ) : null}
       <ManualResultsList
@@ -1468,6 +1573,14 @@ const styles = StyleSheet.create({
   ocrNameErrorText: { ...Typography.small, color: Palette.status.error, flex: 1 },
   controlDisabled: { opacity: 0.56 },
   ocrMetaText: { ...Typography.caption, color: Palette.text.tertiary, marginBottom: Spacing.md },
+  ocrBasis: { marginBottom: Spacing.md },
+  ocrConfirm: { flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: Spacing.sm },
+  ocrPortionPresets: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
+  ocrPortionPreset: { minHeight: 44, justifyContent: 'center', paddingHorizontal: Spacing.sm, borderRadius: Radius.sm, backgroundColor: Palette.bg.elevated },
+  ocrPortionSelected: { borderWidth: 1, borderColor: Palette.accent.green },
+  ocrPortionControls: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  ocrPortionStep: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: Palette.bg.elevated, borderRadius: Radius.sm },
+  ocrPortionInput: { flex: 1, minWidth: 0 },
   nutritionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   nutritionItem: { flex: 1, minWidth: '30%', backgroundColor: Palette.bg.elevated, borderRadius: Radius.md, padding: Spacing.sm },
   nutritionLabel: { ...Typography.small, color: Palette.text.tertiary },

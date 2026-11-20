@@ -1,0 +1,57 @@
+{
+  "date": "2026-11-20",
+  "branch": "v1.0.3",
+  "scope": "Authenticated local vision route through Flask test client with SQLite :memory: and the configured relay",
+  "model": "configured vision model (private relay identifier omitted)",
+  "model_calls": 3,
+  "retries": 0,
+  "live_fdc_calls": 0,
+  "tavily_calls": 0,
+  "production_changed": false,
+  "cases": [
+    {
+      "case": "Seawoods packaged product",
+      "photo_sha256": "93888e3104d524f5e929279da302ccc5c88cab2f2f843cc747828c59f4e642d8",
+      "http_status": 200,
+      "elapsed_seconds": 14.21,
+      "name_zh": "堅果黑糖沙琪瑪",
+      "printed_net_weight_g": 320,
+      "raw_weight_basis": "package_label",
+      "raw_weight_g": null,
+      "weight_confidence": 0,
+      "persisted_weight_g": null,
+      "brand": null,
+      "preparation_method": "unknown",
+      "identity_confirmation_required": true,
+      "local_lookup": "no_local_mapping",
+      "counted_items": 0
+    },
+    {
+      "case": "Mixed bento",
+      "photo_sha256": "1ba15472326f83205c3d2b7f5279808491376021c25622205f3fa33c8d6170ea",
+      "http_status": 502,
+      "test_relay_timeout_seconds": 35,
+      "elapsed_seconds": 36.03,
+      "outcome": "relay_timeout_no_scan"
+    },
+    {
+      "case": "Visible apple",
+      "photo_sha256": "80a7e116a21d460e9132a6764114504667b9594dfb30915e167027ab5684fe43",
+      "http_status": 200,
+      "elapsed_seconds": 8.48,
+      "name_zh": "蘋果",
+      "raw_weight_basis": "visible_portion",
+      "raw_weight_g": 180,
+      "weight_confidence": 0.55,
+      "persisted_weight_g": 180,
+      "identity_confirmation_required": false,
+      "local_lookup": "no_local_mapping",
+      "counted_items": 0
+    }
+  ],
+  "limitations": [
+    "This verifies weight-basis classification on two successful samples, not weight accuracy or stability.",
+    "The mixed meal timed out under the test budget; no accuracy result is available for that photo.",
+    "No same-scan live third-layer positive acceptance was attempted."
+  ]
+}

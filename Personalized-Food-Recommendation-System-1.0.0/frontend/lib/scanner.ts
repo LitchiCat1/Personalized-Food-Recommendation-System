@@ -181,20 +181,24 @@ export function hasUserConfirmableIdentity(
 export type OCRDraft = {
   product_name?: string;
   brand?: string;
-  serving_size_g?: number;
-  servings_per_container?: number;
+  serving_size_g?: number | null;
+  servings_per_container?: number | null;
+  package_net_weight_g?: number | null;
   nutrition_per_serving?: {
-    calories?: number;
-    protein?: number;
-    carbs?: number;
-    fat?: number;
-    sodium?: number;
-    fiber?: number;
-    sugar?: number;
-    saturated_fat?: number;
-    trans_fat?: number;
+    calories?: number | null;
+    protein?: number | null;
+    carbs?: number | null;
+    fat?: number | null;
+    sodium?: number | null;
+    fiber?: number | null;
+    sugar?: number | null;
+    saturated_fat?: number | null;
+    trans_fat?: number | null;
   };
   nutrition_per_100g?: Record<string, number | null>;
+  nutrition_per_100g_source?: 'label' | 'calculated' | null;
+  nutrition_basis_conflict?: boolean;
+  nutrition_basis_unverifiable?: boolean;
   ocr_text?: string;
 };
 
@@ -402,8 +406,13 @@ function enrichedFood(item: any, existing?: DetectedFood): DetectedFood | null {
 export function mergeNutritionEnrichmentResult(
   detections: DetectedFood[], response: NutritionEnrichmentResponse | null,
 ): DetectedFood[] {
-  const items = response?.result?.items;
-  if (!Array.isArray(items)) return detections;
+  const responseItems = response?.result?.items;
+  if (!Array.isArray(responseItems)) return detections;
+  // Reviewed manufacturer labels are preview-only, even when a portion is present.
+  const items = responseItems.filter((item) => {
+    const details = (item?.nutrition_profile as { source_details?: unknown } | undefined)?.source_details;
+    return !(item?.origin === 'web' && details && Object.prototype.hasOwnProperty.call(details, 'manufacturer_label'));
+  });
   const existingIds = new Set(detections.map((food) => food.id));
   const merged = detections.map((food) => {
     const item = items.find((candidate) => candidate && typeof candidate === 'object' && candidate.item_id === food.id);
@@ -637,6 +646,10 @@ export async function runNutritionLabelOCR(params: {
   const draft = suggestedFood || data;
   return {
     ...draft,
+    nutrition_per_100g_source: draft.nutrition_per_100g_source ?? data.nutrition_per_100g_source,
+    package_net_weight_g: draft.package_net_weight_g ?? data.package_net_weight_g,
+    nutrition_basis_conflict: draft.nutrition_basis_conflict === true || data.nutrition_basis_conflict === true,
+    nutrition_basis_unverifiable: draft.nutrition_basis_unverifiable === true || data.nutrition_basis_unverifiable === true,
     product_name: normalizeFoodName(
       suggestedFood?.name_zh || suggestedFood?.product_name || data.product_name
     ) || DEFAULT_OCR_FOOD_NAME,
@@ -649,6 +662,7 @@ export async function saveCustomFood(params: {
   draft: OCRDraft;
   auth?: ApiAuth;
 }) {
+  if (params.draft.nutrition_basis_conflict) throw new Error(OCR_BASIS_CONFLICT_MESSAGE);
   const foodName = normalizeFoodName(params.draft.product_name);
   if (!foodName) {
     throw new Error(FOOD_NAME_REQUIRED_MESSAGE);
@@ -662,7 +676,7 @@ export async function saveCustomFood(params: {
       brand: params.draft.brand,
       serving_size_g: params.draft.serving_size_g,
       servings_per_container: params.draft.servings_per_container,
-      nutrition_per_serving: params.draft.nutrition_per_serving,
+      nutrition_per_serving: params.draft.nutrition_basis_unverifiable ? undefined : params.draft.nutrition_per_serving,
       nutrition_per_100g: params.draft.nutrition_per_100g,
       ocr_text: params.draft.ocr_text,
       source: 'nutrition-label-ocr',
@@ -676,37 +690,100 @@ export async function saveCustomFood(params: {
   return data;
 }
 
-export function buildOCRDetectedFood(draft: OCRDraft): DetectedFood {
+const OCR_NUTRIENTS = ['calories', 'protein', 'carbs', 'fat', 'sodium', 'fiber', 'sugar', 'saturated_fat', 'trans_fat'] as const;
+type OCRNutrient = typeof OCR_NUTRIENTS[number];
+export const OCR_BASIS_CONFLICT_MESSAGE = '每份與每 100 g 的讀值不一致，請核對標示後重新辨識。';
+const OCR_INCOMPLETE_MESSAGE = '營養欄位不完整或缺少換算基準，無法直接加入紀錄。';
+const OCR_PORTION_MESSAGE = '請輸入實際食用重量（0–2000 g，不含 0）。';
+
+export function parseOCRPortion(value: string): number | null {
+  const input = value.trim();
+  if (!/^\d+(?:\.\d{1,2})?$/.test(input)) return null;
+  const grams = Number(input);
+  return grams > 0 && grams <= 2000 ? grams : null;
+}
+
+export function getOCRPortionPresets(draft: OCRDraft) {
+  const positive = (value: unknown) => finite(value) && value > 0 ? value : null;
+  const text = (value: number | null) => {
+    if (!finite(value) || value <= 0 || value > 2000) return '';
+    const rounded = String(Number(value.toFixed(2)));
+    return parseOCRPortion(rounded) === null ? '' : rounded;
+  };
+  const serving = positive(draft.serving_size_g);
+  const count = positive(draft.servings_per_container);
+  const net = positive(draft.package_net_weight_g);
+  const inferred = serving !== null && count !== null && count >= 1 ? serving * count : null;
+  const packageConflict = net !== null && ((serving !== null && net < serving) ||
+    (inferred !== null && Math.abs(net - inferred) > 0.010000001));
+  const oneServing = text(serving);
+  const printedPer100g = draft.nutrition_per_100g_source === 'label' &&
+    canUseOCRNutrients(draft.nutrition_per_100g);
+  const wholePackage = !packageConflict && (oneServing || printedPer100g) ? text(net ?? inferred) : '';
+  return { oneServing, wholePackage, initial: oneServing || wholePackage, packageConflict };
+}
+
+export function stepOCRPortion(value: string, direction: -1 | 1): string {
+  const current = parseOCRPortion(value);
+  if (current === null) return value === '' && direction === 1 ? '5' : value;
+  return String(Number(Math.min(2000, Math.max(0.01, current + direction * 5)).toFixed(2)));
+}
+
+function canUseOCRNutrients(values: Partial<Record<OCRNutrient, number | null>> | undefined): boolean {
+  return OCR_NUTRIENTS.every((key) => {
+    const value = values?.[key];
+    return finite(value) && value >= 0;
+  });
+}
+
+function getOCRRecordBasis(draft: OCRDraft) {
+  if (draft.nutrition_per_100g_source === 'label' && canUseOCRNutrients(draft.nutrition_per_100g)) {
+    return { values: draft.nutrition_per_100g, grams: 100 };
+  }
+  if (!draft.nutrition_basis_unverifiable && finite(draft.serving_size_g) && draft.serving_size_g > 0 &&
+    canUseOCRNutrients(draft.nutrition_per_serving)) {
+    return { values: draft.nutrition_per_serving, grams: draft.serving_size_g };
+  }
+  return null;
+}
+
+export function getOCRQuickAddIssue(draft: OCRDraft): string | null {
+  if (draft.nutrition_basis_conflict) return OCR_BASIS_CONFLICT_MESSAGE;
+  return getOCRRecordBasis(draft) ? null : OCR_INCOMPLETE_MESSAGE;
+}
+
+export function buildOCRDetectedFood(draft: OCRDraft, consumedGrams: number | null): DetectedFood {
   const foodName = normalizeFoodName(draft.product_name);
   if (!foodName) {
     throw new Error(FOOD_NAME_REQUIRED_MESSAGE);
   }
+  if (draft.nutrition_basis_conflict) throw new Error(OCR_BASIS_CONFLICT_MESSAGE);
+  const basis = getOCRRecordBasis(draft);
+  if (!basis) throw new Error(OCR_INCOMPLETE_MESSAGE);
+  if (!finite(consumedGrams) || consumedGrams <= 0 || consumedGrams > 2000) throw new Error(OCR_PORTION_MESSAGE);
+  const nutrition = Object.fromEntries(OCR_NUTRIENTS.map((key) => {
+    const value = basis.values?.[key];
+    if (!finite(value)) throw new Error(OCR_INCOMPLETE_MESSAGE);
+    const scaled = (value / basis.grams) * consumedGrams;
+    if (!finite(scaled)) throw new Error(OCR_INCOMPLETE_MESSAGE);
+    return [key, scaled];
+  })) as Record<OCRNutrient, number>;
   return {
     id: `ocr_${Date.now()}`,
     foodName,
-    confidence: 100,
+    confidence: 80,
     source: 'nutrition-label-ocr',
     needsConfirmation: false,
     boundingBox: { x: 0, y: 0, w: 0, h: 0 },
-    estimatedWeight: draft.serving_size_g || 100,
-    portionRange: { minG: draft.serving_size_g || 100, maxG: draft.serving_size_g || 100, uncertaintyPercent: 0 },
-    portionEstimationMethod: 'nutrition_label_serving_size',
+    estimatedWeight: consumedGrams,
+    portionRange: { minG: consumedGrams, maxG: consumedGrams, uncertaintyPercent: 0 },
+    portionEstimationMethod: 'user_confirmed_weight',
     reliability: {
       level: 'medium',
       score: 0.8,
       reasons: ['使用 Gemini OCR 讀取營養標示', '仍需人工核對包裝文字與每份重量'],
     },
-    nutrition: {
-      calories: Number(draft.nutrition_per_serving?.calories || 0),
-      protein: Number(draft.nutrition_per_serving?.protein || 0),
-      carbs: Number(draft.nutrition_per_serving?.carbs || 0),
-      sugar: Number(draft.nutrition_per_serving?.sugar || 0),
-      fat: Number(draft.nutrition_per_serving?.fat || 0),
-      saturated_fat: Number(draft.nutrition_per_serving?.saturated_fat || 0),
-      trans_fat: Number(draft.nutrition_per_serving?.trans_fat || 0),
-      sodium: Number(draft.nutrition_per_serving?.sodium || 0),
-      fiber: Number(draft.nutrition_per_serving?.fiber || 0),
-    },
+    nutrition,
     gi: 'medium',
     allergens: [],
     warnings: ['營養標示 OCR 結果，建議人工核對後再長期使用'],

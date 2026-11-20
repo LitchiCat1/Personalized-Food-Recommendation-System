@@ -7,16 +7,90 @@ import {
   formatScannerResultTitle,
   formatScannerSourceBadge,
   FOOD_NAME_REQUIRED_MESSAGE,
+  getOCRQuickAddIssue,
+  getOCRPortionPresets,
   hasReviewableNutritionMiss,
   hasUserConfirmableIdentity,
   manualSearchFood,
   normalizeFoodName,
+  OCR_BASIS_CONFLICT_MESSAGE,
+  parseOCRPortion,
+  stepOCRPortion,
   runNutritionLabelOCR,
   runPrediction,
   mergeNutritionEnrichmentResult,
   saveRecord,
+  saveCustomFood,
 } from '../lib/scanner.ts';
 import { getAutoMealType, normalizeMealType, perMealBudget } from '../lib/meal.ts';
+import { getManufacturerLabelPreviews } from '../lib/scanner-manufacturer-label.ts';
+
+function labelFixture() {
+  const profile = {
+    has_required_point_values: true, basis: 'per_serving', basis_weight_g: 30,
+    per_100g: { calories: 500, protein: 7, fat: 24, carbs: 64, sugar: 0 },
+    upper_bounds_per_100g: { sodium: 3 },
+    source_details: { source_url: 'https://maker.example/label',
+      manufacturer_label: { publisher: '測試廠商', product_name: '測試食品・原味' } },
+  };
+  const item = { origin: 'web', status: 'needs_portion', item_id: 'scan:1',
+    original_visual_name: '測試食品', nutrition_profile: profile };
+  return { profile, item, response: { status: 'partial', result: { items: [item] } } };
+}
+
+test('manufacturer preview attributes normalized label values without needing a portion', () => {
+  const { response, item } = labelFixture();
+  response.result.items.push(item);
+  const [preview, duplicate] = getManufacturerLabelPreviews(response, new Set(['scan:1']));
+  assert.equal(duplicate, undefined);
+  assert.equal(preview.publisher, '測試廠商');
+  assert.equal(preview.visualName, '測試食品');
+  assert.equal(preview.product, '測試食品・原味');
+  assert.equal(preview.url, 'https://maker.example/label');
+  assert.equal(preview.basis, 'per_serving');
+  assert.equal(preview.basisWeight, 30);
+  assert.equal(preview.nutrients.find(({ key }) => key === 'fiber').value, null);
+  assert.equal(preview.nutrients.find(({ key }) => key === 'sugar').value, 0);
+  assert.equal(preview.nutrients.find(({ key }) => key === 'sodium').bound, 3);
+});
+
+test('manufacturer preview rejects stale items, unsafe links and unverified core values', () => {
+  const { profile, item, response } = labelFixture();
+  const eligible = new Set(['scan:1']);
+  assert.deepEqual(getManufacturerLabelPreviews(response, new Set(['scan:2'])), []);
+  for (const url of ['', 'javascript:alert(1)', 'https://user@maker.example/label', 'http://maker.example/label']) {
+    profile.source_details.source_url = url;
+    assert.deepEqual(getManufacturerLabelPreviews(response, eligible), []);
+  }
+  profile.source_details.source_url = 'https://maker.example/label';
+  profile.per_100g.protein = '7.';
+  assert.deepEqual(getManufacturerLabelPreviews(response, eligible), []);
+  profile.per_100g.protein = 7;
+  item.origin = 'local';
+  assert.deepEqual(getManufacturerLabelPreviews(response, eligible), []);
+});
+
+test('structured label preview shows the dataset and exact trace code together', () => {
+  const { profile, response } = labelFixture();
+  const label = profile.source_details.manufacturer_label;
+  label.dataset_name = '食藥署食品追溯追蹤系統消費者查詢資料集';
+  assert.deepEqual(getManufacturerLabelPreviews(response, new Set(['scan:1'])), []);
+  label.trace_code = 'B-112981393-00000-5-09040000-0000000001';
+  const [preview] = getManufacturerLabelPreviews(response, new Set(['scan:1']));
+  assert.equal(preview.datasetName, label.dataset_name);
+  assert.equal(preview.traceCode, label.trace_code);
+});
+
+test('manufacturer previews never become recordable detections even with a complete portion', () => {
+  const { item, response } = labelFixture();
+  item.status = 'accepted';
+  item.portion = { weight_g: 30, values: { calories: 150, protein: 2, carbs: 19, fat: 7, sodium: 113, fiber: 2 } };
+  const local = { id: 'scan:1', source: 'TFDA' };
+  assert.deepEqual(mergeNutritionEnrichmentResult([], response), []);
+  assert.equal(mergeNutritionEnrichmentResult([local], response)[0], local);
+  item.nutrition_profile.source_details.manufacturer_label = null;
+  assert.deepEqual(mergeNutritionEnrichmentResult([], response), []);
+});
 
 test('scanner summary distinguishes matched nutrition from pending foods', () => {
   assert.equal(formatScannerResultTitle(2, 5), '已配對 2 項營養資料');
@@ -308,15 +382,121 @@ test('enrichment with unknown weight stays unresolved and never assumes 100g', (
   assert.deepEqual(invalidPortion, []);
 });
 
-test('normalizes the final OCR food name and carries it into detected food', () => {
+const ocrNutrition = { calories: 180, protein: 8.5, carbs: 22, sugar: 0, fat: 6,
+  saturated_fat: 2, trans_fat: 0, sodium: 210, fiber: 3 };
+
+test('normalizes the final OCR food name and scales only the actual intake', () => {
   assert.equal(normalizeFoodName('  修改後豆漿  '), '修改後豆漿');
   assert.equal(normalizeFoodName('   '), '');
-  assert.equal(buildOCRDetectedFood({
+  const food = buildOCRDetectedFood({
     product_name: '  修改後豆漿  ',
     serving_size_g: 250,
-    nutrition_per_serving: { calories: 180, protein: 8.5, carbs: 22, fat: 6, sodium: 210, fiber: 3 },
-  }).foodName, '修改後豆漿');
+    nutrition_per_serving: ocrNutrition,
+  }, 125);
+  assert.equal(food.foodName, '修改後豆漿');
+  assert.equal(food.estimatedWeight, 125);
+  assert.equal(food.nutrition.calories, 90);
+  assert.equal(food.nutrition.trans_fat, 0);
   assert.throws(() => buildOCRDetectedFood({ product_name: '   ' }), new RegExp(FOOD_NAME_REQUIRED_MESSAGE));
+});
+
+test('OCR quick-add rejects missing serving weight, unknown nutrients, and missing intake', () => {
+  const draft = { product_name: '豆漿', serving_size_g: 250, nutrition_per_serving: ocrNutrition };
+  assert.equal(getOCRQuickAddIssue(draft), null);
+  assert.throws(() => buildOCRDetectedFood(draft, null), /實際食用重量/);
+  for (const invalid of [{ ...draft, serving_size_g: null }, { ...draft,
+    nutrition_per_serving: { ...ocrNutrition, fiber: null } }]) {
+    assert.match(getOCRQuickAddIssue(invalid), /營養欄位不完整/);
+    assert.throws(() => buildOCRDetectedFood(invalid, 100), /營養欄位不完整/);
+  }
+  for (const input of ['', '0', '1e2', '-1', '2001', '2.345']) assert.equal(parseOCRPortion(input), null);
+  assert.equal(parseOCRPortion('125.5'), 125.5);
+});
+
+test('OCR uses a printed per-100g column even if serving weight was not printed', () => {
+  const food = buildOCRDetectedFood({ product_name: '豆漿', serving_size_g: null,
+    nutrition_per_100g_source: 'label', nutrition_per_100g: ocrNutrition }, 50);
+  assert.equal(food.estimatedWeight, 50);
+  assert.equal(food.nutrition.calories, 90);
+});
+
+test('OCR portion presets prefer one serving and never prefill a conflicting package', () => {
+  const draft = { serving_size_g: 40, servings_per_container: 8, package_net_weight_g: 320 };
+  assert.deepEqual(getOCRPortionPresets(draft), {
+    oneServing: '40', wholePackage: '320', initial: '40', packageConflict: false,
+  });
+  assert.equal(getOCRPortionPresets({ ...draft, package_net_weight_g: null }).wholePackage, '320');
+  assert.deepEqual(getOCRPortionPresets({ ...draft, package_net_weight_g: 300 }), {
+    oneServing: '40', wholePackage: '', initial: '40', packageConflict: true,
+  });
+  assert.equal(getOCRPortionPresets({ ...draft, package_net_weight_g: 30, servings_per_container: null }).wholePackage, '');
+  assert.equal(getOCRPortionPresets({ serving_size_g: 33.3, servings_per_container: 3 }).wholePackage, '99.9');
+  assert.equal(getOCRPortionPresets({ serving_size_g: 300, servings_per_container: 10 }).wholePackage, '');
+});
+
+test('OCR package-only prefill requires a usable printed per-100g basis', () => {
+  const draft = { package_net_weight_g: 320, nutrition_per_100g: ocrNutrition };
+  assert.equal(getOCRPortionPresets(draft).initial, '');
+  assert.equal(getOCRPortionPresets({ ...draft, nutrition_per_100g_source: 'calculated' }).initial, '');
+  assert.equal(getOCRPortionPresets({ ...draft, nutrition_per_100g_source: 'label' }).initial, '320');
+  assert.equal(getOCRPortionPresets({}).initial, '');
+});
+
+test('OCR weight buttons adjust editable grams without stepping out of the allowed range', () => {
+  assert.equal(stepOCRPortion('40', -1), '35');
+  assert.equal(stepOCRPortion('40', 1), '45');
+  assert.equal(stepOCRPortion('1999.9', 1), '2000');
+  assert.equal(stepOCRPortion('2', -1), '0.01');
+  assert.equal(stepOCRPortion('oops', 1), 'oops');
+});
+
+test('OCR basis conflict survives the suggested profile and blocks both save paths', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => ({ ok: true, json: async () => ({
+      nutrition_basis_conflict: true, nutrition_per_100g_source: 'label',
+      suggested_custom_food: { name_zh: '豆漿', serving_size_g: 250, nutrition_per_serving: ocrNutrition },
+    }) });
+    const draft = await runNutritionLabelOCR({ apiBaseUrl: 'https://api.example.test', imageBase64: 'aW1hZ2U=' });
+    assert.equal(draft.nutrition_per_100g_source, 'label');
+    assert.equal(getOCRQuickAddIssue(draft), OCR_BASIS_CONFLICT_MESSAGE);
+    assert.throws(() => buildOCRDetectedFood(draft, 100), /讀值不一致/);
+    globalThis.fetch = () => assert.fail('A conflicted label must not reach storage');
+    await assert.rejects(saveCustomFood({ apiBaseUrl: 'https://api.example.test', userId: 'u', draft }), /讀值不一致/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('OCR with unverifiable bases uses only the printed per-100g column for records and custom foods', async () => {
+  const originalFetch = globalThis.fetch;
+  const printed = { ...ocrNutrition, calories: 466.2, trans_fat: 0.04 };
+  try {
+    globalThis.fetch = async () => ({ ok: true, json: async () => ({
+      nutrition_basis_conflict: false, nutrition_basis_unverifiable: true, nutrition_per_100g_source: 'label',
+      suggested_custom_food: { name_zh: '測試包裝', package_net_weight_g: 320,
+        nutrition_per_serving: { calories: 180 }, nutrition_per_100g: printed },
+    }) });
+    const params = { apiBaseUrl: 'https://api.example.test', userId: 'u' };
+    const draft = await runNutritionLabelOCR({ ...params, imageBase64: 'aW1hZ2U=' });
+    assert.equal(draft.nutrition_basis_unverifiable, true);
+    assert.equal(getOCRPortionPresets(draft).initial, '320');
+    assert.equal(getOCRQuickAddIssue(draft), null);
+    const food = buildOCRDetectedFood(draft, 50);
+    assert.equal(food.nutrition.calories, 233.1);
+    assert.equal(food.nutrition.trans_fat, 0.02);
+    assert.match(getOCRQuickAddIssue({ ...draft, nutrition_per_100g: { calories: 466.2 },
+      serving_size_g: 40, nutrition_per_serving: ocrNutrition }), /營養欄位不完整/);
+    globalThis.fetch = async (_url, init) => {
+      const body = JSON.parse(init.body);
+      assert.equal(Object.hasOwn(body, 'nutrition_per_serving'), false);
+      assert.deepEqual(body.nutrition_per_100g, printed);
+      return { ok: true, json: async () => ({}) };
+    };
+    await saveCustomFood({ ...params, draft });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('saves the user final trimmed name in the existing foods schema', async () => {

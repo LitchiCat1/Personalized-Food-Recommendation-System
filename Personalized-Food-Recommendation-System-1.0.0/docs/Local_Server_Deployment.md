@@ -11,12 +11,7 @@
 - SQLite 預設位置：`%LOCALAPPDATA%\NutriLens\nutrilens.db`。
 - 自訂資料庫位置：在 `backend/.env.local` 設定 `DATABASE_PATH`，建議使用專案外的完整路徑。
 - 備份與日誌：資料庫旁的 `backups`、`logs\backend.log`。
-- 本機設定：`backend/.env.local`，不會提交至 Git。
-- AI 設定：專案根目錄 `key.txt`，不會提交至 Git。
-- USDA FoodData Central API key（選填）：在 `backend/.env.local` 設定
-  `USDA_FDC_API_KEY=...`，只由後端讀取；用於已審查來源的確認／預覽及隔離 API 測試，
-  尚未啟用自動網路補全。現有171688限定發布見下文。根目錄 `USDA KEY.txt` 不會被程式自動讀取，
-  也不應放進前端、Expo 變數、提示詞或日誌。未設定時仍使用內附 USDA FNDDS 快照。
+- 本機設定與私有 API 金鑰集中在 `backend/.env.local`。GitHub 提供 `backend/.env.local.example` 供組員建立各自的設定。
 
 帳號驗證預設開啟。請先用本機網址註冊自己的帳號；`OPEN_SIGNUP=false` 且未設定
 `SIGNUP_CODE` 時，外部網址只能登入既有帳號，本機仍能註冊。店家搜尋與網頁地圖需
@@ -25,12 +20,16 @@
 ## 第一次架設
 
 1. 安裝 Python、Node.js 與 Tailscale，登入自己的 Tailscale 帳號。
-2. 在包含 `backend`、`frontend` 的專案根目錄執行 `python -m pip install -r backend/requirements.txt`
-   與 `npm --prefix frontend ci`。
-3. 將 `backend/.env.local.example` 複製為 `backend/.env.local`，填入本機設定；將私下取得的
-   完整 `key.txt` 放在專案根目錄，內容包含 Base URL、指定模型 ID 與金鑰。若要使用
-   USDA FoodData Central API client，另外在 `backend/.env.local` 填入
-   `USDA_FDC_API_KEY`；不要把 `USDA KEY.txt` 改名或放到前端讓它讀取。
+2. 從 GitHub 選 `v1.0.3` **分支**下載或執行下列指令。進入包含 `backend`、`frontend` 的內層資料夾，再安裝依賴。
+
+   ```powershell
+   git clone --branch v1.0.3 --single-branch https://github.com/LitchiCat1/Personalized-Food-Recommendation-System.git
+   Set-Location Personalized-Food-Recommendation-System\Personalized-Food-Recommendation-System-1.0.0
+   python -m pip install -r backend/requirements.txt
+   npm --prefix frontend ci
+   ```
+
+3. 將 `backend/.env.local.example` 複製為 `backend/.env.local`，依下方說明填入各自的金鑰。
 4. 執行 `npm --prefix frontend run build:local` 打包網站。
 5. 在 Windows 工作排程器建立名稱完全相同的 `NutriLens Backend` 工作，使用執行後端的
    Windows 帳號並設定登入時觸發。程式填入該電腦 `pythonw.exe` 的完整路徑，引數填入
@@ -45,6 +44,21 @@
 Procfile 已移除。既有外層 BAT／排程／Funnel 是正式入口，GitHub 只作備份與 CI。
 從不同 Windows 啟動環境執行後端時，請參考 README 的 AppData 導向說明。
 
+## API 金鑰設定
+
+在 `backend/.env.local` 依使用的功能填寫下列欄位，每位組員使用自己取得或專案私下分配的金鑰。GitHub 只提交設定範本。這份本機設定請存為 UTF-8。
+
+| 功能 | 設定欄位 | 使用方式 |
+| --- | --- | --- |
+| AI 中轉站 | `AI_BASE_URL`、`AI_MODEL`、`AI_API_KEYS` | 三個欄位一起填寫。多把金鑰在同一行用逗號分隔。模型需支援要使用的輸入，例如餐點照片與營養標示影像。 |
+| Google 店家搜尋 | `GOOGLE_PLACES_API_KEY` | 後端使用。 |
+| Google 網頁地圖 | `GOOGLE_MAPS_BROWSER_KEY` | 可放在同一設定檔，但 Web 打包會公開此欄位。另建只允許 Maps JavaScript API 與部署網址的瀏覽器金鑰。 |
+| USDA FoodData Central | `USDA_FDC_API_KEY` | 供線上 FDC 使用。已審查來源預覽仍需要核准來源及對應開關。內附 FNDDS 快照不需要金鑰。 |
+| Tavily | `TAVILY_API_KEY` | 供後端第三層使用。新增金鑰後，仍按企劃書的來源審核與放行條件才能開啟補全。 |
+| 直連 AI 供應商 | `GEMINI_API_KEYS`、`OPENAI_API_KEY` | 選填。未設定 AI 中轉時供既有直連流程使用。 |
+
+舊部署的 `key.txt` 及 `AI_RELAY_KEYS_FILE` 保留相容性。遷移時將 Base URL、模型 ID 與金鑰填入上述三個中轉欄位，並檢查 Windows 工作排程環境及內層專案根目錄 `.env.local` 有沒有重複值。既有讀取順序是程序環境、根目錄 `.env.local`、`backend/.env.local`。完整的中轉環境變數優先於舊檔。根目錄散放的 `USDA KEY.txt` 等檔案需手動將金鑰移入設定欄位。重啟後先檢查 `/health`，再以實際照片辨識或店家搜尋確認供應商連線。若修改地圖瀏覽器金鑰，也要重跑 `build:local`，讓網站載入新值。
+
 ## PostgreSQL 歷史測試紀錄
 
 PostgreSQL 17 曾用於隔離的 repository integration test；該測試已完成，結果保留於
@@ -55,7 +69,7 @@ PostgreSQL 17 曾用於隔離的 repository integration test；該測試已完�
 
 ## 啟動與停止
 
-GitHub 下載內容的根目錄提供兩個批次檔；本機若多包了一層資料夾，也可放在內層專案的上一層：
+GitHub `v1.0.3` 分支的最外層提供兩個批次檔。後端的工作排程依第一次架設步驟指向內層的 `backend\scripts\run_in_background.py`。
 
 - `start-server.bat`：要求啟動工作排程 `NutriLens Backend`。
 - `stop-server.bat`：要求停止同一個工作排程，保留 SQLite 資料。

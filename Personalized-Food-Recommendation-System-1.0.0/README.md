@@ -82,21 +82,17 @@ Personalized-Food-Recommendation-System/
 
 ```bash
 pip install -r backend/requirements.txt
-cp backend/.env.local.example backend/.env.local   # 填入 GOOGLE_PLACES_API_KEY 等非 AI 設定
-cp key.txt.example key.txt                        # 填入私下取得的 AI 中轉站金鑰
+cp backend/.env.local.example backend/.env.local   # 填入伺服器 API 金鑰
 npm --prefix frontend install
 ```
 
 ### AI 中轉站設定與伺服器交接
 
 所有 AI 功能（食物照片辨識、營養標示 OCR、店家摘要、店家菜單建檔與菜單照片辨識）
-共用 OpenAI Compatible 中轉站與金鑰池。後端會自動讀取本 README 同目錄下的 `key.txt`，
-使用檔案中的 Base URL、指定模型 ID 與所有金鑰，不需要修改程式碼或前端設定。
-
-公開儲存庫只提供不含金鑰的 `key.txt.example`；已填入金鑰的 `key.txt` 由 `.gitignore` 排除。
-架設同學下載後，將專案持有人私下提供的完整 `key.txt` 放到 `key.txt.example` 同目錄，
-覆蓋自己建立的空白 `key.txt`，重新啟動後端即可。只更新後端即可套用，不需要重建前端。
-`key.txt` 每行放一把 `sk-` 開頭的金鑰；Base URL 與模型 ID 請保留範例的標示格式。
+共用 OpenAI Compatible 中轉站與金鑰池。新部署在 `backend/.env.local` 填入 `AI_BASE_URL`、
+`AI_MODEL` 與 `AI_API_KEYS`，並在同一檔案設定需要的後端服務金鑰。組員可使用自己的金鑰，
+或透過私密管道取得個別測試設定。金鑰輪替後重新啟動後端。需要網頁地圖時另外設定有網址限制的
+瀏覽器 Maps 金鑰並重建前端。既有的 `key.txt` 格式保留給舊部署。
 
 同一個後端程序會依序分配空閒金鑰，一把金鑰同時只處理一個 AI 呼叫；全部忙碌時等待空位。
 遇到 429 會依 `Retry-After`（預設 60 秒，最多 300 秒）暫停該金鑰，權限錯誤暫停 300 秒，

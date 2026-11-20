@@ -4,9 +4,9 @@
 
 ## 設定與資料
 
-- `backend/.env.local`：`DATABASE_PATH`、`AUTH_REQUIRED=true`、註冊與伺服器金鑰設定。非空 `DATABASE_URL` 會拒絕啟動；不會改連其他資料庫。
+- `backend/.env.local`：集中設定 `DATABASE_PATH`、登入與註冊選項、伺服器金鑰，以及 `AI_BASE_URL`、`AI_MODEL`、`AI_API_KEYS`。非空的 `DATABASE_URL` 會拒絕啟動。[部署手冊](Local_Server_Deployment.md#api-金鑰設定)
 - `frontend/.env.local`：僅公開建置參數，如 `EXPO_PUBLIC_API_BASE_URL=same-origin`、`EXPO_PUBLIC_AUTH_REQUIRED=true` 及經核可的前端功能開關。修改後須重建。
-- 專案根目錄 `key.txt`：AI 中轉 Base URL、模型與金鑰池；也可用 `AI_RELAY_KEYS_FILE` 或完整三組 `AI_BASE_URL`／`AI_MODEL`／`AI_API_KEYS` 覆寫。中轉設定存在時，呼叫失敗不改用其他 provider。
+- 舊部署可沿用 `key.txt` 或 `AI_RELAY_KEYS_FILE`。填齊 `AI_BASE_URL`、`AI_MODEL` 與 `AI_API_KEYS` 時，以這三項設定為準。
 - `USDA_FDC_API_KEY`、`TAVILY_API_KEY` 與 `NUTRITION_AUTHORITY_SECRET` 只放後端。根目錄的 `USDA KEY.txt`／`TavilyKey.txt` 是私下交付資料，正常 app 不會自動載入。
 - SQLite 與備份放專案外；跨 Windows 啟動環境時選 AppData 外的絕對路徑。`DATABASE_PATH=` 僅供明確的暫存測試，重啟會失去資料；沒有 MongoDB 備援。
 

@@ -19,6 +19,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from services import ai_relay_service as relay
+from services import env_service
 from services.nutrition_label_service import (
     call_gemini_nutrition_ocr_with_rotation,
     get_gemini_api_keys,
@@ -70,6 +71,25 @@ class RelayConfigTests(unittest.TestCase):
         }):
             self.assertEqual(get_gemini_api_keys("client-key"), list(KEYS))
             self.assertEqual(get_gemini_models(), [MODEL])
+
+    def test_backend_dotenv_is_sufficient_for_relay_and_other_server_keys(self):
+        with tempfile.TemporaryDirectory() as directory:
+            backend = Path(directory) / "backend"
+            backend.mkdir()
+            (backend / ".env.local").write_text(
+                f"AI_BASE_URL=https://relay.example/v1\nAI_MODEL={MODEL}\n"
+                f"AI_API_KEYS={','.join(KEYS)}\nGOOGLE_PLACES_API_KEY=fake-places\n"
+                "USDA_FDC_API_KEY=fake-usda\nTAVILY_API_KEY=fake-tavily\nOPENAI_API_KEY=fake-openai\n",
+                encoding="utf-8-sig",
+            )
+            with patch.dict(os.environ, {}, clear=True), \
+                    patch.object(env_service, "__file__", str(backend / "services" / "env_service.py")), \
+                    patch.object(Path, "read_text", side_effect=AssertionError("relay file must not be read")):
+                env_service.load_local_env()
+                self.assertEqual(relay.get_relay_config().keys, KEYS)
+                self.assertEqual(relay.get_relay_config().model, MODEL)
+                for name in ("GOOGLE_PLACES", "USDA_FDC", "TAVILY", "OPENAI"):
+                    self.assertTrue(os.environ[f"{name}_API_KEY"].startswith("fake-"))
 
     def test_partial_environment_or_missing_explicit_file_fails_closed(self):
         for settings in ({"AI_MODEL": MODEL}, {"AI_RELAY_KEYS_FILE": "missing-secret-file"}):

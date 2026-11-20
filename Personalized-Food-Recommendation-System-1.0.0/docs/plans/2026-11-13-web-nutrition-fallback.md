@@ -3,6 +3,8 @@
 建立日期：2026-11-13；最近更新：2026-11-19（`v1.0.3` 原始碼快照）。`origin/v1.0.2` 已以 `f45c52f14735fabb17be7cb4351d16201a2c49e3` 備份當時狀態，含使用者同意公開的照片。使用者已明確撤銷「不碰 v1.0.1」限制；下文舊批次的版本保護敘述僅為歷史紀錄，不再是現行規範。本版 GitHub 發布範圍為程式、測試與文件，不包含正式部署。私密模型與金鑰設定、正式資料庫、新增原始照片與手機截圖及暫存資料不納入本次提交；各批「未提交／未部署」只描述當時狀態。
 **現行閱讀順序**以本頁現況表及第2／5／6／13／15／19節為準；第22節是歷史索引。線上 FDC 屬 USDA 第二層。AFCD 已排除、不聯絡官方；第92批已確認 CNF 2026 青江菜列重用 USDA，兩者均非目前待查來源。青江菜不計添加油，但不得以生鮮值乘照片熟重；生鮮參考功能未啟用。下方第87及91批保留當時的條款與候選觀察，不是現行待辦。
 
+**2026-11-21 部署檢查。**本機設定缺少 `DATABASE_PATH`，後端因 AppData 路徑的 MSIX 導向檢查停止，Funnel 回傳 502。將設定補為 `%USERPROFILE%/NutriLensData/nutrilens.db` 後，原排程以既有 SQLite 重新啟動。SQLite 唯讀完整性檢查通過，本機與公開首頁、`/health`、`/scanner` 均回 200，登入保護已啟用。工作樹為 `v1.0.4`，健康端點仍回報 `app_version=v1.0.3`、`deployed_commit=local`。這次驗證涵蓋部署入口與資料庫狀態。
+
 **2026-11-21 版本交付。**GitHub 的 `v1.0.3` 分支收錄 `60ecace` 的 Scanner OCR 份量、影像重量分流、廠商標示唯讀預覽及來源政策綁定，以及 `571f4ad` 的重建驗證紀錄。既有 `v1.0.3` Release 標籤仍指向 `ecceed6c`；GitHub 分支更新與 Windows 正式部署分開記錄。正式 Tavily 自動補全維持關閉，真來源放行條件見第 19 節。[交付驗證](2026-11-13-web-nutrition-fallback-review.md#v103-本機交付預檢)
 
 **新部署的金鑰設定。**組員以 `backend/.env.local.example` 建立各自的 `backend/.env.local`，集中設定 AI 中轉、Google Places、USDA FDC 與 Tavily 金鑰。網頁地圖使用另外限制 API 與網址的瀏覽器金鑰。既有 AI `key.txt` 維持相容，完整的三項中轉環境變數優先。Tavily 正式啟用仍依第 19 節的放行條件辦理。[Windows 部署手冊](../Local_Server_Deployment.md#api-金鑰設定)

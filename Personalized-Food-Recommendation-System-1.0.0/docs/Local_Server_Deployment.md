@@ -8,8 +8,8 @@
 
 - 本機網站：http://localhost:5000
 - 公開網址：啟用 Funnel 後列出的 `https://<裝置名稱>.<tailnet>.ts.net`。
-- SQLite 預設位置：`%LOCALAPPDATA%\NutriLens\nutrilens.db`。
-- 自訂資料庫位置：在 `backend/.env.local` 設定 `DATABASE_PATH`，建議使用專案外的完整路徑。
+- Windows 首次部署可共用 `DATABASE_PATH=%USERPROFILE%/NutriLensData/nutrilens.db`。後端會展開執行排程的 Windows 帳號家目錄，備份時也請使用同一帳號。
+- 既有部署沿用目前的資料庫路徑。省略 `DATABASE_PATH` 時仍使用 `%LOCALAPPDATA%\NutriLens\nutrilens.db`。若原資料庫在其他位置，先核對原路徑再調整設定，避免啟動時建立新的空庫。
 - 備份與日誌：資料庫旁的 `backups`、`logs\backend.log`。
 - 本機設定與私有 API 金鑰集中在 `backend/.env.local`。GitHub 提供 `backend/.env.local.example` 供組員建立各自的設定。
 

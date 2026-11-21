@@ -1672,8 +1672,7 @@ def fdc_profile_accept():
 
 # ─── 2. User Profile CRUD (PRD: 健康檔案與疾病管理) ──────────
 def _user_profile_response(user):
-    overrides = normalize_daily_nutrient_limit_overrides(user.get(OVERRIDES_FIELD),
-        normalize_condition_ids(user.get("health_conditions") or [], DISEASE_RULES))
+    overrides = normalize_daily_nutrient_limit_overrides(user.get(OVERRIDES_FIELD))
     daily = calculate_daily_targets_with_basis(user, include_limit_settings=True)
     return {**user, OVERRIDES_FIELD: overrides,
             "daily_nutrient_limit_settings": daily["daily_nutrient_limit_settings"]}
@@ -1725,7 +1724,7 @@ def create_or_update_user():
         profile_data.setdefault("health_conditions", existing.get("health_conditions") or [])
         profile = build_user_profile(profile_data, DISEASE_RULES, ALLERGEN_TAXONOMY)
         profile[OVERRIDES_FIELD] = normalize_daily_nutrient_limit_overrides(
-            data.get(OVERRIDES_FIELD, existing.get(OVERRIDES_FIELD)), profile["health_conditions"],
+            data.get(OVERRIDES_FIELD, existing.get(OVERRIDES_FIELD)),
             strict=OVERRIDES_FIELD in data,
         )
         return profile

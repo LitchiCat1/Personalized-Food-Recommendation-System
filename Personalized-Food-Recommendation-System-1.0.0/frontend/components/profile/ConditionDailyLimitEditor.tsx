@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { Palette, Radius, Spacing, Typography } from '@/constants/theme';
@@ -7,13 +8,20 @@ import PrimaryButton from '@/components/ui/primary-button';
 import {
   parseDailyLimitInput, resolveDailyLimitDraft, stepDailyLimitValue,
   type ConditionDailyLimits, type ConditionDailyLimitOverrides, type DailyLimitDraft,
-  type DailyLimitNutrient,
+  type DailyLimitNutrient, type DailyLimitSetting,
 } from '@/lib/daily-nutrient-limits';
 
 const LABELS: Record<DailyLimitNutrient, string> = {
   carbs: '總碳水化合物', sugar: '精緻糖', fat: '總脂肪', saturated_fat: '飽和脂肪',
   protein: '蛋白質', sodium: '鈉',
 };
+
+const HOLD_DELAY_MS = 350;
+const HOLD_REPEAT_MS = 70;
+
+function displayValue(raw: string | null | undefined, setting: DailyLimitSetting) {
+  return raw === null ? String(setting.default_value) : raw ?? String(setting.value);
+}
 
 type Props = {
   settings: ConditionDailyLimits;
@@ -27,17 +35,86 @@ export default function ConditionDailyLimitEditor({ settings, conditionLabel, co
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState<DailyLimitDraft>({});
   const [saved, setSaved] = useState(false);
+  const press = useRef<{ nutrient: DailyLimitNutrient; direction: -1 | 1 } | null>(null);
+  const repeat = useRef<ReturnType<typeof setInterval> | null>(null);
   const dirty = Object.keys(draft).length > 0;
   const resolved = resolveDailyLimitDraft(draft, settings);
   const rows = Object.keys(LABELS) as DailyLimitNutrient[];
+
+  const stopHold = useCallback(() => {
+    press.current = null;
+    if (repeat.current !== null) {
+      clearInterval(repeat.current);
+      repeat.current = null;
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => stopHold, [stopHold]));
+  useEffect(() => {
+    if (!expanded || disabled) return;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.addEventListener('blur', stopHold);
+      return () => {
+        window.removeEventListener('blur', stopHold);
+        stopHold();
+      };
+    }
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') stopHold();
+    });
+    return () => {
+      subscription.remove();
+      stopHold();
+    };
+  }, [disabled, expanded, stopHold]);
+
+  useEffect(() => {
+    const holding = press.current;
+    if (!holding) return;
+    const setting = settings[holding.nutrient];
+    if (!setting) {
+      stopHold();
+      return;
+    }
+    const value = displayValue(draft[holding.nutrient], setting);
+    const next = stepDailyLimitValue(value, holding.direction, setting);
+    if (next === null || Number(value) === Number(next)) stopHold();
+  }, [draft, settings, stopHold]);
 
   const update = (nutrient: DailyLimitNutrient, raw: string | null) => {
     setSaved(false);
     setDraft((previous) => ({ ...previous, [nutrient]: raw }));
   };
 
+  const step = (nutrient: DailyLimitNutrient, direction: -1 | 1, setting: DailyLimitSetting) => {
+    setSaved(false);
+    setDraft((previous) => {
+      const value = displayValue(previous[nutrient], setting);
+      const next = stepDailyLimitValue(value, direction, setting);
+      return next === null || Number(next) === Number(value) ? previous : { ...previous, [nutrient]: next };
+    });
+  };
+
+  const pressHandlers = (nutrient: DailyLimitNutrient, direction: -1 | 1, setting: DailyLimitSetting) => ({
+    delayLongPress: HOLD_DELAY_MS,
+    onPress: () => step(nutrient, direction, setting),
+    onPressIn: () => {
+      stopHold();
+      press.current = { nutrient, direction };
+    },
+    onLongPress: () => {
+      if (disabled || press.current?.nutrient !== nutrient || press.current.direction !== direction) return;
+      // Pressable suppresses the ordinary press after a recognized long press.
+      step(nutrient, direction, setting);
+      repeat.current = setInterval(() => step(nutrient, direction, setting), HOLD_REPEAT_MS);
+    },
+    onPressOut: stopHold,
+    onBlur: stopHold,
+  });
+
   const save = async () => {
     if (!dirty || !resolved || disabled) return;
+    stopHold();
     if (await onSave(resolved)) {
       setDraft({});
       setSaved(true);
@@ -50,7 +127,10 @@ export default function ConditionDailyLimitEditor({ settings, conditionLabel, co
         accessibilityRole="button"
         accessibilityLabel={`${conditionLabel}每日營養上限`}
         accessibilityState={{ expanded }}
-        onPress={() => setExpanded((value) => !value)}
+        onPress={() => {
+          stopHold();
+          setExpanded((value) => !value);
+        }}
         style={styles.heading}
       >
         <Text style={styles.title}>每日營養上限{dirty ? ' · 未儲存' : ''}</Text>
@@ -63,10 +143,12 @@ export default function ConditionDailyLimitEditor({ settings, conditionLabel, co
             if (!setting) return null;
             const label = LABELS[nutrient];
             const raw = draft[nutrient];
-            const value = raw === null ? String(setting.default_value) : raw ?? String(setting.value);
+            const value = displayValue(raw, setting);
             const invalid = raw != null && parseDailyLimitInput(raw, setting) === null;
             const decrement = stepDailyLimitValue(value, -1, setting);
             const increment = stepDailyLimitValue(value, 1, setting);
+            const canDecrease = !disabled && decrement !== null && Number(decrement) !== Number(value);
+            const canIncrease = !disabled && increment !== null && Number(increment) !== Number(value);
             const sources = setting.effective_condition_ids.map((id) => conditionLabels.get(id) ?? id);
             return (
               <View key={nutrient} style={styles.row}>
@@ -80,9 +162,9 @@ export default function ConditionDailyLimitEditor({ settings, conditionLabel, co
                     accessibilityRole="button"
                     accessibilityLabel={`減少${label}每日上限`}
                     accessibilityHint={`每次減少 ${setting.step} ${setting.unit}`}
-                    disabled={disabled || decrement === null || decrement === value}
-                    onPress={() => { if (decrement !== null) update(nutrient, decrement); }}
-                    style={({ pressed }) => [styles.control, (disabled || decrement === null || decrement === value) && styles.disabled, pressed && styles.pressed]}
+                    disabled={!canDecrease}
+                    {...pressHandlers(nutrient, -1, setting)}
+                    style={({ pressed }) => [styles.control, !canDecrease && styles.disabled, pressed && styles.pressed]}
                   >
                     <Ionicons name="remove-outline" size={20} color={Palette.text.primary} />
                   </Pressable>
@@ -101,9 +183,9 @@ export default function ConditionDailyLimitEditor({ settings, conditionLabel, co
                     accessibilityRole="button"
                     accessibilityLabel={`增加${label}每日上限`}
                     accessibilityHint={`每次增加 ${setting.step} ${setting.unit}`}
-                    disabled={disabled || increment === null || increment === value}
-                    onPress={() => { if (increment !== null) update(nutrient, increment); }}
-                    style={({ pressed }) => [styles.control, (disabled || increment === null || increment === value) && styles.disabled, pressed && styles.pressed]}
+                    disabled={!canIncrease}
+                    {...pressHandlers(nutrient, 1, setting)}
+                    style={({ pressed }) => [styles.control, !canIncrease && styles.disabled, pressed && styles.pressed]}
                   >
                     <Ionicons name="add-outline" size={20} color={Palette.text.primary} />
                   </Pressable>

@@ -99,9 +99,19 @@ class DailyLimitApiTests(ApiTestBase):
 
     def test_metadata_uses_same_specs_as_the_editor(self):
         metadata = self.client.get("/medical-metadata").get_json()
-        self.assertEqual(metadata["daily_nutrient_limit_specs"], daily_nutrient_limit_specs())
+        specs = metadata["daily_nutrient_limit_specs"]
+        self.assertEqual(specs, daily_nutrient_limit_specs())
+        for condition in specs.values():
+            for setting in condition.values():
+                self.assertEqual(setting["step"], 1)
+                self.assertEqual(setting["precision"], int(setting["unit"] == "g"))
+        with self.mock_auth():
+            response = self._profile(**{OVERRIDES_FIELD: {"hypertension": {"carbs": 123.4}}})
+            self.assertEqual(response.status_code, 200)
+            setting = response.get_json()["user"]["daily_nutrient_limit_settings"]["hypertension"]["carbs"]
+            self.assertEqual((setting["value"], setting["step"], setting["precision"]), (123.4, 1, 1))
 
-    def test_legacy_writes_preserve_and_unselect_or_empty_map_clears(self):
+    def test_legacy_writes_and_unselection_preserve_until_explicit_clear(self):
         with self.mock_auth():
             first = self._profile(**{OVERRIDES_FIELD: {"hypertension": {"sodium": 0}}})
             self.assertEqual(first.status_code, 200)
@@ -113,10 +123,30 @@ class DailyLimitApiTests(ApiTestBase):
             patch_profile = self.client.post("/user", json={"user_id": "user-a", "name": "Updated name"},
                                              headers=self.auth_headers())
             self.assertEqual(patch_profile.get_json()["user"][OVERRIDES_FIELD], {"hypertension": {"sodium": 0}})
-            self.assertEqual(self._profile(health_conditions=[]).get_json()["user"][OVERRIDES_FIELD], {})
-            self.assertEqual(self._profile().get_json()["user"][OVERRIDES_FIELD], {})
-            self.assertEqual(self._profile(**{OVERRIDES_FIELD: {"hypertension": {"sodium": 1234}}}).status_code, 200)
+            unselected = self._profile(health_conditions=[]).get_json()["user"]
+            self.assertEqual(unselected[OVERRIDES_FIELD], {"hypertension": {"sodium": 0}})
+            self.assertEqual(unselected["daily_nutrient_limit_settings"], {})
+            inactive_records = self._records()
+            self.assertEqual(inactive_records["nutrition_targets"]["sodium"], 2000)
+            self.assertNotIn("default_sodium_target", inactive_records["nutrition_target_basis"])
+            reselected = self._profile().get_json()["user"]
+            self.assertEqual(reselected["daily_nutrient_limit_settings"]["hypertension"]["sodium"]["value"], 0)
+            self.assertEqual(self._records()["nutrition_targets"]["sodium"], 0)
             self.assertEqual(self._profile(**{OVERRIDES_FIELD: {}}).get_json()["user"][OVERRIDES_FIELD], {})
+
+    def test_saving_another_condition_keeps_dormant_setting_and_validates_it(self):
+        with self.mock_auth():
+            overrides = {"hypertension": {"sodium": 1234}, "diabetes": {"sugar": 13.5}}
+            response = self._profile(health_conditions=["diabetes"], **{OVERRIDES_FIELD: overrides})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.get_json()["user"][OVERRIDES_FIELD], overrides)
+            self.assertEqual(self._records()["nutrition_targets"]["sodium"], 2000)
+            invalid = self._profile(health_conditions=["diabetes"], **{OVERRIDES_FIELD: {
+                **overrides, "hypertension": {"sodium": -1},
+            }})
+            self.assertEqual(invalid.status_code, 400)
+            self.assertEqual(self._profile().get_json()["user"][OVERRIDES_FIELD], overrides)
+            self.assertEqual(self._records()["nutrition_targets"]["sodium"], 1234)
 
     def test_invalid_and_foreign_writes_do_not_replace_prior_settings(self):
         with self.mock_auth():
@@ -146,9 +176,17 @@ class DailyLimitApiTests(ApiTestBase):
                                 self.assertEqual(self._profile().status_code, 200)
                                 baseline = self._records()["meal_nutrient_limits"]
                                 self.assertEqual(self._profile(**{OVERRIDES_FIELD: {"hypertension": {"sodium": 1234}}}).status_code, 200)
+                            else:
+                                read = self.client.get("/user/user-a", headers=self.auth_headers()).get_json()
+                                self.assertEqual(read[OVERRIDES_FIELD], {"hypertension": {"sodium": 1234}})
+                                self.assertEqual(read["daily_nutrient_limit_settings"], {})
+                                self.assertEqual(self._records()["nutrition_targets"]["sodium"], 2000)
+                                self.assertEqual(self._profile().status_code, 200)
                             self.assertEqual(self._records()["nutrition_targets"]["sodium"], 1234)
                             self.assertEqual(self._records()["meal_nutrient_limits"], baseline)
                             read = self.client.get("/user/user-a", headers=self.auth_headers()).get_json()
                             self.assertEqual(read[OVERRIDES_FIELD], {"hypertension": {"sodium": 1234}})
+                            if not reopen:
+                                self.assertEqual(self._profile(health_conditions=[]).status_code, 200)
                     finally:
                         sql.close()

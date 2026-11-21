@@ -783,7 +783,7 @@ export default function ProfileScreen() {
               <Pressable
                 accessibilityRole="checkbox"
                 accessibilityLabel={cond.label_zh}
-                accessibilityHint={limitSettings ? '取消勾選會清除這個病況的個人上限。' : undefined}
+                accessibilityHint={limitSettings ? '取消勾選會暫停套用，已儲存的個人上限會保留。' : undefined}
                 aria-checked={isActive}
                 disabled={saving || loading}
                 onPress={() => {
@@ -804,7 +804,7 @@ export default function ProfileScreen() {
                       ⚠ 此條件的門檻需由醫療人員依你的分期與抽血數值個人化，App 目前套用的是通用估算值。
                     </Text>
                   ) : null}
-                  {limitSettings ? <Text style={styles.conditionCaveat}>取消勾選會清除這個病況的個人上限。</Text> : null}
+                  {!isActive && activeLimits?.overrides[cond.id] ? <Text style={styles.conditionCaveat}>個人上限已保留，重新勾選後套用。</Text> : null}
                 </View>
                 <Ionicons name={isActive ? 'checkmark-circle' : 'add-circle-outline'} size={22} color={isActive ? accent : Palette.text.tertiary} />
               </Pressable>

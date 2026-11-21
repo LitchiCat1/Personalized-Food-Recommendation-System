@@ -5,7 +5,7 @@ import {
 } from '../lib/daily-nutrient-limits.ts';
 
 const carbs = {
-  unit: 'g', min: 0, max: 1000, step: 0.1, precision: 1, default_value: 250,
+  unit: 'g', min: 0, max: 1000, step: 1, precision: 1, default_value: 250,
   value: 250, source: 'default', active: true, effective_value: 250, effective_condition_ids: ['diabetes'],
 };
 const sugar = { ...carbs, max: 500, value: 10.5, source: 'custom' };
@@ -21,9 +21,11 @@ test('accepts zero and values within server bounds and decimal precision', () =>
   assert.equal(parseDailyLimitInput('1.5', sodium), null);
 });
 
-test('steps in integer precision units and never moves outside the server range', () => {
-  assert.equal(stepDailyLimitValue('0.2', 1, carbs), '0.3');
-  assert.equal(stepDailyLimitValue('0.3', -1, carbs), '0.2');
+test('steps by 1 g without dropping a fractional value and clamps to the server range', () => {
+  assert.equal(stepDailyLimitValue('0.2', 1, carbs), '1.2');
+  assert.equal(stepDailyLimitValue('1.2', -1, carbs), '0.2');
+  assert.equal(stepDailyLimitValue('0.2', -1, carbs), '0');
+  assert.equal(stepDailyLimitValue('999.5', 1, carbs), '1000');
   assert.equal(stepDailyLimitValue('0', -1, carbs), '0');
   assert.equal(stepDailyLimitValue('1000', 1, carbs), '1000');
   assert.equal(stepDailyLimitValue('1500', -1, sodium), '1499');

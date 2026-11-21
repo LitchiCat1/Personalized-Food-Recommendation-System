@@ -334,7 +334,11 @@ def calculate_daily_targets_with_basis(user: dict, *, include_limit_settings=Fal
         ),
     }
 
-    overrides = normalize_daily_nutrient_limit_overrides(user.get(OVERRIDES_FIELD), conditions)
+    overrides = {
+        condition: values
+        for condition, values in normalize_daily_nutrient_limit_overrides(user.get(OVERRIDES_FIELD)).items()
+        if condition in conditions
+    }
     if any("sodium" in values for values in overrides.values()):
         basis["default_sodium_target"] = _display_number(targets["sodium"])
     if overrides or include_limit_settings:

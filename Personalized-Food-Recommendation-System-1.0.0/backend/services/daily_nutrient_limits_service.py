@@ -15,11 +15,11 @@ CONDITION_NUTRIENTS = {
 
 # These bounds only validate input, not recommended intake.
 _SPECS = {
-    "carbs": {"unit": "g", "min": 0, "max": 1000, "step": 0.1, "precision": 1},
-    "sugar": {"unit": "g", "min": 0, "max": 500, "step": 0.1, "precision": 1},
-    "fat": {"unit": "g", "min": 0, "max": 500, "step": 0.1, "precision": 1},
-    "saturated_fat": {"unit": "g", "min": 0, "max": 500, "step": 0.1, "precision": 1},
-    "protein": {"unit": "g", "min": 0, "max": 500, "step": 0.1, "precision": 1},
+    "carbs": {"unit": "g", "min": 0, "max": 1000, "step": 1, "precision": 1},
+    "sugar": {"unit": "g", "min": 0, "max": 500, "step": 1, "precision": 1},
+    "fat": {"unit": "g", "min": 0, "max": 500, "step": 1, "precision": 1},
+    "saturated_fat": {"unit": "g", "min": 0, "max": 500, "step": 1, "precision": 1},
+    "protein": {"unit": "g", "min": 0, "max": 500, "step": 1, "precision": 1},
     "sodium": {"unit": "mg", "min": 0, "max": 10000, "step": 1, "precision": 0},
 }
 
@@ -45,8 +45,8 @@ def _validated_value(condition, nutrient, value):
     return int(amount) if amount == amount.to_integral_value() else float(amount)
 
 
-def normalize_daily_nutrient_limit_overrides(raw, conditions, *, strict=False):
-    """Validate writes and prune settings for conditions no longer selected."""
+def normalize_daily_nutrient_limit_overrides(raw, *, strict=False):
+    """Validate stored settings independently of the current condition selection."""
     if not isinstance(raw, dict):
         if strict:
             raise ValueError(f"{OVERRIDES_FIELD} must be an object.")
@@ -68,7 +68,7 @@ def normalize_daily_nutrient_limit_overrides(raw, conditions, *, strict=False):
             except ValueError:
                 if strict:
                     raise
-        if values and condition in conditions:
+        if values:
             result[condition] = values
     return result
 

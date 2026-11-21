@@ -54,9 +54,7 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
       <View style={styles.placeholderCard}>
         <Ionicons name="image-outline" size={rs(34)} color={Palette.text.tertiary} />
         <Text style={styles.placeholderTitle}>{hasUnmatchedFoods ? '目前沒有可記錄的營養' : '尚未產生辨識結果'}</Text>
-        <Text style={styles.placeholderText}>{hasUnmatchedFoods
-          ? '上方列出的食物尚未納入營養合計。'
-          : '拍攝餐點、上傳相簿或使用手動搜尋後，結果會出現在這裡。'}</Text>
+        {hasUnmatchedFoods ? <Text style={styles.placeholderText}>待確認食材未計入營養合計。</Text> : null}
       </View>
     );
   }
@@ -74,18 +72,15 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
             <View style={styles.foodTop}>
               <View style={styles.foodInfo}>
                 <Text style={styles.foodName}>{food.foodName}</Text>
-                <Text style={styles.foodWeight}>
-                  {food.portionAdjusted ? '已校正份量' : '估算份量'} {food.estimatedWeight}g
-                </Text>
+                <Text style={styles.sourceLabel}>營養來源：{sourceLabel || '未標示'}</Text>
               </View>
-              <DataPill tone={food.confidence >= 80 ? 'success' : 'warning'}>{food.confidence}%</DataPill>
+              <DataPill tone={food.confidence >= 80 ? 'success' : 'warning'}>辨識 {food.confidence}%</DataPill>
             </View>
 
-            <View style={styles.portionCard}>
+            <View style={styles.portionSection}>
               <View style={styles.portionHeader}>
-                <Ionicons name="scale-outline" size={14} color={Palette.accent.green} />
-                <Text style={styles.portionTitle}>份量校正</Text>
-                {food.portionAdjusted ? <Text style={styles.portionAdjustedText}>已重算營養</Text> : null}
+                <Ionicons name="scale-outline" size={16} color={Palette.text.secondary} />
+                <Text style={styles.portionTitle}>{food.portionAdjusted ? '已調整份量' : '估算份量'}</Text>
               </View>
               <View style={styles.portionControls}>
                 <Pressable
@@ -96,31 +91,34 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
                   aria-disabled={controlsDisabled}
                   style={[styles.portionButton, controlsDisabled && styles.controlDisabled]}
                 >
-                  <Text style={styles.portionButtonText}>-10g</Text>
+                  <Ionicons name="remove" size={20} color={Palette.text.primary} />
                 </Pressable>
-                <TextInput
-                  value={weightDrafts[food.id] ?? String(Math.round(food.estimatedWeight))}
-                  onChangeText={(value) => {
-                    const digits = value.replace(/[^0-9]/g, '');
-                    setWeightDrafts((prev) => ({ ...prev, [food.id]: digits }));
-                    const next = Number(digits);
-                    if (digits.length > 0 && Number.isFinite(next) && next > 0) {
-                      onWeightChange(food.id, next);
-                    }
-                  }}
-                  onBlur={() => {
-                    const digits = (weightDrafts[food.id] ?? '').trim();
-                    const next = Number(digits);
-                    if (!digits || !Number.isFinite(next) || next <= 0) {
-                      setWeightDrafts((prev) => ({ ...prev, [food.id]: String(Math.round(food.estimatedWeight)) }));
-                    }
-                  }}
-                  keyboardType="numeric"
-                  selectTextOnFocus
-                  editable={!controlsDisabled}
-                  style={[styles.portionInput, controlsDisabled && styles.controlDisabled]}
-                />
-                <Text style={styles.portionUnit}>g</Text>
+                <View style={[styles.portionField, controlsDisabled && styles.controlDisabled]}>
+                  <TextInput
+                    value={weightDrafts[food.id] ?? String(Math.round(food.estimatedWeight))}
+                    onChangeText={(value) => {
+                      const digits = value.replace(/[^0-9]/g, '');
+                      setWeightDrafts((prev) => ({ ...prev, [food.id]: digits }));
+                      const next = Number(digits);
+                      if (digits.length > 0 && Number.isFinite(next) && next > 0) {
+                        onWeightChange(food.id, next);
+                      }
+                    }}
+                    onBlur={() => {
+                      const digits = (weightDrafts[food.id] ?? '').trim();
+                      const next = Number(digits);
+                      if (!digits || !Number.isFinite(next) || next <= 0) {
+                        setWeightDrafts((prev) => ({ ...prev, [food.id]: String(Math.round(food.estimatedWeight)) }));
+                      }
+                    }}
+                    keyboardType="numeric"
+                    accessibilityLabel={`${food.foodName} 份量（克）`}
+                    selectTextOnFocus
+                    editable={!controlsDisabled}
+                    style={styles.portionInput}
+                  />
+                  <Text style={styles.portionUnit}>g</Text>
+                </View>
                 <Pressable
                   onPress={() => onWeightChange(food.id, food.estimatedWeight + 10)}
                   disabled={controlsDisabled}
@@ -129,7 +127,7 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
                   aria-disabled={controlsDisabled}
                   style={[styles.portionButton, controlsDisabled && styles.controlDisabled]}
                 >
-                  <Text style={styles.portionButtonText}>+10g</Text>
+                  <Ionicons name="add" size={20} color={Palette.text.primary} />
                 </Pressable>
                 {food.portionAdjusted ? (
                   <Pressable
@@ -140,7 +138,7 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
                     aria-disabled={controlsDisabled}
                     style={[styles.resetButton, controlsDisabled && styles.controlDisabled]}
                   >
-                    <Text style={styles.resetButtonText}>還原</Text>
+                    <Text style={styles.resetButtonText}>還原份量</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -150,7 +148,6 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
               <DataPill tone={food.gi === 'high' ? 'danger' : food.gi === 'medium' ? 'warning' : 'success'}>
                 GI {food.gi === 'high' ? '高' : food.gi === 'medium' ? '中' : '低'}
               </DataPill>
-              {sourceLabel ? <DataPill tone="info">{sourceLabel}</DataPill> : null}
               {food.nutrition.is_fried ? <DataPill tone="danger">油炸食物</DataPill> : null}
               {food.needsConfirmation ? <DataPill tone="warning">需人工確認</DataPill> : null}
               {food.allergens.map((a) => <DataPill key={a} tone="warning">{a}</DataPill>)}
@@ -163,6 +160,7 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
               </View>
             ) : null}
 
+            <Text accessibilityRole="header" style={styles.nutritionHeading}>目前份量營養 · <Text style={styles.numeric}>{food.estimatedWeight} g</Text></Text>
             <View style={styles.nutritionGrid}>
               {[
                 { key: 'calories', label: '熱量', value: food.nutrition.calories, unit: 'kcal', color: Palette.accent.green },
@@ -173,7 +171,7 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
                 { key: 'saturated_fat', label: '飽和脂肪', value: food.nutrition.saturated_fat ?? 0, unit: 'g', color: Palette.accent.purple },
                 { key: 'trans_fat', label: '反式脂肪', value: food.nutrition.trans_fat ?? 0, unit: 'g', color: Palette.status.error },
                 { key: 'fiber', label: '膳食纖維', value: food.nutrition.fiber, unit: 'g', color: Palette.accent.cyan },
-                { key: 'sodium', label: '鈉 (Sodium)', value: food.nutrition.sodium, unit: 'mg', color: food.nutrition.sodium > sodiumMealBudget ? Palette.status.warning : Palette.accent.pink },
+                { key: 'sodium', label: '鈉', value: food.nutrition.sodium, unit: 'mg', color: food.nutrition.sodium > sodiumMealBudget ? Palette.status.warning : Palette.accent.pink },
               ].map((item) => (
                 <View key={item.label} style={[styles.nutritionItem, { minWidth: wp(26) }]}>
                   <Text style={styles.nutritionLabel}>{item.label}</Text>
@@ -204,7 +202,7 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
 
       <View style={styles.totalCard}>
         <View style={styles.totalHeader}>
-          <Text style={styles.totalTitle}>{hasUnmatchedFoods ? '已配對項目合計' : '估計攝取合計'}</Text>
+          <Text accessibilityRole="header" style={styles.totalTitle}>可記錄項目合計</Text>
           <DataPill tone={totalSodium > sodiumMealBudget ? 'warning' : 'success'}>鈉 {totalSodium}mg</DataPill>
         </View>
         <View style={styles.totalRow}>
@@ -221,6 +219,7 @@ export default function ScannerResults({ rs, wp, results, onAddRecord, onWeightC
             <Text style={[styles.totalValue, { color: Palette.text.primary }]}>{results.length} 項</Text>
           </View>
         </View>
+        {hasUnmatchedFoods ? <Text style={styles.totalNote}>待確認食材不會加入這筆紀錄。</Text> : null}
         <PrimaryButton
           label={submitting ? '儲存中' : '加入今日紀錄'}
           onPress={onAddRecord}
@@ -251,7 +250,7 @@ const styles = StyleSheet.create({
   placeholderText: { ...Typography.caption, color: Palette.text.tertiary, textAlign: 'center' },
   foodCard: {
     backgroundColor: Palette.bg.card,
-    borderRadius: Radius.xl,
+    borderRadius: Radius.sm,
     marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
@@ -259,48 +258,53 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     ...Shadows.card,
   },
-  foodTop: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
-  foodInfo: { flex: 1, gap: 4 },
+  foodTop: { flexDirection: 'row', alignItems: 'flex-start', flexWrap: 'wrap', gap: Spacing.md },
+  foodInfo: { flexGrow: 1, flexBasis: 132, minWidth: 0, gap: Spacing.xs },
   foodName: { ...Typography.h3, color: Palette.text.primary },
-  foodWeight: { ...Typography.caption, color: Palette.text.tertiary },
-  portionCard: {
-    backgroundColor: Palette.bg.mint,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(31,157,114,0.16)',
+  sourceLabel: { ...Typography.caption, color: Palette.text.secondary },
+  portionSection: {
+    borderTopWidth: 1,
+    borderTopColor: Palette.border.subtle,
+    paddingTop: Spacing.md,
     gap: Spacing.sm,
   },
   portionHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   portionTitle: { ...Typography.bodyBold, color: Palette.text.secondary, flex: 1 },
-  portionAdjustedText: { ...Typography.small, color: Palette.accent.green },
   portionControls: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' },
   portionButton: {
     minHeight: 44,
+    minWidth: 44,
     backgroundColor: Palette.bg.card,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.sm,
+    alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: Palette.border.subtle,
   },
-  portionButtonText: { ...Typography.bodyBold, color: Palette.accent.green },
-  portionInput: {
-    width: 72,
+  portionField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: Spacing.sm,
     minHeight: 44,
     backgroundColor: Palette.bg.card,
     borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
+  },
+  portionInput: {
+    width: 60,
+    minHeight: 44,
     color: Palette.text.primary,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 10,
     textAlign: 'center',
     ...Typography.caption,
+    ...Typography.number,
   },
-  portionUnit: { ...Typography.caption, color: Palette.text.tertiary, marginLeft: -4 },
+  portionUnit: { ...Typography.caption, color: Palette.text.secondary },
   resetButton: { minHeight: 44, paddingHorizontal: Spacing.sm, justifyContent: 'center' },
-  resetButtonText: { ...Typography.caption, color: Palette.status.warning },
+  resetButtonText: { ...Typography.caption, color: Palette.text.secondary },
   controlDisabled: { opacity: 0.48 },
   tagsRow: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' },
   mealWarningCard: {
@@ -327,7 +331,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(245,158,11,0.2)',
   },
-  warningText: { ...Typography.caption, color: Palette.status.warning, flex: 1 },
+  warningText: { ...Typography.caption, color: Palette.text.secondary, flex: 1 },
+  nutritionHeading: { ...Typography.bodyBold, color: Palette.text.primary },
+  numeric: { ...Typography.number },
   nutritionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   nutritionItem: { backgroundColor: Palette.bg.elevated, borderRadius: Radius.md, padding: Spacing.sm, flex: 1 },
   nutritionLabel: { ...Typography.small, color: Palette.text.tertiary, marginBottom: 2 },
@@ -342,10 +348,11 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
     ...Shadows.card,
   },
-  totalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md },
+  totalHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
   totalTitle: { ...Typography.h3, color: Palette.text.primary },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.sm },
-  totalItem: { flex: 1, backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, padding: Spacing.md },
+  totalRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  totalItem: { flexGrow: 1, flexBasis: 80, backgroundColor: Palette.bg.elevated, borderRadius: Radius.sm, padding: Spacing.sm },
   totalLabel: { ...Typography.small, color: Palette.text.tertiary, marginBottom: 4 },
   totalValue: { ...Typography.bodyBold, ...Typography.number },
+  totalNote: { ...Typography.caption, color: Palette.text.secondary },
 });

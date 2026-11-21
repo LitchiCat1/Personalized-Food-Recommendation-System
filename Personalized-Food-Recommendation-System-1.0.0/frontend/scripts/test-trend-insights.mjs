@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   CALORIE_GOAL_LOWER_RATIO,
   CALORIE_GOAL_UPPER_RATIO,
+  buildTrendChart,
   buildTrendInsights,
   classifyCalories,
   findSodiumOverDays,
@@ -81,7 +82,7 @@ test('six over-limit days: gives the count and names the worst day', () => {
   const insight = insightsFor(daily)[1];
   assert.equal(
     insight,
-    '近 7 天有 6 天鈉超過每日上限 2,000 mg，最高是 06-29 的 2,730 mg，建議檢查加工食品與外食比例。'
+    '近 7 天有 6 天鈉超過每日上限 2,000 mg，最高是 06/29 的 2,730 mg，建議檢查加工食品與外食比例。'
   );
 });
 
@@ -89,7 +90,7 @@ test('one over-limit day is named without calling it the highest', () => {
   const daily = [day('2026-06-28', 1800, 1500), day('2026-06-29', 1800, 2730)];
   assert.equal(
     insightsFor(daily)[1],
-    '近 2 天有 1 天鈉超過每日上限 2,000 mg，是 06-29 的 2,730 mg，建議檢查加工食品與外食比例。'
+    '近 2 天有 1 天鈉超過每日上限 2,000 mg，是 06/29 的 2,730 mg，建議檢查加工食品與外食比例。'
   );
 });
 
@@ -103,11 +104,37 @@ test('uses the sodium limit it is given (e.g. 1,500 mg for kidney disease)', () 
   assert.equal(findSodiumOverDays(daily, 1500).length, 1);
   assert.equal(
     insightsFor(daily, 2000, 1500)[1],
-    '近 2 天有 1 天鈉超過每日上限 1,500 mg，是 06-29 的 1,800 mg，建議檢查加工食品與外食比例。'
+    '近 2 天有 1 天鈉超過每日上限 1,500 mg，是 06/29 的 1,800 mg，建議檢查加工食品與外食比例。'
   );
   assert.equal(insightsFor(daily, 2000, 2000)[1], NO_SODIUM_OVER_MESSAGE);
 });
 
 test('no history returns the empty-state hint only', () => {
   assert.deepEqual(buildTrendInsights({}, [], 2000, 2000), ['尚無歷史紀錄，先從掃描或手動加入餐點開始建立趨勢。']);
+});
+
+test('scales sodium bars and the reference line against the same maximum', () => {
+  const dates = ['2026-12-30', '2026-12-31', '2027-01-01', '2027-01-02'];
+  const daily = [1800, 2000, 2300, 3200].map((sodium, index) => day(dates[index], 2000, sodium));
+  const chart = buildTrendChart(daily, 'sodium', 2000);
+  assert.equal(chart.targetPercent, 62.5);
+  assert.deepEqual(chart.points.map((point) => point.percent), [56.25, 62.5, 71.875, 100]);
+  assert.deepEqual(chart.points.map((point) => point.overLimit), [false, false, true, true]);
+  assert.equal(chart.points[3].latest, true);
+});
+
+test('keeps a zero sodium reference and marks any positive intake above it', () => {
+  const daily = [day('2026-06-28', 1800, 0), day('2026-06-29', 1800, 0.5)];
+  const chart = buildTrendChart(daily, 'sodium', 0);
+  assert.equal(chart.targetPercent, 0);
+  assert.deepEqual(chart.points.map((point) => point.percent), [0, 50]);
+  assert.deepEqual(chart.points.map((point) => point.overLimit), [false, true]);
+});
+
+test('latest calorie point retains its risk and uses the established tolerance', () => {
+  const daily = [day('2026-06-28', 2300), day('2026-06-29', 2301)];
+  const chart = buildTrendChart(daily, 'calories', 2000);
+  assert.equal(chart.points[0].overLimit, false);
+  assert.equal(chart.points[1].overLimit, true);
+  assert.equal(chart.points[1].latest, true);
 });

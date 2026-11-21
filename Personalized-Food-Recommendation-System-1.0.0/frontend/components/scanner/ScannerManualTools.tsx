@@ -1,8 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
-import DataPill from '@/components/ui/data-pill';
+import { Palette, Typography, Spacing, Radius } from '@/constants/theme';
 import type { NutritionEnrichmentItem } from '@/lib/nutrition-enrichment-api';
 
 type RejectedDetection = {
@@ -14,13 +13,10 @@ type RejectedDetection = {
 };
 
 type Props = {
-  rs: (value: number) => number;
   manualQuery: string;
   onManualQueryChange: (value: string) => void;
   manualSearching: boolean;
   onManualSearch: () => void;
-  ocrQuerying: boolean;
-  onOCRSearch: () => void;
 };
 
 export function ScannerPendingFoods({
@@ -102,38 +98,25 @@ export function ScannerPendingFoods({
 }
 
 export default function ScannerManualTools({
-  rs,
   manualQuery,
   onManualQueryChange,
   manualSearching,
   onManualSearch,
-  ocrQuerying,
-  onOCRSearch,
 }: Props) {
   return (
       <View style={styles.manualCard}>
-        <View style={styles.manualHeader}>
-          <View style={styles.iconCircle}>
-            <Ionicons name="search-outline" size={rs(17)} color={Palette.accent.green} />
-          </View>
-          <View style={styles.manualHeaderCopy}>
-            <Text style={styles.manualTitle}>手動備援</Text>
-            <Text style={styles.manualHint}>辨識不穩時，使用 TFDA 或自訂食品資料庫補上紀錄。</Text>
-          </View>
-          <DataPill tone="info">TFDA</DataPill>
-        </View>
         <View style={styles.manualSearchRow}>
           <TextInput
             accessibilityLabel="搜尋食品名稱"
             value={manualQuery}
             onChangeText={onManualQueryChange}
-            onSubmitEditing={onManualSearch}
+            onSubmitEditing={manualSearching ? undefined : onManualSearch}
             returnKeyType="search"
             placeholder="輸入食品名稱，例如：白飯"
             placeholderTextColor={Palette.text.muted}
             style={styles.manualInput}
           />
-          <Pressable accessibilityRole="button" accessibilityLabel="搜尋" aria-busy={manualSearching} onPress={onManualSearch} style={styles.manualButton}>
+          <Pressable accessibilityRole="button" accessibilityLabel="搜尋" aria-busy={manualSearching} disabled={manualSearching} onPress={onManualSearch} style={styles.manualButton}>
             {manualSearching ? (
               <ActivityIndicator size="small" color={Palette.text.inverse} />
             ) : (
@@ -141,16 +124,6 @@ export default function ScannerManualTools({
             )}
           </Pressable>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="辨識營養標示照片" aria-busy={ocrQuerying} onPress={onOCRSearch} style={styles.ocrButton}>
-          {ocrQuerying ? (
-            <ActivityIndicator size="small" color={Palette.accent.blue} />
-          ) : (
-            <>
-              <Ionicons name="document-text-outline" size={rs(16)} color={Palette.accent.blue} />
-              <Text style={styles.ocrButtonText}>辨識營養標示照片</Text>
-            </>
-          )}
-        </Pressable>
       </View>
   );
 }
@@ -185,30 +158,13 @@ const styles = StyleSheet.create({
   identityConfirmButtonText: { ...Typography.bodyBold, color: Palette.text.inverse },
   identityDisabled: { opacity: 0.55 },
   manualCard: {
-    backgroundColor: Palette.bg.card,
-    borderRadius: Radius.xl,
+    marginTop: Spacing.md,
     marginBottom: Spacing.xl,
-    borderWidth: 1,
-    borderColor: Palette.border.subtle,
-    padding: Spacing.xl,
-    gap: Spacing.md,
-    ...Shadows.card,
   },
-  manualHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Palette.accent.greenDim,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  manualHeaderCopy: { flex: 1, gap: 2 },
-  manualTitle: { ...Typography.h3, color: Palette.text.primary },
-  manualHint: { ...Typography.caption, color: Palette.text.secondary },
   manualSearchRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
   manualInput: {
     flex: 1,
+    minWidth: 0,
     minHeight: 48,
     backgroundColor: Palette.bg.elevated,
     borderRadius: Radius.lg,
@@ -228,16 +184,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
   manualButtonText: { ...Typography.bodyBold, color: Palette.text.inverse },
-  ocrButton: {
-    minHeight: 46,
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Palette.accent.blueDim,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(47,128,237,0.18)',
-  },
-  ocrButtonText: { ...Typography.bodyBold, color: Palette.accent.blue },
 });

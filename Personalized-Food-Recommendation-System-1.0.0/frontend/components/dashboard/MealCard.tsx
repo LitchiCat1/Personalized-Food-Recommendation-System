@@ -27,7 +27,7 @@ export default function MealCard({ meal, sodiumDailyTarget }: Props) {
       <View style={styles.content}>
         <View style={styles.header}>
           <View style={styles.nameWrap}>
-            <Text style={styles.name} numberOfLines={1}>{meal.name}</Text>
+            <Text style={styles.name}>{meal.name}</Text>
             <View style={styles.metaRow}>
               <DataPill tone={hasWarnings ? 'warning' : 'success'}>{meal.mealType}</DataPill>
               <Text style={styles.source}>{meal.emoji} {formatMealEmojiSource(meal.emoji)}</Text>
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   time: { ...Typography.small, ...Typography.number, color: Palette.text.tertiary },
   content: { flex: 1, gap: Spacing.md },
   header: { flexDirection: 'row', gap: Spacing.md, alignItems: 'flex-start' },
-  nameWrap: { flex: 1, gap: Spacing.sm },
+  nameWrap: { flex: 1, minWidth: 0, gap: Spacing.sm },
   name: { ...Typography.bodyBold, color: Palette.text.primary },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' },
   source: { ...Typography.small, color: Palette.text.tertiary },

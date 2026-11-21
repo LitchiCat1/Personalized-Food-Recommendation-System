@@ -23,6 +23,21 @@ export function findSodiumOverDays(daily: HistoryDay[], sodiumTarget: number): H
   return daily.filter((day) => day.sodium > sodiumTarget);
 }
 
+export function buildTrendChart(daily: HistoryDay[], nutrient: 'calories' | 'sodium', target: number) {
+  const scale = Math.max(1, target, ...daily.map((day) => day[nutrient]));
+  const sodiumOverDays = nutrient === 'sodium' ? new Set(findSodiumOverDays(daily, target)) : null;
+  return {
+    targetPercent: target / scale * 100,
+    points: daily.map((day, index) => ({
+      date: day.date,
+      value: day[nutrient],
+      percent: day[nutrient] / scale * 100,
+      overLimit: sodiumOverDays ? sodiumOverDays.has(day) : classifyCalories(day.calories, target) === 'high',
+      latest: index === daily.length - 1,
+    })),
+  };
+}
+
 export function buildTrendInsights(
   summary: HistoryResponse['summary'],
   daily: HistoryDay[],
@@ -48,7 +63,7 @@ function buildSodiumInsight(daily: HistoryDay[], sodiumTarget: number): string {
   }
 
   const worst = overDays.reduce((max, day) => (day.sodium > max.sodium ? day : max));
-  const worstText = `${shortDate(worst.date)} 的 ${formatNumber(worst.sodium)} mg`;
+  const worstText = `${formatTrendDate(worst.date)} 的 ${formatNumber(worst.sodium)} mg`;
   const prefix = `近 ${daily.length} 天有 ${overDays.length} 天鈉超過每日上限 ${formatNumber(sodiumTarget)} mg`;
   const detail = overDays.length === 1 ? `，是 ${worstText}` : `，最高是 ${worstText}`;
   return `${prefix}${detail}，建議檢查加工食品與外食比例。`;
@@ -65,14 +80,13 @@ function buildLatestCalorieInsight(latest: HistoryDay, calorieTarget: number): s
   }
 }
 
-/** YYYY-MM-DD → MM-DD，跟熱量長條圖下方的日期標籤一樣。 */
-function shortDate(date: string): string {
-  return date.slice(5);
+export function formatTrendDate(date: string): string {
+  return date.slice(5).replace('-', '/');
 }
 
 // 固定用 en-US 分位號，不跟著裝置語系變成 2.730 之類的寫法。
-const numberFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+const numberFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 });
 
 function formatNumber(value: number): string {
-  return numberFormat.format(Math.round(value));
+  return numberFormat.format(value);
 }

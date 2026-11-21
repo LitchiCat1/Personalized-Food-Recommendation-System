@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, ActivityIndicator, Keyboard, TextInp
 import { useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
-import { Palette, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
+import { Palette, Typography, Spacing, Radius } from '@/constants/theme';
 import type { DetectedFood } from '@/constants/mock-data';
 import { allergenLabels, conditionLabels } from '@/lib/medical-labels';
 import { useStore } from '@/store/useStore';
@@ -26,9 +26,6 @@ import { resolveImageBase64 } from '@/lib/image';
 import {
   buildOCRDetectedFood,
   describeScannerPendingNutrition,
-  formatScannerNutritionSummary,
-  formatScannerResultTitle,
-  formatScannerSourceBadge,
   FOOD_NAME_REQUIRED_MESSAGE,
   getOCRQuickAddIssue,
   getOCRPortionPresets,
@@ -393,8 +390,6 @@ export default function ScannerScreen() {
   const enrichmentConfigured = enrichmentEnabled && Boolean(sourcePolicyId) &&
     Number.isSafeInteger(sourcePolicyRevision) && sourcePolicyRevision >= 0;
   const scanItemCount = results.length + rejectedDetections.length;
-  const sourceBadge = formatScannerSourceBadge(results.map((food) => food.source), rejectedDetections.length);
-  const resultTitle = formatScannerResultTitle(results.length, rejectedDetections.length);
   const serverScanReference = scanResult.serverScanReference;
   const labelPreviews = labelPreviewState && labelPreviewState.reference === serverScanReference &&
     labelPreviewState.reference.ownerUserId === user.userId && labelPreviewState.reference.apiBaseUrl === apiBaseUrl &&
@@ -421,8 +416,6 @@ export default function ScannerScreen() {
   const pendingNutrition = describeScannerPendingNutrition(rejectedDetections, fdcCandidateSnapshot,
     completedFdcConfirmation, fdcConfirmationEnabled, fdcPreviewEnabled);
   const labelPreviewIds = new Set(labelPreviews.map((preview) => preview.id));
-  const totalCal = results.reduce((sum, f) => sum + f.nutrition.calories, 0);
-  const totalSodium = results.reduce((sum, f) => sum + f.nutrition.sodium, 0);
   const userPendingRecords = pendingRecordQueue.filter((item) => item.userId === user.userId);
   const firstPendingRecord = userPendingRecords[0];
   const recordActionsDisabled = Boolean(activeRecordSubmission) || syncingRecord;
@@ -1256,52 +1249,34 @@ export default function ScannerScreen() {
     return normalizedDraft;
   };
 
-  const modeConfig = {
-    camera: { icon: 'camera-outline' as const, title: '拍攝完整餐盤', hint: '保持光線充足並避免遮擋，拍攝後會立即送出 AI 分析。', action: '啟動相機', onPress: handleCamera },
-    gallery: { icon: 'images-outline' as const, title: '從相簿選擇餐點', hint: '可使用已拍攝的餐點照片，不需要重新開啟相機。', action: '選擇餐點照片', onPress: handleGallery },
-    label: { icon: 'document-text-outline' as const, title: '辨識包裝營養標示', hint: '選擇清晰的營養標示照片，可建立自訂食品或直接加入紀錄。', action: ocrQuerying ? '辨識中' : '選擇標示照片', onPress: handleLabelOCRFromGallery },
-    menu: { icon: 'restaurant-outline' as const, title: '拍菜單看能不能吃', hint: '拍下任何一張菜單，AI 會讀出每道菜，依你的疾病與過敏原分成可以吃、要注意、不建議。大約需要 20~40 秒。', action: menuChecking ? '分析中' : '拍攝菜單', onPress: () => handleMenuCheck('camera') },
-    manual: { icon: 'search-outline' as const, title: '從食品資料庫搜尋', hint: '辨識結果不確定時，可直接從 TFDA 與自訂食品中補上餐點。', action: '', onPress: handleManualSearch },
+  const isMealPhoto = scanMode === 'camera' || scanMode === 'gallery';
+  const captureBusy = scanResult.isScanning || ocrQuerying || menuChecking;
+  const busyMessage = scanResult.isScanning ? '正在辨識餐點照片' : ocrQuerying ? '正在讀取營養標示' : '正在分析菜單';
+  const modeConfig = scanMode === 'manual' ? null : {
+    camera: { icon: 'camera-outline' as const, action: '啟動相機', onPress: handleCamera },
+    gallery: { icon: 'images-outline' as const, action: '選擇餐點照片', onPress: handleGallery },
+    label: { icon: 'document-text-outline' as const, action: '選擇標示照片', onPress: handleLabelOCRFromGallery },
+    menu: { icon: 'restaurant-outline' as const, action: '拍攝菜單', onPress: () => handleMenuCheck('camera') },
   }[scanMode];
 
   const captureWorkspace = (
     <>
       <SegmentedControl options={SCAN_MODE_OPTIONS} value={scanMode} onChange={(value) => setScanMode(value as ScanMode)} />
-      <View style={styles.scanHero}>
-        <View style={styles.scanIcon}>
-          {scanResult.isScanning || ocrQuerying || menuChecking ? (
-            <ActivityIndicator size="large" color={Palette.accent.green} />
-          ) : results.length > 0 && rejectedDetections.length === 0 && scanMode !== 'menu' ? (
-            <Ionicons name="checkmark-circle-outline" size={42} color={Palette.accent.green} />
-          ) : scanItemCount > 0 && scanMode !== 'menu' ? (
-            <Ionicons name="alert-circle-outline" size={42} color={Palette.status.warning} />
-          ) : (
-            <Ionicons name={modeConfig.icon} size={42} color={Palette.accent.green} />
-          )}
+      {captureBusy ? (
+        <View style={styles.inlineStatus} accessibilityRole="progressbar">
+          <ActivityIndicator size="small" color={Palette.accent.green} />
+          <Text style={styles.inlineStatusText} accessibilityLiveRegion="polite">{busyMessage}</Text>
         </View>
-        <Text style={styles.scanTitle}>
-          {menuChecking ? '正在用 AI 分析菜單' : scanResult.isScanning ? '正在分析照片' : resultTitle && scanMode !== 'menu' ? resultTitle : modeConfig.title}
-        </Text>
-        <Text style={styles.scanHint}>{scanItemCount > 0 && scanMode !== 'menu'
-          ? formatScannerNutritionSummary(results.length, totalCal, totalSodium, pendingNutrition)
-          : modeConfig.hint}</Text>
-        {scanMode !== 'manual' ? (
-          <PrimaryButton label={modeConfig.action} onPress={modeConfig.onPress} disabled={scanResult.isScanning || ocrQuerying || menuChecking} icon={<Ionicons name={modeConfig.icon} size={18} color={Palette.text.inverse} />} />
-        ) : null}
+      ) : null}
+      {modeConfig ? <View style={styles.captureActions}>
+        <PrimaryButton label={modeConfig.action} onPress={modeConfig.onPress} disabled={captureBusy} icon={<Ionicons name={modeConfig.icon} size={18} color={Palette.text.inverse} />} />
         {scanMode === 'menu' ? (
-          <SecondaryButton label="從相簿選擇菜單照片" onPress={() => handleMenuCheck('library')} disabled={menuChecking} icon={<Ionicons name="images-outline" size={16} color={Palette.accent.green} />} />
+          <SecondaryButton label="從相簿選擇菜單照片" onPress={() => handleMenuCheck('library')} disabled={captureBusy} icon={<Ionicons name="images-outline" size={16} color={Palette.accent.green} />} />
         ) : null}
         {scanMode === 'menu' && menuCheck ? (
           <SecondaryButton label="清除菜單結果" onPress={() => setMenuCheck(null)} disabled={menuChecking} icon={<Ionicons name="trash-outline" size={16} color={Palette.text.secondary} />} />
         ) : null}
-        {(results.length > 0 || rejectedDetections.length > 0 || serverScanReference) && scanMode !== 'menu' ? (
-          <SecondaryButton label="清除辨識結果" onPress={() => {
-            clearScanAndInvalidate();
-            setRejectedDetections([]);
-            setMealWarnings([]);
-          }} icon={<Ionicons name="trash-outline" size={16} color={Palette.text.secondary} />} />
-        ) : null}
-      </View>
+      </View> : null}
     </>
   );
 
@@ -1309,11 +1284,21 @@ export default function ScannerScreen() {
     <View style={styles.resultWorkspace}>
       {menuCheck ? <MenuCheckResults result={menuCheck} /> : null}
     </View>
-  ) : (
+  ) : isMealPhoto && !scanResult.isScanning && (scanItemCount > 0 || serverScanReference) ? (
     <View style={styles.resultWorkspace}>
       <View style={styles.resultHeader}>
-        <Text style={styles.sectionTitle}>辨識結果</Text>
-        {scanItemCount > 0 ? <DataPill tone={rejectedDetections.length > 0 ? 'warning' : 'success'}>{scanItemCount} 項食物</DataPill> : null}
+        <Text accessibilityRole="header" style={styles.sectionTitle}>辨識結果</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="清除辨識結果" disabled={recordActionsDisabled} onPress={() => {
+          clearScanAndInvalidate();
+          setRejectedDetections([]);
+          setMealWarnings([]);
+        }} style={styles.clearButton}>
+          <Ionicons name="trash-outline" size={19} color={Palette.text.secondary} />
+        </Pressable>
+      </View>
+      <View style={styles.resultCounts} accessibilityLiveRegion="polite">
+        <DataPill tone={results.length ? 'success' : 'info'}>可記錄 {results.length} 項</DataPill>
+        {rejectedDetections.length ? <DataPill tone="warning">待確認 {rejectedDetections.length} 項</DataPill> : null}
       </View>
       <ScannerPendingFoods
         rs={rs}
@@ -1330,7 +1315,7 @@ export default function ScannerScreen() {
         onConfirmIdentity={(itemId) => void handleConfirmIdentity(itemId)}
       />
       {candidateLoading === serverScanReference && candidateLoading ? (
-        <View accessibilityRole="progressbar"><ActivityIndicator color={Palette.accent.blue} /><Text>{reviewedSelectionEnabled ? '正在配對營養來源' : automaticNutritionPending ? '正在查詢營養來源' : '正在取得 USDA 候選'}</Text></View>
+        <View style={styles.inlineStatus} accessibilityRole="progressbar"><ActivityIndicator color={Palette.accent.blue} /><Text style={styles.inlineStatusText}>{reviewedSelectionEnabled ? '正在配對營養來源' : automaticNutritionPending ? '正在查詢營養來源' : '正在取得 USDA 候選'}</Text></View>
       ) : null}
       {candidateFailure && candidateFailure.reference === serverScanReference ? (
         <View>
@@ -1342,19 +1327,6 @@ export default function ScannerScreen() {
         </View>
       ) : null}
       <ManufacturerLabelPreviews previews={labelPreviews} />
-      <ScannerResults
-        hasUnmatchedFoods={rejectedDetections.length > 0}
-        rs={rs}
-        wp={wp}
-        results={results}
-        onAddRecord={handleAddRecord}
-        onWeightChange={updateScanFoodWeight}
-        submitting={cameraRecordSubmitting}
-        disabled={recordActionsDisabled}
-        addDisabled={automaticNutritionPending}
-        sodiumDailyTarget={nutritionTargetBasis?.default_sodium_target ?? dailyNutrition.sodium.target}
-        mealWarnings={mealWarnings}
-      />
       {fdcCandidateSnapshot && serverScanReference ? (
         <FdcCandidateReview
           snapshot={fdcCandidateSnapshot}
@@ -1370,7 +1342,27 @@ export default function ScannerScreen() {
           accessToken={accessToken}
         />
       ) : null}
-      {ocrDraft ? (
+      {rejectedDetections.length ? (
+        <View style={styles.recoveryActions}>
+          <SecondaryButton label="手動搜尋食品" onPress={() => setScanMode('manual')} />
+          <SecondaryButton label="使用營養標示" onPress={() => setScanMode('label')} />
+        </View>
+      ) : null}
+      <ScannerResults
+        hasUnmatchedFoods={rejectedDetections.length > 0}
+        rs={rs}
+        wp={wp}
+        results={results}
+        onAddRecord={handleAddRecord}
+        onWeightChange={updateScanFoodWeight}
+        submitting={cameraRecordSubmitting}
+        disabled={recordActionsDisabled}
+        addDisabled={automaticNutritionPending}
+        sodiumDailyTarget={nutritionTargetBasis?.default_sodium_target ?? dailyNutrition.sodium.target}
+        mealWarnings={mealWarnings}
+      />
+    </View>
+  ) : scanMode === 'label' && ocrDraft && !ocrQuerying ? (
         <OCRDraftCard
           draft={ocrDraft}
           foodNameError={ocrNameError}
@@ -1385,15 +1377,14 @@ export default function ScannerScreen() {
           portion={ocrPortion}
           onPortionChange={setOcrPortion}
         />
-      ) : null}
+  ) : scanMode === 'manual' && !manualSearching ? (
       <ManualResultsList
         foods={manualResults}
         onAddFood={handleAddManualFood}
         submittingFoodId={submittingManualFoodId}
         actionsDisabled={recordActionsDisabled}
       />
-    </View>
-  );
+  ) : null;
 
   const conditionSummary = (
     <View style={styles.conditionSummary}>
@@ -1405,22 +1396,14 @@ export default function ScannerScreen() {
     </View>
   );
 
-  /**
-   * 「手動搜尋」分頁的說明卡沒有按鈕（其他模式那裡是「啟動相機」之類的動作），
-   * 而搜尋框先前排在「辨識結果」與「安全條件」之後，要捲兩段才看得到，
-   * 使用者會以為這個分頁壞了。改成緊接在說明卡下面。
-   */
   const manualTools = scanMode === 'manual' ? (
-    <ScannerManualTools rs={rs} manualQuery={manualQuery} onManualQueryChange={setManualQuery} manualSearching={manualSearching} onManualSearch={handleManualSearch} ocrQuerying={ocrQuerying} onOCRSearch={handleLabelOCRFromGallery} />
+    <ScannerManualTools manualQuery={manualQuery} onManualQueryChange={setManualQuery} manualSearching={manualSearching} onManualSearch={handleManualSearch} />
   ) : null;
 
   return (
     <AppContainer keyboardShouldPersistTaps="handled">
       <ScreenHeader
         title="AI 食物辨識"
-        subtitle="拍照、上傳相簿或掃描營養標示，系統會套用健康條件和過敏原做安全檢查。"
-        badge={sourceBadge}
-        badgeTone="info"
       />
 
       {recordFeedback ? (
@@ -1464,12 +1447,13 @@ export default function ScannerScreen() {
 
       <View style={[styles.desktopColumns, !isDesktop && styles.mobileColumns]}>
         <View style={isDesktop ? styles.desktopCapture : styles.mobileCapture}>
-          {captureWorkspace}{manualTools}{conditionSummary}
+          {captureWorkspace}{manualTools}{isDesktop ? conditionSummary : null}
         </View>
         <View style={isDesktop ? styles.desktopResults : styles.mobileResults}>
           {resultWorkspace}
         </View>
       </View>
+      {!isDesktop ? conditionSummary : null}
     </AppContainer>
   );
 }
@@ -1518,17 +1502,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   retryButtonText: { ...Typography.caption, color: Palette.status.warning },
-  scanHero: {
-    backgroundColor: Palette.bg.card,
-    borderRadius: Radius['2xl'],
-    padding: Spacing.xl,
-    alignItems: 'center',
-    gap: Spacing.md,
+  captureActions: {
+    gap: Spacing.sm,
     marginTop: Spacing.md,
     marginBottom: Spacing.xl,
-    borderWidth: 1,
-    borderColor: Palette.border.subtle,
-    ...Shadows.card,
   },
   desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xl },
   mobileColumns: { flexDirection: 'column', alignItems: 'stretch' },
@@ -1537,21 +1514,16 @@ const styles = StyleSheet.create({
   desktopResults: { flex: 1.08, minWidth: 0 },
   mobileResults: { minWidth: 0 },
   resultWorkspace: { minWidth: 0 },
-  scanIcon: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
-    backgroundColor: Palette.bg.mint,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scanTitle: { ...Typography.h2, color: Palette.text.primary, textAlign: 'center' },
-  scanHint: { ...Typography.caption, color: Palette.text.secondary, textAlign: 'center' },
+  inlineStatus: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginVertical: Spacing.md },
+  inlineStatusText: { ...Typography.caption, color: Palette.text.primary, flexShrink: 1 },
   conditionSummary: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, backgroundColor: Palette.bg.card, borderWidth: 1, borderColor: Palette.border.subtle, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.xl },
   conditionCopy: { flex: 1, gap: 2 },
   conditionTitle: { ...Typography.caption, color: Palette.text.primary },
   conditionText: { ...Typography.small, color: Palette.text.tertiary },
-  resultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.lg },
+  resultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  resultCounts: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.md },
+  recoveryActions: { gap: Spacing.sm, marginBottom: Spacing.lg },
+  clearButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   sectionTitle: { ...Typography.h3, color: Palette.text.primary },
   ocrBrandRow: { flexDirection: 'row', marginBottom: Spacing.md },
   ocrNameField: { minWidth: 0, gap: Spacing.xs, marginBottom: Spacing.md },

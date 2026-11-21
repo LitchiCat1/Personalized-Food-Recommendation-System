@@ -8,26 +8,25 @@ import { useResponsive } from '@/hooks/useResponsive';
 import AppContainer from '@/components/AppContainer';
 import ScreenHeader from '@/components/ui/screen-header';
 import SectionBlock from '@/components/ui/section-block';
-import MetricCard from '@/components/ui/metric-card';
-import DataPill from '@/components/ui/data-pill';
 import ProgressBar from '@/components/ui/progress-bar';
 import PrimaryButton from '@/components/ui/primary-button';
 import { DEFAULT_NUTRITION_GOAL_TYPES, fetchAllRecordsWithTargets, type NutritionGoalTypes, type NutritionTargets } from '@/lib/api';
 import { buildDietaryTrend, type DietaryTrendData } from '@/lib/dietary-trends';
-import { buildTrendInsights, classifyCalories, findSodiumOverDays } from '@/lib/trend-insights';
+import { buildTrendChart, buildTrendInsights, classifyCalories, formatTrendDate } from '@/lib/trend-insights';
 
 export default function HistoryScreen() {
-  const { rs, isSmall, isDesktop } = useResponsive();
+  const { width, fontScale, isDesktop } = useResponsive();
+  const accessibleRows = fontScale > 1.3 || width < 350;
   const { user, apiBaseUrl, accessToken, dietaryRecordsRevision } = useStore();
   const [trend, setTrend] = useState<DietaryTrendData | null>(null);
   // 目標要跟首頁同一份：後端依疾病條件調整過的值。之前這頁用使用者自填的
   // 熱量目標和一組寫死的通用成人數值，同一筆紀錄在兩頁會得到相反的結論。
   const [targets, setTargets] = useState<NutritionTargets | null>(null);
   const [goalTypes, setGoalTypes] = useState<NutritionGoalTypes>({});
-  const target = Math.round(targets?.calories ?? user.dailyCalorieTarget);
+  const target = targets?.calories ?? user.dailyCalorieTarget;
   // 鈉也要跟熱量一樣用後端依疾病調整過的目標。寫死 2000 會讓腎臟病患者
   // （每日上限 1500mg）在首頁看到「超標」、在這頁看到「沒有明顯超標日」。
-  const sodiumTarget = Math.round(targets?.sodium ?? 2000);
+  const sodiumTarget = targets?.sodium ?? 2000;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -65,16 +64,17 @@ export default function HistoryScreen() {
 
   const daily = useMemo(() => trend?.daily || [], [trend]);
   const summary = useMemo(() => trend?.summary || {}, [trend]);
-  const maxCal = Math.max(target, ...daily.map((d) => d.calories), 1);
+  const calorieChart = buildTrendChart(daily, 'calories', target);
+  const sodiumChart = buildTrendChart(daily, 'sodium', sodiumTarget);
   const calorieGoalHitDays = daily.filter((d) => classifyCalories(d.calories, target) === 'on-target').length;
-  const sodiumOverDays = findSodiumOverDays(daily, sodiumTarget).length;
+  const sodiumOverDays = sodiumChart.points.filter((point) => point.overLimit).length;
   const insights = useMemo(() => buildTrendInsights(summary, daily, target, sodiumTarget), [summary, daily, target, sodiumTarget]);
   const totalRecords = summary.total_records || daily.reduce((sum, day) => sum + (day.record_count || 0), 0);
   const recordedDays = summary.recorded_days || daily.length;
 
   return (
     <AppContainer>
-      <ScreenHeader title="飲食趨勢" subtitle="檢查最新連續紀錄區段的熱量、營養素和鈉攝取風險。" badge={daily.length ? `${daily.length} 日摘要` : '近期摘要'} badgeTone="info" />
+      <ScreenHeader title="飲食趨勢" />
 
       {loading ? (
         <StateCard icon="bar-chart-outline" text="讀取歷史紀錄中..." loading />
@@ -95,86 +95,117 @@ export default function HistoryScreen() {
         </View>
       ) : (
         <>
-          <View style={styles.metricRow}>
-            <MetricCard label="區段均值" value={summary.avg_calories || 0} unit="kcal" accent={Palette.accent.green} />
-            <MetricCard label="紀錄餐數" value={totalRecords} unit={`/${recordedDays}天`} accent={Palette.accent.blue} />
-            <MetricCard label="鈉超標" value={sodiumOverDays} unit="天" accent={sodiumOverDays > 0 ? Palette.status.warning : Palette.accent.green} />
-          </View>
+          <SectionBlock title="紀錄區間" subtitle={dateRange(daily[0].date, daily[daily.length - 1].date)} numericSubtitle>
+            <View style={styles.summaryRow}>
+              <SummaryMetric label="平均每日熱量" value={summary.avg_calories ?? 0} unit="kcal" />
+              <SummaryMetric label="紀錄天數" value={recordedDays} unit="天" />
+              <SummaryMetric label="餐點紀錄" value={totalRecords} unit="餐" />
+            </View>
+          </SectionBlock>
 
-          <View style={[isDesktop && styles.desktopColumns]}>
+          <View style={isDesktop && styles.desktopColumns}>
             <View style={isDesktop && styles.desktopMain}>
-          <SectionBlock title="近期重點" subtitle="先看可採取的飲食調整，再檢視詳細趨勢。">
-            <View style={styles.insightStack}>
-              {insights.map((insight, i) => (
-                <View key={i} style={styles.insightRow}>
-                  <View style={styles.noteIndex}><Text style={styles.noteIndexText}>{i + 1}</Text></View>
-                  <Text style={styles.insightText}>{insight}</Text>
-                </View>
-              ))}
-            </View>
-          </SectionBlock>
-
-          <SectionBlock title="每日熱量追蹤" subtitle={`目標 ${target} kcal，達標 ${calorieGoalHitDays}/${daily.length} 天。`} numericSubtitle>
-            <View style={styles.chartTitleRow}>
-              <DataPill tone="success">目標 {target} kcal</DataPill>
-              <DataPill tone={calorieGoalHitDays >= Math.ceil(daily.length / 2) ? 'success' : 'warning'}>達標 {calorieGoalHitDays} 天</DataPill>
-            </View>
-            <View style={styles.barsContainer}>
-              {daily.map((day, index) => {
-                const barHeight = (day.calories / maxCal) * 100;
-                const isLatest = index === daily.length - 1;
-                const overTarget = classifyCalories(day.calories, target) === 'high';
-                return (
-                  <View key={day.date} style={styles.barColumn}>
-                    <Text style={[styles.barValue, { color: overTarget ? Palette.status.warning : Palette.text.tertiary }]}>{day.calories}</Text>
-                    <View style={[styles.barTrack, { height: rs(isSmall ? 108 : 132) }]}>
-                      <View style={[styles.barFill, { height: `${barHeight}%` }, overTarget && styles.barFillOver, isLatest && styles.barFillToday]} />
-                    </View>
-                    <Text style={[styles.barLabel, isLatest && styles.barLabelToday]}>{day.date.slice(5)}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          </SectionBlock>
-
+              <SectionBlock title="每日熱量" subtitle={`目標 ${displayNumber.format(target)} kcal · 達標 ${calorieGoalHitDays}/${daily.length} 天`} numericSubtitle>
+                <TrendChart chart={calorieChart} unit="kcal" riskLabel="偏高" targetLabel="目標" accessibleRows={accessibleRows} />
+                <Text style={styles.legendNote}>達標區間為目標的 85%–115%</Text>
+              </SectionBlock>
+              <SectionBlock title="每日鈉攝取" subtitle={`每日上限 ${displayNumber.format(sodiumTarget)} mg · 超標 ${sodiumOverDays}/${daily.length} 天`} numericSubtitle>
+                <TrendChart chart={sodiumChart} unit="mg" riskLabel="超標" targetLabel="每日上限" accessibleRows={accessibleRows} />
+              </SectionBlock>
             </View>
             <View style={isDesktop && styles.desktopAside}>
-
-          <SectionBlock title="營養素區段均值" subtitle="比對連續紀錄均值與建議目標，找出長期偏差。">
-            <View style={styles.progressStack}>
-              <ProgressBar label="蛋白質" current={summary.avg_protein || 0} target={targets?.protein ?? 130} unit="g" color={Palette.accent.blue} goalType={goalTypes['protein'] ?? DEFAULT_NUTRITION_GOAL_TYPES['protein']} />
-              <ProgressBar label="總碳水化合物" current={summary.avg_carbs || 0} target={targets?.carbs ?? 250} unit="g" color={Palette.accent.orange} goalType={goalTypes['carbs'] ?? DEFAULT_NUTRITION_GOAL_TYPES['carbs']} />
-              <ProgressBar label="精緻糖" current={summary.avg_sugar || 0} target={targets?.sugar ?? 25} unit="g" color={Palette.accent.orange} goalType={goalTypes['sugar'] ?? DEFAULT_NUTRITION_GOAL_TYPES['sugar']} />
-              <ProgressBar label="總脂肪" current={summary.avg_fat || 0} target={targets?.fat ?? 70} unit="g" color={Palette.accent.purple} goalType={goalTypes['fat'] ?? DEFAULT_NUTRITION_GOAL_TYPES['fat']} />
-              <ProgressBar label="飽和脂肪" current={summary.avg_saturated_fat || 0} target={targets?.saturated_fat ?? 20} unit="g" color={Palette.accent.purple} goalType={goalTypes['saturated_fat'] ?? DEFAULT_NUTRITION_GOAL_TYPES['saturated_fat']} />
-              <ProgressBar label="反式脂肪" current={summary.avg_trans_fat || 0} target={0} unit="g" color={Palette.status.error} goalType={goalTypes['trans_fat'] ?? DEFAULT_NUTRITION_GOAL_TYPES['trans_fat']} />
-              <ProgressBar label="膳食纖維" current={summary.avg_fiber || 0} target={targets?.fiber ?? 25} unit="g" color={Palette.accent.green} goalType={goalTypes['fiber'] ?? DEFAULT_NUTRITION_GOAL_TYPES['fiber']} />
-              <ProgressBar label="鈉 (Sodium)" current={summary.avg_sodium || 0} target={sodiumTarget} unit="mg" color={(summary.avg_sodium || 0) > sodiumTarget * 0.9 ? Palette.status.warning : Palette.accent.pink} goalType={goalTypes['sodium'] ?? DEFAULT_NUTRITION_GOAL_TYPES['sodium']} />
-            </View>
-          </SectionBlock>
-
-          <SectionBlock title="鈉攝取風險" subtitle={`以每日 ${sodiumTarget.toLocaleString()}mg 作為健康管理提醒上限。`} numericSubtitle>
-            <View style={styles.sodiumBars}>
-              {daily.map((day) => {
-                const ratio = day.sodium / Math.max(sodiumTarget, 1);
-                const isOver = ratio > 1;
-                return (
-                  <View key={day.date} style={styles.sodiumBarCol}>
-                    <Text style={[styles.sodiumBarVal, { color: isOver ? Palette.status.error : Palette.accent.pink }]}>{day.sodium}</Text>
-                    <View style={[styles.sodiumBarTrack, { height: rs(isSmall ? 58 : 68) }]}>
-                      <View style={[styles.sodiumBarFill, { height: `${Math.min(ratio, 1) * 100}%` }, isOver && styles.sodiumBarOver]} />
+              <SectionBlock title="近期洞察">
+                <View style={styles.insightStack}>
+                  {insights.slice(1).map((insight) => (
+                    <View key={insight} style={styles.insightRow}>
+                      <Ionicons name="information-circle-outline" size={18} color={Palette.text.secondary} />
+                      <Text style={styles.insightText}>{insight}</Text>
                     </View>
-                    <Text style={styles.sodiumBarLabel}>{day.date.slice(-2)}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          </SectionBlock>
+                  ))}
+                </View>
+              </SectionBlock>
+              <SectionBlock title="平均每日營養攝取">
+                <View style={styles.progressStack}>
+                  <ProgressBar label="蛋白質" current={summary.avg_protein || 0} target={targets?.protein ?? 130} unit="g" color={Palette.accent.blue} goalType={goalTypes['protein'] ?? DEFAULT_NUTRITION_GOAL_TYPES['protein']} />
+                  <ProgressBar label="總碳水化合物" current={summary.avg_carbs || 0} target={targets?.carbs ?? 250} unit="g" color={Palette.accent.orange} goalType={goalTypes['carbs'] ?? DEFAULT_NUTRITION_GOAL_TYPES['carbs']} />
+                  <ProgressBar label="精緻糖" current={summary.avg_sugar || 0} target={targets?.sugar ?? 25} unit="g" color={Palette.accent.orange} goalType={goalTypes['sugar'] ?? DEFAULT_NUTRITION_GOAL_TYPES['sugar']} />
+                  <ProgressBar label="總脂肪" current={summary.avg_fat || 0} target={targets?.fat ?? 70} unit="g" color={Palette.accent.purple} goalType={goalTypes['fat'] ?? DEFAULT_NUTRITION_GOAL_TYPES['fat']} />
+                  <ProgressBar label="飽和脂肪" current={summary.avg_saturated_fat || 0} target={targets?.saturated_fat ?? 20} unit="g" color={Palette.accent.purple} goalType={goalTypes['saturated_fat'] ?? DEFAULT_NUTRITION_GOAL_TYPES['saturated_fat']} />
+                  <ProgressBar label="反式脂肪" current={summary.avg_trans_fat || 0} target={0} unit="g" color={Palette.status.error} goalType={goalTypes['trans_fat'] ?? DEFAULT_NUTRITION_GOAL_TYPES['trans_fat']} />
+                  <ProgressBar label="膳食纖維" current={summary.avg_fiber || 0} target={targets?.fiber ?? 25} unit="g" color={Palette.accent.green} goalType={goalTypes['fiber'] ?? DEFAULT_NUTRITION_GOAL_TYPES['fiber']} />
+                  <ProgressBar label="鈉" current={summary.avg_sodium || 0} target={sodiumTarget} unit="mg" color={(summary.avg_sodium || 0) > sodiumTarget * 0.9 ? Palette.status.warning : Palette.accent.pink} goalType={goalTypes['sodium'] ?? DEFAULT_NUTRITION_GOAL_TYPES['sodium']} />
+                </View>
+              </SectionBlock>
             </View>
           </View>
         </>
       )}
     </AppContainer>
+  );
+}
+
+const displayNumber = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 });
+
+function dateRange(first: string, last: string) {
+  const start = first.replace(/-/g, '/');
+  if (first === last) return start;
+  const end = first.slice(0, 4) === last.slice(0, 4) ? last.slice(5) : last;
+  return start + ' 至 ' + end.replace(/-/g, '/');
+}
+
+function SummaryMetric({ label, value, unit }: { label: string; value: number; unit: string }) {
+  return (
+    <View style={styles.summaryMetric}>
+      <Text style={styles.seriesLabel}>{label}</Text>
+      <Text style={styles.summaryValue}>{displayNumber.format(value)} <Text style={styles.seriesLabel}>{unit}</Text></Text>
+    </View>
+  );
+}
+
+function TrendChart({ chart, unit, riskLabel, targetLabel, accessibleRows }: {
+  chart: ReturnType<typeof buildTrendChart>;
+  unit: 'kcal' | 'mg';
+  riskLabel: string;
+  targetLabel: string;
+  accessibleRows: boolean;
+}) {
+  const fill = unit === 'kcal' ? Palette.accent.blue : Palette.accent.cyan;
+  const warning = unit === 'kcal' ? Palette.status.warning : Palette.status.error;
+  return (
+    <>
+      <View style={accessibleRows ? styles.chartList : styles.chartRow}>
+        {chart.points.map((point) => {
+          const date = formatTrendDate(point.date);
+          const value = displayNumber.format(point.value);
+          const status = [point.overLimit ? riskLabel : '', point.latest ? '最新' : ''].filter(Boolean).join('、');
+          return (
+            <View key={point.date} accessible
+              accessibilityLabel={[date, value + ' ' + unit, status].filter(Boolean).join('，')}
+              style={accessibleRows ? styles.chartListRow : styles.chartColumn}
+            >
+              {accessibleRows ? <Text style={styles.seriesLabel}>{date}{status ? ' · ' + status : ''}</Text> : null}
+              <Text style={styles.seriesValue}>{value}{accessibleRows ? ' ' + unit : ''}</Text>
+              {!accessibleRows ? (
+                <>
+                  <View style={styles.track} aria-hidden>
+                    <View testID={'trend-' + unit + '-bar-' + point.date} style={[styles.bar, { height: `${point.percent}%`, backgroundColor: point.overLimit ? warning : fill }]} />
+                    <View style={[styles.referenceMark, { bottom: `${chart.targetPercent}%` }]} />
+                  </View>
+                  <Text style={[styles.seriesLabel, point.latest && styles.latestDate]}>{date}</Text>
+                  <Text style={styles.riskLabel}>{point.overLimit ? riskLabel : point.latest ? '最新' : ''}</Text>
+                </>
+              ) : null}
+            </View>
+          );
+        })}
+      </View>
+      {!accessibleRows ? (
+        <View style={styles.legend}>
+          <View style={styles.referenceKey} />
+          <Text style={styles.seriesLabel}>{targetLabel}參考線</Text>
+        </View>
+      ) : null}
+    </>
   );
 }
 
@@ -189,7 +220,9 @@ function StateCard({ icon, text, loading, tone, action }: { icon: keyof typeof I
 }
 
 const styles = StyleSheet.create({
-  metricRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl },
+  summaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
+  summaryMetric: { flexGrow: 1, flexBasis: 84, gap: Spacing.xs, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: Palette.border.medium },
+  summaryValue: { ...Typography.h2, ...Typography.number, color: Palette.text.primary },
   desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xl },
   desktopMain: { flex: 1.25, minWidth: 0 },
   desktopAside: { flex: 1, minWidth: 0 },
@@ -205,39 +238,22 @@ const styles = StyleSheet.create({
     ...Shadows.card,
   },
   emptyText: { ...Typography.body, color: Palette.text.tertiary, textAlign: 'center' },
-  chartTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, marginBottom: Spacing.lg },
-  barsContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  barColumn: { flex: 1, alignItems: 'center' },
-  barValue: { ...Typography.small, ...Typography.number, marginBottom: 4 },
-  barTrack: {
-    width: '62%',
-    backgroundColor: Palette.bg.elevated,
-    borderRadius: Radius.full,
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
-  },
-  barFill: { width: '100%', backgroundColor: Palette.accent.blue, borderRadius: Radius.full, opacity: 0.68 },
-  barFillOver: { backgroundColor: Palette.status.warning },
-  barFillToday: { backgroundColor: Palette.accent.green, opacity: 1 },
-  barLabel: { ...Typography.small, ...Typography.number, color: Palette.text.tertiary, marginTop: 6 },
-  barLabelToday: { color: Palette.accent.green },
+  chartRow: { flexDirection: 'row' },
+  chartColumn: { flex: 1, minWidth: 0, alignItems: 'center', gap: Spacing.xs },
+  chartList: { gap: Spacing.sm },
+  chartListRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: Spacing.sm },
+  seriesLabel: { ...Typography.small, fontVariant: Typography.number.fontVariant, color: Palette.text.secondary },
+  seriesValue: { ...Typography.small, ...Typography.number, color: Palette.text.primary },
+  latestDate: { ...Typography.number, color: Palette.text.primary, textDecorationLine: 'underline' },
+  riskLabel: { ...Typography.small, color: Palette.text.primary, minHeight: 15 },
+  track: { height: 104, width: '100%', justifyContent: 'flex-end', alignItems: 'center', backgroundColor: Palette.bg.elevated },
+  bar: { width: '60%', maxWidth: 44, borderTopLeftRadius: Radius.sm, borderTopRightRadius: Radius.sm },
+  referenceMark: { position: 'absolute', left: 0, right: 0, borderTopWidth: 1, borderStyle: 'dashed', borderColor: Palette.text.secondary },
+  referenceKey: { width: 18, borderTopWidth: 1, borderStyle: 'dashed', borderColor: Palette.text.secondary },
+  legend: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.sm },
+  legendNote: { ...Typography.small, color: Palette.text.secondary, marginTop: Spacing.sm },
   progressStack: { gap: Spacing.lg },
-  sodiumBars: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  sodiumBarCol: { flex: 1, alignItems: 'center' },
-  sodiumBarVal: { ...Typography.small, ...Typography.number, marginBottom: 4 },
-  sodiumBarTrack: {
-    width: '55%',
-    backgroundColor: Palette.bg.elevated,
-    borderRadius: Radius.full,
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
-  },
-  sodiumBarFill: { width: '100%', backgroundColor: Palette.accent.pink, borderRadius: Radius.full, opacity: 0.62 },
-  sodiumBarOver: { backgroundColor: Palette.status.error, opacity: 1 },
-  sodiumBarLabel: { ...Typography.small, ...Typography.number, color: Palette.text.tertiary, marginTop: 4 },
   insightStack: { gap: Spacing.md },
-  insightRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md, backgroundColor: Palette.bg.elevated, borderRadius: Radius.lg, padding: Spacing.md },
-  noteIndex: { width: 24, height: 24, borderRadius: 12, backgroundColor: Palette.bg.card, alignItems: 'center', justifyContent: 'center' },
-  noteIndexText: { ...Typography.small, color: Palette.accent.green },
-  insightText: { ...Typography.caption, color: Palette.text.secondary, flex: 1, fontVariant: Typography.number.fontVariant },
+  insightRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, paddingVertical: Spacing.sm, borderTopWidth: 1, borderTopColor: Palette.border.subtle },
+  insightText: { ...Typography.body, color: Palette.text.secondary, flex: 1, fontVariant: Typography.number.fontVariant },
 });

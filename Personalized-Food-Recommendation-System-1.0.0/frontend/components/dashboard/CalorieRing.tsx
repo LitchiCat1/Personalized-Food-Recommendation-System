@@ -1,63 +1,46 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import Animated, { Easing, useAnimatedProps, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Palette, Typography, Spacing } from '@/constants/theme';
 import { formatCalories } from '@/lib/calorie-target';
-import { useResponsive } from '@/hooks/useResponsive';
 
 type Props = {
-  current: number;
-  target: number;
-  size?: number;
-  strokeWidth?: number;
+  current: number | null;
+  target: number | null;
 };
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const size = 124;
+const strokeWidth = 8;
+const radius = (size - strokeWidth) / 2;
+const circumference = 2 * Math.PI * radius;
 
-export default function CalorieRing({ current, target, size: sizeProp, strokeWidth: swProp }: Props) {
-  const { rs, isSmall } = useResponsive();
-  const size = sizeProp ?? rs(isSmall ? 126 : 146);
-  const strokeWidth = swProp ?? rs(9);
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const progress = Math.min(current / Math.max(target, 1), 1);
-  const animatedProgress = useSharedValue(0);
-  const remaining = Math.max(target - current, 0);
-
-  React.useEffect(() => {
-    animatedProgress.value = withTiming(progress, {
-      duration: 720,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [animatedProgress, progress]);
-
-  const animatedProps = useAnimatedProps(() => ({
-    strokeDashoffset: circumference * (1 - animatedProgress.value),
-  }));
+export default function CalorieRing({ current, target }: Props) {
+  const over = current !== null && target !== null && current > target;
+  const progress = current === null || target === null ? 0 : target <= 0 ? Number(over) : Math.min(Math.max(current / target, 0), 1);
 
   return (
     <View style={styles.container}>
-      <Svg width={size} height={size}>
+      <Svg width={size} height={size} style={styles.ring} aria-hidden>
         <Circle cx={size / 2} cy={size / 2} r={radius} stroke={Palette.bg.elevated} strokeWidth={strokeWidth} fill="none" />
-        <AnimatedCircle
+        {progress > 0 ? <Circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={current > target ? Palette.status.warning : Palette.accent.green}
+          stroke={over ? Palette.status.warning : Palette.accent.green}
           strokeWidth={strokeWidth}
           fill="none"
           strokeLinecap="round"
           strokeDasharray={circumference}
-          animatedProps={animatedProps}
+          strokeDashoffset={circumference * (1 - progress)}
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
+        /> : null}
       </Svg>
-      <View style={[styles.centerText, { width: size, height: size }]}>
-        <Text style={[styles.currentValue, { fontSize: rs(26) }]}>{formatCalories(current)}</Text>
-        <Text style={[styles.unit, { fontSize: rs(11) }]}>kcal eaten</Text>
-        <Text style={[styles.remaining, { fontSize: rs(11) }]}>剩餘 {formatCalories(remaining)}</Text>
+      <View style={styles.centerText}>
+        <Text style={styles.label}>已攝取</Text>
+        <Text style={styles.currentValue}>{current === null ? '—' : formatCalories(current)}</Text>
+        <Text style={styles.label}>kcal</Text>
       </View>
+      <Text style={styles.target}>目標 {target === null ? '—' : formatCalories(target)} kcal</Text>
     </View>
   );
 }
@@ -66,24 +49,33 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
+    width: size,
+    maxWidth: '100%',
+  },
+  ring: {
+    position: 'absolute',
+    top: 0,
   },
   centerText: {
-    position: 'absolute',
+    minHeight: size,
+    paddingHorizontal: Spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   currentValue: {
-    ...Typography.hero,
+    ...Typography.h1,
+    ...Typography.number,
     color: Palette.text.primary,
+    textAlign: 'center',
   },
-  unit: {
-    ...Typography.small,
-    color: Palette.text.tertiary,
-    marginTop: -2,
+  label: {
+    ...Typography.caption,
+    color: Palette.text.secondary,
   },
-  remaining: {
-    ...Typography.small,
-    color: Palette.accent.green,
+  target: {
+    ...Typography.caption,
+    color: Palette.text.secondary,
     marginTop: Spacing.xs,
+    textAlign: 'center',
   },
 });

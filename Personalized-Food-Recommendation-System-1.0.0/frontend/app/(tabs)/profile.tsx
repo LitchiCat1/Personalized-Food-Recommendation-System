@@ -10,7 +10,6 @@ import { useResponsive } from '@/hooks/useResponsive';
 import AppContainer from '@/components/AppContainer';
 import ScreenHeader from '@/components/ui/screen-header';
 import SectionBlock from '@/components/ui/section-block';
-import MetricCard from '@/components/ui/metric-card';
 import DataPill from '@/components/ui/data-pill';
 import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
@@ -688,60 +687,50 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/*
-          先前這裡放的是 TDEE，但整個 App 實際採用的是疾病指引算出來的目標，
-          兩個數字不一樣又都沒有說明，使用者看到的就是「我的」頁寫 2570、
-          首頁寫 1590。這裡直接顯示生效的那一個，TDEE 移到下面的基本資料列。
-        */}
-        <View style={styles.metricRow}>
-          <MetricCard label="BMR" value={user.bmr} unit="kcal" accent={Palette.accent.blue} />
-          <MetricCard
-            label="每日目標"
-            value={nutritionTargetsReady ? Math.round(dailyNutrition.calories.target) : '—'}
-            unit={nutritionTargetsReady ? 'kcal' : undefined}
-            accent={Palette.accent.green}
-          />
-          <MetricCard label="BMI" value={user.bmi} accent={bmiAccent} caption={bmi.label} />
-        </View>
-
-        {calorieTargetExplanation ? (
-          <View style={styles.targetExplainCard}>
-            <Ionicons name="information-circle-outline" size={16} color={Palette.text.tertiary} />
-            <View style={styles.targetExplainCopy}>
-              <Text style={styles.targetExplainText}>{calorieTargetExplanation}</Text>
-              {userTargetNote ? <Text style={styles.targetExplainMuted}>{userTargetNote}</Text> : null}
-            </View>
-          </View>
-        ) : null}
-
-        {/* 還沒填過的檔案裡，上面那些數字都是起始預設值，不是任何人填的。
-            不講清楚的話，使用者會以為 App 已經知道他的身體狀況。 */}
         {!loading && !error && !user.profileComplete ? (
           <View style={styles.onboardingCard}>
             <Ionicons name="alert-circle-outline" size={18} color={Palette.status.warning} />
             <View style={styles.onboardingCopy}>
               <Text style={styles.onboardingTitle}>還沒填寫你的基本資料</Text>
               <Text style={styles.onboardingText}>
-                上面的身高、體重、年齡與 BMR 目前是起始預設值，不是你的資料。
-                填完之後每日熱量目標與餐點篩選才會照你的身體狀況算。
+                完成基本資料後，即可查看個人數值。
               </Text>
             </View>
           </View>
         ) : null}
 
-        <View style={styles.profileSetupCard}>
-          <View style={styles.profileSetupCopy}>
-            <Text style={styles.profileSetupTitle}>個人基本資料</Text>
-            {/* 生理性別先前沒有出現在這一行，但它決定 BMR 用哪一條公式——
-                同樣的身高體重，男女差 166 kcal，而畫面上看不出來套的是哪個。 */}
-            <Text style={styles.profileSetupMeta}>
-              {user.height}cm · {user.weight}kg · {user.age} 歲 · {user.gender === 'male' ? '男性' : '女性'} · {user.dietType}
-            </Text>
-            <Text style={styles.profileSetupMeta}>
-              目標體重 {user.targetWeight ? `${user.targetWeight} kg` : '未設定'} · TDEE {formatCalories(user.tdee)} kcal（未計入疾病調整）
-            </Text>
+        <View style={styles.detailsSection}>
+          <View style={styles.detailsHeader}>
+            <Text accessibilityRole="header" style={styles.detailsTitle}>個人基本資料</Text>
+            <SecondaryButton label="編輯資料" onPress={() => setProfileModalVisible(true)} icon={<Ionicons name="create-outline" size={17} color={Palette.accent.green} />} />
           </View>
-          <SecondaryButton label="編輯資料" onPress={() => setProfileModalVisible(true)} icon={<Ionicons name="create-outline" size={17} color={Palette.accent.green} />} />
+          <ProfileFacts rows={[
+            [{ label: '身高', value: user.profileComplete ? user.height : '—', unit: user.profileComplete ? 'cm' : undefined },
+              { label: '目前體重', value: user.profileComplete ? user.weight : '—', unit: user.profileComplete ? 'kg' : undefined }],
+            [{ label: '年齡', value: user.profileComplete ? user.age : '—', unit: user.profileComplete ? '歲' : undefined },
+              { label: '生理性別', value: user.profileComplete ? (user.gender === 'male' ? '男性' : '女性') : '—' }],
+            [{ label: '飲食類型', value: user.profileComplete ? user.dietType || '未設定' : '—' },
+              { label: '目標體重', value: user.profileComplete && user.targetWeight ? user.targetWeight : '未設定', unit: user.profileComplete && user.targetWeight ? 'kg' : undefined }],
+          ]} />
+        </View>
+
+        <View style={styles.detailsSection}>
+          <Text accessibilityRole="header" style={styles.detailsTitle}>身體與熱量摘要</Text>
+          <ProfileFacts rows={[
+            [{ label: '每日目標熱量', value: nutritionTargetsReady && user.profileComplete ? formatCalories(dailyNutrition.calories.target) : '—', unit: nutritionTargetsReady && user.profileComplete ? 'kcal' : undefined, accent: Palette.accent.green },
+              { label: 'BMI', value: user.profileComplete ? user.bmi : '—', note: user.profileComplete ? bmi.label : undefined, accent: user.profileComplete ? bmiAccent : undefined }],
+            [{ label: '基礎代謝（BMR）', value: user.profileComplete ? formatCalories(user.bmr) : '—', unit: user.profileComplete ? 'kcal' : undefined },
+              { label: '每日消耗（TDEE）', value: user.profileComplete ? formatCalories(user.tdee) : '—', unit: user.profileComplete ? 'kcal' : undefined, note: user.profileComplete ? '未計入疾病調整' : undefined }],
+          ]} />
+          {!isDesktop && user.profileComplete && calorieTargetExplanation ? (
+            <View style={[styles.targetExplainCard, styles.summaryExplanation]}>
+              <Ionicons name="information-circle-outline" size={16} color={Palette.text.tertiary} />
+              <View style={styles.targetExplainCopy}>
+                <Text style={styles.targetExplainText}>{calorieTargetExplanation}</Text>
+                {userTargetNote ? <Text style={styles.targetExplainMuted}>{userTargetNote}</Text> : null}
+              </View>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.accountActions}>
@@ -1132,6 +1121,28 @@ export default function ProfileScreen() {
   );
 }
 
+type ProfileFact = { label: string; value: string | number; unit?: string; note?: string; accent?: string };
+
+function ProfileFacts({ rows }: { rows: ProfileFact[][] }) {
+  return (
+    <View>
+      {rows.map((row) => (
+        <View key={row[0].label} style={styles.factRow}>
+          {row.map(({ label, value, unit, note, accent }) => (
+            <View key={label} style={styles.fact}>
+              <Text style={styles.factLabel}>{label}</Text>
+              <Text style={[styles.factValue, accent ? { color: accent } : null]}>
+                {value}{unit ? <Text style={styles.factUnit}>{` ${unit}`}</Text> : null}
+              </Text>
+              {note ? <Text style={styles.factLabel}>{note}</Text> : null}
+            </View>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   onboardingCard: {
     flexDirection: 'row',
@@ -1185,32 +1196,31 @@ const styles = StyleSheet.create({
   accountCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.lg,
+    gap: Spacing.md,
     backgroundColor: Palette.bg.card,
     borderRadius: Radius['2xl'],
-    padding: Spacing.xl,
+    padding: Spacing.lg,
     marginBottom: Spacing.xl,
     borderWidth: 1,
     borderColor: Palette.border.subtle,
     ...Shadows.card,
   },
   avatar: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: Palette.bg.mint,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarInitial: { ...Typography.h1, color: Palette.accent.green },
-  accountCopy: { flex: 1, gap: Spacing.xs },
+  accountCopy: { flex: 1, minWidth: 0, gap: Spacing.xs },
   userName: { ...Typography.h2, color: Palette.text.primary },
   userEmail: { ...Typography.caption, color: Palette.text.tertiary },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.xs },
   mobileSectionContent: { marginTop: Spacing.xl },
   desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.lg },
   desktopPane: { flex: 1, minWidth: 0 },
-  metricRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
   targetExplainCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1223,22 +1233,15 @@ const styles = StyleSheet.create({
   targetExplainCopy: { flex: 1, gap: 2 },
   targetExplainText: { ...Typography.small, color: Palette.text.secondary, lineHeight: 17 },
   targetExplainMuted: { ...Typography.small, color: Palette.text.tertiary, lineHeight: 17 },
-  profileSetupCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.md,
-    backgroundColor: Palette.bg.card,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    borderColor: Palette.border.subtle,
-    padding: Spacing.lg,
-    marginBottom: Spacing.xl,
-    ...Shadows.soft,
-  },
-  profileSetupCopy: { flex: 1, gap: Spacing.xs },
-  profileSetupTitle: { ...Typography.bodyBold, color: Palette.text.primary },
-  profileSetupMeta: { ...Typography.caption, color: Palette.text.tertiary },
+  detailsSection: { gap: Spacing.sm, marginBottom: Spacing.xl },
+  detailsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: Spacing.sm },
+  detailsTitle: { ...Typography.h3, color: Palette.text.primary },
+  factRow: { flexDirection: 'row', alignItems: 'stretch', gap: Spacing.md, borderTopWidth: 1, borderColor: Palette.border.subtle },
+  fact: { flex: 1, minWidth: 0, gap: 3, paddingVertical: Spacing.md },
+  factLabel: { ...Typography.caption, color: Palette.text.secondary },
+  factValue: { ...Typography.bodyBold, ...Typography.number, color: Palette.text.primary },
+  factUnit: { ...Typography.caption, color: Palette.text.secondary },
+  summaryExplanation: { marginBottom: 0 },
   formGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.lg },
   inputGroup: { gap: Spacing.xs },
   inputLabel: { ...Typography.small, color: Palette.text.tertiary },

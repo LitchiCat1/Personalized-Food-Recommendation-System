@@ -32,6 +32,7 @@ class StorageRepository:
         self.mem_records = mem_records
         self.mem_custom_foods = mem_custom_foods
         self._record_lock = threading.RLock()
+        self._user_lock = threading.RLock()
         self.mem_restaurant_menus: dict = {}
         self.mem_restaurant_menu_failures: dict = {}
         if self.use_sql:
@@ -194,6 +195,15 @@ class StorageRepository:
             return user_doc
         self.mem_users[user_doc["user_id"]] = user_doc
         return user_doc
+
+    def update_user_document(self, user_id: str, update):
+        """Protect a read-modify-write of one user's JSON document."""
+        with (self.sql.transaction() if self.use_sql else self._user_lock):
+            existing = self.get_user(user_id)
+            updated = update(existing)
+            if updated is not existing:
+                self.upsert_user(updated)
+            return updated
 
     def _enrich_record_totals(self, record: dict) -> dict:
         if not record or "foods" not in record:

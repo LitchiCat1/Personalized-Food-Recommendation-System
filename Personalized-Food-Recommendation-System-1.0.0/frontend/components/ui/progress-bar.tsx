@@ -21,7 +21,7 @@ type Props = {
   goalType?: NutrientGoalType;
 };
 
-/** 反式脂肪這種小數值營養素，四捨五入到整數會把 0.5g 顯示成 0。 */
+/** 攝取量保留原有顯示方式；上限另外保留後端提供的小數精度。 */
 function formatAmount(value: number): string {
   const safe = Number.isFinite(value) ? value : 0;
   if (Math.abs(safe) < 10 && !Number.isInteger(safe)) return safe.toFixed(1);
@@ -72,7 +72,7 @@ export default function ProgressBar({ label, current, target, unit, color, atten
         <Text style={styles.values}>
           <Text style={{ color: fillColor }}>{formatAmount(current)}</Text>
           {/* 目標 0 顯示成「0 / 0 g」讀不出任何訊息，改成講清楚上限是 0。 */}
-          <Text>{target <= 0 ? `${unit}（上限 0）` : ` / ${formatAmount(target)}${unit}`}</Text>
+          <Text>{target <= 0 ? `${unit}（上限 0）` : ` / ${Number.isFinite(target) ? target : 0}${unit}`}</Text>
         </Text>
       </View>
       {attentionLabel ? (

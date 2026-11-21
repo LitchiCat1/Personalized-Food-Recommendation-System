@@ -335,6 +335,7 @@ export default function ScannerScreen() {
     accessToken,
     user,
     dailyNutrition,
+    nutritionTargetBasis,
     invalidateDietaryRecords,
   } = useStore();
   const [manualQuery, setManualQuery] = useState('');
@@ -1351,7 +1352,7 @@ export default function ScannerScreen() {
         submitting={cameraRecordSubmitting}
         disabled={recordActionsDisabled}
         addDisabled={automaticNutritionPending}
-        sodiumDailyTarget={dailyNutrition.sodium.target}
+        sodiumDailyTarget={nutritionTargetBasis?.default_sodium_target ?? dailyNutrition.sodium.target}
         mealWarnings={mealWarnings}
       />
       {fdcCandidateSnapshot && serverScanReference ? (

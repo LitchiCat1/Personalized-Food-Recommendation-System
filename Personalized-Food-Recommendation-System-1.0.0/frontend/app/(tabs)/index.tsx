@@ -38,7 +38,7 @@ function getLocalDateString(): string {
 
 export default function DashboardScreen() {
   const { isDesktop } = useResponsive();
-  const { dailyNutrition, todayMeals, healthAlerts, apiBaseUrl, accessToken, dietaryRecordsRevision, replaceDashboardFromRecords, nutritionGoalTypes, user, dashboardReady } = useStore();
+  const { dailyNutrition, todayMeals, healthAlerts, apiBaseUrl, accessToken, dietaryRecordsRevision, replaceDashboardFromRecords, nutritionGoalTypes, nutritionTargetBasis, user, dashboardReady } = useStore();
   const [syncing, setSyncing] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [conditionRules, setConditionRules] = useState<MedicalConditionRule[]>([]);
@@ -48,9 +48,9 @@ export default function DashboardScreen() {
   // 徽章先前只看整日總量，所以一筆 620mg 的餐（單餐上限 600mg）會配上
   // 「鈉風險：正常」——旁邊的警示卻寫著單餐超標，同一頁自己打自己。
   const mealSodiumOver = healthAlerts.some((alert) => alert.id === 'meal-limit-sodium');
-  const sodiumRisk = sodium.current >= sodium.target || mealSodiumOver
+  const sodiumRisk = sodium.current > sodium.target || mealSodiumOver
     ? '超標'
-    : sodium.current >= sodium.target * 0.8 ? '接近上限' : '正常';
+    : sodium.target > 0 && sodium.current >= sodium.target * 0.8 ? '接近上限' : '正常';
 
   /**
    * 今日紀錄還沒到手之前，一個數字都不要講。
@@ -156,7 +156,7 @@ export default function DashboardScreen() {
         </View>
         <DataPill tone="info">{dash(`${todayMeals.length} 筆`)}</DataPill>
       </View>
-      {todayMeals.map((meal) => <MealCard key={meal.id} meal={meal} sodiumDailyTarget={sodium.target} />)}
+      {todayMeals.map((meal) => <MealCard key={meal.id} meal={meal} sodiumDailyTarget={nutritionTargetBasis?.default_sodium_target ?? sodium.target} />)}
       {!syncing && !syncError && todayMeals.length === 0 ? (
         <View style={styles.emptyMealsCard}>
           <Ionicons name="restaurant-outline" size={26} color={Palette.text.tertiary} />

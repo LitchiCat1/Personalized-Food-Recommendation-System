@@ -58,6 +58,9 @@ from services.nutrition_label_service import (
     scale_nutrition_per_100g,
 )
 from services.nutrition_progress_service import build_daily_nutrition_progress, build_nutrition_goal_types, calculate_daily_targets_with_basis, round_targets_for_display
+from services.daily_nutrient_limits_service import (
+    OVERRIDES_FIELD, daily_nutrient_limit_specs, normalize_daily_nutrient_limit_overrides,
+)
 from services.nutrient_service import NUTRITION_FIELDS, get_nutrient_value
 from services.nutrition_profile_service import (
     NutritionProfileError,
@@ -823,7 +826,7 @@ print(f"[OK] Restaurant catalog loaded: {len(RESTAURANT_CATALOG)} restaurants")
 # ═══════════════════════════════════════════════════════════════
 
 
-APP_VERSION = "v1.0.3"
+APP_VERSION = "v1.0.4"
 STARTED_AT = app_now().isoformat()
 print("[INFO] FDC preview startup: " + json.dumps({
     "app_version": APP_VERSION, "started_at": STARTED_AT,
@@ -908,6 +911,7 @@ def medical_metadata():
         # 表單的選項與合理範圍只能有一份定義，前端不再自己抄。
         "diet_types": list(DIET_TYPES),
         "profile_limits": PROFILE_LIMITS,
+        "daily_nutrient_limit_specs": daily_nutrient_limit_specs(),
         "threshold_conflicts": conflicts,
         # 兩種讀者，兩句話。
         #
@@ -1667,6 +1671,14 @@ def fdc_profile_accept():
 
 
 # ─── 2. User Profile CRUD (PRD: 健康檔案與疾病管理) ──────────
+def _user_profile_response(user):
+    overrides = normalize_daily_nutrient_limit_overrides(user.get(OVERRIDES_FIELD),
+        normalize_condition_ids(user.get("health_conditions") or [], DISEASE_RULES))
+    daily = calculate_daily_targets_with_basis(user, include_limit_settings=True)
+    return {**user, OVERRIDES_FIELD: overrides,
+            "daily_nutrient_limit_settings": daily["daily_nutrient_limit_settings"]}
+
+
 @app.route("/user/<user_id>", methods=["GET"])
 def get_user(user_id):
     require_user_access(user_id)
@@ -1678,10 +1690,14 @@ def get_user(user_id):
     # 舊帳號存的欄位可能已經不在目前的選單裡（例如 diet_type 的「均衡飲食」）。
     # 只修寫入路徑救不到他們——那些帳號會被鎖在一個存不了檔的表單裡，
     # 所以讀到就地補正並寫回去，一次就好。
-    user, changed = normalize_stored_user(user)
+    _, changed = normalize_stored_user(user)
     if changed:
-        storage.upsert_user(user)
-    return jsonify(user)
+        def normalize_existing(existing):
+            updated, changed = normalize_stored_user(existing)
+            return updated if changed else existing
+
+        user = storage.update_user_document(user_id, normalize_existing)
+    return jsonify(_user_profile_response(user))
 
 
 @app.route("/user", methods=["POST"])
@@ -1702,20 +1718,26 @@ def create_or_update_user():
     #
     # 規則：沒送就沿用已存的值；連資料列都沒有的才算新帳號。會建空白檔案的
     # 只有前端那條 404 路徑，而它一定會明確送 profile_complete: false。
-    if "profile_complete" not in data:
-        existing = storage.get_user(data["user_id"])
-        data["profile_complete"] = bool(existing.get("profile_complete", True)) if existing else True
+    def rebuild_profile(existing):
+        existing = existing or {}
+        profile_data = dict(data)
+        profile_data.setdefault("profile_complete", bool(existing.get("profile_complete", True)))
+        profile_data.setdefault("health_conditions", existing.get("health_conditions") or [])
+        profile = build_user_profile(profile_data, DISEASE_RULES, ALLERGEN_TAXONOMY)
+        profile[OVERRIDES_FIELD] = normalize_daily_nutrient_limit_overrides(
+            data.get(OVERRIDES_FIELD, existing.get(OVERRIDES_FIELD)), profile["health_conditions"],
+            strict=OVERRIDES_FIELD in data,
+        )
+        return profile
 
     try:
-        user_doc = build_user_profile(data, DISEASE_RULES, ALLERGEN_TAXONOMY)
+        user_doc = storage.update_user_document(data["user_id"], rebuild_profile)
     except ValueError as e:
         # 身高 1cm、體重 1kg 這種值會一路變成每日目標與單餐上限，
         # 不能只靠前端的表單擋。
         return jsonify({"error": str(e)}), 400
 
-    storage.upsert_user(user_doc)
-
-    return jsonify({"message": "使用者資料已更新", "user": user_doc})
+    return jsonify({"message": "使用者資料已更新", "user": _user_profile_response(user_doc)})
 
 
 # ─── 3. Dietary Records (PRD: 飲食紀錄) ──────────────────────

@@ -2,6 +2,9 @@ from datetime import datetime
 import math
 
 from services.app_time_service import app_today
+from services.daily_nutrient_limits_service import (
+    OVERRIDES_FIELD, normalize_daily_nutrient_limit_overrides, resolve_daily_nutrient_limits,
+)
 from services.nutrition_profile_service import NutritionProfileError
 from services.profile_service import compute_bmr, compute_tdee, resolve_energy_factor, resolve_weight_goal_energy
 
@@ -127,7 +130,7 @@ def calculate_pdf_daily_targets(user: dict) -> dict:
     return calculate_daily_targets_with_basis(user)["targets"]
 
 
-def calculate_daily_targets_with_basis(user: dict) -> dict:
+def calculate_daily_targets_with_basis(user: dict, *, include_limit_settings=False) -> dict:
     """算出每日目標，並一併回報「這個數字是怎麼來的」。
 
     畫面上先前同時存在三個每日熱量（tdee、使用者自填的 daily_calorie_target、
@@ -331,7 +334,15 @@ def calculate_daily_targets_with_basis(user: dict) -> dict:
         ),
     }
 
-    return {"targets": targets, "basis": basis}
+    overrides = normalize_daily_nutrient_limit_overrides(user.get(OVERRIDES_FIELD), conditions)
+    if any("sodium" in values for values in overrides.values()):
+        basis["default_sodium_target"] = _display_number(targets["sodium"])
+    if overrides or include_limit_settings:
+        targets, settings = resolve_daily_nutrient_limits(targets, conditions, E, W, overrides)
+    result = {"targets": targets, "basis": basis}
+    if include_limit_settings:
+        result["daily_nutrient_limit_settings"] = settings
+    return result
 
 
 # 吃不夠一樣要提醒。這些項目只把關「不要超過」的話，畫面會把「今天只吃了
@@ -345,7 +356,8 @@ SHORTFALL_NUTRIENTS = {
 SHORTFALL_RATIO = 0.8
 
 
-def build_shortfalls(consumed: dict, targets: dict, records: list, coverage: dict | None = None) -> list[dict]:
+def build_shortfalls(consumed: dict, targets: dict, records: list, coverage: dict | None = None,
+                     *, goal_types: dict | None = None) -> list[dict]:
     """列出明顯沒吃夠的項目。
 
     只在當天已經有紀錄時才提醒：一天還沒開始當然什麼都沒吃到，
@@ -356,6 +368,8 @@ def build_shortfalls(consumed: dict, targets: dict, records: list, coverage: dic
 
     shortfalls = []
     for nutrient, (label_zh, unit) in SHORTFALL_NUTRIENTS.items():
+        if nutrient != "calories" and (goal_types or NUTRITION_GOAL_TYPES).get(nutrient) == "upper_limit":
+            continue
         if coverage is not None and (coverage.get("nutrients", {}).get(nutrient) or {}).get("status") != "complete":
             continue
         target = _number(targets.get(nutrient))
@@ -423,7 +437,7 @@ def build_daily_nutrition_progress(storage, user_id: str, user: dict, now: datet
             "over_by": {key: _display_number(max(0, value - targets[key])) for key, value in consumed.items()},
             "under_by": {key: _display_number(max(0, targets[key] - value)) if complete[key] else None
                          for key, value in consumed.items()},
-            "shortfalls": build_shortfalls(consumed, targets, records, coverage),
+            "shortfalls": build_shortfalls(consumed, targets, records, coverage, goal_types=goal_types),
             "progress_percent": {key: _progress_percent(value, targets[key])
                                  for key, value in consumed.items()},
             "status": {
@@ -458,7 +472,7 @@ def build_daily_nutrition_progress(storage, user_id: str, user: dict, now: datet
         "remaining": {key: _display_number(value) for key, value in remaining.items()},
         "over_by": {key: _display_number(value) for key, value in over_by.items()},
         "under_by": {key: _display_number(value) for key, value in under_by.items()},
-        "shortfalls": build_shortfalls(consumed, targets, records),
+        "shortfalls": build_shortfalls(consumed, targets, records, goal_types=goal_types),
         "progress_percent": {
             nutrient: _progress_percent(consumed[nutrient], targets[nutrient])
             for nutrient in targets

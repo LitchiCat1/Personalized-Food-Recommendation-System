@@ -16,6 +16,7 @@ import PrimaryButton from '@/components/ui/primary-button';
 import SecondaryButton from '@/components/ui/secondary-button';
 import SegmentedControl from '@/components/ui/segmented-control';
 import FeedbackBanner from '@/components/ui/feedback-banner';
+import ConditionDailyLimitEditor from '@/components/profile/ConditionDailyLimitEditor';
 import { clearNearbyVenueIndex, fetchAllRecordsWithTargets, fetchMedicalMetadata, fetchUserProfile, indexNearbyVenues, listNearbyVenueIndex, saveUserProfile } from '@/lib/api';
 import { bmiCategory, readWeightGoal } from '@/lib/body-metrics';
 import { describeRequestError } from '@/lib/error-copy';
@@ -24,7 +25,8 @@ import { calculateActivityStats } from '@/lib/dietary-trends';
 import { describeLocation, resolveLocation } from '@/lib/location';
 import { describeIndexProgress, describeIndexRun, indexVenuesUntilDone, type VenueIndexProgress } from '@/lib/venue-indexing';
 import { isAuthRequired, signOut } from '@/lib/auth';
-import { isSelected } from '@/lib/safety-selection';
+import { isSelected, toggleSelection } from '@/lib/safety-selection';
+import type { ConditionDailyLimitOverrides, DailyLimitOverrides, DailyLimitSettings } from '@/lib/daily-nutrient-limits';
 
 type MedicalMetadata = Awaited<ReturnType<typeof fetchMedicalMetadata>>;
 
@@ -36,8 +38,9 @@ const PROFILE_SECTIONS = [
 
 export default function ProfileScreen() {
   const { gridCol2, isDesktop } = useResponsive();
-  const { user, toggleCondition, toggleAllergen, apiBaseUrl, accessToken, replaceUser, invalidateDietaryRecords , dailyNutrition, nutritionTargetBasis, setActivityStats, applyNutritionTargets, isAuthenticated, nutritionTargetsReady } = useStore();
-  const initialUserRef = useRef(user);
+  const { user, apiBaseUrl, accessToken, replaceUser, invalidateDietaryRecords, dailyNutrition, nutritionTargetBasis, setActivityStats, applyNutritionTargets, isAuthenticated, nutritionTargetsReady } = useStore();
+  const profileWrite = useRef<symbol | null>(null);
+  const targetRefresh = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -48,6 +51,19 @@ export default function ProfileScreen() {
   const [indexProgress, setIndexProgress] = useState<VenueIndexProgress | null>(null);
   const [activeSection, setActiveSection] = useState('personal');
   const [medicalMetadata, setMedicalMetadata] = useState<MedicalMetadata | null>(null);
+  const [dailyLimits, setDailyLimits] = useState<{
+    userId: string; apiBaseUrl: string; accessToken: string | null;
+    overrides: DailyLimitOverrides; settings: DailyLimitSettings;
+  } | null>(null);
+  const [targetRefreshFailed, setTargetRefreshFailed] = useState(false);
+  const activeLimits = dailyLimits?.userId === user.userId && dailyLimits.apiBaseUrl === apiBaseUrl
+    && dailyLimits.accessToken === accessToken ? dailyLimits : null;
+  const isCurrentProfileSession = useCallback(() => {
+    const current = useStore.getState();
+    return current.user.userId === user.userId && current.apiBaseUrl === apiBaseUrl && current.accessToken === accessToken;
+  }, [accessToken, apiBaseUrl, user.userId]);
+
+  useEffect(() => () => { profileWrite.current = null; targetRefresh.current++; }, [isCurrentProfileSession]);
   const [profileDraft, setProfileDraft] = useState({
     name: user.name,
     height: String(user.height),
@@ -68,7 +84,10 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    const seedUser = initialUserRef.current;
+    const seedUser = useStore.getState().user;
+    setLoading(true);
+    setSaving(false);
+    setTargetRefreshFailed(false);
 
     fetchMedicalMetadata(apiBaseUrl)
       .then((metadata) => {
@@ -80,7 +99,7 @@ export default function ProfileScreen() {
 
     fetchUserProfile(apiBaseUrl, user.userId, { accessToken })
       .catch((err: Error) => {
-        if (!err.message.includes('使用者不存在')) throw err;
+        if (cancelled || !isCurrentProfileSession() || !err.message.includes('使用者不存在')) throw err;
         // 帳號還沒有檔案時要先建一份，否則其他 API 全部 404。
         //
         // 先前這裡送的是 seedUser——也就是 store 的預設值，而那組預設值是
@@ -107,7 +126,7 @@ export default function ProfileScreen() {
         }, { accessToken }).then((response) => response.user);
       })
       .then((data) => {
-        if (cancelled) return;
+        if (cancelled || !isCurrentProfileSession()) return;
         replaceUser({
           userId: data.user_id,
           name: data.name,
@@ -137,6 +156,8 @@ export default function ProfileScreen() {
           streak: useStore.getState().user.streak,
           totalMeals: useStore.getState().user.totalMeals,
         });
+        setDailyLimits({ userId: data.user_id, apiBaseUrl, accessToken,
+          overrides: data.daily_nutrient_limit_overrides ?? {}, settings: data.daily_nutrient_limit_settings ?? {} });
         setError(null);
       })
       .catch((err: Error) => {
@@ -149,7 +170,7 @@ export default function ProfileScreen() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, apiBaseUrl, replaceUser, user.userId]);
+  }, [accessToken, apiBaseUrl, isCurrentProfileSession, replaceUser, user.userId]);
 
   /**
    * 「連續 N 天」與「累積 N 餐」要從實際紀錄算。
@@ -170,15 +191,19 @@ export default function ProfileScreen() {
     // 沒有 accessToken 也要問。首頁（app/(tabs)/index.tsx）就是無條件抓的，
     // 先前這裡多一道 `if (!accessToken) return`，於是本機／Demo 模式下首頁
     // 顯示後端算的目標、「我的」頁顯示 store 的預設值，同一個數字兩個答案。
+    const request = ++targetRefresh.current;
     try {
       const { records, targets, goalTypes, basis } =
         await fetchAllRecordsWithTargets(apiBaseUrl, user.userId, { accessToken });
+      if (request !== targetRefresh.current || !isCurrentProfileSession()) return false;
       setActivityStats(calculateActivityStats(records));
       applyNutritionTargets(targets, goalTypes, basis);
+      setTargetRefreshFailed(false);
+      return true;
     } catch {
-      // 這些數字只是輔助資訊，抓不到就維持現狀，不要用錯誤蓋掉整頁。
+      return false;
     }
-  }, [accessToken, apiBaseUrl, applyNutritionTargets, setActivityStats, user.userId]);
+  }, [accessToken, apiBaseUrl, applyNutritionTargets, isCurrentProfileSession, setActivityStats, user.userId]);
 
   useEffect(() => {
     void refreshTargets();
@@ -231,50 +256,15 @@ export default function ProfileScreen() {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [profileModalVisible, signOutConfirmVisible]);
 
-  /**
-   * 安全條件的儲存必須排隊，而且要送出當下 store 的最新狀態。
-   *
-   * 先前是 `void syncProfile({ ...user, ... })`：連續勾兩個病症會同時發出兩個
-   * 寫入，誰先到後端不一定（連線延遲可能不同），晚到的舊 payload 會
-   * 把後來勾的那個蓋掉；而且 payload 是用當次 render 的 user 算的，不是 store
-   * 的最新值。畫面永遠顯示兩個都勾了，後端卻少一個——少一個病症就等於那整組
-   * 禁忌規則沒套用。
-   */
-  const profileSyncChain = useRef<Promise<void>>(Promise.resolve());
-
-  /**
-   * 勾／取消一個疾病或過敏原，並且在後端沒收到時把畫面改回去。
-   *
-   * 先前失敗只會在上面顯示一行「同步失敗」，chip 照樣是亮的——畫面說你已經
-   * 勾了高血壓，後端的檔案裡沒有，而整組鈉的禁忌規則是照後端的檔案跑的。
-   * 這比看不到任何東西更危險，因為使用者會以為已經設定好了。
-   *
-   * 這條路徑現在比以前容易踩到：身高體重年齡加了合理範圍之後，一個早年存進
-   * 去的離譜數值會讓「整份檔案」的寫入被退回，即使這次只是想勾一個疾病。
-   */
-  const applySafetySelection = (mutate: () => void) => {
-    const before = useStore.getState().user;
-    mutate();
-    profileSyncChain.current = profileSyncChain.current
-      .catch(() => {})
-      .then(async () => {
-        const saved = await syncProfile(useStore.getState().user);
-        if (saved) return;
-        const current = useStore.getState().user;
-        replaceUser({
-          ...current,
-          healthConditions: before.healthConditions,
-          allergens: before.allergens,
-        });
-      });
-    return profileSyncChain.current;
-  };
-
   const thresholdConflicts = medicalMetadata?.threshold_conflicts ?? [];
 
-  /** 回傳後端是否真的收下了——呼叫端要據此決定畫面要不要改回去。 */
-  const syncProfile = async (nextUser = user): Promise<boolean> => {
+  const syncProfile = async (nextUser: typeof user, overrides?: DailyLimitOverrides): Promise<boolean> => {
+    if (loading || profileWrite.current || !isCurrentProfileSession()) return false;
+    const write = Symbol();
+    profileWrite.current = write;
+    const isCurrentWrite = () => profileWrite.current === write && isCurrentProfileSession();
     setSaving(true);
+    setError(null);
     try {
       const response = await saveUserProfile(apiBaseUrl, {
         user_id: nextUser.userId,
@@ -291,29 +281,55 @@ export default function ProfileScreen() {
         target_weight: nextUser.targetWeight || null,
         diet_type: nextUser.dietType,
         profile_complete: nextUser.profileComplete,
+        ...(overrides === undefined ? {} : { daily_nutrient_limit_overrides: overrides }),
       }, { accessToken });
 
+      if (!isCurrentWrite()) return false;
+      const currentUser = useStore.getState().user;
       replaceUser({
         ...nextUser,
+        streak: currentUser.streak,
+        totalMeals: currentUser.totalMeals,
         bmi: response.user.bmi,
         bmr: response.user.bmr,
         tdee: response.user.tdee,
+        healthConditions: response.user.health_conditions,
+        allergens: response.user.allergens,
         dailyCalorieTarget: response.user.daily_calorie_target,
+        targetWeight: response.user.target_weight ?? 0,
         dietType: response.user.diet_type,
         profileComplete: response.user.profile_complete !== false,
       });
-      setError(null);
-      await refreshTargets();
-      return true;
-    } catch (err: any) {
+      setDailyLimits({ userId: nextUser.userId, apiBaseUrl, accessToken,
+        overrides: response.user.daily_nutrient_limit_overrides ?? {},
+        settings: response.user.daily_nutrient_limit_settings ?? {} });
+      invalidateDietaryRecords();
+      const refreshed = await refreshTargets();
+      if (isCurrentWrite()) setTargetRefreshFailed(!refreshed);
+      return isCurrentWrite();
+    } catch (err) {
+      if (!isCurrentWrite()) return false;
       const message = describeRequestError(err);
       // 後端退回身體數值時，出問題的欄位不在這一頁上——要講去哪裡改。
       const needsProfileEdit = /身高|體重|年齡|目標體重|每日熱量基準/.test(message);
       setError(needsProfileEdit ? `${message}請按「編輯資料」修正後再試。` : message);
       return false;
     } finally {
-      setSaving(false);
+      if (isCurrentWrite()) {
+        profileWrite.current = null;
+        setSaving(false);
+      }
     }
+  };
+
+  const applySafetySelection = (field: 'healthConditions' | 'allergens', id: string, label: string) => {
+    const current = useStore.getState().user;
+    return syncProfile({ ...current, [field]: toggleSelection(current[field], id, [label]) });
+  };
+
+  const saveConditionLimits = (condition: string, values: ConditionDailyLimitOverrides) => {
+    if (!activeLimits) return Promise.resolve(false);
+    return syncProfile(useStore.getState().user, { ...activeLimits.overrides, [condition]: values });
   };
 
   const updateDraft = <K extends keyof typeof profileDraft>(key: K, value: (typeof profileDraft)[K]) => {
@@ -389,6 +405,7 @@ export default function ProfileScreen() {
       risk_nutrients: {},
     }));
   }, [medicalMetadata]);
+  const conditionLabels = new Map(conditionCatalog.map(({ id, label_zh }) => [id, label_zh]));
 
   // 選項由後端提供，前端不再自己抄一份，免得兩邊數字慢慢走鐘
   const activityLevels = medicalMetadata?.activity_levels?.length
@@ -431,9 +448,10 @@ export default function ProfileScreen() {
       profileComplete: true,
     };
 
-    await syncProfile(nextUser);
-    setReplacedDietType(null);
-    setProfileModalVisible(false);
+    if (await syncProfile(nextUser)) {
+      setReplacedDietType(null);
+      setProfileModalVisible(false);
+    }
     setProfileFeedback({ tone: 'success', title: '健康檔案已更新', message: '個人資料已同步到後端。' });
   };
 
@@ -638,6 +656,13 @@ export default function ProfileScreen() {
         </View>
       ) : null}
 
+      {targetRefreshFailed ? (
+        <View style={styles.targetRefreshNotice}>
+          <Text style={styles.syncText} accessibilityLiveRegion="polite">設定已儲存，但未能更新每日進度。</Text>
+          <SecondaryButton label="重新整理每日進度" onPress={() => { void refreshTargets(); }} disabled={saving} />
+        </View>
+      ) : null}
+
       {!isDesktop ? <SegmentedControl options={PROFILE_SECTIONS} value={activeSection} onChange={setActiveSection} /> : null}
 
       <View style={isDesktop ? styles.desktopColumns : styles.mobileSectionContent}>
@@ -750,16 +775,19 @@ export default function ProfileScreen() {
         <View style={styles.conditionsGrid}>
           {conditionCatalog.map((cond) => {
             const isActive = isSelected(user.healthConditions, cond.id, [cond.label_zh]);
+            const limitSettings = isActive ? activeLimits?.settings[cond.id] : undefined;
             const fallback = AVAILABLE_CONDITIONS.find((item) => item.id === cond.id || item.label === cond.label_zh);
             const accent = fallback?.color || Palette.accent.green;
             return (
+              <View key={cond.id} style={styles.conditionGroup}>
               <Pressable
-                key={cond.id}
                 accessibilityRole="checkbox"
                 accessibilityLabel={cond.label_zh}
+                accessibilityHint={limitSettings ? '取消勾選會清除這個病況的個人上限。' : undefined}
                 aria-checked={isActive}
+                disabled={saving || loading}
                 onPress={() => {
-                  void applySafetySelection(() => toggleCondition(cond.id, [cond.label_zh]));
+                  void applySafetySelection('healthConditions', cond.id, cond.label_zh);
                 }}
                 style={[styles.conditionChip, isActive && styles.conditionChipActive]}
               >
@@ -776,9 +804,20 @@ export default function ProfileScreen() {
                       ⚠ 此條件的門檻需由醫療人員依你的分期與抽血數值個人化，App 目前套用的是通用估算值。
                     </Text>
                   ) : null}
+                  {limitSettings ? <Text style={styles.conditionCaveat}>取消勾選會清除這個病況的個人上限。</Text> : null}
                 </View>
                 <Ionicons name={isActive ? 'checkmark-circle' : 'add-circle-outline'} size={22} color={isActive ? accent : Palette.text.tertiary} />
               </Pressable>
+              {limitSettings && Object.keys(limitSettings).length > 0 ? (
+                <ConditionDailyLimitEditor
+                  conditionLabel={cond.label_zh}
+                  conditionLabels={conditionLabels}
+                  settings={limitSettings}
+                  disabled={saving || loading}
+                  onSave={(values) => saveConditionLimits(cond.id, values)}
+                />
+              ) : null}
+              </View>
             );
           })}
         </View>
@@ -794,8 +833,9 @@ export default function ProfileScreen() {
                 accessibilityRole="checkbox"
                 accessibilityLabel={allergen.label_zh}
                 aria-checked={isActive}
+                disabled={saving || loading}
                 onPress={() => {
-                  void applySafetySelection(() => toggleAllergen(allergen.id, [allergen.label_zh]));
+                  void applySafetySelection('allergens', allergen.id, allergen.label_zh);
                 }}
                 style={[styles.allergenChip, isActive && styles.allergenChipActive]}
               >
@@ -1296,6 +1336,8 @@ const styles = StyleSheet.create({
   },
   medicalDisclaimerText: { ...Typography.caption, color: Palette.text.secondary, flex: 1 },
   conditionsGrid: { gap: Spacing.md },
+  conditionGroup: { gap: Spacing.xs },
+  targetRefreshNotice: { gap: Spacing.sm, marginBottom: Spacing.md, alignItems: 'flex-start' },
   conditionChip: {
     flexDirection: 'row',
     alignItems: 'center',

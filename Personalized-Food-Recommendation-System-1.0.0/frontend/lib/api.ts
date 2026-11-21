@@ -124,6 +124,7 @@ export const DEFAULT_NUTRITION_GOAL_TYPES = {
  * 有了 basis 才能只顯示一個生效值，並說明另外兩個為什麼沒被採用。
  */
 export type NutritionTargetBasis = {
+  default_sodium_target?: number;
   /**
    * disease = 疾病指引算出來的；weight_goal = 依目標體重從 TDEE 加減；
    * user = 直接採用使用者填的數字。
@@ -324,6 +325,8 @@ export type UserProfileResponse = {
   diet_type: string;
   /** 使用者是否自己填過這份檔案；新帳號的空白檔案是 false。 */
   profile_complete?: boolean;
+  daily_nutrient_limit_overrides?: import('./daily-nutrient-limits').DailyLimitOverrides;
+  daily_nutrient_limit_settings?: import('./daily-nutrient-limits').DailyLimitSettings;
 };
 
 export type MedicalConditionRule = {
@@ -766,4 +769,3 @@ export async function checkMenuPhoto(
   });
   return parseJson<MenuPhotoCheckResponse>(resp);
 }
-

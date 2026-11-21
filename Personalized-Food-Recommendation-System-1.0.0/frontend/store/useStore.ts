@@ -406,7 +406,7 @@ export const useStore = create<NutriLensState>((set, get) => ({
       const calorieTarget = targets?.calories ?? state.user.dailyCalorieTarget;
       const healthAlerts = buildHealthAlerts(
         totals, sodiumTarget, proteinTarget, calorieTarget, todayMeals.length,
-        todayMeals, mealLimits,
+        todayMeals, mealLimits, (goalTypes ?? state.nutritionGoalTypes).protein,
       );
 
       return {
@@ -676,6 +676,7 @@ function buildHealthAlerts(
   mealCount: number,
   meals: MealEntry[] = [],
   mealLimits?: MealNutrientLimits,
+  proteinGoalType?: NutritionGoalTypes['protein'],
 ): HealthAlert[] {
   // 單餐超標排在最前面：它是「這一餐就已經出事」，比整日累計更該先看到。
   const alerts: HealthAlert[] = [...buildMealLimitAlerts(meals, mealLimits)];
@@ -693,15 +694,15 @@ function buildHealthAlerts(
     });
   }
 
-  if (totals.sodium >= sodiumTarget) {
+  if (totals.sodium > sodiumTarget) {
     alerts.push({
       id: 'sodium-over',
       type: 'danger',
       title: '鈉含量已超過上限',
-      message: `今日鈉攝取 ${totals.sodium}mg，已超過建議上限 ${sodiumTarget}mg。`,
+      message: `今日鈉攝取 ${totals.sodium}mg，已超過每日上限 ${sodiumTarget}mg。`,
       icon: '⚠️',
     });
-  } else if (totals.sodium >= sodiumTarget * 0.8) {
+  } else if (sodiumTarget > 0 && totals.sodium >= sodiumTarget * 0.8) {
     alerts.push({
       id: 'sodium-warning',
       type: 'warning',
@@ -711,7 +712,7 @@ function buildHealthAlerts(
     });
   }
 
-  if (totals.protein >= proteinTarget * 0.6) {
+  if (proteinGoalType !== 'upper_limit' && totals.protein >= proteinTarget * 0.6) {
     alerts.push({
       id: 'protein-good',
       type: 'info',

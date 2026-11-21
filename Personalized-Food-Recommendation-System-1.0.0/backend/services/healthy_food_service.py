@@ -390,9 +390,11 @@ def _fit_penalty(item: dict, remaining: dict) -> int:
     penalty = 0
     # 熱量已經是硬條件（超過今日剩餘就不推薦），這裡只排序剩下的項目
     for nutrient, weight in (("sodium", 18), ("saturated_fat", 8)):
-        left = _number(remaining.get(nutrient))
+        left = _number(remaining.get(nutrient), fallback=-1.0)
         value = _number(item.get(nutrient))
-        if left > 0 and value > left:
+        if left == 0 and value > 0:
+            penalty += weight
+        elif left > 0 and value > left:
             penalty += min(weight, int(weight * (value - left) / left))
     return penalty
 
